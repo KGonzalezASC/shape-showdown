@@ -8,7 +8,7 @@ on:
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    environment: production
+    environment: RariAden-Hub
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
