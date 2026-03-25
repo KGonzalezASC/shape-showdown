@@ -11,6 +11,7 @@ COPY package*.json ./
 RUN npm ci
 COPY server.ts tsconfig.json ./
 COPY server/ ./server/
+COPY src/ ./src/
 RUN npm run build:server
 
 # ---- minimal runtime image ----
