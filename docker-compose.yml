@@ -1,0 +1,10 @@
+services:
+  bubble-blitzers-server:
+    build: .
+    container_name: bubble-blitzers-server
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:${SERVER_PORT}:${SERVER_PORT}"
+    environment:
+      - NODE_ENV=production
+      - PORT=${SERVER_PORT}
