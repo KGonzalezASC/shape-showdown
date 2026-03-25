@@ -1,0 +1,38 @@
+@import "tailwindcss";
+
+/* Score / bubble floating feedback (CSS avoids Motion + transform clashes and honors visibility). */
+@keyframes score-float-field {
+  from {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(-36px);
+  }
+}
+
+@keyframes score-float-header {
+  from {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(-40px);
+  }
+}
+
+.animate-score-float-field {
+  animation-name: score-float-field;
+  animation-duration: 1s;
+  animation-timing-function: ease-out;
+  animation-fill-mode: forwards;
+}
+
+.animate-score-float-header {
+  animation-name: score-float-header;
+  animation-duration: 1s;
+  animation-timing-function: ease-out;
+  animation-fill-mode: forwards;
+}

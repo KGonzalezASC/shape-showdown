@@ -1,0 +1,5 @@
+{
+  "name": "Multiplayer Bubble Breakout",
+  "description": "A server-authoritative multiplayer bubble-breaking game where two players compete to clear their fields first.",
+  "requestFramePermissions": []
+}
