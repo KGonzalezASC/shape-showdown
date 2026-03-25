@@ -34,7 +34,7 @@ export class Physics {
       player.ballPos.x > player.paddleX &&
       player.ballPos.x < player.paddleX + PADDLE_WIDTH
     ) {
-      player.ballVel.y *= -1.05; // Slightly speed up
+      player.ballVel.y *= -1;
       const hitPoint = (player.ballPos.x - (player.paddleX + PADDLE_WIDTH / 2)) / (PADDLE_WIDTH / 2);
       player.ballVel.x = hitPoint * 10;
       player.ballPos.y = GAME_HEIGHT - PADDLE_HEIGHT - BALL_RADIUS;
