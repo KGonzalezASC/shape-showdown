@@ -41,7 +41,9 @@ async function resolveGameServerUrl(): Promise<string> {
     if (res.ok) {
       const json = (await res.json()) as GameRuntimeConfig;
       if (typeof json.gameServerUrl === 'string' && json.gameServerUrl.trim() !== '') {
-        return stripTrailingSlash(json.gameServerUrl.trim());
+        const url = stripTrailingSlash(json.gameServerUrl.trim());
+        console.log('[Socket] Using gameServerUrl from game-config.json:', url);
+        return url;
       }
       const p =
         typeof json.gameServerPort === 'number' && Number.isFinite(json.gameServerPort)
@@ -52,16 +54,21 @@ async function resolveGameServerUrl(): Promise<string> {
           typeof json.gameServerHost === 'string' && json.gameServerHost.trim() !== ''
             ? json.gameServerHost.trim()
             : window.location.hostname;
-        return originFromHostPort(h, p);
+        const url = originFromHostPort(h, p);
+        console.log('[Socket] Using port/host from game-config.json:', url);
+        return url;
       }
     }
-  } catch {
+  } catch (err) {
+    console.warn('[Socket] Failed to fetch or parse game-config.json:', err);
     /* fall through */
   }
 
   const envUrl = import.meta.env.VITE_GAME_SERVER_URL;
   if (typeof envUrl === 'string' && envUrl.trim() !== '') {
-    return stripTrailingSlash(envUrl.trim());
+    const url = stripTrailingSlash(envUrl.trim());
+    console.log('[Socket] Using VITE_GAME_SERVER_URL from env:', url);
+    return url;
   }
 
   const envPort = parseEnvPort(import.meta.env.VITE_GAME_SERVER_PORT);
@@ -71,10 +78,14 @@ async function resolveGameServerUrl(): Promise<string> {
       import.meta.env.VITE_GAME_SERVER_HOST.trim() !== ''
         ? import.meta.env.VITE_GAME_SERVER_HOST.trim()
         : window.location.hostname;
-    return originFromHostPort(envHost, envPort);
+    const url = originFromHostPort(envHost, envPort);
+    console.log('[Socket] Using VITE_GAME_SERVER_PORT from env:', url);
+    return url;
   }
 
-  return window.location.origin;
+  const defaultUrl = window.location.origin;
+  console.log('[Socket] Using window.location.origin as fallback:', defaultUrl);
+  return defaultUrl;
 }
 
 export const useGameSocket = () => {
@@ -89,13 +100,19 @@ export const useGameSocket = () => {
     (async () => {
       const url = await resolveGameServerUrl();
       if (cancelled) return;
+      console.log(`[Socket] Initializing connection to resolved URL: ${url}`);
       sock = io(url, {
         transports: ['websocket', 'polling'],
       });
       setSocket(sock);
 
       sock.on('connect', () => {
-        setMyId(sock.id || null);
+        console.log(`[Socket] Connected successfully with ID: ${sock?.id}`);
+        setMyId(sock?.id || null);
+      });
+
+      sock.on('connect_error', (error) => {
+        console.error('[Socket] Connection error:', error);
       });
 
       sock.on('gameState', (state: GameState) => {
