@@ -35,7 +35,6 @@ export default defineConfig(({ mode }) => {
   const normalizedBase = normalizeViteBase(rawBase);
 
   return {
-    root: path.resolve(projectRoot, 'replay-viewer'),
     base: normalizedBase,
     plugins: [react(), tailwindcss()],
     define: {
