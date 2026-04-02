@@ -37,7 +37,7 @@ jobs:
           username: ${{ secrets.REMOTE_USER }}
           password: ${{ secrets.REMOTE_PASSWORD }}
           source: "."
-          target: "~/bubble-blitzers"
+          target: "${{ secrets.SERVER_DEPLOY_PATH }}"
           rm: true
           exclude: "node_modules,.git"
 
@@ -48,18 +48,18 @@ jobs:
           username: ${{ secrets.REMOTE_USER }}
           password: ${{ secrets.REMOTE_PASSWORD }}
           script: |
-            echo "SERVER_PORT=${{ secrets.SERVER_PORT }}" > ~/bubble-blitzers/.env
-            echo "REPLAYS_HOST_PATH=${{ secrets.REPLAYS_HOST_PATH }}" >> ~/bubble-blitzers/.env
+            echo "SERVER_PORT=${{ secrets.SERVER_PORT }}" > ${{ secrets.SERVER_DEPLOY_PATH }}/.env
+            echo "REPLAYS_HOST_PATH=${{ secrets.REPLAYS_HOST_PATH }}" >> ${{ secrets.SERVER_DEPLOY_PATH }}/.env
             
             # Deploy Main Client
             mkdir -p ${{ secrets.CLIENT_DEPLOY_PATH }}
             rm -rf ${{ secrets.CLIENT_DEPLOY_PATH }}/*
-            cp -r ~/bubble-blitzers/dist/client/. ${{ secrets.CLIENT_DEPLOY_PATH }}/
+            cp -r ${{ secrets.SERVER_DEPLOY_PATH }}/dist/client/. ${{ secrets.CLIENT_DEPLOY_PATH }}/
             
             # Deploy Replay Viewer
             mkdir -p ${{ secrets.REPLAY_DEPLOY_PATH }}
             rm -rf ${{ secrets.REPLAY_DEPLOY_PATH }}/*
-            cp -r ~/bubble-blitzers/dist/replay-viewer/. ${{ secrets.REPLAY_DEPLOY_PATH }}/
+            cp -r ${{ secrets.SERVER_DEPLOY_PATH }}/dist/replay-viewer/. ${{ secrets.REPLAY_DEPLOY_PATH }}/
             
-            cd ~/bubble-blitzers
+            cd ${{ secrets.SERVER_DEPLOY_PATH }}
             docker compose up -d --build --force-recreate
