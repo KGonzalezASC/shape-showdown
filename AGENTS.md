@@ -1,10 +1,12 @@
-# Bubble Blitzers — agent / contributor context
+# Shape Showdown — agent / contributor context
+
+**Repository:** fork of [BubbleBlitzersJS](https://github.com/AVLitskevich/BubbleBlitzersJS) (see [FORK.md](./FORK.md)). **Product name:** Shape Showdown.
 
 Use this file as shared context when working in this repo on any machine or with any AI assistant. It is the **canonical project overview** for humans and agents.
 
 ## What this is
 
-**Bubble Blitzers** is a **two-player, server-authoritative** browser game: parallel breakout-style fields (each player has their own paddle, ball, and bubble grid). Real-time sync via **Socket.IO**. Max **2** players per server instance; identity is **socket.id** (no accounts).
+**Shape Showdown** (fork lineage: **Bubble Blitzers**) is a **two-player, server-authoritative** browser game: parallel breakout-style fields (each player has their own paddle, ball, and bubble grid). Real-time sync via **Socket.IO**. Max **2** players per server instance; identity is **socket.id** (no accounts).
 
 ## Stack
 
@@ -88,6 +90,7 @@ vite.config.mjs
 ## Copying this knowledge elsewhere
 
 - Keep **`AGENTS.md`** in repo root and commit it so clones and other machines get the same context.
+- For fastest local spin-up commands, see **`AGENT_QUICKSTART.md`**.
 - For Cursor: you can add a rule that says “read `AGENTS.md` for project context” or paste sections into project instructions.
 - For other agents: attach or `@` this file at session start.
 

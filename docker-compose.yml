@@ -1,7 +1,7 @@
 services:
-  bubble-blitzers-server:
+  shape-showdown-server:
     build: .
-    container_name: bubble-blitzers-server
+    container_name: shape-showdown-server
     restart: unless-stopped
     ports:
       - "127.0.0.1:${SERVER_PORT}:${SERVER_PORT}"

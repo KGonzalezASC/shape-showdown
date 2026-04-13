@@ -1,10 +1,13 @@
 {
-  "name": "bubble-blitzers",
+  "name": "shape-showdown",
   "private": true,
   "version": "0.0.0",
   "type": "module",
   "scripts": {
     "dev": "esbuild server.ts --bundle --platform=node --format=esm --outfile=.dev-server.mjs --packages=external && node .dev-server.mjs",
+    "dev:server": "esbuild server.ts --bundle --platform=node --format=esm --outfile=.dev-server.mjs --packages=external && cross-env NODE_ENV=production node .dev-server.mjs",
+    "dev:client": "vite",
+    "dev:local": "cross-env VITE_GAME_SERVER_URL=http://localhost:3000 vite",
     "build:client": "vite build",
     "build:replay": "vite build -c vite.replay.config.mjs",
     "build:server": "esbuild server.ts --bundle --platform=node --format=esm --outfile=dist-server/server.mjs --packages=external",
@@ -31,6 +34,7 @@
     "lucide-react": "^0.546.0",
     "motion": "^12.23.24",
     "react": "^19.0.0",
+    "react-doctor": "^0.0.33",
     "react-dom": "^19.0.0",
     "rimraf": "^6.0.1",
     "socket.io-client": "^4.8.3",

@@ -1,20 +1,30 @@
-<div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
-</div>
+# Shape Showdown
 
-# Run and deploy your AI Studio app
+Fork of **[BubbleBlitzersJS](https://github.com/AVLitskevich/BubbleBlitzersJS)** — a two-player, server-authoritative browser game (Socket.IO). This fork keeps the same connection/match shell while evolving gameplay toward **Tetris vs Tetris**; see [TETRIS_VS_TETRIS_PLAN.md](./TETRIS_VS_TETRIS_PLAN.md) and [FORK.md](./FORK.md) (upstream vs `origin` remotes).
 
-This contains everything you need to run your app locally.
+**This repo on GitHub:** [KGonzalezASC/shape-showdown](https://github.com/KGonzalezASC/shape-showdown)
 
-View your app in AI Studio: https://ai.studio/apps/7a4481c3-9aa3-4dc9-9bb1-3b49d92302b9
+Contributor and agent context: [AGENTS.md](./AGENTS.md).
 
-## Run Locally
+---
 
-**Prerequisites:**  Node.js
+## Run locally
 
+**Prerequisites:** Node.js
 
-1. Install dependencies:
-   `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
-   `npm run dev`
+1. Install dependencies: `npm install`
+2. Optional: copy `.env.example` to `.env` if you use env overrides (see AGENTS.md).
+3. Run the full stack (Vite + game server): `npm run dev`  
+   Default: **http://localhost:3000**
+
+### Local client + local server (separate processes)
+
+1. Start the game server: `npm run dev:server`
+2. In a second terminal, start the client pointed at that server: `npm run dev:local`
+
+The client uses Vite’s default port (e.g. 5173) and connects to `http://localhost:3000` for Socket.IO.
+
+### Bun
+
+- `bun install`
+- `bun run dev` (or `bun run dev:server` / `bun run dev:local` as above)

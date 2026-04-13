@@ -47,7 +47,7 @@ async function startServer() {
 
   httpServer.listen(cfg.port, cfg.host, () => {
     const mode = isDev ? 'dev (Vite middleware)' : 'production';
-    console.log(`BubbleBlitzers server [${mode}] on http://${cfg.host}:${cfg.port}`);
+    console.log(`Shape Showdown server [${mode}] on http://${cfg.host}:${cfg.port}`);
     if (!isDev && !cfg.serveClient) {
       console.log('Static client not served (serveClient is false in config/server.json). Host dist/ separately.');
     }
