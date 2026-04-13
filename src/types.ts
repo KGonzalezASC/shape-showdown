@@ -1,98 +1,154 @@
-import { 
-  GAME_WIDTH, 
-  GAME_HEIGHT, 
-  PADDLE_WIDTH, 
-  PADDLE_HEIGHT, 
-  BALL_RADIUS, 
-  BUBBLE_RADIUS, 
-  BUBBLE_ROWS, 
-  BUBBLE_COLS, 
+import {
+  ATTACK_TABLE,
+  BOARD_COLS,
+  BOARD_HIDDEN_ROWS,
+  BOARD_ROWS,
+  BOARD_VISIBLE_ROWS,
+  CELL_SIZE,
+  COMBO_BONUS_TABLE,
+  COUNTDOWN_SECONDS,
+  DAS_TICKS,
   GAME_DURATION,
-  PADDLE_SPEED,
-  BALL_LOSS_SCORE_PENALTY,
-  SHOOT_COOLDOWN_SEC
+  GAME_HEIGHT,
+  GAME_TICK_RATE,
+  GAME_WIDTH,
+  GARBAGE_ARRIVAL_DELAY_TICKS,
+  GRAVITY_TICKS_PER_CELL,
+  HORIZONTAL_SPEED_THRESHOLDS,
+  LOCK_DELAY_TICKS,
+  LOCK_RESET_CAP,
+  NEXT_PREVIEW_COUNT,
+  REPLAY_KEYFRAME_INTERVAL_TICKS,
+  RESTART_DELAY_SECONDS,
+  SCORE_FLOAT_DURATION_SEC,
+  SOFT_DROP_CELLS_PER_TICK,
+  ARR_TICKS,
 } from './constants';
 
-export interface Vector2 {
+export type MatchStatus = 'waiting' | 'countdown' | 'playing' | 'ended';
+export type TetrominoType = 'I' | 'J' | 'L' | 'O' | 'S' | 'T' | 'Z';
+export type RotationState = 0 | 1 | 2 | 3;
+export type CellValue = TetrominoType | 'G' | null;
+export type ActionType = 'rotateCW' | 'rotateCCW' | 'hardDrop' | 'hold';
+
+export interface InputState {
+  left: boolean;
+  right: boolean;
+  softDrop: boolean;
+}
+
+export interface TetrisPiece {
+  type: TetrominoType;
+  rotation: RotationState;
   x: number;
   y: number;
 }
 
-export interface Bubble {
-  id: string;
-  x: number;
-  y: number;
-  radius: number;
-  color: string;
-  active: boolean;
+export interface PendingGarbagePacket {
+  lines: number;
+  arrivalTick: number;
 }
 
 export interface PlayerState {
   id: string;
-  paddleX: number;
-  /** -1 left, 0 none, 1 right — from client, applied each server tick */
-  paddleInputDir: number;
-  paddleWidth: number;
-  paddleHeight: number;
-  ballPos: Vector2;
-  ballVel: Vector2;
-  ballActive: boolean;
-  bubbles: Bubble[];
+  board: CellValue[][];
+  activePiece: TetrisPiece | null;
+  holdPiece: TetrominoType | null;
+  canHold: boolean;
+  nextQueue: TetrominoType[];
+  bag: TetrominoType[];
   score: number;
-  isReady: boolean;
-  canShoot: boolean;
-  shootDelay: number;
+  linesCleared: number;
+  combo: number;
+  backToBack: boolean;
+  inputState: InputState;
+  actionQueue: ActionType[];
+  shiftDirection: -1 | 0 | 1;
+  dasCounter: number;
+  arrCounter: number;
+  gravityCounter: number;
+  lockDelayRemainingTicks: number;
+  lockResetsUsed: number;
+  lastActionWasRotate: boolean;
+  pendingGarbage: PendingGarbagePacket[];
+  topOut: boolean;
 }
 
 export interface GameState {
-  players: { [id: string]: PlayerState };
-  status: 'waiting' | 'countdown' | 'playing' | 'ended';
+  players: Record<string, PlayerState>;
+  status: MatchStatus;
   countdown: number;
   remainingTime: number;
   winnerId: string | null;
   restartTimer?: number;
   technicalVictory?: boolean;
-}
-
-export interface ReplayFramePlayer {
-  paddleX: number;
-  ballPos: Vector2;
-  score: number;
-  ballActive: boolean;
-  canShoot: boolean;
-}
-
-export interface ReplayFrame {
   tick: number;
-  players: Record<string, ReplayFramePlayer>;
+  seed: number;
 }
 
-export interface ReplayEvent {
+export type MatchEvent =
+  | { tick: number; type: 'lineClear'; playerId: string; lines: number; tSpin: boolean }
+  | { tick: number; type: 'attackSent'; playerId: string; lines: number }
+  | { tick: number; type: 'garbageApplied'; playerId: string; lines: number }
+  | { tick: number; type: 'topOut'; playerId: string };
+
+export interface ReplayInputFrame {
   tick: number;
-  type: 'bubbleDestroyed';
   playerId: string;
-  bubbleId: string;
+  kind: 'inputState' | 'action';
+  inputState?: InputState;
+  action?: ActionType;
 }
 
-export interface ReplayData {
-  version: number;
+export interface ReplayKeyframe {
+  tick: number;
+  players: Record<string, PlayerState>;
+}
+
+export interface ReplayDataV2 {
+  version: 2;
+  date: string;
+  seed: number;
+  initialState: GameState;
+  inputs: ReplayInputFrame[];
+  keyframes: ReplayKeyframe[];
+  events: MatchEvent[];
+}
+
+// Legacy support for historical replay files.
+export interface ReplayDataV1 {
+  version: 1;
   date: string;
   initialState: GameState;
-  frames: ReplayFrame[];
-  events: ReplayEvent[];
+  frames: Array<{ tick: number; players: Record<string, Partial<PlayerState>> }>;
+  events: Array<Record<string, unknown>>;
 }
 
-export { 
-  GAME_WIDTH, 
-  GAME_HEIGHT, 
-  PADDLE_WIDTH, 
-  PADDLE_HEIGHT, 
-  BALL_RADIUS, 
-  BUBBLE_RADIUS, 
-  BUBBLE_ROWS, 
-  BUBBLE_COLS, 
+export type ReplayData = ReplayDataV2 | ReplayDataV1;
+
+export {
+  ATTACK_TABLE,
+  BOARD_COLS,
+  BOARD_HIDDEN_ROWS,
+  BOARD_ROWS,
+  BOARD_VISIBLE_ROWS,
+  CELL_SIZE,
+  COMBO_BONUS_TABLE,
+  COUNTDOWN_SECONDS,
+  DAS_TICKS,
   GAME_DURATION,
-  PADDLE_SPEED,
-  BALL_LOSS_SCORE_PENALTY,
-  SHOOT_COOLDOWN_SEC
+  GAME_HEIGHT,
+  GAME_TICK_RATE,
+  GAME_WIDTH,
+  GARBAGE_ARRIVAL_DELAY_TICKS,
+  GRAVITY_TICKS_PER_CELL,
+  HORIZONTAL_SPEED_THRESHOLDS,
+  LOCK_DELAY_TICKS,
+  LOCK_RESET_CAP,
+  NEXT_PREVIEW_COUNT,
+  REPLAY_KEYFRAME_INTERVAL_TICKS,
+  RESTART_DELAY_SECONDS,
+  SCORE_FLOAT_DURATION_SEC,
+  SOFT_DROP_CELLS_PER_TICK,
+  ARR_TICKS,
 };
