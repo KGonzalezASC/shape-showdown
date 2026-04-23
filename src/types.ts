@@ -86,8 +86,10 @@ export interface GameState {
   seed: number;
 }
 
+export type TSpinType = 'full' | 'mini' | false;
+
 export type MatchEvent =
-  | { tick: number; type: 'lineClear'; playerId: string; lines: number; tSpin: boolean }
+  | { tick: number; type: 'lineClear'; playerId: string; lines: number; tSpin: TSpinType }
   | { tick: number; type: 'attackSent'; playerId: string; lines: number }
   | { tick: number; type: 'garbageApplied'; playerId: string; lines: number }
   | { tick: number; type: 'topOut'; playerId: string };

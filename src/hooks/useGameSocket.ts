@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from 'react';
 import { io, Socket } from 'socket.io-client';
-import { GameState } from '../types';
+import { ActionType, GameState, InputState, MatchEvent } from '../types';
 
 type GameRuntimeConfig = {
   /** Full origin, e.g. https://api.example.com:10106 — highest priority when non-empty */
@@ -92,6 +92,7 @@ export const useGameSocket = () => {
   const [socket, setSocket] = useState<Socket | null>(null);
   const [gameState, setGameState] = useState<GameState | null>(null);
   const [myId, setMyId] = useState<string | null>(null);
+  const [lastMatchEvent, setLastMatchEvent] = useState<MatchEvent | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -118,6 +119,9 @@ export const useGameSocket = () => {
       sock.on('gameState', (state: GameState) => {
         setGameState(structuredClone(state) as GameState);
       });
+      sock.on('matchEvent', (evt: MatchEvent) => {
+        setLastMatchEvent(evt);
+      });
     })();
 
     return () => {
@@ -126,19 +130,20 @@ export const useGameSocket = () => {
     };
   }, []);
 
-  const setPaddleInput = useCallback((dir: number) => {
-    socket?.emit('paddleInput', dir);
+  const sendInputState = useCallback((input: InputState) => {
+    socket?.emit('inputState', input);
   }, [socket]);
 
-  const shootBall = useCallback(() => {
-    socket?.emit('shootBall');
+  const sendAction = useCallback((action: ActionType) => {
+    socket?.emit('action', action);
   }, [socket]);
 
   return {
     socket,
     gameState,
     myId,
-    setPaddleInput,
-    shootBall
+    lastMatchEvent,
+    sendInputState,
+    sendAction
   };
 };

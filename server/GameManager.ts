@@ -1,90 +1,52 @@
-import { Server, Socket } from "socket.io";
-import { 
-  GameState, 
-  PlayerState, 
-  GAME_WIDTH, 
-  GAME_HEIGHT, 
-  PADDLE_WIDTH, 
-  PADDLE_HEIGHT, 
-  BALL_RADIUS, 
-  BUBBLE_RADIUS,
-  BUBBLE_ROWS, 
-  BUBBLE_COLS, 
+import { Server, Socket } from 'socket.io';
+import fs from 'fs';
+import path from 'path';
+import {
+  ActionType,
+  COUNTDOWN_SECONDS,
   GAME_DURATION,
-  PADDLE_SPEED,
-  Bubble,
+  GameState,
+  InputState,
+  MatchEvent,
+  PlayerState,
+  REPLAY_KEYFRAME_INTERVAL_TICKS,
   ReplayData,
-  ReplayFrame,
-  ReplayFramePlayer,
-  ReplayEvent
-} from "../src/types.js";
-import { Physics } from "./Physics.js";
-import fs from "fs";
-import path from "path";
+  ReplayDataV2,
+  RESTART_DELAY_SECONDS,
+} from '../src/types.js';
+import {
+  initialSeed,
+  makePlayer,
+  makeRng,
+  replayDateLabel,
+  stepPlayer,
+  tickSeconds,
+} from './tetris/engine.js';
 
 export class GameManager {
   private io: Server;
   private gameState: GameState;
-  private activeReplay: ReplayData | null = null;
-  private currentTick: number = 0;
+  private activeReplay: ReplayDataV2 | null = null;
+  private rng = makeRng(initialSeed());
 
   constructor(io: Server) {
     this.io = io;
     this.gameState = {
       players: {},
       status: 'waiting',
-      countdown: 3,
+      countdown: COUNTDOWN_SECONDS,
       remainingTime: GAME_DURATION,
-      winnerId: null
+      winnerId: null,
+      tick: 0,
+      seed: this.rng.seed,
     };
 
     this.startLoop();
   }
 
-  private createBubbles(): Bubble[] {
-    const bubbles: Bubble[] = [];
-    const padding = 10;
-    const startY = 50;
-    const spacingX = (GAME_WIDTH - padding * 2) / BUBBLE_COLS;
-    const spacingY = 40;
-
-    for (let row = 0; row < BUBBLE_ROWS; row++) {
-      for (let col = 0; col < BUBBLE_COLS; col++) {
-        bubbles.push({
-          id: `b-${row}-${col}`,
-          x: padding + spacingX / 2 + col * spacingX,
-          y: startY + row * spacingY,
-          radius: BUBBLE_RADIUS,
-          color: `hsl(${Math.random() * 360}, 70%, 60%)`,
-          active: true
-        });
-      }
-    }
-    return bubbles;
-  }
-
-  private resetPlayer(id: string): PlayerState {
-    const paddleX = (GAME_WIDTH - PADDLE_WIDTH) / 2;
-    return {
-      id,
-      paddleX,
-      paddleInputDir: 0,
-      paddleWidth: PADDLE_WIDTH,
-      paddleHeight: PADDLE_HEIGHT,
-      ballPos: { x: paddleX + PADDLE_WIDTH / 2, y: GAME_HEIGHT - PADDLE_HEIGHT - BALL_RADIUS - 5 },
-      ballVel: { x: 0, y: 0 },
-      ballActive: false,
-      bubbles: this.createBubbles(),
-      score: 0,
-      isReady: false,
-      canShoot: true,
-      shootDelay: 0
-    };
-  }
-
   public handleConnection(socket: Socket) {
     if (Object.keys(this.gameState.players).length < 2) {
-      this.gameState.players[socket.id] = this.resetPlayer(socket.id);
+      this.gameState.players[socket.id] = makePlayer(socket.id, this.rng);
       this.io.emit("gameState", this.gameState);
     } else {
       socket.emit("error", "Game is full");
@@ -92,20 +54,36 @@ export class GameManager {
       return;
     }
 
-    socket.on("paddleInput", (dir: number) => {
+    socket.on('inputState', (input: InputState) => {
       const player = this.gameState.players[socket.id];
       if (!player) return;
-      const d = dir === -1 || dir === 1 ? dir : 0;
-      player.paddleInputDir = d;
+      player.inputState = {
+        left: !!input?.left,
+        right: !!input?.right,
+        softDrop: !!input?.softDrop,
+      };
+      if (this.activeReplay && this.gameState.status === 'playing') {
+        this.activeReplay.inputs.push({
+          tick: this.gameState.tick,
+          playerId: socket.id,
+          kind: 'inputState',
+          inputState: player.inputState,
+        });
+      }
     });
 
-    socket.on("shootBall", () => {
+    socket.on('action', (action: ActionType) => {
       const player = this.gameState.players[socket.id];
-      if (player && player.canShoot && !player.ballActive && this.gameState.status === 'playing') {
-        player.ballActive = true;
-        player.ballPos = { x: player.paddleX + PADDLE_WIDTH / 2, y: GAME_HEIGHT - PADDLE_HEIGHT - BALL_RADIUS - 5 };
-        player.ballVel = { x: (Math.random() - 0.5) * 10, y: -8 };
-        player.canShoot = false;
+      if (!player || this.gameState.status !== 'playing') return;
+      if (!['rotateCW', 'rotateCCW', 'hardDrop', 'hold'].includes(action)) return;
+      player.actionQueue.push(action);
+      if (this.activeReplay) {
+        this.activeReplay.inputs.push({
+          tick: this.gameState.tick,
+          playerId: socket.id,
+          kind: 'action',
+          action,
+        });
       }
     });
 
@@ -116,7 +94,7 @@ export class GameManager {
           this.gameState.status = 'ended';
           this.gameState.winnerId = remainingIds[0];
           this.gameState.technicalVictory = true;
-          this.gameState.restartTimer = 5;
+          this.gameState.restartTimer = RESTART_DELAY_SECONDS;
         } else {
           this.gameState.status = 'waiting';
           this.gameState.remainingTime = GAME_DURATION;
@@ -139,46 +117,49 @@ export class GameManager {
     }, 1000 / 60);
   }
 
-  private zeroPaddleInputs() {
+  private clearInputs() {
     for (const id in this.gameState.players) {
-      this.gameState.players[id].paddleInputDir = 0;
+      this.gameState.players[id].inputState = { left: false, right: false, softDrop: false };
+      this.gameState.players[id].actionQueue = [];
     }
   }
 
   private update() {
     if (this.gameState.status === 'waiting') {
-      this.zeroPaddleInputs();
+      this.clearInputs();
       if (Object.keys(this.gameState.players).length === 2) {
         this.gameState.status = 'countdown';
-        this.gameState.countdown = 3;
+        this.gameState.countdown = COUNTDOWN_SECONDS;
       }
     } else if (this.gameState.status === 'countdown') {
-      this.zeroPaddleInputs();
-      this.gameState.countdown -= 1/60;
+      this.clearInputs();
+      this.gameState.countdown -= tickSeconds();
       if (this.gameState.countdown <= 0) {
         this.gameState.status = 'playing';
         this.gameState.remainingTime = GAME_DURATION;
-        const now = new Date();
-        const yyyy = now.getFullYear();
-        const mm = String(now.getMonth() + 1).padStart(2, '0');
-        const dd = String(now.getDate()).padStart(2, '0');
-        const hr = String(now.getHours()).padStart(2, '0');
-        const mn = String(now.getMinutes()).padStart(2, '0');
-        const sc = String(now.getSeconds()).padStart(2, '0');
-        const dateStr = `${yyyy}-${mm}-${dd}_${hr}-${mn}-${sc}`;
+        this.gameState.tick = 0;
+        this.rng = makeRng(this.gameState.seed);
         this.activeReplay = {
-          version: 1,
-          date: dateStr,
+          version: 2,
+          date: replayDateLabel(),
+          seed: this.gameState.seed,
           initialState: JSON.parse(JSON.stringify(this.gameState)),
-          frames: [],
+          inputs: [],
+          keyframes: [
+            {
+              tick: 0,
+              players: JSON.parse(JSON.stringify(this.gameState.players)),
+            },
+          ],
           events: []
         };
       }
     } else if (this.gameState.status === 'playing') {
-      this.gameState.remainingTime -= 1/60;
+      this.gameState.tick += 1;
+      this.gameState.remainingTime -= tickSeconds();
       if (this.gameState.remainingTime <= 0) {
         this.gameState.status = 'ended';
-        this.gameState.restartTimer = 5;
+        this.gameState.restartTimer = RESTART_DELAY_SECONDS;
         const pIds = Object.keys(this.gameState.players);
         if (pIds.length === 2) {
           const p1 = this.gameState.players[pIds[0]];
@@ -188,80 +169,50 @@ export class GameManager {
         this.saveReplay();
       }
 
-      const dt = 1 / 60;
-      this.currentTick++;
+      const matchEvents: MatchEvent[] = [];
+      const pids = Object.keys(this.gameState.players);
       for (const id in this.gameState.players) {
         const player = this.gameState.players[id];
-
-        const dir = player.paddleInputDir === -1 || player.paddleInputDir === 1 ? player.paddleInputDir : 0;
-        player.paddleX = Math.max(
-          0,
-          Math.min(GAME_WIDTH - PADDLE_WIDTH, player.paddleX + dir * PADDLE_SPEED * dt)
-        );
-
-        if (!player.ballActive) {
-          if (player.shootDelay > 0) {
-            player.shootDelay -= dt;
-            player.canShoot = false;
-          }
-          if (player.shootDelay <= 0) {
-            player.shootDelay = 0;
-            player.canShoot = true;
-            player.ballPos = {
-              x: player.paddleX + PADDLE_WIDTH / 2,
-              y: GAME_HEIGHT - PADDLE_HEIGHT - BALL_RADIUS - 5,
-            };
-          }
-          continue;
-        }
-
-        const { allCleared, destroyedBubbles } = Physics.updateBall(player);
-        if (destroyedBubbles.length > 0 && this.activeReplay) {
-          for (const bid of destroyedBubbles) {
-            this.activeReplay.events.push({
-              tick: this.currentTick,
-              type: 'bubbleDestroyed',
-              playerId: player.id,
-              bubbleId: bid
-            });
-          }
-        }
-        if (allCleared) {
+        const opponentId = pids.find((pid) => pid !== id);
+        const opponent = opponentId ? this.gameState.players[opponentId] : null;
+        stepPlayer(this.gameState, player, opponent, this.rng, matchEvents);
+        if (player.topOut) {
           this.gameState.status = 'ended';
-          this.gameState.winnerId = player.id;
-          this.gameState.restartTimer = 5;
+          this.gameState.winnerId = opponent?.id ?? null;
+          this.gameState.restartTimer = RESTART_DELAY_SECONDS;
           this.saveReplay();
         }
       }
-      if (this.activeReplay && this.currentTick % 3 === 0) {
-        const payload: Record<string, ReplayFramePlayer> = {};
-        for (const pid in this.gameState.players) {
-          const p = this.gameState.players[pid];
-          payload[pid] = {
-            paddleX: p.paddleX,
-            ballPos: { x: p.ballPos.x, y: p.ballPos.y },
-            score: p.score,
-            ballActive: p.ballActive,
-            canShoot: p.canShoot
-          };
+
+      if (this.activeReplay && matchEvents.length > 0) {
+        this.activeReplay.events.push(...matchEvents);
+      }
+      if (matchEvents.length > 0) {
+        for (const ev of matchEvents) {
+          this.io.emit('matchEvent', ev);
         }
-        this.activeReplay.frames.push({
-          tick: this.currentTick,
-          players: payload
+      }
+
+      if (this.activeReplay && this.gameState.tick % REPLAY_KEYFRAME_INTERVAL_TICKS === 0) {
+        this.activeReplay.keyframes.push({
+          tick: this.gameState.tick,
+          players: JSON.parse(JSON.stringify(this.gameState.players)),
         });
       }
     } else if (this.gameState.status === 'ended') {
-      this.zeroPaddleInputs();
+      this.clearInputs();
       if (this.gameState.restartTimer !== undefined) {
-        this.gameState.restartTimer -= 1/60;
+        this.gameState.restartTimer -= tickSeconds();
         if (this.gameState.restartTimer <= 0) {
           this.gameState.restartTimer = undefined;
           this.gameState.technicalVictory = false;
+          this.gameState.seed = initialSeed();
+          this.rng = makeRng(this.gameState.seed);
           for (const id in this.gameState.players) {
-            this.gameState.players[id] = this.resetPlayer(id);
+            this.gameState.players[id] = makePlayer(id, this.rng);
           }
           this.gameState.status = 'countdown';
-          this.gameState.countdown = 3;
+          this.gameState.countdown = COUNTDOWN_SECONDS;
         }
       }
     }
