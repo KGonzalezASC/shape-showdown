@@ -32,6 +32,20 @@ export type RotationState = 0 | 1 | 2 | 3;
 export type CellValue = TetrominoType | 'G' | null;
 export type ActionType = 'rotateCW' | 'rotateCCW' | 'hardDrop' | 'hold';
 
+export interface ShopItem {
+  id: string;
+  name: string;
+  icon: string;
+  cost: number;
+  tier: 1 | 2;
+  baseWeight: number;
+  colorClass: string;
+  borderColorClass: string;
+  description: string;
+  synergyTargetId?: string;
+  synergyBoost?: number;
+}
+
 export interface InputState {
   left: boolean;
   right: boolean;

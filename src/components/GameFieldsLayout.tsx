@@ -4,11 +4,15 @@ import { PlayfieldCellSizeContext } from './playfieldCellSizeContext';
 
 function fitCellSizeForDualBoard(outerWidth: number, outerHeight: number): number {
   const gap = outerWidth >= 640 ? 24 : 12;
+  // Reserve width for the desktop/tablet shop rail placed left of the player board.
+  // 7rem rail (112px) + board gap (12px) + tiny breathing room.
+  const shopRailReserve = outerWidth >= 768 ? 128 : 0;
   const horizontalPad = 16;
   // Exact chrome height: title(~28px) + storage row layout(~58px) = 86px.
   // We use 90 to give a tiny bit of breathing room and ensure the board scales as large as mathematically possible without overflowing.
-  const verticalPad = 90;
-  const fromW = (outerWidth - horizontalPad - gap) / (2 * BOARD_COLS);
+  const desktopTopOffset = outerWidth >= 768 ? 40 : 0;
+  const verticalPad = 90 + desktopTopOffset;
+  const fromW = (outerWidth - horizontalPad - gap - shopRailReserve) / (2 * BOARD_COLS);
   const fromH = (outerHeight - verticalPad) / BOARD_VISIBLE_ROWS;
   const MIN_CELL_SIZE = 22;
   const MAX_CELL_SIZE = 48;
@@ -44,7 +48,7 @@ export const GameFieldsLayout: React.FC<{ children: React.ReactNode }> = ({ chil
   return (
     <div
       ref={outerRef}
-      className="flex h-full min-h-0 w-full min-w-0 flex-1 flex-col items-center justify-center overflow-hidden px-1 py-1 sm:px-2 sm:py-2"
+      className="flex h-full min-h-0 w-full min-w-0 flex-1 flex-col items-center justify-center overflow-hidden px-1 py-1 sm:px-2 sm:py-2 md:pt-10 md:pb-2"
     >
       {cellSize !== null && (
         <PlayfieldCellSizeContext.Provider value={cellSize}>

@@ -433,15 +433,28 @@ export function stepPlayer(
   applyHorizontalInput(player);
 
   const isSoftDrop = !!player.inputState.softDrop;
-  const dropSteps = isSoftDrop ? SOFT_DROP_CELLS_PER_TICK + 1 : 1;
-  player.gravityCounter += 1;
+  
   let movedDown = false;
-  const shouldGravity = player.gravityCounter >= GRAVITY_TICKS_PER_CELL / dropSteps;
-  if (shouldGravity) {
-    movedDown = tryMove(player, 0, 1);
-    // Guideline: 1 point per cell soft-dropped.
-    if (movedDown && isSoftDrop) player.score += 1;
+  let cellsToDrop = 0;
+
+  if (isSoftDrop) {
+    cellsToDrop = Math.max(1, Math.floor(SOFT_DROP_CELLS_PER_TICK));
     player.gravityCounter = 0;
+  } else {
+    player.gravityCounter += 1;
+    if (player.gravityCounter >= GRAVITY_TICKS_PER_CELL) {
+      cellsToDrop = 1;
+      player.gravityCounter = 0;
+    }
+  }
+
+  for (let i = 0; i < cellsToDrop; i++) {
+    if (tryMove(player, 0, 1)) {
+      movedDown = true;
+      if (isSoftDrop) player.score += 1;
+    } else {
+      break;
+    }
   }
 
   if (player.activePiece && !movedDown && isGrounded(player)) {
