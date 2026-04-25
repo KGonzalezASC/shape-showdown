@@ -1,4 +1,4 @@
-import React, { useContext, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import React, { useCallback, useContext, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { Timer, Trophy, Users, Zap } from 'lucide-react';
 import { AnimatePresence, LazyMotion, domAnimation, m } from 'motion/react';
 import { useGameSocket } from './hooks/useGameSocket';
@@ -38,18 +38,54 @@ function matchEventLabel(evt: { type: string; lines?: number; playerId?: string 
 
 const App: React.FC = () => {
   const { gameState, myId, lastMatchEvent, sendAction, sendInputState } = useGameSocket();
+
+  const stateRef = useRef({ gameState, myId });
+  useLayoutEffect(() => {
+    stateRef.current = { gameState, myId };
+  }, [gameState, myId]);
+
   const mobilePlayfieldRef = useRef<HTMLDivElement>(null);
   const [mobileCellSize, setMobileCellSize] = useState(28);
+  const [mobileControlsHeight, setMobileControlsHeight] = useState(() => 
+    typeof window !== 'undefined' && window.innerWidth >= 768 ? 0 : 188
+  );
   const [lockDrillEnabled, setLockDrillEnabled] = useState(false);
   const [drillResult, setDrillResult] = useState<{ status: 'pass' | 'fail'; message: string } | null>(null);
-  const drillStepRef = useRef<'idle' | 'seekGround' | 'consumeCap' | 'spam'>('idle');
+  const [kickPopup, setKickPopup] = useState<{ kx: number; ky: number } | null>(null);
+  const prevKickNonceRef = useRef(0);
+  const kickPopupTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const drillStepRef = useRef<'idle' | 'seekGround' | 'consumeCap' | 'exhaustCap' | 'spam' | 'waitForLock'>('idle');
   const drillSpinsRef = useRef(0);
   const drillLastSpinMsRef = useRef(0);
   const drillDirectionRef = useRef<1 | -1>(1);
   const drillTrackingPieceRef = useRef(false);
+  /** True once lockResetsUsed >= LOCK_RESET_CAP so we only flag illegal refreshes after the cap is actually spent. */
   const drillObservedCapRef = useRef(false);
   const drillPrevLockDelayRef = useRef<number | null>(null);
+  const drillPrevPieceYRef = useRef<number | null>(null);
+  const drillExhaustAttemptsRef = useRef(0);
   const drillFailureReasonRef = useRef<string | null>(null);
+
+  const [myShake, setMyShake] = useState('');
+  const [oppShake, setOppShake] = useState('');
+
+  const triggerShake = useCallback((isMe: boolean, type: 'soft' | 'medium') => {
+    const setter = isMe ? setMyShake : setOppShake;
+    const cls = type === 'soft' ? 'animate-shake-soft' : 'animate-shake-medium';
+    setter('');
+    setTimeout(() => setter(cls), 10);
+    setTimeout(() => setter(''), 400);
+  }, []);
+
+  const handleAction = useCallback(
+    (action: ActionType) => {
+      if (action === 'hardDrop') {
+        triggerShake(true, 'soft');
+      }
+      sendAction(action);
+    },
+    [sendAction, triggerShake],
+  );
 
   useLayoutEffect(() => {
     const el = mobilePlayfieldRef.current;
@@ -57,11 +93,15 @@ const App: React.FC = () => {
     const measure = () => {
       const { width, height } = el.getBoundingClientRect();
       if (width < 8 || height < 8) return;
-      const headerReserve = 48;
-      const fromW = (width - 4) / BOARD_COLS;
-      const fromH = (height - headerReserve) / BOARD_VISIBLE_ROWS;
-      const c = Math.floor(Math.min(fromW, fromH));
-      setMobileCellSize(Math.max(22, Math.min(36, c)));
+      // Space reserved for title row, compact storage panel, bottom padding, and a small safety margin.
+      const boardChromeReserve = 114;
+      const fromH = (height - boardChromeReserve) / BOARD_VISIBLE_ROWS;
+      const c = Math.floor(Math.min((width - 104) / BOARD_COLS, fromH));
+      setMobileCellSize((prev) => {
+        // Increased max cell size to 36 to allow board to grow on intermediate tablet views
+        const next = Math.max(10, Math.min(36, c));
+        return prev !== next ? next : prev;
+      });
     };
     measure();
     const ro = new ResizeObserver(measure);
@@ -88,6 +128,7 @@ const App: React.FC = () => {
         setLockDrillEnabled((prev) => !prev);
         return;
       }
+      const { gameState, myId } = stateRef.current;
       if (!gameState || gameState.status !== 'playing' || !myId || !gameState.players[myId]) return;
       if (e.key === 'ArrowLeft') {
         e.preventDefault();
@@ -98,21 +139,22 @@ const App: React.FC = () => {
       } else if (e.key === 'ArrowDown') {
         e.preventDefault();
         sendInputState({ ...gameState.players[myId].inputState, softDrop: true });
-      } else if (e.key === 'ArrowUp' || e.key.toLowerCase() === 'x') {
+      } else if (e.key === 'ArrowUp') {
         e.preventDefault();
-        sendAction('rotateCW');
+        handleAction('hardDrop');
+      } else if (e.key.toLowerCase() === 'x') {
+        e.preventDefault();
+        handleAction('rotateCW');
       } else if (e.key.toLowerCase() === 'z' || e.key === 'Control') {
         e.preventDefault();
-        sendAction('rotateCCW');
-      } else if (e.key === ' ') {
+        handleAction('rotateCCW');
+      } else if (e.key === 'Shift') {
         e.preventDefault();
-        sendAction('hardDrop');
-      } else if (e.key.toLowerCase() === 'c' || e.key === 'Shift') {
-        e.preventDefault();
-        sendAction('hold');
+        handleAction('hold');
       }
     };
     const onKeyUp = (e: KeyboardEvent) => {
+      const { gameState, myId } = stateRef.current;
       if (!gameState || !myId || !gameState.players[myId]) return;
       const current = gameState.players[myId].inputState;
       if (e.key === 'ArrowLeft') {
@@ -134,7 +176,7 @@ const App: React.FC = () => {
       window.removeEventListener('keyup', onKeyUp);
       window.removeEventListener('blur', clearInput);
     };
-  }, [gameState, myId, sendAction, sendInputState]);
+  }, [handleAction, sendInputState]);
 
   useEffect(() => {
     if (!lockDrillEnabled || !gameState || gameState.status !== 'playing' || !myId) {
@@ -143,6 +185,8 @@ const App: React.FC = () => {
       drillTrackingPieceRef.current = false;
       drillObservedCapRef.current = false;
       drillPrevLockDelayRef.current = null;
+      drillPrevPieceYRef.current = null;
+      drillExhaustAttemptsRef.current = 0;
       drillFailureReasonRef.current = null;
       return;
     }
@@ -153,12 +197,23 @@ const App: React.FC = () => {
         if (drillFailureReasonRef.current) {
           setDrillResult({ status: 'fail', message: drillFailureReasonRef.current });
         } else if (drillObservedCapRef.current) {
-          setDrillResult({ status: 'pass', message: 'PASS: Piece locked after cap without extra lock reset.' });
+          setDrillResult({
+            status: 'pass',
+            message:
+              'PASS: Move-reset cap was exhausted; no illegal lock-delay refresh before lock (gravity refills ignored).',
+          });
+        } else {
+          setDrillResult({
+            status: 'pass',
+            message: 'PASS: Piece locked (cap not fully exhausted this cycle — e.g. few valid rotations).',
+          });
         }
       }
       drillTrackingPieceRef.current = false;
       drillObservedCapRef.current = false;
       drillPrevLockDelayRef.current = null;
+      drillPrevPieceYRef.current = null;
+      drillExhaustAttemptsRef.current = 0;
       drillFailureReasonRef.current = null;
       drillStepRef.current = 'seekGround';
       drillSpinsRef.current = 0;
@@ -179,35 +234,62 @@ const App: React.FC = () => {
       return;
     }
     if (drillStepRef.current === 'consumeCap') {
-      sendAction('rotateCW');
       drillDirectionRef.current = -1;
       drillSpinsRef.current = 0;
       drillLastSpinMsRef.current = performance.now();
       drillTrackingPieceRef.current = true;
       drillObservedCapRef.current = false;
       drillPrevLockDelayRef.current = null;
+      drillPrevPieceYRef.current = null;
+      drillExhaustAttemptsRef.current = 0;
       drillFailureReasonRef.current = null;
-      drillStepRef.current = 'spam';
+      drillStepRef.current = 'exhaustCap';
+      return;
+    }
+    if (drillStepRef.current === 'exhaustCap') {
+      if (me.lockResetsUsed >= LOCK_RESET_CAP) {
+        drillSpinsRef.current = 0;
+        drillLastSpinMsRef.current = performance.now();
+        drillStepRef.current = 'spam';
+        return;
+      }
+      const now = performance.now();
+      if (now - drillLastSpinMsRef.current < 120) return;
+      if (drillExhaustAttemptsRef.current >= 40) {
+        drillSpinsRef.current = 0;
+        drillLastSpinMsRef.current = now;
+        drillStepRef.current = 'spam';
+        return;
+      }
+      sendAction('rotateCW');
+      drillExhaustAttemptsRef.current += 1;
+      drillLastSpinMsRef.current = now;
       return;
     }
     if (drillStepRef.current === 'spam') {
-      if (me.lockResetsUsed >= 1) {
+      if (me.lockResetsUsed >= LOCK_RESET_CAP) {
         if (!drillObservedCapRef.current) {
           drillObservedCapRef.current = true;
           drillPrevLockDelayRef.current = me.lockDelayRemainingTicks;
-        } else if (
-          drillPrevLockDelayRef.current !== null &&
-          me.lockDelayRemainingTicks > drillPrevLockDelayRef.current + 1 &&
-          !drillFailureReasonRef.current
-        ) {
-          drillFailureReasonRef.current = 'FAIL: lockDelay refreshed again after cap was already used.';
+          drillPrevPieceYRef.current = me.activePiece?.y ?? null;
+        } else {
+          const prevD = drillPrevLockDelayRef.current;
+          const prevY = drillPrevPieceYRef.current;
+          const y = me.activePiece?.y ?? null;
+          const yIncreased = prevY !== null && y !== null && y > prevY;
+          const jumped = prevD !== null && me.lockDelayRemainingTicks > prevD + 1;
+          if (jumped && !yIncreased && !drillFailureReasonRef.current) {
+            drillFailureReasonRef.current =
+              'FAIL: lockDelay refreshed after move-reset cap exhausted without a gravity step (illegal rotate/move reset).';
+          }
+          drillPrevLockDelayRef.current = me.lockDelayRemainingTicks;
+          drillPrevPieceYRef.current = y;
         }
-        drillPrevLockDelayRef.current = me.lockDelayRemainingTicks;
       }
       const now = performance.now();
       if (now - drillLastSpinMsRef.current < 120) return;
       if (drillSpinsRef.current >= 8) {
-        drillStepRef.current = 'seekGround';
+        drillStepRef.current = 'waitForLock';
         drillSpinsRef.current = 0;
         sendInputState({ left: false, right: false, softDrop: true });
         return;
@@ -216,8 +298,58 @@ const App: React.FC = () => {
       drillDirectionRef.current = drillDirectionRef.current === 1 ? -1 : 1;
       drillSpinsRef.current += 1;
       drillLastSpinMsRef.current = now;
+      return;
+    }
+    if (drillStepRef.current === 'waitForLock') {
+      if (me.lockResetsUsed >= LOCK_RESET_CAP) {
+        const prevD = drillPrevLockDelayRef.current;
+        const prevY = drillPrevPieceYRef.current;
+        const y = me.activePiece?.y ?? null;
+        const yIncreased = prevY !== null && y !== null && y > prevY;
+        const jumped = prevD !== null && me.lockDelayRemainingTicks > prevD + 1;
+        if (jumped && !yIncreased && !drillFailureReasonRef.current) {
+          drillFailureReasonRef.current =
+            'FAIL: lockDelay refreshed after move-reset cap exhausted without a gravity step (illegal rotate/move reset).';
+        }
+        drillPrevLockDelayRef.current = me.lockDelayRemainingTicks;
+        drillPrevPieceYRef.current = y;
+      }
+      return;
     }
   }, [gameState, myId, lockDrillEnabled, sendAction, sendInputState]);
+
+  useEffect(() => {
+    if (!lastMatchEvent) return;
+    const isMe = !!(myId && lastMatchEvent.playerId === myId);
+    if (lastMatchEvent.type === 'lineClear') {
+      triggerShake(isMe, 'soft');
+    } else if (lastMatchEvent.type === 'garbageApplied') {
+      triggerShake(isMe, 'medium');
+    }
+  }, [lastMatchEvent, myId, triggerShake]);
+
+  useEffect(() => {
+    return () => {
+      if (kickPopupTimeoutRef.current) clearTimeout(kickPopupTimeoutRef.current);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!gameState) return;
+    if (gameState.status !== 'playing' || !myId) {
+      prevKickNonceRef.current = myId ? (gameState.players[myId]?.srsKickNonce ?? 0) : 0;
+      return;
+    }
+    const me = gameState.players[myId];
+    if (!me) return;
+    const n = me.srsKickNonce ?? 0;
+    if (n > prevKickNonceRef.current && me.lastSrsKick) {
+      if (kickPopupTimeoutRef.current) clearTimeout(kickPopupTimeoutRef.current);
+      setKickPopup({ kx: me.lastSrsKick.kx, ky: me.lastSrsKick.ky });
+      kickPopupTimeoutRef.current = setTimeout(() => setKickPopup(null), 480);
+    }
+    prevKickNonceRef.current = n;
+  }, [gameState, myId]);
 
   const myPlayer = myId ? gameState?.players[myId] : null;
   const opponentId = myId ? Object.keys(gameState?.players ?? {}).find((id) => id !== myId) : null;
@@ -238,7 +370,10 @@ const App: React.FC = () => {
   }
 
   return (
-    <div className="flex h-dvh max-h-dvh min-h-0 flex-col overflow-hidden bg-[#0a0a0a] px-2 py-2 pb-36 md:pb-2 font-sans text-white sm:px-4 sm:py-3">
+    <div
+      className="flex h-dvh max-h-dvh min-h-0 flex-col overflow-hidden bg-[#0a0a0a] px-2 py-2 pb-[var(--mobile-controls-pad)] font-sans text-white sm:px-4 sm:py-3 md:pb-2"
+      style={{ '--mobile-controls-pad': `${mobileControlsHeight + 10}px` } as React.CSSProperties}
+    >
       {/* Header */}
       <div className="mb-2 flex w-full max-w-5xl shrink-0 items-center justify-between gap-2 self-center overflow-visible rounded-xl border border-white/5 bg-[#1a1a1a] p-2 shadow-xl sm:mb-3 sm:rounded-2xl sm:p-3 md:p-4">
         <div className="flex min-w-0 items-center gap-2 sm:gap-4">
@@ -297,17 +432,32 @@ const App: React.FC = () => {
       )}
       {drillResult && (
         <div
-          className={`mb-2 w-full max-w-5xl self-center rounded-lg border px-3 py-2 text-sm font-semibold ${
-            drillResult.status === 'pass'
+          className={`mb-2 w-full max-w-5xl self-center rounded-lg border px-3 py-2 text-sm font-semibold ${drillResult.status === 'pass'
               ? 'border-emerald-400/40 bg-emerald-950/30 text-emerald-200'
               : 'border-rose-400/40 bg-rose-950/30 text-rose-200'
-          }`}
+            }`}
         >
           {drillResult.message}
         </div>
       )}
       {myPlayer && (
-        <div className="mb-2 w-full max-w-5xl self-center rounded-lg border border-cyan-500/25 bg-cyan-950/15 px-3 py-2 text-xs text-cyan-100">
+        <div className="relative mb-2 hidden w-full max-w-5xl self-center rounded-lg border border-cyan-500/25 bg-cyan-950/15 px-3 py-2 text-xs text-cyan-100 md:block">
+          <AnimatePresence>
+            {kickPopup && (
+              <m.div
+                key={`${kickPopup.kx},${kickPopup.ky}-${myPlayer.srsKickNonce ?? 0}`}
+                initial={{ opacity: 0, scale: 0.92, y: 6 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.94, y: -4 }}
+                transition={{ type: 'spring', stiffness: 520, damping: 28 }}
+                className="pointer-events-none absolute -top-2 right-3 z-10 rounded border border-amber-400/45 bg-amber-950/95 px-1.5 py-0.5 font-mono text-[10px] font-semibold uppercase tracking-tight text-amber-100 shadow-md shadow-amber-950/50"
+              >
+                Kick {kickPopup.kx >= 0 ? '+' : ''}
+                {kickPopup.kx},{kickPopup.ky >= 0 ? '+' : ''}
+                {kickPopup.ky}
+              </m.div>
+            )}
+          </AnimatePresence>
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div className="font-semibold uppercase tracking-wide">Lock Debug</div>
             <button
@@ -323,15 +473,21 @@ const App: React.FC = () => {
             <span>resetUsed: {myPlayer.lockResetsUsed}</span>
             <span>pieceY: {myPlayer.activePiece ? myPlayer.activePiece.y : 'none'}</span>
             <span>cap: {LOCK_RESET_CAP}</span>
+            <span>
+              lastKick:{' '}
+              {myPlayer.lastSrsKick
+                ? `${myPlayer.lastSrsKick.kx},${myPlayer.lastSrsKick.ky}`
+                : '—'}
+            </span>
           </div>
           <div className="mt-1 text-[10px] text-cyan-200/80">
-            Drill auto-soft-drops to ground, uses one rotate reset, then spams more rotations so you can see whether lockDelay stops refreshing after cap.
+            Soft-drops to ground, rotates until move-reset cap is spent, then probes with more rotations. Fails only if lockDelay jumps to full after cap without the piece stepping down (Y increase).
           </div>
         </div>
       )}
 
       {gameState.status === 'waiting' && Object.keys(gameState.players).length < 2 && (
-        <div className="mb-1 shrink-0 self-center rounded-full border border-white/5 bg-zinc-900/90 px-4 py-1.5 sm:py-2">
+        <div className="mb-1 hidden shrink-0 self-center rounded-full border border-white/5 bg-zinc-900/90 px-4 py-1.5 sm:block sm:py-2">
           <p className="text-center text-xs font-medium tracking-wide text-zinc-400">
             Waiting for another player to join…
           </p>
@@ -340,28 +496,32 @@ const App: React.FC = () => {
 
       {/* Mobile game view: primary board + mini opponent at top-right */}
       <div className="relative min-h-0 w-full flex-1 md:hidden">
-        <div className="absolute right-1 top-1 z-20">
-          <OpponentMiniField player={opponentPlayer} pendingGarbage={oppPendingGarbage} />
-        </div>
         <div
           ref={mobilePlayfieldRef}
-          className="flex h-full w-full items-center justify-center overflow-hidden px-1 pr-[6.25rem]"
+          className="flex h-full w-full items-start justify-center overflow-hidden px-1 pb-3 pr-[6.25rem]"
         >
           {myPlayer && (
-            <GameField
-              player={myPlayer}
-              isMe={true}
-              title="👤 YOUR FIELD"
-              borderColorClass="border-emerald-500/20"
-              shadowColorClass="shadow-[0_0_30px_rgba(16,185,129,0.1)]"
-              cellSize={mobileCellSize}
-            />
+            <div className="relative">
+              <GameField
+                player={myPlayer}
+                isMe={true}
+                title="👤 YOUR FIELD"
+                borderColorClass="border-emerald-500/20"
+                shadowColorClass="shadow-[0_0_30px_rgba(16,185,129,0.1)]"
+                cellSize={mobileCellSize}
+                shakeClass={myShake}
+              />
+              {/* Anchor mini field to the right of the main board so it doesn't drift away on wider screens */}
+              <div className="absolute left-[calc(100%+0.5rem)] sm:left-[calc(100%+1rem)] top-0 z-20 origin-top-left">
+                <OpponentMiniField player={opponentPlayer} pendingGarbage={oppPendingGarbage} />
+              </div>
+            </div>
           )}
         </div>
       </div>
 
       {/* Desktop game view: dual full boards */}
-      <div className="hidden min-h-0 w-full flex-1 md:block">
+      <div className="hidden min-h-0 w-full flex-1 md:flex md:flex-col">
         <GameFieldsLayout>
           {myPlayer && (
             <GameField
@@ -370,6 +530,7 @@ const App: React.FC = () => {
               title="👤 YOUR FIELD"
               borderColorClass="border-emerald-500/20"
               shadowColorClass="shadow-[0_0_30px_rgba(16,185,129,0.1)]"
+              shakeClass={myShake}
             />
           )}
 
@@ -382,6 +543,7 @@ const App: React.FC = () => {
                 borderColorClass="border-rose-500/20"
                 shadowColorClass="shadow-[0_0_30px_rgba(244,63,94,0.1)]"
                 opacityClass="opacity-80"
+                shakeClass={oppShake}
               />
             ) : (
               <WaitingForOpponentBoard />
@@ -392,58 +554,58 @@ const App: React.FC = () => {
 
       {/* Overlays */}
       <LazyMotion features={domAnimation}>
-      <AnimatePresence>
-        {gameState.status === 'countdown' && (
-          <m.div 
-            initial={{ opacity: 0, scale: 0.5 }}
-            animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 2 }}
-            className="fixed inset-0 flex items-center justify-center z-50 pointer-events-none"
-          >
-            <h1 className="font-black italic text-white drop-shadow-2xl [font-size:min(28vw,12rem)]">
-              {Math.ceil(gameState.countdown)}
-            </h1>
-          </m.div>
-        )}
+        <AnimatePresence>
+          {gameState.status === 'countdown' && (
+            <m.div
+              initial={{ opacity: 0, scale: 0.5 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 2 }}
+              className="fixed inset-0 flex items-center justify-center z-50 pointer-events-none"
+            >
+              <h1 className="font-black italic text-white drop-shadow-2xl [font-size:min(28vw,12rem)]">
+                {Math.ceil(gameState.countdown)}
+              </h1>
+            </m.div>
+          )}
 
-        {gameState.status === 'ended' && (
-          <m.div 
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            className="fixed inset-0 bg-black/80 backdrop-blur-md flex items-center justify-center z-50 p-8"
-          >
-            <div className="bg-[#1a1a1a] p-12 rounded-[2rem] border border-white/10 shadow-2xl text-center max-w-md w-full">
-              <Trophy className="w-20 h-20 text-yellow-400 mx-auto mb-6" />
-              <h2 className="text-4xl font-black uppercase tracking-tighter mb-2">Game Over</h2>
-              <p className="text-zinc-400 mb-8">
-                {gameState.technicalVictory && gameState.winnerId === myId ? "Opponent disconnected. Technical Victory!" :
-                 gameState.winnerId === myId ? "You won the match!" : 
-                 gameState.winnerId === 'draw' ? "It's a draw!" : "Opponent won the match."}
-              </p>
-              <div className="grid grid-cols-2 gap-4 mb-8">
-                <div className="bg-black/40 p-4 rounded-2xl">
-                  <p className="text-[10px] uppercase text-zinc-500 font-bold mb-1">Your Score</p>
-                  <p className="text-2xl font-mono">{myPlayer?.score || 0}</p>
+          {gameState.status === 'ended' && (
+            <m.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              className="fixed inset-0 bg-black/80 backdrop-blur-md flex items-center justify-center z-50 p-8"
+            >
+              <div className="bg-[#1a1a1a] p-12 rounded-[2rem] border border-white/10 shadow-2xl text-center max-w-md w-full">
+                <Trophy className="w-20 h-20 text-yellow-400 mx-auto mb-6" />
+                <h2 className="text-4xl font-black uppercase tracking-tighter mb-2">Game Over</h2>
+                <p className="text-zinc-400 mb-8">
+                  {gameState.technicalVictory && gameState.winnerId === myId ? "Opponent disconnected. Technical Victory!" :
+                    gameState.winnerId === myId ? "You won the match!" :
+                      gameState.winnerId === 'draw' ? "It's a draw!" : "Opponent won the match."}
+                </p>
+                <div className="grid grid-cols-2 gap-4 mb-8">
+                  <div className="bg-black/40 p-4 rounded-2xl">
+                    <p className="text-[10px] uppercase text-zinc-500 font-bold mb-1">Your Score</p>
+                    <p className="text-2xl font-mono">{myPlayer?.score || 0}</p>
+                  </div>
+                  <div className="bg-black/40 p-4 rounded-2xl">
+                    <p className="text-[10px] uppercase text-zinc-500 font-bold mb-1">Opponent</p>
+                    <p className="text-2xl font-mono">{opponentPlayer?.score || 0}</p>
+                  </div>
                 </div>
-                <div className="bg-black/40 p-4 rounded-2xl">
-                  <p className="text-[10px] uppercase text-zinc-500 font-bold mb-1">Opponent</p>
-                  <p className="text-2xl font-mono">{opponentPlayer?.score || 0}</p>
-                </div>
+                <p className="text-xs text-zinc-600">
+                  {gameState.restartTimer !== undefined
+                    ? `Restarting level in ${Math.ceil(gameState.restartTimer)} seconds...`
+                    : "Waiting for server reset..."}
+                </p>
               </div>
-              <p className="text-xs text-zinc-600">
-                {gameState.restartTimer !== undefined
-                  ? `Restarting level in ${Math.ceil(gameState.restartTimer)} seconds...`
-                  : "Waiting for server reset..."}
-              </p>
-            </div>
-          </m.div>
-        )}
+            </m.div>
+          )}
 
-      </AnimatePresence>
+        </AnimatePresence>
       </LazyMotion>
 
       {/* Controls Help */}
-      <div className="pointer-events-none fixed bottom-2 left-2 z-30 hidden sm:flex flex-col gap-1 sm:bottom-6 sm:left-6 sm:gap-2 md:bottom-8 md:left-8">
+      <div className="pointer-events-none fixed bottom-2 left-2 z-30 hidden md:flex flex-col gap-1 md:bottom-8 md:left-8 md:gap-2">
         <div className="flex items-center gap-2 text-zinc-500 sm:gap-3">
           <kbd className="rounded border border-white/5 bg-zinc-800 px-1.5 py-0.5 font-mono text-[10px] sm:px-2 sm:py-1 sm:text-xs">
             ←
@@ -455,18 +617,34 @@ const App: React.FC = () => {
         </div>
         <div className="flex items-center gap-2 text-zinc-500 sm:gap-3">
           <kbd className="rounded border border-white/5 bg-zinc-800 px-2 py-0.5 font-mono text-[10px] sm:px-4 sm:py-1 sm:text-xs">
+            ↓
+          </kbd>
+          <span className="text-[9px] font-bold uppercase tracking-widest sm:text-[10px]">Soft Drop</span>
+        </div>
+        <div className="flex items-center gap-2 text-zinc-500 sm:gap-3">
+          <kbd className="rounded border border-white/5 bg-zinc-800 px-2 py-0.5 font-mono text-[10px] sm:px-4 sm:py-1 sm:text-xs">
+            ↑
+          </kbd>
+          <span className="text-[9px] font-bold uppercase tracking-widest sm:text-[10px]">Hard Drop</span>
+        </div>
+        <div className="flex items-center gap-2 text-zinc-500 sm:gap-3">
+          <kbd className="rounded border border-white/5 bg-zinc-800 px-2 py-0.5 font-mono text-[10px] sm:px-4 sm:py-1 sm:text-xs">
             Z / X
           </kbd>
           <span className="text-[9px] font-bold uppercase tracking-widest sm:text-[10px]">Rotate</span>
         </div>
         <div className="flex items-center gap-2 text-zinc-500 sm:gap-3">
           <kbd className="rounded border border-white/5 bg-zinc-800 px-2 py-0.5 font-mono text-[10px] sm:px-4 sm:py-1 sm:text-xs">
-            SPACE
+            SHIFT
           </kbd>
-          <span className="text-[9px] font-bold uppercase tracking-widest sm:text-[10px]">Hard Drop</span>
+          <span className="text-[9px] font-bold uppercase tracking-widest sm:text-[10px]">Storage</span>
         </div>
       </div>
-      <MobileControls onInput={sendInputState} onAction={(action: ActionType) => sendAction(action)} />
+      <MobileControls
+        onInput={sendInputState}
+        onAction={handleAction}
+        onHeightChange={setMobileControlsHeight}
+      />
     </div>
   );
 };

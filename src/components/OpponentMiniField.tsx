@@ -19,6 +19,13 @@ const COLORS: Record<Exclude<CellValue, null>, string> = {
   G: 'bg-zinc-500',
 };
 
+const MemoizedMiniCell = React.memo(({ color }: { color: CellValue }) => (
+  <div
+    className={`border border-black/25 ${color ? COLORS[color] : 'bg-zinc-900'}`}
+    style={{ width: MINI_CELL_SIZE, height: MINI_CELL_SIZE }}
+  />
+));
+
 const SHAPES: Record<TetrominoType, [number, number][][]> = {
   I: [
     [[0, 1], [1, 1], [2, 1], [3, 1]],
@@ -78,7 +85,7 @@ const OpponentMiniField: React.FC<OpponentMiniFieldProps> = ({ player, pendingGa
       }
     }
     return rows;
-  }, [player]);
+  }, [player?.board, player?.activePiece]);
 
   if (!player || !visibleRows) {
     return (
@@ -104,11 +111,7 @@ const OpponentMiniField: React.FC<OpponentMiniFieldProps> = ({ player, pendingGa
         >
           {visibleRows.flatMap((row, y) =>
             row.map((cell, x) => (
-              <div
-                key={`${x}-${y}`}
-                className={`border border-black/25 ${cell ? COLORS[cell] : 'bg-zinc-900'}`}
-                style={{ width: MINI_CELL_SIZE, height: MINI_CELL_SIZE }}
-              />
+              <MemoizedMiniCell key={`${x}-${y}`} color={cell} />
             )),
           )}
         </div>
@@ -125,4 +128,7 @@ const OpponentMiniField: React.FC<OpponentMiniFieldProps> = ({ player, pendingGa
   );
 };
 
-export default OpponentMiniField;
+export default React.memo(OpponentMiniField, (prev, next) => {
+  return prev.pendingGarbage === next.pendingGarbage &&
+         JSON.stringify(prev.player) === JSON.stringify(next.player);
+});

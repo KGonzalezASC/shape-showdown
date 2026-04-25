@@ -14,6 +14,7 @@ import {
   GAME_WIDTH,
   GARBAGE_ARRIVAL_DELAY_TICKS,
   GRAVITY_TICKS_PER_CELL,
+  HOLD_SWAP_CUTOFF_VISIBLE_ROW,
   HORIZONTAL_SPEED_THRESHOLDS,
   LOCK_DELAY_TICKS,
   LOCK_RESET_CAP,
@@ -69,6 +70,11 @@ export interface PlayerState {
   gravityCounter: number;
   lockDelayRemainingTicks: number;
   lockResetsUsed: number;
+  lowestY: number;
+  /** Increments when a rotation succeeds using a non-zero SRS kick offset (debug / UI). */
+  srsKickNonce?: number;
+  /** Last SRS kick offset (kick table kx, ky); null if none since spawn or after lock/hold. */
+  lastSrsKick?: { kx: number; ky: number } | null;
   lastActionWasRotate: boolean;
   pendingGarbage: PendingGarbagePacket[];
   topOut: boolean;
@@ -144,6 +150,7 @@ export {
   GAME_WIDTH,
   GARBAGE_ARRIVAL_DELAY_TICKS,
   GRAVITY_TICKS_PER_CELL,
+  HOLD_SWAP_CUTOFF_VISIBLE_ROW,
   HORIZONTAL_SPEED_THRESHOLDS,
   LOCK_DELAY_TICKS,
   LOCK_RESET_CAP,

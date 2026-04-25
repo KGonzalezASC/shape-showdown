@@ -13,8 +13,9 @@ export const COUNTDOWN_SECONDS = 3;
 export const RESTART_DELAY_SECONDS = 5;
 
 export const NEXT_PREVIEW_COUNT = 5;
-export const LOCK_DELAY_TICKS = 6; // shorter lock window for testing
-export const LOCK_RESET_CAP = 2;
+export const LOCK_DELAY_TICKS = 24; // 0.4s @ 60hz
+export const LOCK_RESET_CAP = 10;
+export const HOLD_SWAP_CUTOFF_VISIBLE_ROW = 10;
 export const GARBAGE_ARRIVAL_DELAY_TICKS = 18; // 300ms @ 60hz
 export const GRAVITY_TICKS_PER_CELL = 30;
 export const SOFT_DROP_CELLS_PER_TICK = 1;

@@ -9,6 +9,7 @@ import {
   GAME_TICK_RATE,
   GARBAGE_ARRIVAL_DELAY_TICKS,
   GameState,
+  HOLD_SWAP_CUTOFF_VISIBLE_ROW,
   InputState,
   LOCK_DELAY_TICKS,
   LOCK_RESET_CAP,
@@ -83,12 +84,16 @@ export function makePlayer(id: string, rng: MutableRng): PlayerState {
     gravityCounter: 0,
     lockDelayRemainingTicks: LOCK_DELAY_TICKS,
     lockResetsUsed: 0,
+    lowestY: BOARD_HIDDEN_ROWS - 2,
+    srsKickNonce: 0,
+    lastSrsKick: null,
     lastActionWasRotate: false,
     pendingGarbage: [],
     topOut: false,
   };
   ensureQueue(player, rng);
   player.activePiece = spawnNextPiece(player, rng);
+  if (player.activePiece) player.lowestY = player.activePiece.y;
   return player;
 }
 
@@ -124,14 +129,23 @@ function collides(board: CellValue[][], piece: { type: TetrominoType; rotation: 
 
 function tryMove(player: PlayerState, dx: number, dy: number): boolean {
   if (!player.activePiece) return false;
+  const wasGrounded = isGrounded(player);
   const candidate = { ...player.activePiece, x: player.activePiece.x + dx, y: player.activePiece.y + dy };
   if (collides(player.board, candidate)) return false;
   player.activePiece = candidate;
-  if (dx !== 0 && dy === 0 && isGrounded(player) && player.lockResetsUsed < LOCK_RESET_CAP) {
-    player.lockResetsUsed += 1;
-    player.lockDelayRemainingTicks = LOCK_DELAY_TICKS;
+  if (dx !== 0 && dy === 0) {
+    // A horizontal shift breaks a T-Spin sequence (last action must be a rotation).
+    player.lastActionWasRotate = false;
+    if (wasGrounded && player.lockResetsUsed < LOCK_RESET_CAP) {
+      player.lockResetsUsed += 1;
+      player.lockDelayRemainingTicks = LOCK_DELAY_TICKS;
+    }
   }
-  if (dy > 0) {
+  // Step down: only refill lock delay when the piece reaches a genuinely new lowest row.
+  // Falling back to a previously-visited row (e.g. after a kick-up) does NOT refill,
+  // preventing the kick-up→fall→free-timer infinite loop.
+  if (dy > 0 && player.activePiece.y > player.lowestY) {
+    player.lowestY = player.activePiece.y;
     player.lockDelayRemainingTicks = LOCK_DELAY_TICKS;
     player.lockResetsUsed = 0;
   }
@@ -140,6 +154,7 @@ function tryMove(player: PlayerState, dx: number, dy: number): boolean {
 
 function tryRotate(player: PlayerState, dir: 1 | -1): boolean {
   if (!player.activePiece) return false;
+  const wasGrounded = isGrounded(player);
   const from = player.activePiece.rotation;
   const to = (((from + dir) % 4) + 4) % 4 as RotationState;
   const tests = getKickTests(player.activePiece.type, from, to);
@@ -148,7 +163,12 @@ function tryRotate(player: PlayerState, dir: 1 | -1): boolean {
     if (!collides(player.board, candidate)) {
       player.activePiece = candidate;
       player.lastActionWasRotate = true;
-      if (isGrounded(player) && player.lockResetsUsed < LOCK_RESET_CAP) {
+      if (kx !== 0 || ky !== 0) {
+        player.srsKickNonce += 1;
+        player.lastSrsKick = { kx, ky };
+      }
+      // Count resets whenever the piece was grounded before the rotate, even if SRS kicks it airborne.
+      if (wasGrounded && player.lockResetsUsed < LOCK_RESET_CAP) {
         player.lockResetsUsed += 1;
         player.lockDelayRemainingTicks = LOCK_DELAY_TICKS;
       }
@@ -162,6 +182,12 @@ function isGrounded(player: PlayerState): boolean {
   if (!player.activePiece) return false;
   const test = { ...player.activePiece, y: player.activePiece.y + 1 };
   return collides(player.board, test);
+}
+
+function canHoldAtCurrentHeight(player: PlayerState): boolean {
+  if (!player.activePiece) return false;
+  const maxVisibleRow = Math.max(...getCells(player.activePiece).map((cell) => cell.y - BOARD_HIDDEN_ROWS));
+  return maxVisibleRow < HOLD_SWAP_CUTOFF_VISIBLE_ROW;
 }
 
 function lockPiece(player: PlayerState): { lines: number; tSpin: 'full' | 'mini' | false; perfectClear: boolean } {
@@ -189,6 +215,8 @@ function lockPiece(player: PlayerState): { lines: number; tSpin: 'full' | 'mini'
   player.canHold = true;
   player.lockDelayRemainingTicks = LOCK_DELAY_TICKS;
   player.lockResetsUsed = 0;
+  player.lowestY = 0;
+  player.lastSrsKick = null;
   player.lastActionWasRotate = false;
   return { lines, tSpin, perfectClear };
 }
@@ -287,8 +315,10 @@ function applyGarbageIfReady(player: PlayerState, tick: number, rng: MutableRng)
   while (player.pendingGarbage.length > 0 && player.pendingGarbage[0].arrivalTick <= tick) {
     const packet = player.pendingGarbage.shift();
     if (!packet) break;
+    // One shared hole column per packet — matching standard competitive behaviour
+    // where garbage lines from a single attack share the same gap.
+    const hole = Math.floor(rngNext(rng) * BOARD_COLS);
     for (let i = 0; i < packet.lines; i++) {
-      const hole = Math.floor(rngNext(rng) * BOARD_COLS);
       player.board.shift();
       const row = Array.from({ length: BOARD_COLS }, (_, x): CellValue => (x === hole ? null : 'G'));
       player.board.push(row);
@@ -311,7 +341,8 @@ function processActions(player: PlayerState): void {
     if (action === 'rotateCW') tryRotate(player, 1);
     if (action === 'rotateCCW') tryRotate(player, -1);
     if (action === 'hold') {
-      if (!player.canHold || !player.activePiece) continue;
+      if (!player.canHold || !player.activePiece || !canHoldAtCurrentHeight(player)) continue;
+      player.lastSrsKick = null;
       const current = player.activePiece.type;
       if (player.holdPiece) {
         player.activePiece = { type: player.holdPiece, rotation: 0, x: 3, y: BOARD_HIDDEN_ROWS - 2 };
@@ -323,11 +354,15 @@ function processActions(player: PlayerState): void {
       player.canHold = false;
       player.lockDelayRemainingTicks = LOCK_DELAY_TICKS;
       player.lockResetsUsed = 0;
+      player.lowestY = player.activePiece ? player.activePiece.y : 0;
     }
     if (action === 'hardDrop') {
+      let dropped = 0;
       while (tryMove(player, 0, 1)) {
-        // hard drop until blocked
+        dropped += 1;
       }
+      // Guideline: 2 points per cell hard-dropped.
+      player.score += dropped * 2;
       player.lockDelayRemainingTicks = 0;
     }
   }
@@ -381,7 +416,12 @@ export function stepPlayer(
   matchEvents: MatchEvent[],
 ): void {
   if (!player.activePiece) {
+    player.lastSrsKick = null;
     player.activePiece = spawnNextPiece(player, rng);
+    if (player.activePiece) {
+      player.lowestY = player.activePiece.y;
+      player.lockResetsUsed = 0;
+    }
     if (pieceWouldTopOut(player)) {
       player.topOut = true;
       matchEvents.push({ tick: gameState.tick, type: 'topOut', playerId: player.id });
@@ -392,12 +432,15 @@ export function stepPlayer(
   processActions(player);
   applyHorizontalInput(player);
 
-  const dropSteps = player.inputState.softDrop ? SOFT_DROP_CELLS_PER_TICK + 1 : 1;
+  const isSoftDrop = !!player.inputState.softDrop;
+  const dropSteps = isSoftDrop ? SOFT_DROP_CELLS_PER_TICK + 1 : 1;
   player.gravityCounter += 1;
   let movedDown = false;
   const shouldGravity = player.gravityCounter >= GRAVITY_TICKS_PER_CELL / dropSteps;
   if (shouldGravity) {
     movedDown = tryMove(player, 0, 1);
+    // Guideline: 1 point per cell soft-dropped.
+    if (movedDown && isSoftDrop) player.score += 1;
     player.gravityCounter = 0;
   }
 

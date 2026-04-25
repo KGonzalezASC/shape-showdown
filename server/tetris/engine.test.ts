@@ -37,4 +37,43 @@ describe('tetris engine', () => {
     assert.equal(player.canHold, false);
     assert.ok(player.holdPiece);
   });
+
+  it('allows hold when piece is above swap threshold', () => {
+    const rng = makeRng(11);
+    const player = makePlayer('a', rng);
+    const opponent = makePlayer('b', rng);
+    const game = makeGame([player, opponent]);
+
+    assert.ok(player.activePiece);
+    if (!player.activePiece) return;
+
+    player.activePiece.y = 20;
+    const beforeType = player.activePiece.type;
+    player.actionQueue.push('hold');
+    stepPlayer(game, player, opponent, rng, []);
+
+    assert.equal(player.holdPiece, beforeType);
+    assert.equal(player.canHold, false);
+  });
+
+  it('blocks hold when piece is below swap threshold', () => {
+    const rng = makeRng(13);
+    const player = makePlayer('a', rng);
+    const opponent = makePlayer('b', rng);
+    const game = makeGame([player, opponent]);
+
+    assert.ok(player.activePiece);
+    if (!player.activePiece) return;
+
+    player.activePiece.y = 30;
+    const beforeType = player.activePiece.type;
+    const beforeQueue = [...player.nextQueue];
+    player.actionQueue.push('hold');
+    stepPlayer(game, player, opponent, rng, []);
+
+    assert.equal(player.holdPiece, null);
+    assert.equal(player.canHold, true);
+    assert.equal(player.activePiece?.type, beforeType);
+    assert.deepEqual(player.nextQueue, beforeQueue);
+  });
 });
