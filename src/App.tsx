@@ -572,7 +572,11 @@ const App: React.FC = () => {
       // Space reserved for title row, compact storage panel, bottom padding, and a small safety margin.
       const boardChromeReserve = 114;
       const fromH = (height - boardChromeReserve) / BOARD_VISIBLE_ROWS;
-      const c = Math.floor(Math.min((width - 104) / BOARD_COLS, fromH));
+      // Reserve width for the right rail (OpponentMiniField + ShopRail are each
+      // w-[5.75rem]=92px) plus the gap and a safety margin, so board + rail fit
+      // within narrow viewports (e.g. Galaxy S20 FE) without the rail clipping.
+      const railReserve = 120;
+      const c = Math.floor(Math.min((width - railReserve) / BOARD_COLS, fromH));
       setMobileCellSize((prev) => {
         // Increased max cell size to 36 to allow board to grow on intermediate tablet views
         const next = Math.max(10, Math.min(36, c));
@@ -1061,7 +1065,7 @@ const App: React.FC = () => {
       <div className="relative min-h-0 w-full flex-1 md:hidden">
         <div
           ref={mobilePlayfieldRef}
-          className="flex h-full w-full items-start justify-center overflow-hidden px-1 pb-3 pr-[6.25rem]"
+          className="flex h-full w-full items-start justify-start overflow-hidden px-1 pb-3 pr-[7.5rem]"
         >
           {myPlayer && (
             <div className="relative">
