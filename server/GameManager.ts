@@ -34,10 +34,20 @@ export class GameManager {
   private activeReplay: ReplayDataV2 | null = null;
   private rng = makeRng(initialSeed());
   private readonly replayKeyframeIntervalTicks: number;
+  private readonly netcastEveryNTicks: number;
+  private readonly lobbyNetcastEveryNTicks: number;
 
   constructor(io: Server, replayKeyframeIntervalTicks = REPLAY_KEYFRAME_INTERVAL_TICKS) {
     this.io = io;
     this.replayKeyframeIntervalTicks = Math.max(1, Math.floor(replayKeyframeIntervalTicks));
+
+    // Decouple the network broadcast rate from the 60Hz simulation. Emitting
+    // full state 60x/sec is brutal on phones (radio wake-ups, JSON.parse,
+    // React renders). Default to 30Hz during play, ~5Hz in the lobby. The
+    // simulation stays authoritative at 60Hz. Tunable live via NETCAST_HZ.
+    const hz = Number(process.env.NETCAST_HZ);
+    this.netcastEveryNTicks = Number.isFinite(hz) && hz > 0 ? Math.max(1, Math.round(60 / hz)) : 2;
+    this.lobbyNetcastEveryNTicks = Math.max(this.netcastEveryNTicks, 12);
     this.gameState = {
       players: {},
       status: 'waiting',
@@ -178,9 +188,23 @@ export class GameManager {
   }
 
   private startLoop() {
+    let sinceEmit = 0;
+    let prevStatus = this.gameState.status;
     setInterval(() => {
       this.update();
-      this.io.emit("gameState", this.gameState);
+      sinceEmit += 1;
+
+      // Always flush immediately on a status transition so lobby/countdown/
+      // ended changes aren't held back by the slower lobby cadence.
+      const statusChanged = this.gameState.status !== prevStatus;
+      prevStatus = this.gameState.status;
+
+      const active = this.gameState.status === 'playing' || this.gameState.status === 'countdown';
+      const interval = active ? this.netcastEveryNTicks : this.lobbyNetcastEveryNTicks;
+      if (statusChanged || sinceEmit >= interval) {
+        sinceEmit = 0;
+        this.io.emit('gameState', this.gameState);
+      }
     }, 1000 / 60);
   }
 

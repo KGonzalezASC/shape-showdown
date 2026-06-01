@@ -117,7 +117,10 @@ export const useGameSocket = () => {
       });
 
       sock.on('gameState', (state: GameState) => {
-        setGameState(structuredClone(state) as GameState);
+        // socket.io already hands us a freshly-deserialized object per message,
+        // so structuredClone here is pure wasted CPU/GC — deep-cloning two
+        // 40x10 boards up to 60x/sec, which is brutal on phones. Use directly.
+        setGameState(state);
       });
       sock.on('matchEvent', (evt: MatchEvent) => {
         setLastMatchEvent(evt);
