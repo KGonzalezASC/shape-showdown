@@ -1,4 +1,4 @@
-name: Deploy BubbleBlitzers
+name: Deploy Shape Showdown
 
 on:
   push:
@@ -30,36 +30,49 @@ jobs:
       - name: Build replay viewer
         run: bun run build:replay
 
-      - name: Copy project to server
-        uses: appleboy/scp-action@v0.1.4
+      - name: Compile server binary (standalone, Linux x64)
+        run: bun run build:server:bin
+
+      - name: Deploy client static files
+        uses: appleboy/scp-action@v0.1.7
         with:
           host: ${{ secrets.REMOTE_HOST }}
           username: ${{ secrets.REMOTE_USER }}
           password: ${{ secrets.REMOTE_PASSWORD }}
-          source: "."
-          target: "${{ secrets.SERVER_DEPLOY_PATH }}"
+          source: "dist/client/*"
+          target: "${{ secrets.CLIENT_DEPLOY_PATH }}"
+          strip_components: 2
           rm: true
-          exclude: "node_modules,.git"
 
-      - name: Deploy server and client
-        uses: appleboy/ssh-action@v0.1.10
+      - name: Deploy replay viewer static files
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.REMOTE_HOST }}
+          username: ${{ secrets.REMOTE_USER }}
+          password: ${{ secrets.REMOTE_PASSWORD }}
+          source: "dist/replay-viewer/*"
+          target: "${{ secrets.REPLAY_DEPLOY_PATH }}"
+          strip_components: 2
+          rm: true
+
+      - name: Deploy server binary
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.REMOTE_HOST }}
+          username: ${{ secrets.REMOTE_USER }}
+          password: ${{ secrets.REMOTE_PASSWORD }}
+          source: "dist-server/shape-showdown-server.x86_64"
+          target: "${{ secrets.SERVER_DEPLOY_PATH }}/build"
+          strip_components: 1
+
+      - name: Restart game server service
+        uses: appleboy/ssh-action@v1.2.0
         with:
           host: ${{ secrets.REMOTE_HOST }}
           username: ${{ secrets.REMOTE_USER }}
           password: ${{ secrets.REMOTE_PASSWORD }}
           script: |
-            echo "SERVER_PORT=${{ secrets.SERVER_PORT }}" > ${{ secrets.SERVER_DEPLOY_PATH }}/.env
-            echo "REPLAYS_HOST_PATH=${{ secrets.REPLAYS_HOST_PATH }}" >> ${{ secrets.SERVER_DEPLOY_PATH }}/.env
-            
-            # Deploy Main Client
-            mkdir -p ${{ secrets.CLIENT_DEPLOY_PATH }}
-            rm -rf ${{ secrets.CLIENT_DEPLOY_PATH }}/*
-            cp -r ${{ secrets.SERVER_DEPLOY_PATH }}/dist/client/. ${{ secrets.CLIENT_DEPLOY_PATH }}/
-            
-            # Deploy Replay Viewer
-            mkdir -p ${{ secrets.REPLAY_DEPLOY_PATH }}
-            rm -rf ${{ secrets.REPLAY_DEPLOY_PATH }}/*
-            cp -r ${{ secrets.SERVER_DEPLOY_PATH }}/dist/replay-viewer/. ${{ secrets.REPLAY_DEPLOY_PATH }}/
-            
-            cd ${{ secrets.SERVER_DEPLOY_PATH }}
-            docker compose up -d --build --force-recreate
+            chmod +x ${{ secrets.SERVER_DEPLOY_PATH }}/build/shape-showdown-server.x86_64
+            sudo systemctl restart shape-showdown-server
+            sleep 2
+            sudo systemctl is-active shape-showdown-server
