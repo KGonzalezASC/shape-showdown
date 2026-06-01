@@ -11,7 +11,7 @@
     "build:client": "bunx vite build",
     "build:replay": "bunx vite build -c vite.replay.config.mjs",
     "build:server": "bun build server.ts --target=node --outfile=dist-server/server.mjs",
-    "build:server:bin": "bun build server.ts --compile --target=bun-linux-x64 --outfile=dist-server/shape-showdown-server.x86_64",
+    "build:server:bin": "bun build server.ts --compile --target=bun-linux-x64 --define 'process.env.NODE_ENV=\"production\"' --outfile=dist-server/shape-showdown-server.x86_64",
     "build": "bun run build:client && bun run build:replay && bun run build:server",
     "preview": "bunx vite preview",
     "clean": "rimraf dist dist-server .dev-server.mjs",
