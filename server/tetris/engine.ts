@@ -15,6 +15,7 @@ import {
   LOCK_RESET_CAP,
   MatchEvent,
   PendingGarbagePacket,
+  PendingShopEffect,
   PlayerState,
   RotationState,
   SOFT_DROP_CELLS_PER_TICK,
@@ -22,6 +23,7 @@ import {
 } from '../../src/types.js';
 import {
   COMBO_BONUS_TABLE,
+  CURTAIN_DURATION_TICKS,
   DAS_TICKS,
   GRAVITY_TICKS_PER_CELL,
   HORIZONTAL_SPEED_THRESHOLDS,
@@ -90,6 +92,9 @@ export function makePlayer(id: string, rng: MutableRng): PlayerState {
     lastActionWasRotate: false,
     pendingGarbage: [],
     topOut: false,
+    swapCutoffRow: HOLD_SWAP_CUTOFF_VISIBLE_ROW,
+    pendingShopEffects: [],
+    activeEffects: [],
   };
   ensureQueue(player, rng);
   player.activePiece = spawnNextPiece(player, rng);
@@ -187,7 +192,7 @@ function isGrounded(player: PlayerState): boolean {
 function canHoldAtCurrentHeight(player: PlayerState): boolean {
   if (!player.activePiece) return false;
   const maxVisibleRow = Math.max(...getCells(player.activePiece).map((cell) => cell.y - BOARD_HIDDEN_ROWS));
-  return maxVisibleRow < HOLD_SWAP_CUTOFF_VISIBLE_ROW;
+  return maxVisibleRow < player.swapCutoffRow;
 }
 
 function lockPiece(player: PlayerState): { lines: number; tSpin: 'full' | 'mini' | false; perfectClear: boolean } {
@@ -415,6 +420,44 @@ export function stepPlayer(
   rng: MutableRng,
   matchEvents: MatchEvent[],
 ): void {
+  // ── Clean up expired visual effect pills ──
+  if (player.activeEffects && player.activeEffects.length > 0) {
+    player.activeEffects = player.activeEffects.filter(
+      (effect) => effect.expiresAtTick === undefined || gameState.tick < effect.expiresAtTick
+    );
+  }
+
+  // ── Process any pending shop effects that have reached their activation tick ──
+  if (player.pendingShopEffects.length > 0) {
+    const remaining: PendingShopEffect[] = [];
+    for (const effect of player.pendingShopEffects) {
+      if (effect.activationTick <= gameState.tick) {
+        if (effect.itemId === 'retrim') {
+          player.swapCutoffRow = Math.max(0, player.swapCutoffRow - 1);
+        } else if (effect.itemId === 'curtain') {
+          // Telegraph elapsed — drop the frost overlay. The client renders an
+          // overlay whenever an active effect with this id prefix is present,
+          // and the prune above removes it automatically at expiresAtTick.
+          if (!player.activeEffects) player.activeEffects = [];
+          player.activeEffects.push({
+            id: `curtain-active-${gameState.tick}`,
+            label: 'Curtain',
+            icon: '🎭',
+            bgClass: 'bg-indigo-900/80',
+            borderClass: 'border-indigo-400',
+            textClass: 'text-indigo-100',
+            glowClass: 'shadow-[0_0_10px_rgba(129,140,248,0.7)]',
+            expiresAtTick: gameState.tick + CURTAIN_DURATION_TICKS,
+          });
+        }
+        // Future effects can be dispatched here with additional else-if branches.
+      } else {
+        remaining.push(effect);
+      }
+    }
+    player.pendingShopEffects = remaining;
+  }
+
   if (!player.activePiece) {
     player.lastSrsKick = null;
     player.activePiece = spawnNextPiece(player, rng);

@@ -129,6 +129,41 @@ const OpponentMiniField: React.FC<OpponentMiniFieldProps> = ({ player, pendingGa
 };
 
 export default React.memo(OpponentMiniField, (prev, next) => {
-  return prev.pendingGarbage === next.pendingGarbage &&
-         JSON.stringify(prev.player) === JSON.stringify(next.player);
+  if (prev.pendingGarbage !== next.pendingGarbage) return false;
+
+  const pA = prev.player;
+  const pB = next.player;
+  if (pA === pB) return true;
+  if (!pA || !pB) return false;
+
+  if (
+    pA.score !== pB.score ||
+    pA.linesCleared !== pB.linesCleared
+  ) {
+    return false;
+  }
+
+  const aA = pA.activePiece;
+  const aB = pB.activePiece;
+  if ((!aA && aB) || (aA && !aB)) return false;
+  if (aA && aB) {
+    if (
+      aA.x !== aB.x ||
+      aA.y !== aB.y ||
+      aA.rotation !== aB.rotation ||
+      aA.type !== aB.type
+    ) {
+      return false;
+    }
+  }
+
+  for (let y = 0; y < pA.board.length; y++) {
+    const rowA = pA.board[y];
+    const rowB = pB.board[y];
+    for (let x = 0; x < rowA.length; x++) {
+      if (rowA[x] !== rowB[x]) return false;
+    }
+  }
+
+  return true;
 });

@@ -17,7 +17,7 @@ async function startServer() {
     },
   });
 
-  const gameManager = new GameManager(io);
+  const gameManager = new GameManager(io, cfg.replayKeyframeIntervalTicks);
 
   app.get('/health', (_req, res) => {
     res.status(200).type('text/plain').send('ok');

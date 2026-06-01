@@ -1,4 +1,4 @@
-import React, { useCallback, useContext, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import React, { useCallback, useContext, useEffect, useLayoutEffect, useReducer, useRef, useState } from 'react';
 import { Timer, Trophy, Users, Zap } from 'lucide-react';
 import { AnimatePresence, LazyMotion, domAnimation, m } from 'motion/react';
 import { useGameSocket } from './hooks/useGameSocket';
@@ -9,7 +9,8 @@ import ShopRail from './components/ShopRail';
 import { ShopRailVariations } from './components/ShopRailVariations';
 import { GameFieldsLayout } from './components/GameFieldsLayout';
 import { PlayfieldCellSizeContext } from './components/playfieldCellSizeContext';
-import { ActionType, BOARD_COLS, BOARD_VISIBLE_ROWS, LOCK_DELAY_TICKS, LOCK_RESET_CAP, ShopItem } from './types';
+import { GameFieldRef } from './components/GameField';
+import { ActionType, BOARD_COLS, BOARD_VISIBLE_ROWS, CURTAIN_COST, LOCK_DELAY_TICKS, LOCK_RESET_CAP, RETRIM_COST, ShopItem } from './types';
 
 function WaitingForOpponentBoard() {
   const cell = useContext(PlayfieldCellSizeContext);
@@ -38,6 +39,7 @@ function matchEventLabel(evt: { type: string; lines?: number; playerId?: string 
   return { text: evt.type, tone: 'text-zinc-300' };
 }
 
+
 const SHOP_MOCK_POOL: ShopItem[] = [
   {
     id: 'spark-overclock',
@@ -51,15 +53,28 @@ const SHOP_MOCK_POOL: ShopItem[] = [
     description: 'Lorem ipsum dolor sit amet.',
   },
   {
-    id: 'aegis-core',
-    name: 'Aegis',
-    icon: '🛡️',
-    cost: 150,
-    tier: 1,
-    baseWeight: 1,
-    colorClass: 'bg-emerald-900/75',
-    borderColorClass: 'border-emerald-300/70',
-    description: 'Consectetur adipiscing elit.',
+    id: 'retrim',
+    name: 'Re-Trim',
+    icon: '✂️',
+    cost: RETRIM_COST,
+    tier: 2,
+    baseWeight: 2.25,
+    colorClass: 'bg-rose-900/70',
+    borderColorClass: 'border-rose-300/65',
+    description: 'Permanently moves the opponent\'s swap line up one row.',
+  },
+  {
+    id: 'curtain',
+    name: 'Curtain',
+    icon: '🎭',
+    cost: CURTAIN_COST,
+    tier: 2,
+    baseWeight: 2.25,
+    colorClass: 'bg-indigo-900/70',
+    borderColorClass: 'border-indigo-300/65',
+    description: 'Frosts the opponent\'s field below their swap line for 4 seconds.',
+    synergyTargetId: 'retrim',
+    synergyBoost: 2.5,
   },
   {
     id: 'nova-charge',
@@ -237,19 +252,42 @@ function drawIdFromTierBag(
   return { itemId: null, nextBagState: { ...bagState, [key]: bag } };
 }
 
+/**
+ * Synergy boost for an item given the set of items the player already owns.
+ * Returns the multiplier (>1) when the item's synergy partner is owned, else 1.
+ * e.g. Curtain (synergyTargetId 'retrim') becomes more likely once you own scissors.
+ */
+function synergyMultiplier(item: ShopItem, ownedIds: Set<string>): number {
+  if (item.synergyTargetId && item.synergyBoost && ownedIds.has(item.synergyTargetId)) {
+    return Math.max(1, item.synergyBoost);
+  }
+  return 1;
+}
+
+/** Remove a specific id from its tier bag (no-op if absent). */
+function removeIdFromTierBag(bagState: ShopBagState, tier: 1 | 2, id: string): ShopBagState {
+  const key = tier === 1 ? 'tier1Bag' : 'tier2Bag';
+  if (!bagState[key].includes(id)) return bagState;
+  return { ...bagState, [key]: bagState[key].filter((x) => x !== id) };
+}
+
 function drawOneWeightedShopItem(
   pool: ShopItem[],
   bagState: ShopBagState,
   excludedIds: Set<string>,
   currentTier1Count: number,
+  ownedIds: Set<string>,
 ): { item: ShopItem | null; nextBagState: ShopBagState } {
   const byId = new Map(pool.map((item) => [item.id, item]));
+  // Effective weight folds in the synergy multiplier so a boosted item also
+  // nudges its *tier* to be chosen more often, not just its within-tier odds.
+  const effWeight = (item: ShopItem) => item.baseWeight * synergyMultiplier(item, ownedIds);
   const tier1Weight = pool
     .filter((item) => item.tier === 1 && !excludedIds.has(item.id))
-    .reduce((sum, item) => sum + item.baseWeight, 0);
+    .reduce((sum, item) => sum + effWeight(item), 0);
   const tier2Weight = pool
     .filter((item) => item.tier === 2 && !excludedIds.has(item.id))
-    .reduce((sum, item) => sum + item.baseWeight, 0);
+    .reduce((sum, item) => sum + effWeight(item), 0);
   const hasTier1Available = tier1Weight > 0;
   const hasTier2Available = tier2Weight > 0;
   const canTakeTier1 = hasTier1Available && currentTier1Count < SHOP_MAX_TIER1_OFFERS;
@@ -265,6 +303,17 @@ function drawOneWeightedShopItem(
   for (const tier of tiersToTry) {
     if (tier === 1 && !canTakeTier1) continue;
     if (tier === 2 && !canTakeTier2) continue;
+
+    // Synergy fast-path: if a boosted item is eligible in this tier, give it a
+    // chance to jump the bag with probability (1 - 1/boost) — e.g. boost 2.5 → 60%.
+    const synergyItem = pool.find(
+      (it) => it.tier === tier && !excludedIds.has(it.id) && synergyMultiplier(it, ownedIds) > 1,
+    );
+    if (synergyItem && Math.random() < 1 - 1 / synergyMultiplier(synergyItem, ownedIds)) {
+      nextState = removeIdFromTierBag(nextState, tier, synergyItem.id);
+      return { item: synergyItem, nextBagState: nextState };
+    }
+
     const drawn = drawIdFromTierBag(pool, tier, nextState, excludedIds);
     nextState = drawn.nextBagState;
     if (drawn.itemId) {
@@ -279,6 +328,7 @@ function drawWeightedShopOffers(
   pool: ShopItem[],
   count: number,
   bagState: ShopBagState,
+  ownedIds: Set<string> = new Set(),
 ): { offers: ShopItem[]; nextBagState: ShopBagState } {
   const target = Math.max(0, Math.min(count, pool.length));
   const offers: ShopItem[] = [];
@@ -287,7 +337,7 @@ function drawWeightedShopOffers(
   let nextState = bagState;
 
   while (offers.length < target) {
-    const drawn = drawOneWeightedShopItem(pool, nextState, excludedIds, tier1Count);
+    const drawn = drawOneWeightedShopItem(pool, nextState, excludedIds, tier1Count, ownedIds);
     nextState = drawn.nextBagState;
     if (!drawn.item) break;
     offers.push(drawn.item);
@@ -305,9 +355,13 @@ function drawWeightedShopOffers(
   return { offers, nextBagState: nextState };
 }
 
-function createInitialShopRoll(pool: ShopItem[], count: number): { offers: ShopItem[]; bagState: ShopBagState } {
+function createInitialShopRoll(
+  pool: ShopItem[],
+  count: number,
+  ownedIds: Set<string> = new Set(),
+): { offers: ShopItem[]; bagState: ShopBagState } {
   const freshBag = buildShopBagState(pool);
-  const rolled = drawWeightedShopOffers(pool, count, freshBag);
+  const rolled = drawWeightedShopOffers(pool, count, freshBag, ownedIds);
   return {
     offers: rolled.offers,
     bagState: rolled.nextBagState,
@@ -315,7 +369,7 @@ function createInitialShopRoll(pool: ShopItem[], count: number): { offers: ShopI
 }
 
 const App: React.FC = () => {
-  const { gameState, myId, lastMatchEvent, sendAction, sendInputState } = useGameSocket();
+  const { gameState, myId, lastMatchEvent, sendAction, sendInputState, sendShopPurchase } = useGameSocket();
 
   const stateRef = useRef({ gameState, myId });
   useLayoutEffect(() => {
@@ -345,29 +399,94 @@ const App: React.FC = () => {
   const drillExhaustAttemptsRef = useRef(0);
   const drillFailureReasonRef = useRef<string | null>(null);
 
-  const [myShake, setMyShake] = useState('');
-  const [oppShake, setOppShake] = useState('');
-  const [shopState, setShopState] = useState<{ offers: ShopItem[]; bagState: ShopBagState }>(() =>
-    createInitialShopRoll(SHOP_MOCK_POOL, SHOP_VISIBLE_COUNT),
-  );
-  const [shopPhase, setShopPhase] = useState<'waiting' | 'ready' | 'cycling' | 'expired'>('waiting');
-  const [shopCycleIndex, setShopCycleIndex] = useState(-1);
-  const [purchasedItem, setPurchasedItem] = useState<ShopItem | null>(null);
-  const [shopSpentScore, setShopSpentScore] = useState(0);
-  const shopSpentScoreRef = useRef(0);
-  const shopStateRef = useRef({ phase: 'waiting', cycleIndex: -1, offers: shopState.offers });
+  const myMobileFieldRef = useRef<GameFieldRef>(null);
+  const myDesktopFieldRef = useRef<GameFieldRef>(null);
+  const oppDesktopFieldRef = useRef<GameFieldRef>(null);
+
+  // ---------------------------------------------------------------------------
+  // Shop state — single useReducer so all fields update atomically, no manual
+  // ref sync needed for closure-safe reads (use shopRef.current instead).
+  // ---------------------------------------------------------------------------
+  interface ShopReducerState {
+    offers: ShopItem[];
+    bagState: ShopBagState;
+    phase: 'waiting' | 'ready' | 'cycling' | 'expired';
+    cycleIndex: number;
+    purchasedItem: ShopItem | null;
+    spentScore: number;
+    /** Ids of every item bought this match — drives synergy draw weighting. */
+    ownedIds: string[];
+  }
+
+  type ShopAction =
+    | { type: 'RESET'; payload: { offers: ShopItem[]; bagState: ShopBagState } }
+    | { type: 'LINE_CLEAR_ROLL'; payload: { offers: ShopItem[]; bagState: ShopBagState } }
+    | { type: 'START_CYCLE' }
+    | { type: 'TICK_CYCLE'; payload: { nextIndex: number } }
+    | { type: 'EXPIRE_CYCLE' }
+    | { type: 'PURCHASE'; payload: { item: ShopItem; cost: number } }
+    | { type: 'STOP_CYCLE' };
+
+  function shopReducer(state: ShopReducerState, action: ShopAction): ShopReducerState {
+    switch (action.type) {
+      case 'RESET': {
+        const { offers, bagState } = action.payload;
+        return { offers, bagState, phase: 'waiting', cycleIndex: -1, purchasedItem: null, spentScore: 0, ownedIds: [] };
+      }
+      case 'LINE_CLEAR_ROLL': {
+        const { offers, bagState } = action.payload;
+        return { ...state, offers, bagState, phase: 'ready', cycleIndex: -1 };
+      }
+      case 'START_CYCLE':
+        return { ...state, phase: 'cycling', cycleIndex: 0 };
+      case 'TICK_CYCLE':
+        return { ...state, cycleIndex: action.payload.nextIndex };
+      case 'EXPIRE_CYCLE':
+        return { ...state, phase: 'expired', cycleIndex: -1 };
+      case 'PURCHASE': {
+        const { item, cost } = action.payload;
+        return {
+          ...state,
+          phase: 'waiting',
+          cycleIndex: -1,
+          purchasedItem: item,
+          spentScore: state.spentScore + cost,
+          ownedIds: [...state.ownedIds, item.id],
+        };
+      }
+      case 'STOP_CYCLE':
+        return { ...state, phase: 'waiting', cycleIndex: -1 };
+      default:
+        return state;
+    }
+  }
+
+  const initialShop = createInitialShopRoll(SHOP_MOCK_POOL, SHOP_VISIBLE_COUNT);
+  const [shop, shopDispatch] = useReducer(shopReducer, {
+    offers: initialShop.offers,
+    bagState: initialShop.bagState,
+    phase: 'waiting',
+    cycleIndex: -1,
+    purchasedItem: null,
+    spentScore: 0,
+    ownedIds: [],
+  });
+
+  // Ref mirror so interval callbacks and key-event closures always read fresh state
+  const shopRef = useRef(shop);
+  useLayoutEffect(() => {
+    shopRef.current = shop;
+  }, [shop]);
+
   const shopCycleTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  useLayoutEffect(() => {
-    shopStateRef.current = { phase: shopPhase, cycleIndex: shopCycleIndex, offers: shopState.offers };
-  }, [shopPhase, shopCycleIndex, shopState.offers]);
-
   const triggerShake = useCallback((isMe: boolean, type: 'soft' | 'medium') => {
-    const setter = isMe ? setMyShake : setOppShake;
-    const cls = type === 'soft' ? 'animate-shake-soft' : 'animate-shake-medium';
-    setter('');
-    setTimeout(() => setter(cls), 10);
-    setTimeout(() => setter(''), 400);
+    if (isMe) {
+      myMobileFieldRef.current?.shake(type);
+      myDesktopFieldRef.current?.shake(type);
+    } else {
+      oppDesktopFieldRef.current?.shake(type);
+    }
   }, []);
 
   const handleAction = useCallback(
@@ -388,26 +507,21 @@ const App: React.FC = () => {
       shopCycleTimerRef.current = null;
     }
     if (offersLength <= 0) return;
-    setShopPhase('cycling');
-    setShopCycleIndex(0);
-    // Sync ref immediately so handleShopConfirm closure reads fresh phase/index
-    shopStateRef.current = { ...shopStateRef.current, phase: 'cycling', cycleIndex: 0 };
+    shopDispatch({ type: 'START_CYCLE' });
 
     shopCycleTimerRef.current = setInterval(() => {
-      setShopCycleIndex((prev) => {
-        const nextIndex = prev + 1;
-        if (nextIndex >= offersLength) {
-          if (shopCycleTimerRef.current) {
-            clearInterval(shopCycleTimerRef.current);
-            shopCycleTimerRef.current = null;
-          }
-          setShopPhase('expired');
-          shopStateRef.current = { ...shopStateRef.current, phase: 'expired', cycleIndex: -1 };
-          return -1;
+      // Read fresh state from ref so this closure is never stale
+      const current = shopRef.current;
+      const nextIndex = current.cycleIndex + 1;
+      if (nextIndex >= offersLength) {
+        if (shopCycleTimerRef.current) {
+          clearInterval(shopCycleTimerRef.current);
+          shopCycleTimerRef.current = null;
         }
-        shopStateRef.current = { ...shopStateRef.current, cycleIndex: nextIndex };
-        return nextIndex;
-      });
+        shopDispatch({ type: 'EXPIRE_CYCLE' });
+        return;
+      }
+      shopDispatch({ type: 'TICK_CYCLE', payload: { nextIndex } });
     }, SHOP_CYCLE_INTERVAL_MS);
   }, []);
 
@@ -416,12 +530,11 @@ const App: React.FC = () => {
       clearInterval(shopCycleTimerRef.current);
       shopCycleTimerRef.current = null;
     }
-    setShopPhase('waiting');
-    setShopCycleIndex(-1);
+    shopDispatch({ type: 'STOP_CYCLE' });
   }, []);
 
   const handleShopConfirm = useCallback(() => {
-    const { phase, cycleIndex, offers } = shopStateRef.current;
+    const { phase, cycleIndex, offers, spentScore } = shopRef.current;
     if (phase === 'waiting') return;
 
     if (phase === 'ready' || phase === 'expired') {
@@ -433,25 +546,22 @@ const App: React.FC = () => {
       if (cycleIndex < 0 || cycleIndex >= offers.length) return;
 
       const picked = offers[cycleIndex];
-      const currentScore = myId && gameState ? (gameState.players[myId]?.score ?? 0) : 0;
-      const availableScore = Math.max(0, currentScore - shopSpentScoreRef.current);
+      const currentGameState = stateRef.current.gameState;
+      const currentMyId = stateRef.current.myId;
+      const currentScore = currentMyId && currentGameState ? (currentGameState.players[currentMyId]?.score ?? 0) : 0;
+      const availableScore = Math.max(0, currentScore - spentScore);
 
       if (availableScore < picked.cost) return;
-
-      setPurchasedItem(picked);
-      const nextSpent = shopSpentScoreRef.current + picked.cost;
-      shopSpentScoreRef.current = nextSpent;
-      setShopSpentScore(nextSpent);
 
       if (shopCycleTimerRef.current) {
         clearInterval(shopCycleTimerRef.current);
         shopCycleTimerRef.current = null;
       }
-      setShopPhase('waiting');
-      setShopCycleIndex(-1);
-      shopStateRef.current = { ...shopStateRef.current, phase: 'waiting', cycleIndex: -1 };
+      shopDispatch({ type: 'PURCHASE', payload: { item: picked, cost: picked.cost } });
+      // Notify the server — it validates, deducts score, and applies the effect to the opponent.
+      sendShopPurchase(picked.id);
     }
-  }, [gameState, myId, startShopCycle]);
+  }, [startShopCycle, sendShopPurchase]);
 
   useLayoutEffect(() => {
     const el = mobilePlayfieldRef.current;
@@ -481,12 +591,15 @@ const App: React.FC = () => {
     return () => window.clearTimeout(t);
   }, [drillResult]);
 
-  useEffect(() => {
-    shopSpentScoreRef.current = shopSpentScore;
-  }, [shopSpentScore]);
+  // shopSpentScore sync effect removed — spentScore lives inside shop reducer state,
+  // read via shopRef.current.spentScore in closures.
 
-  const previousLineClearTickRef = useRef<number | null>(null);
+  const previousLinesClearedRef = useRef<number | null>(null);
   const previousStatusRef = useRef<string | null>(null);
+  // Local source of truth for held movement keys. Inputs must NOT be derived
+  // from the server-echoed gameState (which lags ~RTT in prod) or holding one
+  // key while tapping another can drop/resurrect keys ("stuck"/"ignored").
+  const heldKeysRef = useRef({ left: false, right: false, softDrop: false });
   useEffect(() => {
     const status = gameState?.status ?? null;
     if (!status) return;
@@ -494,41 +607,52 @@ const App: React.FC = () => {
     previousStatusRef.current = status;
 
     if (status === 'waiting' || status === 'countdown') {
-      stopShopCycle();
-      setShopState(createInitialShopRoll(SHOP_MOCK_POOL, SHOP_VISIBLE_COUNT));
-      setShopSpentScore(0);
-      setPurchasedItem(null);
-      shopSpentScoreRef.current = 0;
-      previousLineClearTickRef.current = null;
+      if (shopCycleTimerRef.current) {
+        clearInterval(shopCycleTimerRef.current);
+        shopCycleTimerRef.current = null;
+      }
+      const fresh = createInitialShopRoll(SHOP_MOCK_POOL, SHOP_VISIBLE_COUNT);
+      shopDispatch({ type: 'RESET', payload: fresh });
+      previousLinesClearedRef.current = null;
+    } else if (status === 'playing') {
+      // Establish this match's lines-cleared baseline so the first clear
+      // (0 -> N) triggers a shop roll.
+      previousLinesClearedRef.current = 0;
     }
-  }, [gameState?.status, stopShopCycle]);
+  }, [gameState?.status]);
 
+  // Roll the shop off the AUTHORITATIVE per-player linesCleared counter in
+  // gameState (sent 60x/sec), NOT transient 'lineClear' matchEvents. In prod,
+  // multiple same-tick events (lineClear/attackSent/garbageApplied) coalesce
+  // into one packet and React batches them, so lastMatchEvent ends up as a
+  // non-lineClear event and the roll is silently lost. Diffing the cumulative
+  // counter is immune to event batching and even to dropped frames.
+  const myLinesCleared = myId ? gameState?.players?.[myId]?.linesCleared : undefined;
   useEffect(() => {
-    if (!gameState || gameState.status !== 'playing') return;
-    if (!lastMatchEvent || lastMatchEvent.type !== 'lineClear' || !myId) return;
-    if (lastMatchEvent.playerId !== myId) return;
-    if (previousLineClearTickRef.current === lastMatchEvent.tick) return;
-    previousLineClearTickRef.current = lastMatchEvent.tick;
-    
-    const rolled = drawWeightedShopOffers(SHOP_MOCK_POOL, SHOP_VISIBLE_COUNT, shopState.bagState);
-    const newOffers = rolled.offers;
-    setShopState({
-      offers: newOffers,
-      bagState: rolled.nextBagState,
-    });
+    if (!gameState || gameState.status !== 'playing' || !myId) return;
+    const me = gameState.players[myId];
+    if (!me) return;
+    const prev = previousLinesClearedRef.current;
+    previousLinesClearedRef.current = me.linesCleared;
+    if (prev === null) return;            // baseline not established yet
+    if (me.linesCleared <= prev) return;  // no new line clear since last frame
 
     if (shopCycleTimerRef.current) {
       clearInterval(shopCycleTimerRef.current);
       shopCycleTimerRef.current = null;
     }
-    setShopPhase('ready');
-    setShopCycleIndex(-1);
-    // Update ref synchronously so C key handler reads fresh offers+phase immediately
-    shopStateRef.current = { phase: 'ready', cycleIndex: -1, offers: newOffers };
-  }, [gameState?.status, lastMatchEvent, myId, shopState.bagState]);
+    const rolled = drawWeightedShopOffers(
+      SHOP_MOCK_POOL,
+      SHOP_VISIBLE_COUNT,
+      shopRef.current.bagState,
+      new Set(shopRef.current.ownedIds),
+    );
+    shopDispatch({ type: 'LINE_CLEAR_ROLL', payload: { offers: rolled.offers, bagState: rolled.nextBagState } });
+  }, [myLinesCleared, gameState?.status, myId]);
 
   useEffect(() => {
     if (!gameState || gameState.status !== 'playing') {
+      heldKeysRef.current = { left: false, right: false, softDrop: false };
       sendInputState({ left: false, right: false, softDrop: false });
     }
   }, [gameState?.status, sendInputState]);
@@ -544,13 +668,19 @@ const App: React.FC = () => {
       if (!gameState || gameState.status !== 'playing' || !myId || !gameState.players[myId]) return;
       if (e.key === 'ArrowLeft') {
         e.preventDefault();
-        sendInputState({ ...gameState.players[myId].inputState, left: true });
+        if (heldKeysRef.current.left) return; // ignore OS key-repeat
+        heldKeysRef.current = { ...heldKeysRef.current, left: true };
+        sendInputState({ ...heldKeysRef.current });
       } else if (e.key === 'ArrowRight') {
         e.preventDefault();
-        sendInputState({ ...gameState.players[myId].inputState, right: true });
+        if (heldKeysRef.current.right) return;
+        heldKeysRef.current = { ...heldKeysRef.current, right: true };
+        sendInputState({ ...heldKeysRef.current });
       } else if (e.key === 'ArrowDown') {
         e.preventDefault();
-        sendInputState({ ...gameState.players[myId].inputState, softDrop: true });
+        if (heldKeysRef.current.softDrop) return;
+        heldKeysRef.current = { ...heldKeysRef.current, softDrop: true };
+        sendInputState({ ...heldKeysRef.current });
       } else if (e.key === 'ArrowUp') {
         e.preventDefault();
         handleAction('hardDrop');
@@ -572,18 +702,21 @@ const App: React.FC = () => {
       }
     };
     const onKeyUp = (e: KeyboardEvent) => {
-      const { gameState, myId } = stateRef.current;
-      if (!gameState || !myId || !gameState.players[myId]) return;
-      const current = gameState.players[myId].inputState;
+      // Always honor key-up from the LOCAL held-keys state, independent of
+      // gameState — a release must take effect even if the echo is delayed.
       if (e.key === 'ArrowLeft') {
-        sendInputState({ ...current, left: false });
+        heldKeysRef.current = { ...heldKeysRef.current, left: false };
+        sendInputState({ ...heldKeysRef.current });
       } else if (e.key === 'ArrowRight') {
-        sendInputState({ ...current, right: false });
+        heldKeysRef.current = { ...heldKeysRef.current, right: false };
+        sendInputState({ ...heldKeysRef.current });
       } else if (e.key === 'ArrowDown') {
-        sendInputState({ ...current, softDrop: false });
+        heldKeysRef.current = { ...heldKeysRef.current, softDrop: false };
+        sendInputState({ ...heldKeysRef.current });
       }
     };
     const clearInput = () => {
+      heldKeysRef.current = { left: false, right: false, softDrop: false };
       sendInputState({ left: false, right: false, softDrop: false });
     };
     window.addEventListener('keydown', onKeyDown);
@@ -772,8 +905,8 @@ const App: React.FC = () => {
   const myPlayer = myId ? gameState?.players[myId] : null;
   const opponentId = myId ? Object.keys(gameState?.players ?? {}).find((id) => id !== myId) : null;
   const opponentPlayer = opponentId && gameState ? gameState.players[opponentId] : null;
-  const availableShopScore = Math.max(0, (myPlayer?.score ?? 0) - shopSpentScore);
-  const shopCanPurchase = shopPhase === 'cycling' || shopPhase === 'ready';
+  const availableShopScore = Math.max(0, (myPlayer?.score ?? 0) - shop.spentScore);
+  const shopCanPurchase = shop.phase === 'cycling' || shop.phase === 'ready';
   const myPendingGarbage = myPlayer ? myPlayer.pendingGarbage.reduce((sum, g) => sum + g.lines, 0) : 0;
   const oppPendingGarbage = opponentPlayer ? opponentPlayer.pendingGarbage.reduce((sum, g) => sum + g.lines, 0) : 0;
   const eventUi = matchEventLabel(lastMatchEvent, myId);
@@ -784,7 +917,7 @@ const App: React.FC = () => {
 
   if (!gameState) {
     return (
-      <div className="flex h-dvh items-center justify-center bg-black text-white">
+      <div className="flex h-dvh items-center justify-center bg-[#0a0a0f] text-white">
         <div className="flex flex-col items-center gap-4">
           <div className="w-12 h-12 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin" />
           <p className="font-mono text-sm tracking-widest uppercase animate-pulse">Connecting to Game Server...</p>
@@ -933,13 +1066,13 @@ const App: React.FC = () => {
           {myPlayer && (
             <div className="relative">
               <GameField
+                ref={myMobileFieldRef}
                 player={myPlayer}
                 isMe={true}
                 title="👤 YOUR FIELD"
                 borderColorClass="border-emerald-500/20"
                 shadowColorClass="shadow-[0_0_30px_rgba(16,185,129,0.1)]"
                 cellSize={mobileCellSize}
-                shakeClass={myShake}
               />
               {/* Anchor mini field to the right of the main board so it doesn't drift away on wider screens */}
               <div className="absolute left-[calc(100%+0.5rem)] sm:left-[calc(100%+1rem)] top-0 z-20 origin-top-left">
@@ -947,12 +1080,12 @@ const App: React.FC = () => {
               </div>
               <div className="absolute left-[calc(100%+0.5rem)] sm:left-[calc(100%+1rem)] top-[9.5rem] z-20 origin-top-left">
           <ShopRail
-            items={shopState.offers}
+            items={shop.offers}
             isPlaying={gameState.status === 'playing'}
             canPurchase={shopCanPurchase}
-            cycleIndex={shopCycleIndex}
-            shopPhase={shopPhase}
-            purchasedItem={purchasedItem}
+            cycleIndex={shop.cycleIndex}
+            shopPhase={shop.phase}
+            purchasedItem={shop.purchasedItem}
             onConfirm={handleShopConfirm}
             availableScore={availableShopScore}
             viewportMode="mobile"
@@ -970,24 +1103,24 @@ const App: React.FC = () => {
             <div className="flex shrink-0 items-start gap-3 sm:gap-4">
               <div className="shrink-0">
             <ShopRail
-              items={shopState.offers}
+              items={shop.offers}
               isPlaying={gameState.status === 'playing'}
               canPurchase={shopCanPurchase}
-              cycleIndex={shopCycleIndex}
-              shopPhase={shopPhase}
-              purchasedItem={purchasedItem}
+              cycleIndex={shop.cycleIndex}
+              shopPhase={shop.phase}
+              purchasedItem={shop.purchasedItem}
               onConfirm={handleShopConfirm}
               availableScore={availableShopScore}
               viewportMode="tabletDesktop"
             />
               </div>
               <GameField
+                ref={myDesktopFieldRef}
                 player={myPlayer}
                 isMe={true}
                 title="👤 YOUR FIELD"
                 borderColorClass="border-emerald-500/20"
                 shadowColorClass="shadow-[0_0_30px_rgba(16,185,129,0.1)]"
-                shakeClass={myShake}
               />
             </div>
           )}
@@ -995,13 +1128,13 @@ const App: React.FC = () => {
           <div className="relative shrink-0">
             {opponentPlayer ? (
               <GameField
+                ref={oppDesktopFieldRef}
                 player={opponentPlayer}
                 isMe={false}
                 title="Opponent Field"
                 borderColorClass="border-rose-500/20"
                 shadowColorClass="shadow-[0_0_30px_rgba(244,63,94,0.1)]"
                 opacityClass="opacity-80"
-                shakeClass={oppShake}
               />
             ) : (
               <WaitingForOpponentBoard />
@@ -1030,7 +1163,7 @@ const App: React.FC = () => {
             <m.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
-              className="fixed inset-0 bg-black/80 backdrop-blur-md flex items-center justify-center z-50 p-4 sm:p-8"
+              className="fixed inset-0 bg-[#0a0a0f]/80 backdrop-blur-md flex items-center justify-center z-50 p-4 sm:p-8"
             >
               <div className="bg-[#1a1a1a] p-6 sm:p-10 md:p-12 rounded-[1.5rem] sm:rounded-[2rem] border border-white/10 shadow-2xl text-center max-w-[min(calc(100vw-2rem),28rem)] w-full">
                 <Trophy className="w-12 h-12 sm:w-16 sm:h-16 md:w-20 md:h-20 text-yellow-400 mx-auto mb-4 sm:mb-6" />
@@ -1041,11 +1174,11 @@ const App: React.FC = () => {
                       gameState.winnerId === 'draw' ? "It's a draw!" : "Opponent won the match."}
                 </p>
                 <div className="grid grid-cols-2 gap-3 sm:gap-4 mb-5 sm:mb-8">
-                  <div className="bg-black/40 p-3 sm:p-4 rounded-xl sm:rounded-2xl">
+                  <div className="bg-[#0a0a0f]/40 p-3 sm:p-4 rounded-xl sm:rounded-2xl">
                     <p className="text-[9px] sm:text-[10px] uppercase text-zinc-500 font-bold mb-1">Your Score</p>
                     <p className="text-xl sm:text-2xl font-mono">{myPlayer?.score || 0}</p>
                   </div>
-                  <div className="bg-black/40 p-3 sm:p-4 rounded-xl sm:rounded-2xl">
+                  <div className="bg-[#0a0a0f]/40 p-3 sm:p-4 rounded-xl sm:rounded-2xl">
                     <p className="text-[9px] sm:text-[10px] uppercase text-zinc-500 font-bold mb-1">Opponent</p>
                     <p className="text-xl sm:text-2xl font-mono">{opponentPlayer?.score || 0}</p>
                   </div>

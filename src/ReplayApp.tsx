@@ -29,6 +29,7 @@ export default function ReplayApp() {
   const lastTimeRef = useRef<number>(0);
 
   const totalTicks = useMemo(() => replay?.keyframes[replay.keyframes.length - 1]?.tick ?? 1, [replay]);
+  const keyframeIntervalTicks = replay?.keyframeIntervalTicks ?? null;
 
   useEffect(() => {
     if (!playing || !replay) return;
@@ -99,6 +100,9 @@ export default function ReplayApp() {
         <div>
           <h1 className="text-xl font-black text-emerald-400 tracking-wider">REPLAY VIEWER</h1>
           <p className="text-xs text-zinc-500">{replay ? replay.date : 'No file loaded'}</p>
+          {keyframeIntervalTicks !== null && (
+            <p className="text-[10px] text-zinc-600">Snapshot interval: {keyframeIntervalTicks} tick(s)</p>
+          )}
         </div>
         <div className="flex gap-3 items-center">
           <button
@@ -116,7 +120,7 @@ export default function ReplayApp() {
           >
             {playing ? 'PAUSE' : 'PLAY'}
           </button>
-          <select value={speed} onChange={(e) => setSpeed(Number(e.target.value))} className="bg-black border border-white/20 rounded p-1">
+          <select value={speed} onChange={(e) => setSpeed(Number(e.target.value))} className="bg-[#0a0a0f] border border-white/20 rounded p-1">
             <option value={0.5}>0.5x</option>
             <option value={1}>1x</option>
             <option value={2}>2x</option>
@@ -131,7 +135,7 @@ export default function ReplayApp() {
           {p2 && <GameField player={p2} isMe={false} title="Player 2" borderColorClass="border-rose-500/20" shadowColorClass="" />}
         </GameFieldsLayout>
         {replay && tick >= totalTicks - 1 && (
-          <div className="absolute inset-0 z-40 bg-black/40 flex items-center justify-center">
+          <div className="absolute inset-0 z-40 bg-[#0a0a0f]/40 flex items-center justify-center">
             <div className="bg-[#121212]/90 border border-emerald-500/30 p-6 rounded-xl text-center shadow-[0_0_30px_rgba(16,185,129,0.2)] backdrop-blur px-12">
               <Trophy className="mx-auto mb-3 text-emerald-400" size={32} />
               <div className="text-zinc-400 text-xs tracking-widest mb-1 uppercase">Match Finished</div>

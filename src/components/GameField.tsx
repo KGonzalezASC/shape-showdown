@@ -1,5 +1,6 @@
-import React, { useContext, useMemo } from 'react';
+import React, { forwardRef, useContext, useImperativeHandle, useMemo, useState } from 'react';
 import {
+  ActiveFieldEffect,
   BOARD_COLS,
   BOARD_HIDDEN_ROWS,
   BOARD_VISIBLE_ROWS,
@@ -19,7 +20,10 @@ interface GameFieldProps {
   opacityClass?: string;
   /** When omitted, uses `PlayfieldCellSizeContext` (desktop layout). */
   cellSize?: number;
-  shakeClass?: string;
+}
+
+export interface GameFieldRef {
+  shake: (type: 'soft' | 'medium') => void;
 }
 
 const COLORS: Record<Exclude<CellValue, null>, string> = {
@@ -86,8 +90,10 @@ const SHAPES: Record<TetrominoType, [number, number][][]> = {
 };
 
 const HOLD_PREVIEW_SIZE = 4;
+/** Curtain: rows just below the swap line that stay frosted/semi-visible; everything deeper is fully opaque. */
+const CURTAIN_FROST_ROWS = 3;
 
-const GameField: React.FC<GameFieldProps> = ({
+const GameField = forwardRef<GameFieldRef, GameFieldProps>(({
   player,
   isMe,
   title,
@@ -95,10 +101,20 @@ const GameField: React.FC<GameFieldProps> = ({
   shadowColorClass,
   opacityClass = '',
   cellSize: cellSizeProp,
-  shakeClass = '',
-}) => {
+}, ref) => {
+  const activeEffects = player.activeEffects || [];
   const layoutCellSize = useContext(PlayfieldCellSizeContext);
   const cellSize = cellSizeProp ?? layoutCellSize;
+  const [shakeClass, setShakeClass] = useState('');
+
+  useImperativeHandle(ref, () => ({
+    shake(type: 'soft' | 'medium') {
+      const cls = type === 'soft' ? 'animate-shake-soft' : 'animate-shake-medium';
+      setShakeClass('');
+      setTimeout(() => setShakeClass(cls), 10);
+      setTimeout(() => setShakeClass(''), 400);
+    }
+  }));
   const visibleRows = useMemo(() => {
     const rows = player.board.slice(BOARD_HIDDEN_ROWS, BOARD_HIDDEN_ROWS + BOARD_VISIBLE_ROWS).map((r) => [...r]);
     if (player.activePiece) {
@@ -121,7 +137,8 @@ const GameField: React.FC<GameFieldProps> = ({
     );
   }, [player.activePiece]);
 
-  const canHoldByHeight = maxActiveVisibleRow !== null && maxActiveVisibleRow < HOLD_SWAP_CUTOFF_VISIBLE_ROW;
+  const cutoffRow = player.swapCutoffRow ?? HOLD_SWAP_CUTOFF_VISIBLE_ROW;
+  const canHoldByHeight = maxActiveVisibleRow !== null && maxActiveVisibleRow < cutoffRow;
   const holdPreview = useMemo(() => {
     if (!player.holdPiece) return null;
     const occupied = new Set(SHAPES[player.holdPiece][0].map(([dx, dy]) => `${dx},${dy}`));
@@ -132,10 +149,10 @@ const GameField: React.FC<GameFieldProps> = ({
   const holdPreviewCell = Math.max(5, Math.round(cellSize * 0.31));
   const compactStorageLayout = cellSize <= 20;
   const swapZoneText = compactStorageLayout
-    ? `Swap rows 0-${HOLD_SWAP_CUTOFF_VISIBLE_ROW - 1}`
-    : `Swap zone rows 0-${HOLD_SWAP_CUTOFF_VISIBLE_ROW - 1}`;
-  const swapLineY = HOLD_SWAP_CUTOFF_VISIBLE_ROW * cellSize;
-  const showSwapLine = isMe && HOLD_SWAP_CUTOFF_VISIBLE_ROW > 0 && HOLD_SWAP_CUTOFF_VISIBLE_ROW < BOARD_VISIBLE_ROWS;
+    ? `Swap rows 0-${cutoffRow - 1}`
+    : `Swap zone rows 0-${cutoffRow - 1}`;
+  const swapLineY = cutoffRow * cellSize;
+  const showSwapLine = isMe && cutoffRow > 0 && cutoffRow < BOARD_VISIBLE_ROWS;
 
   const holdStatus = !player.activePiece
     ? { text: 'No active piece', tone: 'text-zinc-300' }
@@ -147,13 +164,38 @@ const GameField: React.FC<GameFieldProps> = ({
 
   return (
     <div className={`relative ${opacityClass}`}>
-      <div className="mb-2 flex justify-between items-end">
+      {/* ── Header row: title / active-effect pills / line counter ── */}
+      <div className="mb-2 flex items-end justify-between gap-1.5">
         <h2
-          className={`text-sm font-bold uppercase tracking-widest ${isMe ? 'text-emerald-400' : 'text-rose-400'}`}
+          className={`shrink-0 text-sm font-bold uppercase tracking-widest ${isMe ? 'text-emerald-400' : 'text-rose-400'}`}
         >
           {title}
         </h2>
-        <span className="text-[10px] bg-zinc-800 text-zinc-300 px-2 py-0.5 rounded-full font-mono tabular-nums">
+
+        {/* Active-effect pills — only renders when effects are present */}
+        {isMe && activeEffects.length > 0 && (
+          <div className="flex min-w-0 flex-1 flex-wrap items-center justify-center gap-1 overflow-hidden px-1">
+            {activeEffects.map((effect) => (
+              <span
+                key={effect.id}
+                className={[
+                  'inline-flex items-center gap-0.5 rounded-full border px-2 py-0.5',
+                  'font-mono text-[9px] font-bold uppercase tracking-wider leading-none',
+                  'animate-pulse',
+                  effect.bgClass,
+                  effect.borderClass,
+                  effect.textClass ?? 'text-white',
+                  effect.glowClass ?? '',
+                ].join(' ')}
+              >
+                {effect.icon && <span className="text-[10px] leading-none">{effect.icon}</span>}
+                {effect.label}
+              </span>
+            ))}
+          </div>
+        )}
+
+        <span className="shrink-0 rounded-full bg-zinc-800 px-2 py-0.5 font-mono text-[10px] tabular-nums text-zinc-300">
           {player.linesCleared} lines
         </span>
       </div>
@@ -172,6 +214,25 @@ const GameField: React.FC<GameFieldProps> = ({
               style={{ top: swapLineY }}
             >
               swap line
+            </div>
+          </>
+        )}
+        {/* ── Curtain: a frosted band right below the swap line, fully opaque beyond it ── */}
+        {isMe && activeEffects.some((e) => e.id.startsWith('curtain-active')) && (
+          <>
+            {/* Frosted/blurred transition band — semi-visible for the first few rows */}
+            <div
+              className="pointer-events-none absolute left-0 right-0 bottom-0 z-20 overflow-hidden border-t-2 border-indigo-300/50 bg-indigo-950/30 backdrop-blur-md"
+              style={{ top: swapLineY }}
+            />
+            {/* Solid blackout — impossible to see through — covers everything past the band */}
+            <div
+              className="pointer-events-none absolute left-0 right-0 bottom-0 z-30 flex items-center justify-center bg-[#0b0b16]"
+              style={{ top: swapLineY + CURTAIN_FROST_ROWS * cellSize }}
+            >
+              <span className="select-none text-4xl opacity-50 drop-shadow-[0_0_8px_rgba(129,140,248,0.8)]">
+                🎭
+              </span>
             </div>
           </>
         )}
@@ -226,12 +287,55 @@ const GameField: React.FC<GameFieldProps> = ({
       )}
     </div>
   );
-};
+});
 
 export default React.memo(GameField, (prev, next) => {
-  return prev.isMe === next.isMe &&
-         prev.title === next.title &&
-         prev.cellSize === next.cellSize &&
-         prev.shakeClass === next.shakeClass &&
-         JSON.stringify(prev.player) === JSON.stringify(next.player);
+  if (
+    prev.isMe !== next.isMe ||
+    prev.title !== next.title ||
+    prev.cellSize !== next.cellSize
+  ) {
+    return false;
+  }
+
+  const pA = prev.player;
+  const pB = next.player;
+  if (pA === pB) return true;
+
+  if (JSON.stringify(pA.activeEffects) !== JSON.stringify(pB.activeEffects)) {
+    return false;
+  }
+
+  if (
+    pA.holdPiece !== pB.holdPiece ||
+    pA.canHold !== pB.canHold ||
+    pA.linesCleared !== pB.linesCleared ||
+    pA.swapCutoffRow !== pB.swapCutoffRow
+  ) {
+    return false;
+  }
+
+  const aA = pA.activePiece;
+  const aB = pB.activePiece;
+  if ((!aA && aB) || (aA && !aB)) return false;
+  if (aA && aB) {
+    if (
+      aA.x !== aB.x ||
+      aA.y !== aB.y ||
+      aA.rotation !== aB.rotation ||
+      aA.type !== aB.type
+    ) {
+      return false;
+    }
+  }
+
+  for (let y = 0; y < pA.board.length; y++) {
+    const rowA = pA.board[y];
+    const rowB = pB.board[y];
+    for (let x = 0; x < rowA.length; x++) {
+      if (rowA[x] !== rowB[x]) return false;
+    }
+  }
+
+  return true;
 });

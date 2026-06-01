@@ -21,6 +21,11 @@ import {
   NEXT_PREVIEW_COUNT,
   REPLAY_KEYFRAME_INTERVAL_TICKS,
   RESTART_DELAY_SECONDS,
+  RETRIM_ACTIVATION_TICKS,
+  RETRIM_COST,
+  CURTAIN_COST,
+  CURTAIN_TELEGRAPH_TICKS,
+  CURTAIN_DURATION_TICKS,
   SCORE_FLOAT_DURATION_SEC,
   SOFT_DROP_CELLS_PER_TICK,
   ARR_TICKS,
@@ -46,6 +51,37 @@ export interface ShopItem {
   synergyBoost?: number;
 }
 
+/**
+ * An effect currently being applied to a player's field by the opponent.
+ * All styling is driven by Tailwind class strings so each shop item can
+ * have its own visual identity without hard-coding colours in the component.
+ */
+export interface ActiveFieldEffect {
+  /** Unique ID matching the originating ShopItem.id */
+  id: string;
+  /** Short display label shown in the pill (e.g. "Frost", "Nova") */
+  label: string;
+  /** Optional emoji / icon prefix */
+  icon?: string;
+  /**
+   * Tailwind bg class(es) for the pill body.
+   * Supports gradients: e.g. "bg-gradient-to-r from-sky-600 to-cyan-400"
+   * or simple: "bg-rose-600/80"
+   */
+  bgClass: string;
+  /** Border colour class, e.g. "border-sky-300/60" */
+  borderClass: string;
+  /** Text colour class, defaults to "text-white" when omitted */
+  textClass?: string;
+  /**
+   * Optional glow / shadow class applied to the pill wrapper.
+   * e.g. "shadow-[0_0_10px_rgba(56,189,248,0.7)]"
+   */
+  glowClass?: string;
+  /** Tick at which this effect expires (for future countdown display) */
+  expiresAtTick?: number;
+}
+
 export interface InputState {
   left: boolean;
   right: boolean;
@@ -62,6 +98,17 @@ export interface TetrisPiece {
 export interface PendingGarbagePacket {
   lines: number;
   arrivalTick: number;
+}
+
+/**
+ * A shop effect that has been purchased and is scheduled to activate
+ * at a specific future game tick.
+ */
+export interface PendingShopEffect {
+  /** Matches ShopItem.id */
+  itemId: string;
+  /** The game tick at which this effect triggers */
+  activationTick: number;
 }
 
 export interface PlayerState {
@@ -91,7 +138,16 @@ export interface PlayerState {
   lastSrsKick?: { kx: number; ky: number } | null;
   lastActionWasRotate: boolean;
   pendingGarbage: PendingGarbagePacket[];
+  /** Active visual effects applied to this player's field */
+  activeEffects?: ActiveFieldEffect[];
   topOut: boolean;
+  /**
+   * Current swap-line row (visible row index). Starts at HOLD_SWAP_CUTOFF_VISIBLE_ROW;
+   * modified permanently by re-trim and similar effects.
+   */
+  swapCutoffRow: number;
+  /** Shop effects queued and waiting for their activationTick. */
+  pendingShopEffects: PendingShopEffect[];
 }
 
 export interface GameState {
@@ -131,6 +187,8 @@ export interface ReplayDataV2 {
   version: 2;
   date: string;
   seed: number;
+  /** Optional snapshot cadence in ticks for frame-by-frame or sparse replays. */
+  keyframeIntervalTicks?: number;
   initialState: GameState;
   inputs: ReplayInputFrame[];
   keyframes: ReplayKeyframe[];
@@ -171,6 +229,11 @@ export {
   NEXT_PREVIEW_COUNT,
   REPLAY_KEYFRAME_INTERVAL_TICKS,
   RESTART_DELAY_SECONDS,
+  RETRIM_ACTIVATION_TICKS,
+  RETRIM_COST,
+  CURTAIN_COST,
+  CURTAIN_TELEGRAPH_TICKS,
+  CURTAIN_DURATION_TICKS,
   SCORE_FLOAT_DURATION_SEC,
   SOFT_DROP_CELLS_PER_TICK,
   ARR_TICKS,

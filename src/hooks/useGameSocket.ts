@@ -138,12 +138,17 @@ export const useGameSocket = () => {
     socket?.emit('action', action);
   }, [socket]);
 
+  const sendShopPurchase = useCallback((itemId: string) => {
+    socket?.emit('shopPurchase', itemId);
+  }, [socket]);
+
   return {
     socket,
     gameState,
     myId,
     lastMatchEvent,
     sendInputState,
-    sendAction
+    sendAction,
+    sendShopPurchase,
   };
 };

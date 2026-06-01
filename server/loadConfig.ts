@@ -5,12 +5,14 @@ export type ServerConfig = {
   port: number;
   host: string;
   serveClient: boolean;
+  replayKeyframeIntervalTicks: number;
 };
 
 const defaults: ServerConfig = {
   port: 3000,
   host: "0.0.0.0",
   serveClient: false,
+  replayKeyframeIntervalTicks: 30,
 };
 
 /**
@@ -33,6 +35,12 @@ export function loadServerConfig(cwd: string = process.cwd()): ServerConfig {
         : defaults.port,
     host: typeof fromFile.host === "string" && fromFile.host.length > 0 ? fromFile.host : defaults.host,
     serveClient: typeof fromFile.serveClient === "boolean" ? fromFile.serveClient : defaults.serveClient,
+    replayKeyframeIntervalTicks:
+      typeof fromFile.replayKeyframeIntervalTicks === "number" &&
+      Number.isFinite(fromFile.replayKeyframeIntervalTicks) &&
+      fromFile.replayKeyframeIntervalTicks > 0
+        ? Math.floor(fromFile.replayKeyframeIntervalTicks)
+        : defaults.replayKeyframeIntervalTicks,
   };
 
   let port = merged.port;
@@ -45,5 +53,11 @@ export function loadServerConfig(cwd: string = process.cwd()): ServerConfig {
   if (process.env.SERVE_CLIENT === "true") serveClient = true;
   if (process.env.SERVE_CLIENT === "false") serveClient = false;
 
-  return { ...merged, port, serveClient };
+  let replayKeyframeIntervalTicks = merged.replayKeyframeIntervalTicks;
+  if (process.env.REPLAY_KEYFRAME_INTERVAL_TICKS !== undefined && process.env.REPLAY_KEYFRAME_INTERVAL_TICKS !== "") {
+    const n = Number(process.env.REPLAY_KEYFRAME_INTERVAL_TICKS);
+    if (Number.isFinite(n) && n > 0) replayKeyframeIntervalTicks = Math.max(1, Math.floor(n));
+  }
+
+  return { ...merged, port, serveClient, replayKeyframeIntervalTicks };
 }

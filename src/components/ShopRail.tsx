@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { memo } from 'react';
 import { ShopItem } from '../types';
 
 interface ShopRailProps {
@@ -105,4 +105,4 @@ const ShopRail: React.FC<ShopRailProps> = ({
   );
 };
 
-export default ShopRail;
+export default memo(ShopRail);

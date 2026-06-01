@@ -17,6 +17,12 @@ export const LOCK_DELAY_TICKS = 24; // 0.4s @ 60hz
 export const LOCK_RESET_CAP = 10;
 export const HOLD_SWAP_CUTOFF_VISIBLE_ROW = 10;
 export const GARBAGE_ARRIVAL_DELAY_TICKS = 18; // 300ms @ 60hz
+export const RETRIM_ACTIVATION_TICKS = 60; // 2 rows of gravity (1s @ 60Hz)
+export const RETRIM_COST = 120;
+// Curtain: a timed frost overlay dropped on the opponent's field below their swap line.
+export const CURTAIN_COST = 140;
+export const CURTAIN_TELEGRAPH_TICKS = 60; // 1s warning pill before the curtain drops
+export const CURTAIN_DURATION_TICKS = 240; // 4s blackout once active
 export const GRAVITY_TICKS_PER_CELL = 30;
 export const SOFT_DROP_CELLS_PER_TICK = 1;
 export const DAS_TICKS = 10;

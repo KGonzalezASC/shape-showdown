@@ -8,11 +8,16 @@ import {
   GameState,
   InputState,
   MatchEvent,
+  PendingShopEffect,
   PlayerState,
   REPLAY_KEYFRAME_INTERVAL_TICKS,
   ReplayData,
   ReplayDataV2,
   RESTART_DELAY_SECONDS,
+  RETRIM_ACTIVATION_TICKS,
+  RETRIM_COST,
+  CURTAIN_COST,
+  CURTAIN_TELEGRAPH_TICKS,
 } from '../src/types.js';
 import {
   initialSeed,
@@ -28,9 +33,11 @@ export class GameManager {
   private gameState: GameState;
   private activeReplay: ReplayDataV2 | null = null;
   private rng = makeRng(initialSeed());
+  private readonly replayKeyframeIntervalTicks: number;
 
-  constructor(io: Server) {
+  constructor(io: Server, replayKeyframeIntervalTicks = REPLAY_KEYFRAME_INTERVAL_TICKS) {
     this.io = io;
+    this.replayKeyframeIntervalTicks = Math.max(1, Math.floor(replayKeyframeIntervalTicks));
     this.gameState = {
       players: {},
       status: 'waiting',
@@ -83,6 +90,66 @@ export class GameManager {
           playerId: socket.id,
           kind: 'action',
           action,
+        });
+      }
+    });
+
+    socket.on('shopPurchase', (itemId: string) => {
+      if (this.gameState.status !== 'playing') return;
+      const buyer = this.gameState.players[socket.id];
+      if (!buyer) return;
+
+      // Authoritative cost per item (mirrors the client SHOP_MOCK_POOL costs).
+      const COSTS: Record<string, number> = {
+        retrim: RETRIM_COST,
+        curtain: CURTAIN_COST,
+      };
+      const cost = COSTS[itemId];
+      if (cost === undefined) return; // Unknown / not-yet-implemented item.
+      if (buyer.score < cost) return;
+
+      // Find the opponent — every current shop item targets them.
+      const pids = Object.keys(this.gameState.players);
+      const opponentId = pids.find((id) => id !== socket.id);
+      const opponent = opponentId ? this.gameState.players[opponentId] : null;
+      if (!opponent) return;
+
+      // Deduct cost from the server's authoritative score so it can't be spammed.
+      buyer.score -= cost;
+      if (!opponent.activeEffects) opponent.activeEffects = [];
+
+      if (itemId === 'retrim') {
+        opponent.pendingShopEffects.push({
+          itemId: 'retrim',
+          activationTick: this.gameState.tick + RETRIM_ACTIVATION_TICKS,
+        });
+        // Show a visual warning pill to the opponent
+        opponent.activeEffects.push({
+          id: `retrim-${this.gameState.tick}`,
+          label: 'Retrimmed',
+          icon: '✂️',
+          bgClass: 'bg-rose-900/80',
+          borderClass: 'border-rose-400',
+          textClass: 'text-rose-100',
+          glowClass: 'shadow-[0_0_10px_rgba(244,63,94,0.7)]',
+          expiresAtTick: this.gameState.tick + 240, // Shows for 4 seconds
+        });
+      } else if (itemId === 'curtain') {
+        // Telegraph first; the engine drops the real overlay at activationTick.
+        opponent.pendingShopEffects.push({
+          itemId: 'curtain',
+          activationTick: this.gameState.tick + CURTAIN_TELEGRAPH_TICKS,
+        });
+        // Warning pill during the telegraph window, then the overlay takes over.
+        opponent.activeEffects.push({
+          id: `curtain-warn-${this.gameState.tick}`,
+          label: 'Curtain incoming',
+          icon: '🎭',
+          bgClass: 'bg-indigo-900/80',
+          borderClass: 'border-indigo-400',
+          textClass: 'text-indigo-100',
+          glowClass: 'shadow-[0_0_10px_rgba(129,140,248,0.7)]',
+          expiresAtTick: this.gameState.tick + CURTAIN_TELEGRAPH_TICKS,
         });
       }
     });
@@ -143,6 +210,7 @@ export class GameManager {
           version: 2,
           date: replayDateLabel(),
           seed: this.gameState.seed,
+          keyframeIntervalTicks: this.replayKeyframeIntervalTicks,
           initialState: JSON.parse(JSON.stringify(this.gameState)),
           inputs: [],
           keyframes: [
@@ -193,7 +261,7 @@ export class GameManager {
         }
       }
 
-      if (this.activeReplay && this.gameState.tick % REPLAY_KEYFRAME_INTERVAL_TICKS === 0) {
+      if (this.activeReplay && this.gameState.tick % this.replayKeyframeIntervalTicks === 0) {
         this.activeReplay.keyframes.push({
           tick: this.gameState.tick,
           players: JSON.parse(JSON.stringify(this.gameState.players)),
@@ -236,4 +304,3 @@ export class GameManager {
     this.activeReplay = null;
   }
 }
-
