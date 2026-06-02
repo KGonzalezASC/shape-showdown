@@ -37,12 +37,24 @@ const COLORS: Record<Exclude<CellValue, null>, string> = {
   G: 'bg-zinc-500',
 };
 
-const MemoizedCell = React.memo(({ color, size }: { color: CellValue; size: number }) => (
-  <div
-    className={`border border-black/20 ${color ? COLORS[color] : 'bg-zinc-900'}`}
-    style={{ width: size, height: size }}
-  />
-));
+const MemoizedCell = React.memo(({ color, poison, size }: { color: CellValue; poison: number; size: number }) => {
+  if (poison > 0) {
+    // Synced (no per-cell stagger) so a poisoned region scrolls as one cohesive
+    // "sheet" of poison, like the reference screen effect.
+    return (
+      <div
+        className={`poison-cell poison-cell-v${Math.min(Math.max(poison, 1), 4)}`}
+        style={{ width: size, height: size }}
+      />
+    );
+  }
+  return (
+    <div
+      className={`border border-black/20 ${color ? COLORS[color] : 'bg-zinc-900'}`}
+      style={{ width: size, height: size }}
+    />
+  );
+});
 
 const SHAPES: Record<TetrominoType, [number, number][][]> = {
   I: [
@@ -129,6 +141,30 @@ const GameField = forwardRef<GameFieldRef, GameFieldProps>(({
     }
     return rows;
   }, [player.board, player.activePiece]);
+
+  // Parallel poison overlay grid (0 = clean, 1..4 = poison variant), mirroring
+  // visibleRows. The poisoned active piece previews as wave-1 poison.
+  const visiblePoison = useMemo(() => {
+    const src = player.poisonBoard;
+    const rows: number[][] = Array.from({ length: BOARD_VISIBLE_ROWS }, (_, y) =>
+      Array.from({ length: BOARD_COLS }, (_, x) =>
+        src ? (src[BOARD_HIDDEN_ROWS + y]?.[x] ?? 0) : 0,
+      ),
+    );
+    if (player.activePiece?.poisoned) {
+      // The whole piece is a single poison type — the variant (1–4) chosen for
+      // this Elixir event. Every cell it later infects keeps this same colour.
+      const variant = player.activePiece.poisonVariant ?? 1;
+      for (const [dx, dy] of SHAPES[player.activePiece.type][player.activePiece.rotation]) {
+        const x = player.activePiece.x + dx;
+        const y = player.activePiece.y + dy - BOARD_HIDDEN_ROWS;
+        if (y >= 0 && y < BOARD_VISIBLE_ROWS && x >= 0 && x < BOARD_COLS) {
+          rows[y][x] = variant;
+        }
+      }
+    }
+    return rows;
+  }, [player.poisonBoard, player.activePiece]);
 
   const maxActiveVisibleRow = useMemo(() => {
     if (!player.activePiece) return null;
@@ -242,7 +278,7 @@ const GameField = forwardRef<GameFieldRef, GameFieldProps>(({
         >
           {visibleRows.flatMap((row, y) =>
             row.map((cell, x) => (
-              <MemoizedCell key={`${x}-${y}`} color={cell} size={cellSize} />
+              <MemoizedCell key={`${x}-${y}`} color={cell} poison={visiblePoison[y][x]} size={cellSize} />
             )),
           )}
         </div>
@@ -323,7 +359,9 @@ export default React.memo(GameField, (prev, next) => {
       aA.x !== aB.x ||
       aA.y !== aB.y ||
       aA.rotation !== aB.rotation ||
-      aA.type !== aB.type
+      aA.type !== aB.type ||
+      !!aA.poisoned !== !!aB.poisoned ||
+      aA.poisonVariant !== aB.poisonVariant
     ) {
       return false;
     }
@@ -334,6 +372,20 @@ export default React.memo(GameField, (prev, next) => {
     const rowB = pB.board[y];
     for (let x = 0; x < rowA.length; x++) {
       if (rowA[x] !== rowB[x]) return false;
+    }
+  }
+
+  // Diff the poison overlay — the spread changes it without touching `board`.
+  const poA = pA.poisonBoard;
+  const poB = pB.poisonBoard;
+  if (poA || poB) {
+    if (!poA || !poB || poA.length !== poB.length) return false;
+    for (let y = 0; y < poA.length; y++) {
+      const rowA = poA[y];
+      const rowB = poB[y];
+      for (let x = 0; x < rowA.length; x++) {
+        if (rowA[x] !== rowB[x]) return false;
+      }
     }
   }
 

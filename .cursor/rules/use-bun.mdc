@@ -1,0 +1,11 @@
+---
+description: Prefer Bun over Node for JS/TS tooling and package managers
+alwaysApply: true
+---
+
+# Use Bun
+
+- Prefer **bun** over **node** for running scripts and one-liners.
+- Prefer **bunx** over **npx** for CLI tools and MCP servers.
+- Prefer **bun install** over npm/yarn/pnpm when the project has no established lockfile preference.
+- If `npx` is not on PATH, use `bunx` without asking.

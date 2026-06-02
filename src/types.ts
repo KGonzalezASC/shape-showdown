@@ -26,6 +26,9 @@ import {
   CURTAIN_COST,
   CURTAIN_TELEGRAPH_TICKS,
   CURTAIN_DURATION_TICKS,
+  POISON_COST,
+  POISON_SPREAD_INTERVAL_TICKS,
+  POISON_GENERATIONS,
   SCORE_FLOAT_DURATION_SEC,
   SOFT_DROP_CELLS_PER_TICK,
   ARR_TICKS,
@@ -93,6 +96,29 @@ export interface TetrisPiece {
   rotation: RotationState;
   x: number;
   y: number;
+  /** When true, this piece poisons the cells it connects to on lock (Elixir effect). */
+  poisoned?: boolean;
+  /**
+   * Which colour variant (1–4) this poison event belongs to. All cells seeded
+   * by the same Elixir purchase share this value so the colour is consistent.
+   */
+  poisonVariant?: number;
+}
+
+/**
+ * Tracks an in-progress poison spread on a player's board. Poison seeds at the
+ * locked piece (wave 1) and spreads to orthogonally-adjacent filled cells once
+ * per interval. After POISON_GENERATIONS waves it stops spreading, but the
+ * poisoned cells remain poisoned permanently (this state goes null, the
+ * poisonBoard marks are never cleared).
+ */
+export interface PoisonSpreadState {
+  /** Waves still to apply after the initial lock wave. */
+  generationsRemaining: number;
+  /** Game tick at which the next wave spreads. */
+  nextSpreadTick: number;
+  /** Colour variant (1–4) shared by every cell seeded from this event. */
+  variant: number;
 }
 
 export interface PendingGarbagePacket {
@@ -148,6 +174,18 @@ export interface PlayerState {
   swapCutoffRow: number;
   /** Shop effects queued and waiting for their activationTick. */
   pendingShopEffects: PendingShopEffect[];
+  /**
+   * Parallel to `board`; same dimensions. 0 = clean, 1..POISON_GENERATIONS marks
+   * a poisoned cell and which spread wave reached it (also selects its colour
+   * variant). Mutated in lockstep with `board` on line clears / garbage.
+   */
+  poisonBoard?: number[][];
+  /** Active spread scheduler; null when no spread is in progress. */
+  poisonSpread?: PoisonSpreadState | null;
+  /** One-shot: poison the next piece that spawns (set when no active piece existed at purchase). */
+  poisonNextPiece?: boolean;
+  /** Colour variant to assign to the next deferred poison spawn. */
+  poisonNextVariant?: number;
 }
 
 export interface GameState {
@@ -234,6 +272,9 @@ export {
   CURTAIN_COST,
   CURTAIN_TELEGRAPH_TICKS,
   CURTAIN_DURATION_TICKS,
+  POISON_COST,
+  POISON_SPREAD_INTERVAL_TICKS,
+  POISON_GENERATIONS,
   SCORE_FLOAT_DURATION_SEC,
   SOFT_DROP_CELLS_PER_TICK,
   ARR_TICKS,

@@ -10,7 +10,7 @@ import { ShopRailVariations } from './components/ShopRailVariations';
 import { GameFieldsLayout } from './components/GameFieldsLayout';
 import { PlayfieldCellSizeContext } from './components/playfieldCellSizeContext';
 import { GameFieldRef } from './components/GameField';
-import { ActionType, BOARD_COLS, BOARD_VISIBLE_ROWS, CURTAIN_COST, LOCK_DELAY_TICKS, LOCK_RESET_CAP, RETRIM_COST, ShopItem } from './types';
+import { ActionType, BOARD_COLS, BOARD_VISIBLE_ROWS, CURTAIN_COST, LOCK_DELAY_TICKS, LOCK_RESET_CAP, POISON_COST, RETRIM_COST, ShopItem } from './types';
 
 function WaitingForOpponentBoard() {
   const cell = useContext(PlayfieldCellSizeContext);
@@ -124,12 +124,12 @@ const SHOP_MOCK_POOL: ShopItem[] = [
     id: 'elixir-pulse',
     name: 'Elixir',
     icon: '🧪',
-    cost: 55,
+    cost: POISON_COST,
     tier: 2,
     baseWeight: 2.25,
     colorClass: 'bg-lime-900/70',
     borderColorClass: 'border-lime-300/65',
-    description: 'Quis nostrud exercitation ullamco.',
+    description: "Poisons the opponent's active piece — it infects the stack it locks into, spreading for 4 waves.",
   },
   {
     id: 'vortex-step',

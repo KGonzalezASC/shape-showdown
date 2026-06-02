@@ -1,0 +1,16 @@
+---
+description: Agentic planning workflow — grill before implement, align with plan during execution
+alwaysApply: true
+---
+
+# Agent Planning
+
+For non-trivial features, prefer **grill-with-docs** over Cursor Plan mode:
+
+1. **Grill** — one question at a time until shared understanding; small scope.
+2. **to-prd** — crystallize decisions in the same session (never discard grilled context).
+3. **Implement** — fresh session with PRD; use **align-with-plan** and **communicate-clearly**.
+
+Session tools: **handoff** for prototypes or out-of-scope work; **CONTEXT.md** + ADRs for shared language.
+
+Skills live in `~/.cursor/skills/` and are available in every project.

@@ -28,6 +28,8 @@ import {
   GRAVITY_TICKS_PER_CELL,
   HORIZONTAL_SPEED_THRESHOLDS,
   NEXT_PREVIEW_COUNT,
+  POISON_GENERATIONS,
+  POISON_SPREAD_INTERVAL_TICKS,
 } from '../../src/constants.js';
 import { getKickTests, PIECE_SEQUENCE, SHAPES } from './pieces.js';
 
@@ -35,6 +37,18 @@ type MutableRng = { seed: number };
 
 export function createEmptyBoard(): CellValue[][] {
   return Array.from({ length: BOARD_ROWS }, () => Array.from({ length: BOARD_COLS }, () => null));
+}
+
+export function createEmptyPoisonBoard(): number[][] {
+  return Array.from({ length: BOARD_ROWS }, () => Array.from({ length: BOARD_COLS }, () => 0));
+}
+
+/** Lazily ensure the parallel poison grid exists and matches board dimensions (legacy/replay safety). */
+function ensurePoisonBoard(player: PlayerState): number[][] {
+  if (!player.poisonBoard || player.poisonBoard.length !== player.board.length) {
+    player.poisonBoard = createEmptyPoisonBoard();
+  }
+  return player.poisonBoard;
 }
 
 function rngNext(rng: MutableRng): number {
@@ -95,6 +109,10 @@ export function makePlayer(id: string, rng: MutableRng): PlayerState {
     swapCutoffRow: HOLD_SWAP_CUTOFF_VISIBLE_ROW,
     pendingShopEffects: [],
     activeEffects: [],
+    poisonBoard: createEmptyPoisonBoard(),
+    poisonSpread: null,
+    poisonNextPiece: false,
+    poisonNextVariant: undefined,
   };
   ensureQueue(player, rng);
   player.activePiece = spawnNextPiece(player, rng);
@@ -117,7 +135,12 @@ function spawnNextPiece(player: PlayerState, rng: MutableRng) {
   const type = player.nextQueue.shift();
   if (!type) return null;
   ensureQueue(player, rng);
-  return { type, rotation: 0 as RotationState, x: 3, y: BOARD_HIDDEN_ROWS - 2 };
+  // Consume a queued poison (purchase landed while no piece was active).
+  const poisoned = !!player.poisonNextPiece;
+  const poisonVariant = player.poisonNextVariant;
+  player.poisonNextPiece = false;
+  player.poisonNextVariant = undefined;
+  return { type, rotation: 0 as RotationState, x: 3, y: BOARD_HIDDEN_ROWS - 2, poisoned, poisonVariant };
 }
 
 function getCells(piece: { type: TetrominoType; rotation: RotationState; x: number; y: number }) {
@@ -195,12 +218,25 @@ function canHoldAtCurrentHeight(player: PlayerState): boolean {
   return maxVisibleRow < player.swapCutoffRow;
 }
 
-function lockPiece(player: PlayerState): { lines: number; tSpin: 'full' | 'mini' | false; perfectClear: boolean } {
+function lockPiece(player: PlayerState, tick: number): { lines: number; tSpin: 'full' | 'mini' | false; perfectClear: boolean } {
   if (!player.activePiece) return { lines: 0, tSpin: false, perfectClear: false };
+  const poison = ensurePoisonBoard(player);
+  const wasPoisoned = !!player.activePiece.poisoned;
+  const poisonVariant = player.activePiece.poisonVariant ?? 1;
   for (const cell of getCells(player.activePiece)) {
     if (cell.y >= 0 && cell.y < BOARD_ROWS && cell.x >= 0 && cell.x < BOARD_COLS) {
       player.board[cell.y][cell.x] = player.activePiece.type;
+      // Seed the locked cells with the event's variant (not a wave index).
+      if (wasPoisoned) poison[cell.y][cell.x] = poisonVariant;
     }
+  }
+  // Start (or restart) the spread scheduler when a poisoned piece locks.
+  if (wasPoisoned) {
+    player.poisonSpread = {
+      generationsRemaining: POISON_GENERATIONS - 1,
+      nextSpreadTick: tick + POISON_SPREAD_INTERVAL_TICKS,
+      variant: poisonVariant,
+    };
   }
 
   const linesToClear: number[] = [];
@@ -210,6 +246,9 @@ function lockPiece(player: PlayerState): { lines: number; tSpin: 'full' | 'mini'
   for (const y of linesToClear) {
     player.board.splice(y, 1);
     player.board.unshift(Array.from({ length: BOARD_COLS }, () => null));
+    // Mirror onto the poison grid so poison rides line clears with its blocks.
+    poison.splice(y, 1);
+    poison.unshift(Array.from({ length: BOARD_COLS }, () => 0));
   }
 
   const lines = linesToClear.length;
@@ -323,10 +362,14 @@ function applyGarbageIfReady(player: PlayerState, tick: number, rng: MutableRng)
     // One shared hole column per packet — matching standard competitive behaviour
     // where garbage lines from a single attack share the same gap.
     const hole = Math.floor(rngNext(rng) * BOARD_COLS);
+    const poison = ensurePoisonBoard(player);
     for (let i = 0; i < packet.lines; i++) {
       player.board.shift();
       const row = Array.from({ length: BOARD_COLS }, (_, x): CellValue => (x === hole ? null : 'G'));
       player.board.push(row);
+      // Mirror: drop the top poison row, push a clean (unpoisoned) garbage row.
+      poison.shift();
+      poison.push(Array.from({ length: BOARD_COLS }, () => 0));
       applied += 1;
     }
   }
@@ -413,6 +456,43 @@ function applyHorizontalInput(player: PlayerState): void {
   }
 }
 
+/**
+ * Advance a poison spread by one wave when its timer elapses. Each wave infects
+ * every filled board cell (piece blocks AND garbage) orthogonally adjacent to an
+ * already-poisoned cell, stamping the current generation index. After
+ * POISON_GENERATIONS waves the scheduler stops, but poisoned cells stay poisoned
+ * permanently (the poisonBoard marks are never cleared).
+ */
+function processPoisonSpread(player: PlayerState, tick: number): void {
+  const spread = player.poisonSpread;
+  if (!spread || tick < spread.nextSpreadTick) return;
+
+  const poison = ensurePoisonBoard(player);
+  const { variant } = spread;
+  const newlyPoisoned: Array<[number, number]> = [];
+  for (let y = 0; y < BOARD_ROWS; y++) {
+    for (let x = 0; x < BOARD_COLS; x++) {
+      if (poison[y][x] !== 0) continue; // already poisoned
+      if (player.board[y][x] === null) continue; // empty cell can't be poisoned
+      const neighbourPoisoned =
+        (y > 0 && poison[y - 1][x] !== 0) ||
+        (y < BOARD_ROWS - 1 && poison[y + 1][x] !== 0) ||
+        (x > 0 && poison[y][x - 1] !== 0) ||
+        (x < BOARD_COLS - 1 && poison[y][x + 1] !== 0);
+      if (neighbourPoisoned) newlyPoisoned.push([y, x]);
+    }
+  }
+  // All cells from this event share the same variant — consistent colour throughout.
+  for (const [y, x] of newlyPoisoned) poison[y][x] = variant;
+
+  spread.generationsRemaining -= 1;
+  if (spread.generationsRemaining <= 0 || newlyPoisoned.length === 0) {
+    player.poisonSpread = null;
+  } else {
+    spread.nextSpreadTick = tick + POISON_SPREAD_INTERVAL_TICKS;
+  }
+}
+
 export function stepPlayer(
   gameState: GameState,
   player: PlayerState,
@@ -457,6 +537,9 @@ export function stepPlayer(
     }
     player.pendingShopEffects = remaining;
   }
+
+  // ── Advance any in-progress poison spread ──
+  processPoisonSpread(player, gameState.tick);
 
   if (!player.activePiece) {
     player.lastSrsKick = null;
@@ -503,7 +586,7 @@ export function stepPlayer(
   if (player.activePiece && !movedDown && isGrounded(player)) {
     player.lockDelayRemainingTicks -= 1;
     if (player.lockDelayRemainingTicks <= 0) {
-      const clearResult = lockPiece(player);
+      const clearResult = lockPiece(player, gameState.tick);
       const attackLines = attackFromClear(clearResult.lines, clearResult.tSpin, clearResult.perfectClear, player);
       if (clearResult.lines > 0) {
         matchEvents.push({

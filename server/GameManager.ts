@@ -18,6 +18,7 @@ import {
   RETRIM_COST,
   CURTAIN_COST,
   CURTAIN_TELEGRAPH_TICKS,
+  POISON_COST,
 } from '../src/types.js';
 import {
   initialSeed,
@@ -113,6 +114,7 @@ export class GameManager {
       const COSTS: Record<string, number> = {
         retrim: RETRIM_COST,
         curtain: CURTAIN_COST,
+        'elixir-pulse': POISON_COST,
       };
       const cost = COSTS[itemId];
       if (cost === undefined) return; // Unknown / not-yet-implemented item.
@@ -160,6 +162,33 @@ export class GameManager {
           textClass: 'text-indigo-100',
           glowClass: 'shadow-[0_0_10px_rgba(129,140,248,0.7)]',
           expiresAtTick: this.gameState.tick + CURTAIN_TELEGRAPH_TICKS,
+        });
+      } else if (itemId === 'elixir-pulse') {
+        // The poison's colour is rolled randomly — a 1-in-4 chance per variant.
+        // Whatever lands is the single colour the piece spreads through the stack.
+        const variant = Math.floor(Math.random() * 4) + 1;
+
+        // Apply immediately to the active piece, or flag the next spawn.
+        if (opponent.activePiece) {
+          opponent.activePiece.poisoned = true;
+          opponent.activePiece.poisonVariant = variant;
+        } else {
+          const stackEmpty = opponent.board.every((row) => row.every((cell) => cell === null));
+          if (!stackEmpty) {
+            opponent.poisonNextPiece = true;
+            opponent.poisonNextVariant = variant;
+          }
+        }
+        // Warning pill so the victim sees the poison land.
+        opponent.activeEffects.push({
+          id: `poison-${this.gameState.tick}`,
+          label: 'Poisoned',
+          icon: '🧪',
+          bgClass: 'bg-fuchsia-900/80',
+          borderClass: 'border-fuchsia-400',
+          textClass: 'text-fuchsia-100',
+          glowClass: 'shadow-[0_0_10px_rgba(217,70,239,0.7)]',
+          expiresAtTick: this.gameState.tick + 180, // ~3s
         });
       }
     });
