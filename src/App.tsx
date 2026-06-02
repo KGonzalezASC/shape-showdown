@@ -589,6 +589,33 @@ const App: React.FC = () => {
     return () => ro.disconnect();
   }, []);
 
+  // TEMP DEBUG: surface device metrics so we can diagnose the Samsung-only
+  // mobile layout overflow that we can't reproduce. Remove after diagnosis.
+  const [dbgInfo, setDbgInfo] = useState('');
+  useEffect(() => {
+    const update = () => {
+      const r = mobilePlayfieldRef.current?.getBoundingClientRect();
+      const rootFs = getComputedStyle(document.documentElement).fontSize;
+      const vv = window.visualViewport;
+      setDbgInfo(
+        `iw${window.innerWidth} ih${window.innerHeight} ` +
+        `vv${vv ? Math.round(vv.width) + 'x' + Math.round(vv.height) : '-'} ` +
+        `dpr${window.devicePixelRatio} rem${rootFs} ` +
+        `pf${r ? Math.round(r.width) + 'x' + Math.round(r.height) : '-'} cs${mobileCellSize}`,
+      );
+    };
+    update();
+    window.addEventListener('resize', update);
+    const vv = window.visualViewport;
+    vv?.addEventListener('resize', update);
+    const id = window.setInterval(update, 1000);
+    return () => {
+      window.removeEventListener('resize', update);
+      vv?.removeEventListener('resize', update);
+      window.clearInterval(id);
+    };
+  }, [mobileCellSize]);
+
   useEffect(() => {
     if (!drillResult) return;
     const t = window.setTimeout(() => setDrillResult(null), 2200);
@@ -935,6 +962,11 @@ const App: React.FC = () => {
       className="flex h-dvh max-h-dvh min-h-0 flex-col overflow-hidden bg-[#0a0a0a] px-2 py-2 pb-[var(--mobile-controls-pad)] font-sans text-white sm:px-4 sm:py-3 md:pb-2"
       style={{ '--mobile-controls-pad': `${mobileControlsHeight + 10}px` } as React.CSSProperties}
     >
+      {/* TEMP DEBUG overlay — remove after diagnosing Samsung layout */}
+      <div className="pointer-events-none fixed left-0 top-0 z-[9999] max-w-full break-all bg-black/85 px-1.5 py-0.5 font-mono text-[10px] leading-tight text-lime-300">
+        {dbgInfo}
+      </div>
+
       {/* Header */}
       <div className="mb-2 flex w-full max-w-5xl shrink-0 items-center justify-between gap-2 self-center overflow-visible rounded-xl border border-white/5 bg-[#1a1a1a] p-2 shadow-xl sm:mb-3 sm:rounded-2xl sm:p-3 md:p-4">
         <div className="flex min-w-0 items-center gap-2 sm:gap-4">
