@@ -583,7 +583,9 @@ const App: React.FC = () => {
       const fromH = (ob.height - boardChromeReserve) / BOARD_VISIBLE_ROWS;
       const c = Math.floor(Math.min(fromW, fromH));
       setMobileCellSize((prev) => {
-        const next = Math.max(8, Math.min(36, c));
+        // Cap raised to 48 so the board grows to fill wider phones (it stays
+        // limited by width/height on smaller ones, so this is a no-op there).
+        const next = Math.max(8, Math.min(48, c));
         return prev !== next ? next : prev;
       });
     };
@@ -592,7 +594,10 @@ const App: React.FC = () => {
     ro.observe(outer);
     if (railRef.current) ro.observe(railRef.current);
     return () => ro.disconnect();
-  }, []);
+    // Re-run once the game connects: the playfield/rail only mount after the
+    // "Connecting…" screen, so on first mount the refs are null. Without this
+    // the ResizeObserver never attaches and the board stays at its default size.
+  }, [gameState != null]);
 
   useEffect(() => {
     if (!drillResult) return;
@@ -941,57 +946,75 @@ const App: React.FC = () => {
       style={{ '--mobile-controls-pad': `${mobileControlsHeight + 10}px` } as React.CSSProperties}
     >
       {/* Header */}
-      <div className="mb-2 flex w-full max-w-5xl shrink-0 items-center justify-between gap-2 self-center overflow-visible rounded-xl border border-white/5 bg-[#1a1a1a] p-2 shadow-xl sm:mb-3 sm:rounded-2xl sm:p-3 md:p-4">
-        <div className="flex min-w-0 items-center gap-2 sm:gap-4">
-          <div className="shrink-0 rounded-lg bg-emerald-500/10 p-1.5 sm:p-2">
+      <div className="mb-1 flex w-full max-w-5xl shrink-0 items-center justify-between gap-1 self-center overflow-visible rounded-lg border border-white/5 bg-[#1a1a1a] px-2 py-1.5 shadow-xl sm:mb-3 sm:gap-2 sm:rounded-2xl sm:p-3 md:p-4">
+        
+        {/* Left: My Score + Funds + Incoming */}
+        <div className="flex flex-1 items-center gap-1.5 min-w-0 sm:gap-4">
+          <div className="hidden shrink-0 rounded-lg bg-emerald-500/10 sm:block sm:p-2">
             <Zap className="h-4 w-4 text-emerald-400 sm:h-5 sm:w-5" />
           </div>
-          <div className="relative z-10 min-h-[2.25rem] min-w-0 overflow-visible sm:min-h-[2.5rem] sm:min-w-[3rem]">
-            <p className="text-[9px] font-semibold uppercase tracking-wider text-emerald-400/60 sm:text-[10px]">
+          <div className="flex flex-row flex-wrap items-center gap-x-1.5 gap-y-0.5 sm:flex-col sm:items-start sm:gap-0 min-w-0">
+            <p className="hidden text-[10px] font-semibold uppercase tracking-wider text-emerald-400/60 sm:block">
               Your Attack Score
             </p>
-            <p className="font-mono text-lg leading-none sm:text-2xl">{myPlayer?.score ?? 0}</p>
+            <div className="flex items-center gap-1">
+              <Zap className="h-3 w-3 text-emerald-400 sm:hidden" />
+              <p className="font-mono text-sm leading-none text-emerald-50 sm:text-2xl">{myPlayer?.score ?? 0}</p>
+            </div>
             {myPlayer && (
-              <div className="mt-1 flex items-center gap-1.5">
-                <span className="text-[9px] font-bold uppercase tracking-widest text-cyan-400/80">Funds</span>
-                <span className="font-mono text-xs sm:text-sm text-cyan-200">{availableShopScore}</span>
+              <div className="flex items-center gap-1 sm:mt-0.5 sm:gap-1.5">
+                <span className="hidden text-[9px] font-bold uppercase tracking-widest text-cyan-400/80 sm:inline">Funds</span>
+                <span className="text-[9px] font-bold text-cyan-400/80 sm:hidden">F</span>
+                <span className="font-mono text-xs text-cyan-200 sm:text-sm">{availableShopScore}</span>
               </div>
             )}
+            <div className="flex items-center text-[10px] font-mono sm:hidden">
+              <span className="mr-0.5 text-rose-400/80">In:</span>
+              <span className="text-rose-200">{myPendingGarbage}</span>
+            </div>
           </div>
         </div>
 
-        <div className="flex shrink-0 flex-col items-center px-1">
-          <div className="mb-0.5 flex items-center gap-1 sm:mb-1 sm:gap-2">
-            <Timer className="h-3.5 w-3.5 text-zinc-500 sm:h-4 sm:w-4" />
-            <span className="hidden text-[10px] font-bold uppercase tracking-widest text-zinc-500 sm:inline sm:text-xs">
+        {/* Center: Timer */}
+        <div className="flex shrink-0 flex-col items-center px-1 sm:px-2">
+          <div className="hidden items-center gap-2 sm:mb-1 sm:flex">
+            <Timer className="h-4 w-4 text-zinc-500" />
+            <span className="text-xs font-bold uppercase tracking-widest text-zinc-500">
               Remaining
             </span>
           </div>
-          <p className="font-mono text-2xl tracking-tighter sm:text-3xl">
+          <p className="font-mono text-base leading-none tracking-tighter text-zinc-300 sm:text-3xl">
             {Math.floor(gameState.remainingTime / 60)}:{(Math.floor(gameState.remainingTime % 60)).toString().padStart(2, '0')}
           </p>
         </div>
 
-        <div className="flex min-w-0 items-center gap-2 text-right sm:gap-4">
-          <div className="relative z-10 min-h-[2.25rem] min-w-0 overflow-visible sm:min-h-[2.5rem] sm:min-w-[3rem]">
-            <p className="text-[9px] font-semibold uppercase leading-tight tracking-wider text-rose-400/60 sm:text-[10px]">
-              <span className="sm:hidden">Opp.</span>
-              <span className="hidden sm:inline">Opponent Attack Score</span>
+        {/* Right: Opponent Score + Incoming */}
+        <div className="flex flex-1 items-center justify-end gap-1.5 min-w-0 sm:gap-4">
+          <div className="flex flex-row flex-wrap items-center justify-end gap-x-1.5 gap-y-0.5 sm:flex-col sm:items-end sm:gap-0 min-w-0">
+            <div className="flex items-center text-[10px] font-mono sm:hidden">
+              <span className="mr-0.5 text-rose-400/80">In:</span>
+              <span className="text-rose-200">{oppPendingGarbage}</span>
+            </div>
+            <p className="hidden text-[10px] font-semibold uppercase leading-tight tracking-wider text-rose-400/60 sm:block">
+              Opponent Attack Score
             </p>
-            <p className="font-mono text-lg leading-none sm:text-2xl">{opponentPlayer?.score ?? 0}</p>
+            <div className="flex items-center gap-1">
+              <p className="font-mono text-sm leading-none text-rose-50 sm:text-2xl">{opponentPlayer?.score ?? 0}</p>
+              <Users className="h-3 w-3 text-rose-400 sm:hidden" />
+            </div>
           </div>
-          <div className="shrink-0 rounded-lg bg-rose-500/10 p-1.5 sm:p-2">
+          <div className="hidden shrink-0 rounded-lg bg-rose-500/10 sm:block sm:p-2">
             <Users className="h-4 w-4 text-rose-400 sm:h-5 sm:w-5" />
           </div>
         </div>
       </div>
       {lastMatchEvent && (
-        <div className={`mb-2 self-center rounded-full border border-white/10 bg-white/5 px-3 py-1 text-[11px] uppercase tracking-wider ${eventUi.tone}`}>
+        <div className={`mb-1 self-center rounded-full border border-white/10 bg-white/5 px-2.5 py-0.5 text-[10px] uppercase tracking-wider sm:mb-2 sm:px-3 sm:py-1 sm:text-[11px] ${eventUi.tone}`}>
           {eventUi.text}
         </div>
       )}
       {(myPlayer || opponentPlayer) && (
-        <div className="mb-2 grid w-full max-w-5xl grid-cols-2 gap-2 self-center">
+        <div className="mb-1.5 hidden w-full max-w-5xl grid-cols-2 gap-2 self-center sm:grid">
           <div className="rounded-lg border border-rose-500/25 bg-rose-950/20 px-3 py-1.5 text-xs">
             <span className="text-rose-300/90">Incoming (you): </span>
             <span className="font-mono text-rose-200">{myPendingGarbage}</span>
