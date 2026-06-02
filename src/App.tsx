@@ -377,7 +377,7 @@ const App: React.FC = () => {
   }, [gameState, myId]);
 
   const mobilePlayfieldRef = useRef<HTMLDivElement>(null);
-  const boardColRef = useRef<HTMLDivElement>(null);
+  const railRef = useRef<HTMLDivElement>(null);
   const [mobileCellSize, setMobileCellSize] = useState(28);
   const [mobileControlsHeight, setMobileControlsHeight] = useState(() => 
     typeof window !== 'undefined' && window.innerWidth >= 768 ? 0 : 188
@@ -565,22 +565,22 @@ const App: React.FC = () => {
   }, [startShopCycle, sendShopPurchase]);
 
   useLayoutEffect(() => {
-    // Measure the board COLUMN (a flex child). The opponent/shop rail is a flex
-    // sibling, so its real rendered width — including any rem inflation from a
-    // larger system font / display size (e.g. Samsung) — is already excluded by
-    // flexbox. No fixed pixel reserve for the rail, so it can never clip.
-    const el = boardColRef.current;
-    if (!el) return;
+    // Size the board to the space left over after the rail's ACTUAL rendered
+    // width. Measuring the live rail (rather than reserving fixed pixels) makes
+    // this correct even when a larger system font / display zoom inflates the
+    // rem-based rail and chrome — the case that broke the Samsung layout.
+    const outer = mobilePlayfieldRef.current;
+    if (!outer) return;
     const measure = () => {
-      const { width, height } = el.getBoundingClientRect();
-      if (width < 8 || height < 8) return;
-      // GameField's title row + storage panel are rem-based and inflate with the
-      // root font size; scale the chrome reserve to match so the board never
-      // overflows past the swap line on devices with larger font/display scaling.
+      const ob = outer.getBoundingClientRect();
+      if (ob.width < 8 || ob.height < 8) return;
+      const railW = railRef.current?.getBoundingClientRect().width ?? 0;
       const scale = (parseFloat(getComputedStyle(document.documentElement).fontSize) || 16) / 16;
-      const boardChromeReserve = 118 * scale;
-      const fromH = (height - boardChromeReserve) / BOARD_VISIBLE_ROWS;
-      const fromW = width / BOARD_COLS;
+      const boardChromeReserve = 118 * scale; // GameField title + storage (rem-based)
+      const GAP_AND_SAFETY = 16;              // flex gap + a couple px breathing room
+      const availW = ob.width - railW - GAP_AND_SAFETY;
+      const fromW = availW / BOARD_COLS;
+      const fromH = (ob.height - boardChromeReserve) / BOARD_VISIBLE_ROWS;
       const c = Math.floor(Math.min(fromW, fromH));
       setMobileCellSize((prev) => {
         const next = Math.max(8, Math.min(36, c));
@@ -589,7 +589,8 @@ const App: React.FC = () => {
     };
     measure();
     const ro = new ResizeObserver(measure);
-    ro.observe(el);
+    ro.observe(outer);
+    if (railRef.current) ro.observe(railRef.current);
     return () => ro.disconnect();
   }, []);
 
@@ -1075,9 +1076,9 @@ const App: React.FC = () => {
           ref={mobilePlayfieldRef}
           className="flex h-full w-full items-stretch gap-2 overflow-hidden px-1 pb-3"
         >
-          {/* Board column is always rendered so its ref/measurement is stable;
-              only its contents are gated on the player existing. */}
-          <div ref={boardColRef} className="flex min-h-0 min-w-0 flex-1 items-start justify-start">
+          {/* Board shrink-wraps to its computed cell size (no flex-grow, so it
+              never leaves a gap that shoves the rail off-screen). */}
+          <div className="flex min-h-0 shrink-0 items-start justify-start">
             {myPlayer && (
               <GameField
                 ref={myMobileFieldRef}
@@ -1090,22 +1091,22 @@ const App: React.FC = () => {
               />
             )}
           </div>
-          {myPlayer && (
-            <div className="flex shrink-0 flex-col gap-2 overflow-y-auto">
-              <OpponentMiniField player={opponentPlayer} pendingGarbage={oppPendingGarbage} />
-              <ShopRail
-                items={shop.offers}
-                isPlaying={gameState.status === 'playing'}
-                canPurchase={shopCanPurchase}
-                cycleIndex={shop.cycleIndex}
-                shopPhase={shop.phase}
-                purchasedItem={shop.purchasedItem}
-                onConfirm={handleShopConfirm}
-                availableScore={availableShopScore}
-                viewportMode="mobile"
-              />
-            </div>
-          )}
+          {/* Rail is always rendered so its width is a stable measurement target
+              (it shows waiting states pre-match); shrink-0 keeps it intact. */}
+          <div ref={railRef} className="flex shrink-0 flex-col gap-2 overflow-y-auto">
+            <OpponentMiniField player={opponentPlayer} pendingGarbage={oppPendingGarbage} />
+            <ShopRail
+              items={shop.offers}
+              isPlaying={gameState.status === 'playing'}
+              canPurchase={shopCanPurchase}
+              cycleIndex={shop.cycleIndex}
+              shopPhase={shop.phase}
+              purchasedItem={shop.purchasedItem}
+              onConfirm={handleShopConfirm}
+              availableScore={availableShopScore}
+              viewportMode="mobile"
+            />
+          </div>
         </div>
       </div>
 
