@@ -377,6 +377,7 @@ const App: React.FC = () => {
   }, [gameState, myId]);
 
   const mobilePlayfieldRef = useRef<HTMLDivElement>(null);
+  const boardColRef = useRef<HTMLDivElement>(null);
   const [mobileCellSize, setMobileCellSize] = useState(28);
   const [mobileControlsHeight, setMobileControlsHeight] = useState(() => 
     typeof window !== 'undefined' && window.innerWidth >= 768 ? 0 : 188
@@ -564,22 +565,25 @@ const App: React.FC = () => {
   }, [startShopCycle, sendShopPurchase]);
 
   useLayoutEffect(() => {
-    const el = mobilePlayfieldRef.current;
+    // Measure the board COLUMN (a flex child). The opponent/shop rail is a flex
+    // sibling, so its real rendered width — including any rem inflation from a
+    // larger system font / display size (e.g. Samsung) — is already excluded by
+    // flexbox. No fixed pixel reserve for the rail, so it can never clip.
+    const el = boardColRef.current;
     if (!el) return;
     const measure = () => {
       const { width, height } = el.getBoundingClientRect();
       if (width < 8 || height < 8) return;
-      // Space reserved for title row, compact storage panel, bottom padding, and a small safety margin.
-      const boardChromeReserve = 114;
+      // GameField's title row + storage panel are rem-based and inflate with the
+      // root font size; scale the chrome reserve to match so the board never
+      // overflows past the swap line on devices with larger font/display scaling.
+      const scale = (parseFloat(getComputedStyle(document.documentElement).fontSize) || 16) / 16;
+      const boardChromeReserve = 118 * scale;
       const fromH = (height - boardChromeReserve) / BOARD_VISIBLE_ROWS;
-      // Reserve width for the right rail (OpponentMiniField + ShopRail are each
-      // w-[5.75rem]=92px) plus the gap and a safety margin, so board + rail fit
-      // within narrow viewports (e.g. Galaxy S20 FE) without the rail clipping.
-      const railReserve = 120;
-      const c = Math.floor(Math.min((width - railReserve) / BOARD_COLS, fromH));
+      const fromW = width / BOARD_COLS;
+      const c = Math.floor(Math.min(fromW, fromH));
       setMobileCellSize((prev) => {
-        // Increased max cell size to 36 to allow board to grow on intermediate tablet views
-        const next = Math.max(10, Math.min(36, c));
+        const next = Math.max(8, Math.min(36, c));
         return prev !== next ? next : prev;
       });
     };
@@ -588,33 +592,6 @@ const App: React.FC = () => {
     ro.observe(el);
     return () => ro.disconnect();
   }, []);
-
-  // TEMP DEBUG: surface device metrics so we can diagnose the Samsung-only
-  // mobile layout overflow that we can't reproduce. Remove after diagnosis.
-  const [dbgInfo, setDbgInfo] = useState('');
-  useEffect(() => {
-    const update = () => {
-      const r = mobilePlayfieldRef.current?.getBoundingClientRect();
-      const rootFs = getComputedStyle(document.documentElement).fontSize;
-      const vv = window.visualViewport;
-      setDbgInfo(
-        `iw${window.innerWidth} ih${window.innerHeight} ` +
-        `vv${vv ? Math.round(vv.width) + 'x' + Math.round(vv.height) : '-'} ` +
-        `dpr${window.devicePixelRatio} rem${rootFs} ` +
-        `pf${r ? Math.round(r.width) + 'x' + Math.round(r.height) : '-'} cs${mobileCellSize}`,
-      );
-    };
-    update();
-    window.addEventListener('resize', update);
-    const vv = window.visualViewport;
-    vv?.addEventListener('resize', update);
-    const id = window.setInterval(update, 1000);
-    return () => {
-      window.removeEventListener('resize', update);
-      vv?.removeEventListener('resize', update);
-      window.clearInterval(id);
-    };
-  }, [mobileCellSize]);
 
   useEffect(() => {
     if (!drillResult) return;
@@ -962,11 +939,6 @@ const App: React.FC = () => {
       className="flex h-dvh max-h-dvh min-h-0 flex-col overflow-hidden bg-[#0a0a0a] px-2 py-2 pb-[var(--mobile-controls-pad)] font-sans text-white sm:px-4 sm:py-3 md:pb-2"
       style={{ '--mobile-controls-pad': `${mobileControlsHeight + 10}px` } as React.CSSProperties}
     >
-      {/* TEMP DEBUG overlay — remove after diagnosing Samsung layout */}
-      <div className="pointer-events-none fixed left-0 top-0 z-[9999] max-w-full break-all bg-black/85 px-1.5 py-0.5 font-mono text-[10px] leading-tight text-lime-300">
-        {dbgInfo}
-      </div>
-
       {/* Header */}
       <div className="mb-2 flex w-full max-w-5xl shrink-0 items-center justify-between gap-2 self-center overflow-visible rounded-xl border border-white/5 bg-[#1a1a1a] p-2 shadow-xl sm:mb-3 sm:rounded-2xl sm:p-3 md:p-4">
         <div className="flex min-w-0 items-center gap-2 sm:gap-4">
@@ -1093,14 +1065,20 @@ const App: React.FC = () => {
         </div>
       )}
 
-      {/* Mobile game view: primary board + mini opponent at top-right */}
+      {/* Mobile game view: board column (flex-1) + opponent/shop rail (flex sibling).
+          Using a real flex row — instead of an absolutely-positioned rail with a
+          fixed pixel reserve — lets the board shrink to whatever width remains
+          after the rail's actual (possibly font-scaled) size, so the rail can
+          never clip off-screen regardless of device or display scaling. */}
       <div className="relative min-h-0 w-full flex-1 md:hidden">
         <div
           ref={mobilePlayfieldRef}
-          className="flex h-full w-full items-start justify-start overflow-hidden px-1 pb-3 pr-[7.5rem]"
+          className="flex h-full w-full items-stretch gap-2 overflow-hidden px-1 pb-3"
         >
-          {myPlayer && (
-            <div className="relative">
+          {/* Board column is always rendered so its ref/measurement is stable;
+              only its contents are gated on the player existing. */}
+          <div ref={boardColRef} className="flex min-h-0 min-w-0 flex-1 items-start justify-start">
+            {myPlayer && (
               <GameField
                 ref={myMobileFieldRef}
                 player={myPlayer}
@@ -1110,23 +1088,22 @@ const App: React.FC = () => {
                 shadowColorClass="shadow-[0_0_30px_rgba(16,185,129,0.1)]"
                 cellSize={mobileCellSize}
               />
-              {/* Anchor mini field to the right of the main board so it doesn't drift away on wider screens */}
-              <div className="absolute left-[calc(100%+0.5rem)] sm:left-[calc(100%+1rem)] top-0 z-20 origin-top-left">
-                <OpponentMiniField player={opponentPlayer} pendingGarbage={oppPendingGarbage} />
-              </div>
-              <div className="absolute left-[calc(100%+0.5rem)] sm:left-[calc(100%+1rem)] top-[9.5rem] z-20 origin-top-left">
-          <ShopRail
-            items={shop.offers}
-            isPlaying={gameState.status === 'playing'}
-            canPurchase={shopCanPurchase}
-            cycleIndex={shop.cycleIndex}
-            shopPhase={shop.phase}
-            purchasedItem={shop.purchasedItem}
-            onConfirm={handleShopConfirm}
-            availableScore={availableShopScore}
-            viewportMode="mobile"
-          />
-              </div>
+            )}
+          </div>
+          {myPlayer && (
+            <div className="flex shrink-0 flex-col gap-2 overflow-y-auto">
+              <OpponentMiniField player={opponentPlayer} pendingGarbage={oppPendingGarbage} />
+              <ShopRail
+                items={shop.offers}
+                isPlaying={gameState.status === 'playing'}
+                canPurchase={shopCanPurchase}
+                cycleIndex={shop.cycleIndex}
+                shopPhase={shop.phase}
+                purchasedItem={shop.purchasedItem}
+                onConfirm={handleShopConfirm}
+                availableScore={availableShopScore}
+                viewportMode="mobile"
+              />
             </div>
           )}
         </div>
