@@ -29,6 +29,25 @@ import {
   POISON_COST,
   POISON_SPREAD_INTERVAL_TICKS,
   POISON_GENERATIONS,
+  POISON_PURGE_COST,
+  POISON_PURGE_TELEGRAPH_TICKS,
+  FREEZE_COST,
+  FREEZE_DURATION_TICKS,
+  STICKY_LOCK_RESET_CAP,
+  STICKY_COST,
+  MAGNET_COST,
+  MAGNET_PERMANENT_MAX,
+  MAGNET_PERMANENT_GRAVITY_STEP,
+  MAGNET_PIECE_GRAVITY_STEP,
+  MAGNET_GRAVITY_TICK_REDUCTION,
+  MAGNET_MIN_GRAVITY_TICKS,
+  SNAG_COST,
+  SATELLITE_COST,
+  SATELLITE_PACKET_DELAY_TICKS,
+  SATELLITE_INCOMING_DELAY_TICKS,
+  SATELLITE_DURATION_TICKS,
+  BOMBER_COST,
+  BOMBER_BLAST_RADIUS,
   SCORE_FLOAT_DURATION_SEC,
   SOFT_DROP_CELLS_PER_TICK,
   ARR_TICKS,
@@ -103,6 +122,8 @@ export interface TetrisPiece {
    * by the same Elixir purchase share this value so the colour is consistent.
    */
   poisonVariant?: number;
+  /** Bomber shop item: detonates in a circle when this piece locks. */
+  bomber?: boolean;
 }
 
 /**
@@ -135,6 +156,8 @@ export interface PendingShopEffect {
   itemId: string;
   /** The game tick at which this effect triggers */
   activationTick: number;
+  /** Rolled poison colour (1–4) for Wild Purge activation. */
+  poisonVariant?: number;
 }
 
 export interface PlayerState {
@@ -186,6 +209,28 @@ export interface PlayerState {
   poisonNextPiece?: boolean;
   /** Colour variant to assign to the next deferred poison spawn. */
   poisonNextVariant?: number;
+  /** Game tick until hold/store/swap is blocked (Freeze shop item). */
+  holdFrozenUntilTick?: number;
+  /** Per-piece lock reset cap override (Sticky shop item); cleared on lock/hold. */
+  pieceLockResetCap?: number;
+  /** Apply sticky cap to the next piece that spawns (purchase while no active piece). */
+  stickyNextPiece?: boolean;
+  /** Permanent magnet gravity steps applied by opponent (0–MAGNET_PERMANENT_MAX). */
+  magnetPermanentStacks?: number;
+  /** Extra magnet gravity on the current piece only; cleared on lock/hold. */
+  magnetPieceBoost?: number;
+  /** True after a successful hard drop on the current active piece. */
+  pieceHasHardDropped?: boolean;
+  /** Snag: hard drop blocked on this piece until lock/hold. */
+  snagHardDropBlocked?: boolean;
+  /** Snag: apply block to the next spawned piece. */
+  snagNextPiece?: boolean;
+  /** Purchased Satellite waiting for first incoming garbage before it takes effect. */
+  satelliteArmed?: boolean;
+  /** Game tick until newly queued garbage gets SATELLITE_INCOMING_DELAY_TICKS. */
+  satelliteDelayUntilTick?: number;
+  /** Bomber: arm the next spawned piece. */
+  bomberNextPiece?: boolean;
 }
 
 export interface GameState {
@@ -275,6 +320,25 @@ export {
   POISON_COST,
   POISON_SPREAD_INTERVAL_TICKS,
   POISON_GENERATIONS,
+  POISON_PURGE_COST,
+  POISON_PURGE_TELEGRAPH_TICKS,
+  FREEZE_COST,
+  FREEZE_DURATION_TICKS,
+  STICKY_LOCK_RESET_CAP,
+  STICKY_COST,
+  MAGNET_COST,
+  MAGNET_PERMANENT_MAX,
+  MAGNET_PERMANENT_GRAVITY_STEP,
+  MAGNET_PIECE_GRAVITY_STEP,
+  MAGNET_GRAVITY_TICK_REDUCTION,
+  MAGNET_MIN_GRAVITY_TICKS,
+  SNAG_COST,
+  SATELLITE_COST,
+  SATELLITE_PACKET_DELAY_TICKS,
+  SATELLITE_INCOMING_DELAY_TICKS,
+  SATELLITE_DURATION_TICKS,
+  BOMBER_COST,
+  BOMBER_BLAST_RADIUS,
   SCORE_FLOAT_DURATION_SEC,
   SOFT_DROP_CELLS_PER_TICK,
   ARR_TICKS,

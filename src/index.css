@@ -100,76 +100,84 @@ html, body, #root {
   animation: rainbow-bg 3s ease infinite;
 }
 
+/* Magnet pull — rainbow/wind ring on the falling piece while magnet debuff is active */
+@keyframes magnet-pull-glow {
+  0%, 100% {
+    box-shadow:
+      0 0 4px #e879f9,
+      0 0 8px #38bdf8,
+      inset 0 0 2px rgba(255, 255, 255, 0.45);
+    border-color: #f0abfc;
+  }
+  33% {
+    box-shadow:
+      0 0 5px #fbbf24,
+      0 0 10px #a3e635,
+      inset 0 0 2px rgba(255, 255, 255, 0.55);
+    border-color: #bef264;
+  }
+  66% {
+    box-shadow:
+      0 0 5px #38bdf8,
+      0 0 10px #c084fc,
+      inset 0 0 2px rgba(255, 255, 255, 0.5);
+    border-color: #7dd3fc;
+  }
+}
+
+.magnet-pull-ring {
+  border: 2px solid #e879f9;
+  border-radius: 1px;
+  animation: magnet-pull-glow 1.1s ease-in-out infinite;
+}
+
 /*
- * Poison cells — a scrolling chevron/zigzag pattern (Pokemon FR/LG poison-screen
- * homage). Each cell paints a bright zigzag over a dark base in its variant's
- * colour; the whole poisoned region scrolls upward in lockstep so it reads as
- * one cohesive sheet of poison. The zigzag pattern itself is distinctive even
- * with motion reduced, so the effect degrades gracefully.
- *
- * Pattern is built from four diagonal gradients forming chevrons on a TILE-size
- * grid; the animation scrolls background-position by one full tile for a
- * seamless loop.
+ * Poison cells — stepped sprite animation (Gen III battle poison-screen feel;
+ * see public/poison/poison-sheet.svg, built via scripts/generate-poison-sprites.mjs).
+ * 8 frames scroll upward in lockstep across the poisoned region; each variant is
+ * a row in the sheet. steps(8) matches GBA-style discrete frames, not smooth scroll.
  */
-@keyframes poison-scroll {
-  from { background-position: var(--pz-a), var(--pz-b), var(--pz-c), var(--pz-d); }
-  to   { background-position: var(--pz-a2), var(--pz-b2), var(--pz-c2), var(--pz-d2); }
+@keyframes poison-sprite {
+  from { background-position: 0% var(--poison-row, 0%); }
+  to   { background-position: 100% var(--poison-row, 0%); }
+}
+
+@keyframes poison-glow {
+  0%, 100% { filter: brightness(1); }
+  50%      { filter: brightness(1.18); }
 }
 
 .poison-cell {
-  /* 14px chevron tiles; scroll up one tile (14px) per cycle. */
-  --pz-a: 7px 0px;   --pz-a2: 7px -14px;
-  --pz-b: 7px 0px;   --pz-b2: 7px -14px;
-  --pz-c: 0px 0px;   --pz-c2: 0px -14px;
-  --pz-d: 0px 0px;   --pz-d2: 0px -14px;
-  background-size: 14px 14px !important;
-  background-position: var(--pz-a), var(--pz-b), var(--pz-c), var(--pz-d) !important;
-  animation: poison-scroll 0.85s linear infinite;
+  position: relative;
+  overflow: hidden;
+  background-image: url('/poison/poison-sheet.svg');
+  background-repeat: no-repeat;
+  /* 8 columns × 4 variant rows — one frame fills the cell at any cellSize */
+  background-size: 800% 400%;
+  background-position: 0% var(--poison-row, 0%);
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+  animation:
+    poison-sprite 0.64s steps(8) infinite,
+    poison-glow 1.1s ease-in-out infinite;
   border: 1px solid rgba(0, 0, 0, 0.35) !important;
 }
 
-/* v1 – fuchsia/purple (classic poison) */
 .poison-cell-v1 {
-  background-color: #4c1d95 !important;
-  background-image:
-    linear-gradient(135deg, #e879f9 25%, transparent 25%),
-    linear-gradient(225deg, #e879f9 25%, transparent 25%),
-    linear-gradient(45deg,  #e879f9 25%, transparent 25%),
-    linear-gradient(315deg, #e879f9 25%, transparent 25%) !important;
-  box-shadow: inset 0 0 6px rgba(0,0,0,0.4), 0 0 7px rgba(217,70,239,0.7);
+  --poison-row: 0%;
+  box-shadow: inset 0 0 6px rgba(0, 0, 0, 0.4), 0 0 7px rgba(217, 70, 239, 0.7);
 }
-
-/* v2 – toxic lime/green (venom) */
 .poison-cell-v2 {
-  background-color: #365314 !important;
-  background-image:
-    linear-gradient(135deg, #bef264 25%, transparent 25%),
-    linear-gradient(225deg, #bef264 25%, transparent 25%),
-    linear-gradient(45deg,  #bef264 25%, transparent 25%),
-    linear-gradient(315deg, #bef264 25%, transparent 25%) !important;
-  box-shadow: inset 0 0 6px rgba(0,0,0,0.4), 0 0 7px rgba(163,230,53,0.7);
+  --poison-row: 33.333333%;
+  box-shadow: inset 0 0 6px rgba(0, 0, 0, 0.4), 0 0 7px rgba(163, 230, 53, 0.7);
 }
-
-/* v3 – deep indigo/violet */
 .poison-cell-v3 {
-  background-color: #312e81 !important;
-  background-image:
-    linear-gradient(135deg, #a5b4fc 25%, transparent 25%),
-    linear-gradient(225deg, #a5b4fc 25%, transparent 25%),
-    linear-gradient(45deg,  #a5b4fc 25%, transparent 25%),
-    linear-gradient(315deg, #a5b4fc 25%, transparent 25%) !important;
-  box-shadow: inset 0 0 6px rgba(0,0,0,0.4), 0 0 7px rgba(129,140,248,0.7);
+  --poison-row: 66.666667%;
+  box-shadow: inset 0 0 6px rgba(0, 0, 0, 0.4), 0 0 7px rgba(129, 140, 248, 0.7);
 }
-
-/* v4 – acid teal/cyan */
 .poison-cell-v4 {
-  background-color: #134e4a !important;
-  background-image:
-    linear-gradient(135deg, #99f6e4 25%, transparent 25%),
-    linear-gradient(225deg, #99f6e4 25%, transparent 25%),
-    linear-gradient(45deg,  #99f6e4 25%, transparent 25%),
-    linear-gradient(315deg, #99f6e4 25%, transparent 25%) !important;
-  box-shadow: inset 0 0 6px rgba(0,0,0,0.4), 0 0 7px rgba(94,234,212,0.7);
+  --poison-row: 100%;
+  box-shadow: inset 0 0 6px rgba(0, 0, 0, 0.4), 0 0 7px rgba(94, 234, 212, 0.7);
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -182,9 +190,11 @@ html, body, #root {
     scroll-behavior: auto !important;
   }
 
-  /* Poison is a deliberate gameplay signal — keep it scrolling even under
+  /* Poison is a deliberate gameplay signal — keep frame animation even under
      reduced motion (higher specificity than the universal reset above). */
   .poison-cell {
-    animation: poison-scroll 0.85s linear infinite !important;
+    animation:
+      poison-sprite 0.64s steps(8) infinite,
+      poison-glow 1.1s ease-in-out infinite !important;
   }
 }

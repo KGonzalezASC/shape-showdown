@@ -19,12 +19,27 @@ import {
   CURTAIN_COST,
   CURTAIN_TELEGRAPH_TICKS,
   POISON_COST,
+  POISON_GENERATIONS,
+  POISON_PURGE_COST,
+  POISON_PURGE_TELEGRAPH_TICKS,
+  FREEZE_COST,
+  FREEZE_DURATION_TICKS,
+  STICKY_COST,
+  MAGNET_COST,
+  SNAG_COST,
+  SATELLITE_COST,
+  BOMBER_COST,
 } from '../src/types.js';
 import {
   initialSeed,
   makePlayer,
   makeRng,
   replayDateLabel,
+  applyMagnetToOpponent,
+  applySnagToOpponent,
+  armSatelliteToBuyer,
+  applyBomberToBuyer,
+  applyStickyToActivePiece,
   stepPlayer,
   tickSeconds,
 } from './tetris/engine.js';
@@ -110,25 +125,33 @@ export class GameManager {
       const buyer = this.gameState.players[socket.id];
       if (!buyer) return;
 
+      const SELF_SHOP_ITEMS = new Set(['satellite-link', 'nova-charge']);
+
       // Authoritative cost per item (mirrors the client SHOP_MOCK_POOL costs).
       const COSTS: Record<string, number> = {
         retrim: RETRIM_COST,
         curtain: CURTAIN_COST,
         'elixir-pulse': POISON_COST,
+        'vortex-step': POISON_PURGE_COST,
+        'frost-shift': FREEZE_COST,
+        'quickstep-clock': STICKY_COST,
+        'gravity-lure': MAGNET_COST,
+        'fortify-frame': SNAG_COST,
+        'satellite-link': SATELLITE_COST,
+        'nova-charge': BOMBER_COST,
       };
       const cost = COSTS[itemId];
       if (cost === undefined) return; // Unknown / not-yet-implemented item.
       if (buyer.score < cost) return;
 
-      // Find the opponent — every current shop item targets them.
       const pids = Object.keys(this.gameState.players);
       const opponentId = pids.find((id) => id !== socket.id);
       const opponent = opponentId ? this.gameState.players[opponentId] : null;
-      if (!opponent) return;
-
+      if (!SELF_SHOP_ITEMS.has(itemId) && !opponent) return;
       // Deduct cost from the server's authoritative score so it can't be spammed.
       buyer.score -= cost;
-      if (!opponent.activeEffects) opponent.activeEffects = [];
+      if (!buyer.activeEffects) buyer.activeEffects = [];
+      if (opponent && !opponent.activeEffects) opponent.activeEffects = [];
 
       if (itemId === 'retrim') {
         opponent.pendingShopEffects.push({
@@ -189,6 +212,104 @@ export class GameManager {
           textClass: 'text-fuchsia-100',
           glowClass: 'shadow-[0_0_10px_rgba(217,70,239,0.7)]',
           expiresAtTick: this.gameState.tick + 180, // ~3s
+        });
+      } else if (itemId === 'vortex-step') {
+        const variant = Math.floor(Math.random() * POISON_GENERATIONS) + 1;
+        opponent.pendingShopEffects.push({
+          itemId: 'vortex-step',
+          activationTick: this.gameState.tick + POISON_PURGE_TELEGRAPH_TICKS,
+          poisonVariant: variant,
+        });
+        const variantLabels = ['Magenta', 'Lime', 'Indigo', 'Teal'] as const;
+        opponent.activeEffects.push({
+          id: `purge-warn-${this.gameState.tick}`,
+          label: `Wild ${variantLabels[variant - 1]}`,
+          icon: '🃏',
+          bgClass: 'bg-fuchsia-900/80',
+          borderClass: 'border-fuchsia-400',
+          textClass: 'text-fuchsia-100',
+          glowClass: 'shadow-[0_0_10px_rgba(217,70,239,0.7)]',
+          expiresAtTick: this.gameState.tick + POISON_PURGE_TELEGRAPH_TICKS,
+        });
+      } else if (itemId === 'frost-shift') {
+        const until = this.gameState.tick + FREEZE_DURATION_TICKS;
+        opponent.holdFrozenUntilTick = Math.max(opponent.holdFrozenUntilTick ?? 0, until);
+        opponent.activeEffects.push({
+          id: `freeze-active-${this.gameState.tick}`,
+          label: 'Frozen',
+          icon: '❄️',
+          bgClass: 'bg-sky-900/80',
+          borderClass: 'border-sky-300',
+          textClass: 'text-sky-100',
+          glowClass: 'shadow-[0_0_10px_rgba(56,189,248,0.7)]',
+          expiresAtTick: until,
+        });
+      } else if (itemId === 'gravity-lure') {
+        applyMagnetToOpponent(opponent);
+        const permanent = opponent.magnetPermanentStacks ?? 0;
+        const pieceBoost = opponent.magnetPieceBoost ?? 0;
+        const pull = permanent * 2 + pieceBoost;
+        const label = pieceBoost > 0 ? `Magnet +${pull}` : `Magnet ×${permanent} (+${pull})`;
+        opponent.activeEffects.push({
+          id: `magnet-${this.gameState.tick}`,
+          label,
+          icon: '🧲',
+          bgClass: 'bg-violet-900/80',
+          borderClass: 'border-violet-400',
+          textClass: 'text-violet-100',
+          glowClass: 'shadow-[0_0_10px_rgba(167,139,250,0.7)]',
+          expiresAtTick: this.gameState.tick + 180,
+        });
+      } else if (itemId === 'fortify-frame') {
+        applySnagToOpponent(opponent!);
+        opponent.activeEffects.push({
+          id: `snag-${this.gameState.tick}`,
+          label: 'Snagged',
+          icon: '🪝',
+          bgClass: 'bg-orange-900/80',
+          borderClass: 'border-orange-400',
+          textClass: 'text-orange-100',
+          glowClass: 'shadow-[0_0_10px_rgba(251,146,60,0.7)]',
+          expiresAtTick: this.gameState.tick + 180,
+        });
+      } else if (itemId === 'quickstep-clock') {
+        applyStickyToActivePiece(opponent!);
+        opponent!.activeEffects!.push({
+          id: `sticky-${this.gameState.tick}`,
+          label: 'Sticky',
+          icon: '⏱️',
+          bgClass: 'bg-teal-900/80',
+          borderClass: 'border-teal-300',
+          textClass: 'text-teal-100',
+          glowClass: 'shadow-[0_0_10px_rgba(45,212,191,0.7)]',
+          expiresAtTick: this.gameState.tick + 180,
+        });
+      } else if (itemId === 'satellite-link') {
+        armSatelliteToBuyer(buyer, this.gameState.tick);
+        const activated = (buyer.satelliteDelayUntilTick ?? 0) > this.gameState.tick;
+        buyer.activeEffects.push({
+          id: `satellite-${this.gameState.tick}`,
+          label: activated ? 'Satellite' : 'Satellite armed',
+          icon: '🛰️',
+          bgClass: 'bg-zinc-800/90',
+          borderClass: 'border-zinc-300',
+          textClass: 'text-zinc-100',
+          glowClass: 'shadow-[0_0_10px_rgba(212,212,216,0.5)]',
+          expiresAtTick: activated
+            ? buyer.satelliteDelayUntilTick!
+            : this.gameState.tick + 3600,
+        });
+      } else if (itemId === 'nova-charge') {
+        applyBomberToBuyer(buyer);
+        buyer.activeEffects.push({
+          id: `bomber-${this.gameState.tick}`,
+          label: 'Bomber',
+          icon: '💣',
+          bgClass: 'bg-rose-900/80',
+          borderClass: 'border-rose-400',
+          textClass: 'text-rose-100',
+          glowClass: 'shadow-[0_0_10px_rgba(251,113,133,0.7)]',
+          expiresAtTick: this.gameState.tick + 240,
         });
       }
     });

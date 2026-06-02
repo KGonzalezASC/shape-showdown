@@ -33,6 +33,8 @@ src/
   components/
     GameField.tsx         # Canvas + field floating score text
     GameFieldsLayout.tsx  # ResizeObserver scale-to-fit in viewport
+docs/
+  SHOP_POWERUPS.md        # Shop item specs (approved next work + rejections)
 config/
   server.json             # Server port, host, serveClient
   client.json             # Vite baseUrl (asset base path)

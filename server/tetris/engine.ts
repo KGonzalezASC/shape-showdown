@@ -13,6 +13,7 @@ import {
   InputState,
   LOCK_DELAY_TICKS,
   LOCK_RESET_CAP,
+  STICKY_LOCK_RESET_CAP,
   MatchEvent,
   PendingGarbagePacket,
   PendingShopEffect,
@@ -30,6 +31,15 @@ import {
   NEXT_PREVIEW_COUNT,
   POISON_GENERATIONS,
   POISON_SPREAD_INTERVAL_TICKS,
+  MAGNET_PERMANENT_MAX,
+  MAGNET_PERMANENT_GRAVITY_STEP,
+  MAGNET_PIECE_GRAVITY_STEP,
+  MAGNET_GRAVITY_TICK_REDUCTION,
+  MAGNET_MIN_GRAVITY_TICKS,
+  SATELLITE_PACKET_DELAY_TICKS,
+  SATELLITE_INCOMING_DELAY_TICKS,
+  SATELLITE_DURATION_TICKS,
+  BOMBER_BLAST_RADIUS,
 } from '../../src/constants.js';
 import { getKickTests, PIECE_SEQUENCE, SHAPES } from './pieces.js';
 
@@ -113,6 +123,17 @@ export function makePlayer(id: string, rng: MutableRng): PlayerState {
     poisonSpread: null,
     poisonNextPiece: false,
     poisonNextVariant: undefined,
+    holdFrozenUntilTick: undefined,
+    pieceLockResetCap: undefined,
+    stickyNextPiece: false,
+    magnetPermanentStacks: 0,
+    magnetPieceBoost: 0,
+    pieceHasHardDropped: false,
+    snagHardDropBlocked: false,
+    snagNextPiece: false,
+    satelliteArmed: false,
+    satelliteDelayUntilTick: undefined,
+    bomberNextPiece: false,
   };
   ensureQueue(player, rng);
   player.activePiece = spawnNextPiece(player, rng);
@@ -140,7 +161,9 @@ function spawnNextPiece(player: PlayerState, rng: MutableRng) {
   const poisonVariant = player.poisonNextVariant;
   player.poisonNextPiece = false;
   player.poisonNextVariant = undefined;
-  return { type, rotation: 0 as RotationState, x: 3, y: BOARD_HIDDEN_ROWS - 2, poisoned, poisonVariant };
+  const bomber = !!player.bomberNextPiece;
+  player.bomberNextPiece = false;
+  return { type, rotation: 0 as RotationState, x: 3, y: BOARD_HIDDEN_ROWS - 2, poisoned, poisonVariant, bomber };
 }
 
 function getCells(piece: { type: TetrominoType; rotation: RotationState; x: number; y: number }) {
@@ -164,7 +187,7 @@ function tryMove(player: PlayerState, dx: number, dy: number): boolean {
   if (dx !== 0 && dy === 0) {
     // A horizontal shift breaks a T-Spin sequence (last action must be a rotation).
     player.lastActionWasRotate = false;
-    if (wasGrounded && player.lockResetsUsed < LOCK_RESET_CAP) {
+    if (wasGrounded && player.lockResetsUsed < lockResetCapFor(player)) {
       player.lockResetsUsed += 1;
       player.lockDelayRemainingTicks = LOCK_DELAY_TICKS;
     }
@@ -175,7 +198,10 @@ function tryMove(player: PlayerState, dx: number, dy: number): boolean {
   if (dy > 0 && player.activePiece.y > player.lowestY) {
     player.lowestY = player.activePiece.y;
     player.lockDelayRemainingTicks = LOCK_DELAY_TICKS;
-    player.lockResetsUsed = 0;
+    // Sticky: do not refill move-reset budget when the piece slides to a new row.
+    if (player.pieceLockResetCap === undefined) {
+      player.lockResetsUsed = 0;
+    }
   }
   return true;
 }
@@ -196,7 +222,7 @@ function tryRotate(player: PlayerState, dir: 1 | -1): boolean {
         player.lastSrsKick = { kx, ky };
       }
       // Count resets whenever the piece was grounded before the rotate, even if SRS kicks it airborne.
-      if (wasGrounded && player.lockResetsUsed < LOCK_RESET_CAP) {
+      if (wasGrounded && player.lockResetsUsed < lockResetCapFor(player)) {
         player.lockResetsUsed += 1;
         player.lockDelayRemainingTicks = LOCK_DELAY_TICKS;
       }
@@ -218,17 +244,165 @@ function canHoldAtCurrentHeight(player: PlayerState): boolean {
   return maxVisibleRow < player.swapCutoffRow;
 }
 
+export function isHoldFrozen(player: PlayerState, tick: number): boolean {
+  return player.holdFrozenUntilTick !== undefined && tick < player.holdFrozenUntilTick;
+}
+
+export function lockResetCapFor(player: PlayerState): number {
+  return player.pieceLockResetCap ?? LOCK_RESET_CAP;
+}
+
+function clearPieceLockResetCap(player: PlayerState): void {
+  player.pieceLockResetCap = undefined;
+  player.stickyNextPiece = false;
+}
+
+export function magnetGravityLevel(player: PlayerState): number {
+  const permanent = (player.magnetPermanentStacks ?? 0) * MAGNET_PERMANENT_GRAVITY_STEP;
+  const piece = (player.magnetPieceBoost ?? 0) * MAGNET_PIECE_GRAVITY_STEP;
+  return permanent + piece;
+}
+
+export function gravityTicksPerCellFor(player: PlayerState): number {
+  const level = magnetGravityLevel(player);
+  if (level <= 0) return GRAVITY_TICKS_PER_CELL;
+  return Math.max(
+    MAGNET_MIN_GRAVITY_TICKS,
+    GRAVITY_TICKS_PER_CELL - level * MAGNET_GRAVITY_TICK_REDUCTION,
+  );
+}
+
+function clearMagnetPieceBoost(player: PlayerState): void {
+  player.magnetPieceBoost = 0;
+}
+
+function clearSnagHardDrop(player: PlayerState): void {
+  player.snagHardDropBlocked = false;
+  player.snagNextPiece = false;
+}
+
+export function isSnagBlockingHardDrop(player: PlayerState): boolean {
+  return !!player.snagHardDropBlocked;
+}
+
+/**
+ * Snag: block hard drop (and soft drop) on the current piece until lock/hold.
+ * If they already hard-dropped this piece, also snag the next spawn from queue.
+ */
+export function applySnagToOpponent(opponent: PlayerState): void {
+  if (opponent.activePiece) {
+    opponent.snagHardDropBlocked = true;
+    opponent.snagNextPiece = !!opponent.pieceHasHardDropped;
+  } else {
+    opponent.snagHardDropBlocked = false;
+    opponent.snagNextPiece = true;
+  }
+}
+
+/** Magnet shop item on opponent: permanent stack up to 3, then +1 on current piece until lock. */
+export function applyMagnetToOpponent(opponent: PlayerState): void {
+  const permanent = opponent.magnetPermanentStacks ?? 0;
+  if (permanent < MAGNET_PERMANENT_MAX) {
+    opponent.magnetPermanentStacks = permanent + 1;
+  } else {
+    opponent.magnetPieceBoost = (opponent.magnetPieceBoost ?? 0) + 1;
+  }
+}
+
+/** Sticky shop item: cap lock-move resets on the opponent's current (or next) piece. */
+export function applyStickyToActivePiece(player: PlayerState): void {
+  if (player.activePiece) {
+    player.pieceLockResetCap = STICKY_LOCK_RESET_CAP;
+    player.stickyNextPiece = false;
+    player.lockResetsUsed = 0;
+  } else {
+    player.stickyNextPiece = true;
+  }
+}
+
+function satelliteExtraGarbageDelay(target: PlayerState, tick: number): number {
+  if (target.satelliteDelayUntilTick !== undefined && tick < target.satelliteDelayUntilTick) {
+    return SATELLITE_INCOMING_DELAY_TICKS;
+  }
+  return 0;
+}
+
+/** Activate armed Satellite once incoming garbage exists. */
+export function tryActivateSatellite(buyer: PlayerState, tick: number): boolean {
+  if (!buyer.satelliteArmed) return false;
+  if (buyer.pendingGarbage.length === 0) return false;
+
+  buyer.satelliteArmed = false;
+  const until = tick + SATELLITE_DURATION_TICKS;
+  buyer.satelliteDelayUntilTick = Math.max(buyer.satelliteDelayUntilTick ?? 0, until);
+  for (const packet of buyer.pendingGarbage) {
+    packet.arrivalTick += SATELLITE_PACKET_DELAY_TICKS;
+  }
+  return true;
+}
+
+/** Satellite (self): arm on purchase; lingers until garbage is queued, then delays it. */
+export function armSatelliteToBuyer(buyer: PlayerState, tick: number): void {
+  buyer.satelliteArmed = true;
+  tryActivateSatellite(buyer, tick);
+}
+
+/** Bomber (self): arm the current piece or the next spawn. */
+export function applyBomberToBuyer(buyer: PlayerState): void {
+  if (buyer.activePiece) {
+    buyer.activePiece.bomber = true;
+    buyer.bomberNextPiece = false;
+  } else {
+    buyer.bomberNextPiece = true;
+  }
+}
+
+/**
+ * Bomber blast — circular radius around each locked cell. Holes only (no gravity, no score).
+ */
+export function detonateBomberBlast(player: PlayerState, centers: Array<{ x: number; y: number }>): void {
+  const poison = ensurePoisonBoard(player);
+  const r = BOMBER_BLAST_RADIUS;
+  const rSq = r * r;
+  const toClear = new Set<string>();
+
+  for (const { x: cx, y: cy } of centers) {
+    for (let dy = -r; dy <= r; dy++) {
+      for (let dx = -r; dx <= r; dx++) {
+        if (dx * dx + dy * dy > rSq) continue;
+        const x = cx + dx;
+        const y = cy + dy;
+        if (x < 0 || x >= BOARD_COLS || y < 0 || y >= BOARD_ROWS) continue;
+        if (player.board[y][x] !== null) toClear.add(`${x},${y}`);
+      }
+    }
+  }
+
+  for (const key of toClear) {
+    const [xs, ys] = key.split(',');
+    const x = Number(xs);
+    const y = Number(ys);
+    player.board[y][x] = null;
+    poison[y][x] = 0;
+  }
+}
+
 function lockPiece(player: PlayerState, tick: number): { lines: number; tSpin: 'full' | 'mini' | false; perfectClear: boolean } {
   if (!player.activePiece) return { lines: 0, tSpin: false, perfectClear: false };
   const poison = ensurePoisonBoard(player);
   const wasPoisoned = !!player.activePiece.poisoned;
   const poisonVariant = player.activePiece.poisonVariant ?? 1;
-  for (const cell of getCells(player.activePiece)) {
+  const isBomber = !!player.activePiece.bomber;
+  const lockCells = getCells(player.activePiece);
+  for (const cell of lockCells) {
     if (cell.y >= 0 && cell.y < BOARD_ROWS && cell.x >= 0 && cell.x < BOARD_COLS) {
       player.board[cell.y][cell.x] = player.activePiece.type;
       // Seed the locked cells with the event's variant (not a wave index).
       if (wasPoisoned) poison[cell.y][cell.x] = poisonVariant;
     }
+  }
+  if (isBomber) {
+    detonateBomberBlast(player, lockCells);
   }
   // Start (or restart) the spread scheduler when a poisoned piece locks.
   if (wasPoisoned) {
@@ -262,6 +436,9 @@ function lockPiece(player: PlayerState, tick: number): { lines: number; tSpin: '
   player.lowestY = 0;
   player.lastSrsKick = null;
   player.lastActionWasRotate = false;
+  clearPieceLockResetCap(player);
+  clearMagnetPieceBoost(player);
+  clearSnagHardDrop(player);
   return { lines, tSpin, perfectClear };
 }
 
@@ -349,9 +526,10 @@ function enqueueGarbage(target: PlayerState, lines: number, tick: number): void 
   if (lines <= 0) return;
   const packet: PendingGarbagePacket = {
     lines,
-    arrivalTick: tick + GARBAGE_ARRIVAL_DELAY_TICKS,
+    arrivalTick: tick + GARBAGE_ARRIVAL_DELAY_TICKS + satelliteExtraGarbageDelay(target, tick),
   };
   target.pendingGarbage.push(packet);
+  tryActivateSatellite(target, tick);
 }
 
 function applyGarbageIfReady(player: PlayerState, tick: number, rng: MutableRng): number {
@@ -381,7 +559,7 @@ function pieceWouldTopOut(player: PlayerState): boolean {
   return collides(player.board, player.activePiece);
 }
 
-function processActions(player: PlayerState): void {
+function processActions(player: PlayerState, tick: number): void {
   if (!player.activePiece) return;
   while (player.actionQueue.length > 0) {
     const action = player.actionQueue.shift();
@@ -389,6 +567,7 @@ function processActions(player: PlayerState): void {
     if (action === 'rotateCW') tryRotate(player, 1);
     if (action === 'rotateCCW') tryRotate(player, -1);
     if (action === 'hold') {
+      if (isHoldFrozen(player, tick)) continue;
       if (!player.canHold || !player.activePiece || !canHoldAtCurrentHeight(player)) continue;
       player.lastSrsKick = null;
       const current = player.activePiece.type;
@@ -403,8 +582,12 @@ function processActions(player: PlayerState): void {
       player.lockDelayRemainingTicks = LOCK_DELAY_TICKS;
       player.lockResetsUsed = 0;
       player.lowestY = player.activePiece ? player.activePiece.y : 0;
+      clearPieceLockResetCap(player);
+      clearMagnetPieceBoost(player);
+      clearSnagHardDrop(player);
     }
     if (action === 'hardDrop') {
+      if (isSnagBlockingHardDrop(player)) continue;
       let dropped = 0;
       while (tryMove(player, 0, 1)) {
         dropped += 1;
@@ -412,6 +595,7 @@ function processActions(player: PlayerState): void {
       // Guideline: 2 points per cell hard-dropped.
       player.score += dropped * 2;
       player.lockDelayRemainingTicks = 0;
+      player.pieceHasHardDropped = true;
     }
   }
 }
@@ -453,6 +637,34 @@ function applyHorizontalInput(player: PlayerState): void {
   if (player.arrCounter >= arrTicks) {
     player.arrCounter = 0;
     tryMove(player, dir, 0);
+  }
+}
+
+/**
+ * Wild Purge: remove every filled cell carrying the rolled poison variant.
+ * Leaves floating holes (no gravity). Does not run line-clear logic or award score.
+ * Also strips that variant from the active / queued piece.
+ */
+export function purgePoisonVariant(player: PlayerState, variant: number): void {
+  const poison = ensurePoisonBoard(player);
+  for (let y = 0; y < BOARD_ROWS; y++) {
+    for (let x = 0; x < BOARD_COLS; x++) {
+      if (poison[y][x] === variant) {
+        player.board[y][x] = null;
+        poison[y][x] = 0;
+      }
+    }
+  }
+  if (player.activePiece?.poisonVariant === variant) {
+    player.activePiece.poisoned = false;
+    player.activePiece.poisonVariant = undefined;
+  }
+  if (player.poisonNextVariant === variant) {
+    player.poisonNextPiece = false;
+    player.poisonNextVariant = undefined;
+  }
+  if (player.poisonSpread?.variant === variant) {
+    player.poisonSpread = null;
   }
 }
 
@@ -529,6 +741,19 @@ export function stepPlayer(
             glowClass: 'shadow-[0_0_10px_rgba(129,140,248,0.7)]',
             expiresAtTick: gameState.tick + CURTAIN_DURATION_TICKS,
           });
+        } else if (effect.itemId === 'vortex-step' && effect.poisonVariant) {
+          purgePoisonVariant(player, effect.poisonVariant);
+          if (!player.activeEffects) player.activeEffects = [];
+          player.activeEffects.push({
+            id: `purge-hit-${gameState.tick}`,
+            label: 'Purged',
+            icon: '🃏',
+            bgClass: 'bg-fuchsia-900/80',
+            borderClass: 'border-fuchsia-400',
+            textClass: 'text-fuchsia-100',
+            glowClass: 'shadow-[0_0_10px_rgba(217,70,239,0.7)]',
+            expiresAtTick: gameState.tick + 120,
+          });
         }
         // Future effects can be dispatched here with additional else-if branches.
       } else {
@@ -545,6 +770,15 @@ export function stepPlayer(
     player.lastSrsKick = null;
     player.activePiece = spawnNextPiece(player, rng);
     if (player.activePiece) {
+      player.pieceHasHardDropped = false;
+      if (player.stickyNextPiece) {
+        player.pieceLockResetCap = STICKY_LOCK_RESET_CAP;
+        player.stickyNextPiece = false;
+      }
+      if (player.snagNextPiece) {
+        player.snagHardDropBlocked = true;
+        player.snagNextPiece = false;
+      }
       player.lowestY = player.activePiece.y;
       player.lockResetsUsed = 0;
     }
@@ -555,7 +789,11 @@ export function stepPlayer(
     }
   }
 
-  processActions(player);
+  if (isSnagBlockingHardDrop(player)) {
+    player.inputState.softDrop = false;
+  }
+
+  processActions(player, gameState.tick);
   applyHorizontalInput(player);
 
   const isSoftDrop = !!player.inputState.softDrop;
@@ -568,7 +806,7 @@ export function stepPlayer(
     player.gravityCounter = 0;
   } else {
     player.gravityCounter += 1;
-    if (player.gravityCounter >= GRAVITY_TICKS_PER_CELL) {
+    if (player.gravityCounter >= gravityTicksPerCellFor(player)) {
       cellsToDrop = 1;
       player.gravityCounter = 0;
     }

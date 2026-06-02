@@ -15,6 +15,14 @@ async function startServer() {
       origin: '*',
       methods: ['GET', 'POST'],
     },
+    // Compress large frames. The 30Hz full-board `gameState` snapshot is highly
+    // repetitive (mostly null/empty cells) and deflates to a fraction of its
+    // size — the single biggest lever for phones on slow radios. The threshold
+    // skips compression on tiny frames (input acks, lobby ticks) so they don't
+    // pay the per-message CPU/latency cost for no payload win.
+    perMessageDeflate: {
+      threshold: 1024,
+    },
   });
 
   const gameManager = new GameManager(io, cfg.replayKeyframeIntervalTicks);

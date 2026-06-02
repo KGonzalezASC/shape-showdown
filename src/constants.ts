@@ -30,6 +30,36 @@ export const CURTAIN_DURATION_TICKS = 240; // 4s blackout once active
 export const POISON_COST = 55;
 export const POISON_SPREAD_INTERVAL_TICKS = 60; // ~1s between waves @ 60Hz
 export const POISON_GENERATIONS = 4; // total waves incl. the lock wave (also = # of color variants)
+// Wild Purge (Uno-style): rolls one poison colour, then after a telegraph removes every
+// opponent cell of that variant as holes (no gravity, no line-clear score for the victim).
+export const POISON_PURGE_COST = 70;
+export const POISON_PURGE_TELEGRAPH_TICKS = 60; // ~1s warning @ 60Hz
+// Freeze (Frost): opponent cannot store into or swap from hold for the duration.
+export const FREEZE_COST = 45;
+export const FREEZE_DURATION_TICKS = 600; // 10s @ 60Hz
+// Sticky: opponent's current piece only gets this many lock-delay move/rotate resets (default cap is 10).
+export const STICKY_LOCK_RESET_CAP = 2;
+export const STICKY_COST = 50; // Freeze + 5
+// Magnet: opponent falls faster — 3 permanent buys (+2 gravity each, max +6), then +1 temp per buy until lock.
+export const MAGNET_COST = 125;
+export const MAGNET_PERMANENT_MAX = 3;
+/** Gravity level added per permanent magnet purchase (×3 max = 6). */
+export const MAGNET_PERMANENT_GRAVITY_STEP = 2;
+/** Gravity level added per post-cap purchase on the current piece until lock. */
+export const MAGNET_PIECE_GRAVITY_STEP = 1;
+/** Ticks shaved off GRAVITY_TICKS_PER_CELL per gravity level. */
+export const MAGNET_GRAVITY_TICK_REDUCTION = 5;
+export const MAGNET_MIN_GRAVITY_TICKS = 12;
+// Snag (fortify-frame id): opponent cannot hard-drop current/next piece until lock or hold.
+export const SNAG_COST = 48;
+// Satellite (self): delays incoming garbage — immediate push on queued packets + bonus delay on new garbage for a window.
+export const SATELLITE_COST = 80;
+export const SATELLITE_PACKET_DELAY_TICKS = 90; // ~1.5s added per packet on purchase
+export const SATELLITE_INCOMING_DELAY_TICKS = 90; // extra delay on newly queued garbage while active
+export const SATELLITE_DURATION_TICKS = 600; // 10s @ 60Hz
+// Bomber (self): next piece detonates in a circle on lock; blast holes only (no gravity / no blast score).
+export const BOMBER_COST = 110;
+export const BOMBER_BLAST_RADIUS = 2; // Euclidean circle in cells
 export const GRAVITY_TICKS_PER_CELL = 30;
 export const SOFT_DROP_CELLS_PER_TICK = 1;
 export const DAS_TICKS = 10;

@@ -9,6 +9,8 @@ interface ShopRailProps {
   shopPhase: 'waiting' | 'ready' | 'cycling' | 'expired';
   purchasedItem: ShopItem | null;
   availableScore: number;
+  /** Extra per-item gates (e.g. Satellite needs queued garbage). */
+  isItemDisabled?: (item: ShopItem) => boolean;
   onConfirm: () => void;
   viewportMode: 'mobile' | 'tabletDesktop';
 }
@@ -21,6 +23,7 @@ const ShopRail: React.FC<ShopRailProps> = ({
   shopPhase,
   purchasedItem,
   availableScore,
+  isItemDisabled,
   onConfirm,
   viewportMode,
 }) => {
@@ -62,8 +65,9 @@ const ShopRail: React.FC<ShopRailProps> = ({
           <div className={`${isTabletDesktop ? 'max-h-[16rem]' : 'max-h-[13rem]'} space-y-1 overflow-y-auto pr-0.5`}>
             {items.map((item, idx) => {
               const canAfford = availableScore >= item.cost;
+              const blocked = isItemDisabled?.(item) ?? false;
               const isHighlighted = isCycling && idx === cycleIndex;
-              const disabled = isWaiting || !canAfford;
+              const disabled = isWaiting || !canAfford || blocked;
               return (
                 <div
                   key={item.id}

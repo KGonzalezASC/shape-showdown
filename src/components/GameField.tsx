@@ -37,24 +37,45 @@ const COLORS: Record<Exclude<CellValue, null>, string> = {
   G: 'bg-zinc-500',
 };
 
-const MemoizedCell = React.memo(({ color, poison, size }: { color: CellValue; poison: number; size: number }) => {
-  if (poison > 0) {
-    // Synced (no per-cell stagger) so a poisoned region scrolls as one cohesive
-    // "sheet" of poison, like the reference screen effect.
+const MemoizedCell = React.memo(
+  ({
+    color,
+    poison,
+    bomber,
+    magnetAura,
+    size,
+  }: {
+    color: CellValue;
+    poison: number;
+    bomber: boolean;
+    magnetAura: boolean;
+    size: number;
+  }) => {
+    if (poison > 0) {
+      // Synced (no per-cell stagger) so poisoned cells share the same sprite frame,
+      // like the Gen III battle poison overlay on a contiguous region.
+      return (
+        <div
+          className={`poison-cell poison-cell-v${Math.min(Math.max(poison, 1), 4)}`}
+          style={{ width: size, height: size }}
+        />
+      );
+    }
     return (
-      <div
-        className={`poison-cell poison-cell-v${Math.min(Math.max(poison, 1), 4)}`}
-        style={{ width: size, height: size }}
-      />
+      <div className="relative" style={{ width: size, height: size }} title={bomber ? 'Bomber' : undefined}>
+        <div
+          className={`absolute inset-0 border border-black/20 ${color ? COLORS[color] : 'bg-zinc-900'}`}
+        />
+        {magnetAura && <div className="magnet-pull-ring pointer-events-none absolute -inset-px z-10" aria-hidden />}
+        {bomber && (
+          <span className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center text-[11px] leading-none drop-shadow-[0_1px_2px_rgba(0,0,0,0.95)]">
+            💣
+          </span>
+        )}
+      </div>
     );
-  }
-  return (
-    <div
-      className={`border border-black/20 ${color ? COLORS[color] : 'bg-zinc-900'}`}
-      style={{ width: size, height: size }}
-    />
-  );
-});
+  },
+);
 
 const SHAPES: Record<TetrominoType, [number, number][][]> = {
   I: [
@@ -166,6 +187,40 @@ const GameField = forwardRef<GameFieldRef, GameFieldProps>(({
     return rows;
   }, [player.poisonBoard, player.activePiece]);
 
+  const visibleBomber = useMemo(() => {
+    const rows: boolean[][] = Array.from({ length: BOARD_VISIBLE_ROWS }, () =>
+      Array.from({ length: BOARD_COLS }, () => false),
+    );
+    if (player.activePiece?.bomber) {
+      for (const [dx, dy] of SHAPES[player.activePiece.type][player.activePiece.rotation]) {
+        const x = player.activePiece.x + dx;
+        const y = player.activePiece.y + dy - BOARD_HIDDEN_ROWS;
+        if (y >= 0 && y < BOARD_VISIBLE_ROWS && x >= 0 && x < BOARD_COLS) {
+          rows[y][x] = true;
+        }
+      }
+    }
+    return rows;
+  }, [player.activePiece]);
+
+  const visibleMagnetAura = useMemo(() => {
+    const rows: boolean[][] = Array.from({ length: BOARD_VISIBLE_ROWS }, () =>
+      Array.from({ length: BOARD_COLS }, () => false),
+    );
+    const pulled =
+      (player.magnetPermanentStacks ?? 0) > 0 || (player.magnetPieceBoost ?? 0) > 0;
+    if (player.activePiece && pulled) {
+      for (const [dx, dy] of SHAPES[player.activePiece.type][player.activePiece.rotation]) {
+        const x = player.activePiece.x + dx;
+        const y = player.activePiece.y + dy - BOARD_HIDDEN_ROWS;
+        if (y >= 0 && y < BOARD_VISIBLE_ROWS && x >= 0 && x < BOARD_COLS) {
+          rows[y][x] = true;
+        }
+      }
+    }
+    return rows;
+  }, [player.activePiece, player.magnetPermanentStacks, player.magnetPieceBoost]);
+
   const maxActiveVisibleRow = useMemo(() => {
     if (!player.activePiece) return null;
     return Math.max(
@@ -190,13 +245,19 @@ const GameField = forwardRef<GameFieldRef, GameFieldProps>(({
   const swapLineY = cutoffRow * cellSize;
   const showSwapLine = isMe && cutoffRow > 0 && cutoffRow < BOARD_VISIBLE_ROWS;
 
-  const holdStatus = !player.activePiece
-    ? { text: 'No active piece', tone: 'text-zinc-300' }
-    : !player.canHold
-      ? { text: 'Used this piece', tone: 'text-amber-300' }
-      : !canHoldByHeight
-        ? { text: 'Past swap line', tone: 'text-rose-300' }
-        : { text: 'Ready', tone: 'text-emerald-300' };
+  const storageFrozen = isMe && activeEffects.some((e) => e.id.startsWith('freeze-active'));
+  const snagged = isMe && !!player.snagHardDropBlocked;
+  const holdStatus = storageFrozen
+    ? { text: 'Frozen — no store/swap', tone: 'text-sky-300' }
+    : snagged
+      ? { text: 'Snagged — no hard drop', tone: 'text-orange-300' }
+      : !player.activePiece
+      ? { text: 'No active piece', tone: 'text-zinc-300' }
+      : !player.canHold
+        ? { text: 'Used this piece', tone: 'text-amber-300' }
+        : !canHoldByHeight
+          ? { text: 'Past swap line', tone: 'text-rose-300' }
+          : { text: 'Ready', tone: 'text-emerald-300' };
 
   return (
     <div className={`relative ${opacityClass}`}>
@@ -278,7 +339,14 @@ const GameField = forwardRef<GameFieldRef, GameFieldProps>(({
         >
           {visibleRows.flatMap((row, y) =>
             row.map((cell, x) => (
-              <MemoizedCell key={`${x}-${y}`} color={cell} poison={visiblePoison[y][x]} size={cellSize} />
+              <MemoizedCell
+                key={`${x}-${y}`}
+                color={cell}
+                poison={visiblePoison[y][x]}
+                bomber={visibleBomber[y][x]}
+                magnetAura={visibleMagnetAura[y][x]}
+                size={cellSize}
+              />
             )),
           )}
         </div>
@@ -346,7 +414,12 @@ export default React.memo(GameField, (prev, next) => {
     pA.holdPiece !== pB.holdPiece ||
     pA.canHold !== pB.canHold ||
     pA.linesCleared !== pB.linesCleared ||
-    pA.swapCutoffRow !== pB.swapCutoffRow
+    pA.swapCutoffRow !== pB.swapCutoffRow ||
+    pA.holdFrozenUntilTick !== pB.holdFrozenUntilTick ||
+    pA.magnetPermanentStacks !== pB.magnetPermanentStacks ||
+    pA.magnetPieceBoost !== pB.magnetPieceBoost ||
+    pA.snagHardDropBlocked !== pB.snagHardDropBlocked ||
+    pA.pieceHasHardDropped !== pB.pieceHasHardDropped
   ) {
     return false;
   }
@@ -361,7 +434,8 @@ export default React.memo(GameField, (prev, next) => {
       aA.rotation !== aB.rotation ||
       aA.type !== aB.type ||
       !!aA.poisoned !== !!aB.poisoned ||
-      aA.poisonVariant !== aB.poisonVariant
+      aA.poisonVariant !== aB.poisonVariant ||
+      !!aA.bomber !== !!aB.bomber
     ) {
       return false;
     }

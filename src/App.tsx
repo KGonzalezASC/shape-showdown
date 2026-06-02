@@ -10,7 +10,7 @@ import { ShopRailVariations } from './components/ShopRailVariations';
 import { GameFieldsLayout } from './components/GameFieldsLayout';
 import { PlayfieldCellSizeContext } from './components/playfieldCellSizeContext';
 import { GameFieldRef } from './components/GameField';
-import { ActionType, BOARD_COLS, BOARD_VISIBLE_ROWS, CURTAIN_COST, LOCK_DELAY_TICKS, LOCK_RESET_CAP, POISON_COST, RETRIM_COST, ShopItem } from './types';
+import { ActionType, BOARD_COLS, BOARD_VISIBLE_ROWS, BOMBER_COST, CURTAIN_COST, FREEZE_COST, LOCK_DELAY_TICKS, LOCK_RESET_CAP, MAGNET_COST, POISON_COST, POISON_PURGE_COST, RETRIM_COST, SATELLITE_COST, SNAG_COST, STICKY_COST, ShopItem } from './types';
 
 function WaitingForOpponentBoard() {
   const cell = useContext(PlayfieldCellSizeContext);
@@ -78,36 +78,39 @@ const SHOP_MOCK_POOL: ShopItem[] = [
   },
   {
     id: 'nova-charge',
-    name: 'Nova',
+    name: 'Bomber',
     icon: '💣',
-    cost: 175,
-    tier: 1,
-    baseWeight: 1,
-    colorClass: 'bg-rose-900/75',
-    borderColorClass: 'border-rose-300/70',
-    description: 'Sed do eiusmod tempor.',
+    cost: BOMBER_COST,
+    tier: 2,
+    baseWeight: 2.25,
+    colorClass: 'bg-rose-900/70',
+    borderColorClass: 'border-rose-300/65',
+    description:
+      'Your next piece is rigged — on lock it blasts a circle out of your stack (holes only, normal line clears still score).',
   },
   {
     id: 'gravity-lure',
-    name: 'Lure',
+    name: 'Magnet',
     icon: '🧲',
-    cost: 145,
-    tier: 1,
-    baseWeight: 1,
-    colorClass: 'bg-violet-900/75',
-    borderColorClass: 'border-violet-300/70',
-    description: 'Incididunt ut labore et dolore.',
+    cost: MAGNET_COST,
+    tier: 2,
+    baseWeight: 2.25,
+    colorClass: 'bg-violet-900/70',
+    borderColorClass: 'border-violet-300/65',
+    description:
+      'Pulls the opponent down faster — first 3 buys add +2 gravity each (max +6); later buys add +1 on their current piece until it locks (rainbow edge while falling).',
   },
   {
     id: 'frost-shift',
-    name: 'Frost',
+    name: 'Freeze',
     icon: '❄️',
-    cost: 70,
+    cost: FREEZE_COST,
     tier: 2,
     baseWeight: 2.25,
     colorClass: 'bg-sky-900/70',
     borderColorClass: 'border-sky-300/65',
-    description: 'Magna aliqua lorem ipsum.',
+    description:
+      'Locks the opponent\'s storage for 10s — they cannot store into an empty hold or swap with a stored piece.',
   },
   {
     id: 'ember-flare',
@@ -133,14 +136,17 @@ const SHOP_MOCK_POOL: ShopItem[] = [
   },
   {
     id: 'vortex-step',
-    name: 'Vortex',
-    icon: '🌀',
-    cost: 75,
+    name: 'Wild Purge',
+    icon: '🃏',
+    cost: POISON_PURGE_COST,
     tier: 2,
     baseWeight: 2.25,
-    colorClass: 'bg-indigo-900/70',
-    borderColorClass: 'border-indigo-300/65',
-    description: 'Laboris nisi ut aliquip ex ea.',
+    colorClass: 'bg-fuchsia-900/70',
+    borderColorClass: 'border-fuchsia-300/65',
+    description:
+      'Rolls a random poison colour, then after a short delay deletes every cell of that colour on the opponent\'s stack — holes only, no gravity and no line-clear credit.',
+    synergyTargetId: 'elixir-pulse',
+    synergyBoost: 2.5,
   },
   {
     id: 'target-lock',
@@ -155,36 +161,41 @@ const SHOP_MOCK_POOL: ShopItem[] = [
   },
   {
     id: 'fortify-frame',
-    name: 'Fortify',
-    icon: '🧱',
-    cost: 50,
+    name: 'Snag',
+    icon: '🪝',
+    cost: SNAG_COST,
     tier: 2,
     baseWeight: 2.25,
     colorClass: 'bg-orange-900/70',
     borderColorClass: 'border-orange-300/65',
-    description: 'Duis aute irure dolor in.',
+    description:
+      'Hooks the opponent\'s piece — no hard drop until it locks. Current piece if not dropped yet, otherwise the next spawn.',
+    synergyTargetId: 'gravity-lure',
+    synergyBoost: 2.5,
   },
   {
     id: 'quickstep-clock',
-    name: 'Quickstep',
+    name: 'Sticky',
     icon: '⏱️',
-    cost: 65,
+    cost: STICKY_COST,
     tier: 2,
     baseWeight: 2.25,
     colorClass: 'bg-teal-900/70',
     borderColorClass: 'border-teal-300/65',
-    description: 'Reprehenderit in voluptate velit.',
+    description:
+      'The opponent\'s current piece only gets 2 lock-move resets — limited wiggle before it locks.',
   },
   {
     id: 'satellite-link',
     name: 'Satellite',
     icon: '🛰️',
-    cost: 90,
+    cost: SATELLITE_COST,
     tier: 2,
     baseWeight: 2.25,
     colorClass: 'bg-zinc-800/80',
     borderColorClass: 'border-zinc-300/60',
-    description: 'Esse cillum dolore eu fugiat.',
+    description:
+      'Arms until garbage arrives — then pushes queued lines back and slows new garbage for 10s.',
   },
 ];
 
@@ -255,7 +266,7 @@ function drawIdFromTierBag(
 /**
  * Synergy boost for an item given the set of items the player already owns.
  * Returns the multiplier (>1) when the item's synergy partner is owned, else 1.
- * e.g. Curtain (synergyTargetId 'retrim') becomes more likely once you own scissors.
+ * e.g. Curtain (synergyTargetId 'retrim') or Wild Purge ('elixir-pulse') become more likely once you own their pair.
  */
 function synergyMultiplier(item: ShopItem, ownedIds: Set<string>): number {
   if (item.synergyTargetId && item.synergyBoost && ownedIds.has(item.synergyTargetId)) {
@@ -492,7 +503,8 @@ const App: React.FC = () => {
 
   const handleAction = useCallback(
     (action: ActionType) => {
-      if (action === 'hardDrop') {
+      const me = stateRef.current.gameState?.players[stateRef.current.myId ?? ''];
+      if (action === 'hardDrop' && !me?.snagHardDropBlocked) {
         triggerShake(true, 'soft');
       }
       sendAction(action);
@@ -695,7 +707,7 @@ const App: React.FC = () => {
         if (heldKeysRef.current.softDrop) return;
         heldKeysRef.current = { ...heldKeysRef.current, softDrop: true };
         sendInputState({ ...heldKeysRef.current });
-      } else if (e.key === 'ArrowUp') {
+      } else if (e.key === 'ArrowUp' || e.key === ' ') {
         e.preventDefault();
         handleAction('hardDrop');
       } else if (e.key.toLowerCase() === 'x') {
@@ -1067,7 +1079,7 @@ const App: React.FC = () => {
             <span>lockDelay: {myPlayer.lockDelayRemainingTicks}</span>
             <span>resetUsed: {myPlayer.lockResetsUsed}</span>
             <span>pieceY: {myPlayer.activePiece ? myPlayer.activePiece.y : 'none'}</span>
-            <span>cap: {LOCK_RESET_CAP}</span>
+            <span>cap: {myPlayer.pieceLockResetCap ?? LOCK_RESET_CAP}</span>
             <span>
               lastKick:{' '}
               {myPlayer.lastSrsKick
