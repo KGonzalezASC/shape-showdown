@@ -954,8 +954,7 @@ const App: React.FC = () => {
 
   return (
     <div
-      className="flex h-dvh max-h-dvh min-h-0 flex-col overflow-hidden bg-[#0a0a0a] px-2 py-2 pb-[var(--mobile-controls-pad)] font-sans text-white sm:px-4 sm:py-3 md:pb-2"
-      style={{ '--mobile-controls-pad': `${mobileControlsHeight + 10}px` } as React.CSSProperties}
+      className="flex h-dvh max-h-dvh min-h-0 flex-col overflow-hidden bg-[#0a0a0a] px-2 py-2 font-sans text-white sm:px-4 sm:py-3"
     >
       {/* Header */}
       <div className="mb-1 flex w-full max-w-5xl shrink-0 items-center justify-between gap-1 self-center overflow-visible rounded-lg border border-white/5 bg-[#1a1a1a] px-2 py-1.5 shadow-xl sm:mb-3 sm:gap-2 sm:rounded-2xl sm:p-3 md:p-4">

@@ -45,7 +45,7 @@ const MobileControls: React.FC<MobileControlsProps> = ({ onInput, onAction, onSh
   };
 
   return (
-    <div ref={rootRef} className="fixed bottom-0 left-0 right-0 z-50 md:hidden">
+    <div ref={rootRef} className="mt-auto shrink-0 md:hidden">
       <div className="mx-auto flex w-full max-w-md items-end justify-between gap-3 px-3 pb-[max(0.85rem,env(safe-area-inset-bottom))]">
         <div className="grid grid-cols-3 grid-rows-2 gap-2">
           <div />
