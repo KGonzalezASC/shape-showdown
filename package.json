@@ -16,6 +16,8 @@
     "preview": "bunx vite preview",
     "clean": "rimraf dist dist-server .dev-server.mjs",
     "lint": "tsc --noEmit",
+    "knip": "knip",
+    "lint:dead-code": "knip",
     "start": "cross-env NODE_ENV=production bun dist-server/server.mjs",
     "start:serve-client": "cross-env NODE_ENV=production SERVE_CLIENT=true bun dist-server/server.mjs"
   },
@@ -32,6 +34,7 @@
     "autoprefixer": "^10.4.21",
     "cross-env": "^7.0.3",
     "esbuild": "^0.25.0",
+    "knip": "^6.16.1",
     "lucide-react": "^0.546.0",
     "motion": "^12.23.24",
     "react": "^19.0.0",

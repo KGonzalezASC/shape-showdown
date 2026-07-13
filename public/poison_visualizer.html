@@ -1,0 +1,398 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Poison Spread Shapes Visualizer | Shape Showdown</title>
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+  <!-- Tailwind CSS CDN for styling -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Outfit', 'sans-serif'],
+            mono: ['JetBrains Mono', 'monospace'],
+          },
+        },
+      },
+    }
+  </script>
+  <style>
+    /* Glassmorphism custom styles */
+    .glass-panel {
+      background: rgba(17, 24, 39, 0.7);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border: 1px solid rgba(255, 255, 255, 0.05);
+    }
+    .glass-card {
+      background: rgba(31, 41, 55, 0.35);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      border: 1px solid rgba(255, 255, 255, 0.03);
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    .glass-card:hover {
+      background: rgba(31, 41, 55, 0.55);
+      border-color: rgba(16, 185, 129, 0.3);
+      box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3), 0 0 15px rgba(16, 185, 129, 0.15);
+      transform: translateY(-2px);
+    }
+    /* Animated glowing poison cells */
+    .poison-glow {
+      animation: pulse-glow 1.5s ease-in-out infinite alternate;
+    }
+    @keyframes pulse-glow {
+      0% {
+        box-shadow: 0 0 4px rgba(16, 185, 129, 0.4);
+        opacity: 0.85;
+      }
+      100% {
+        box-shadow: 0 0 12px rgba(16, 185, 129, 0.8);
+        opacity: 1;
+      }
+    }
+  </style>
+</head>
+<body class="bg-zinc-950 text-zinc-100 min-h-screen font-sans selection:bg-emerald-500 selection:text-black">
+  <div class="max-w-7xl mx-auto px-4 py-8 md:py-12">
+    <!-- Header -->
+    <header class="mb-10 text-center md:text-left flex flex-col md:flex-row md:items-end md:justify-between gap-6">
+      <div>
+        <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-emerald-500/35 bg-emerald-500/10 text-emerald-400 text-xs font-semibold uppercase tracking-wider mb-3">
+          <span class="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span>
+          Elixir Spread Visualizer
+        </div>
+        <h1 class="text-4xl md:text-5xl font-extrabold tracking-tight bg-gradient-to-r from-emerald-400 via-teal-300 to-cyan-400 bg-clip-text text-transparent">
+          Poison Spread Variations
+        </h1>
+        <p class="text-zinc-400 mt-2 text-base md:text-lg max-w-2xl font-light">
+          An interactive rendering of all unique final poisoned group shapes when a piece lands in different columns and rotations on the sample step-pyramid board.
+        </p>
+      </div>
+      <div class="glass-panel px-6 py-4 rounded-2xl text-center md:text-right shrink-0">
+        <span class="text-xs uppercase tracking-wider text-zinc-500 font-semibold block">Total Unique Combinations</span>
+        <span id="total-variations-badge" class="text-4xl font-extrabold text-emerald-400 font-mono">---</span>
+      </div>
+    </header>
+
+    <!-- Main Grid Content -->
+    <div class="flex flex-col lg:flex-row gap-8">
+      
+      <!-- Controls Panel -->
+      <aside class="w-full lg:w-64 shrink-0 flex flex-col gap-4">
+        <div class="glass-panel p-5 rounded-2xl">
+          <h2 class="text-sm uppercase font-bold tracking-widest text-zinc-400 mb-4">Piece Selector</h2>
+          <div class="flex flex-wrap lg:flex-col gap-2" id="piece-tabs">
+            <!-- Buttons dynamically generated -->
+          </div>
+        </div>
+        
+        <div class="glass-panel p-5 rounded-2xl text-xs text-zinc-500 flex flex-col gap-2 font-light">
+          <div class="font-bold text-zinc-400 mb-1">Spread Rules:</div>
+          <div>• Spreads from the locked piece.</div>
+          <div>• Bounded by <span class="font-mono text-zinc-300">POISON_GENERATIONS = 4</span> (Seed + 3 waves).</div>
+          <div>• Propagates orthogonally (up/down/left/right).</div>
+          <div>• Infects existing stack blocks only (no empty cells).</div>
+        </div>
+      </aside>
+
+      <!-- Variations Display Area -->
+      <main class="flex-1">
+        <div class="glass-panel p-6 rounded-3xl min-h-[40rem]">
+          <div class="flex items-center justify-between border-b border-white/5 pb-4 mb-6">
+            <h3 class="text-lg font-bold text-zinc-200">
+              Unique layouts for piece: <span id="current-piece-display" class="text-emerald-400 font-extrabold text-xl ml-1">I</span>
+            </h3>
+            <span id="piece-count-badge" class="font-mono text-xs px-2.5 py-1 rounded-md bg-zinc-800 text-zinc-400 border border-white/5">0 variations</span>
+          </div>
+          
+          <!-- Variations Cards Grid -->
+          <div id="cards-container" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4">
+            <!-- Cards dynamically inserted -->
+          </div>
+        </div>
+      </main>
+
+    </div>
+  </div>
+
+  <!-- Real-time simulator engine -->
+  <script>
+    // Constants
+    const BOARD_COLS = 10;
+    const BOARD_ROWS = 40; // 20 visible + 20 hidden
+    const POISON_GENERATIONS = 4;
+    const bottomRow = BOARD_ROWS - 1;
+    const printStartRow = bottomRow - 8; // Render bottom 9 rows
+
+    // Tetromino definitions
+    const SHAPES = {
+      I: [
+        [[0, 1], [1, 1], [2, 1], [3, 1]],
+        [[2, 0], [2, 1], [2, 2], [2, 3]],
+        [[0, 2], [1, 2], [2, 2], [3, 2]],
+        [[1, 0], [1, 1], [1, 2], [1, 3]],
+      ],
+      J: [
+        [[0, 0], [0, 1], [1, 1], [2, 1]],
+        [[1, 0], [2, 0], [1, 1], [1, 2]],
+        [[0, 1], [1, 1], [2, 1], [2, 2]],
+        [[1, 0], [1, 1], [0, 2], [1, 2]],
+      ],
+      L: [
+        [[2, 0], [0, 1], [1, 1], [2, 1]],
+        [[1, 0], [1, 1], [1, 2], [2, 2]],
+        [[0, 1], [1, 1], [2, 1], [0, 2]],
+        [[0, 0], [1, 0], [1, 1], [1, 2]],
+      ],
+      O: [
+        [[1, 0], [2, 0], [1, 1], [2, 1]],
+        [[1, 0], [2, 0], [1, 1], [2, 1]],
+        [[1, 0], [2, 0], [1, 1], [2, 1]],
+        [[1, 0], [2, 0], [1, 1], [2, 1]],
+      ],
+      S: [
+        [[1, 0], [2, 0], [0, 1], [1, 1]],
+        [[1, 0], [1, 1], [2, 1], [2, 2]],
+        [[1, 1], [2, 1], [0, 2], [1, 2]],
+        [[0, 0], [0, 1], [1, 1], [1, 2]],
+      ],
+      T: [
+        [[1, 0], [0, 1], [1, 1], [2, 1]],
+        [[1, 0], [1, 1], [2, 1], [1, 2]],
+        [[0, 1], [1, 1], [2, 1], [1, 2]],
+        [[1, 0], [0, 1], [1, 1], [1, 2]],
+      ],
+      Z: [
+        [[0, 0], [1, 0], [1, 1], [2, 1]],
+        [[2, 0], [1, 1], [2, 1], [1, 2]],
+        [[0, 1], [1, 1], [1, 2], [2, 2]],
+        [[1, 0], [0, 1], [1, 1], [0, 2]],
+      ],
+    };
+
+    const TYPES = ['I', 'J', 'L', 'O', 'S', 'T', 'Z'];
+
+    // Sample Stack Setup (pyramid)
+    function buildSampleBoard() {
+      const board = Array.from({ length: BOARD_ROWS }, () => Array(BOARD_COLS).fill(null));
+      const bottom = BOARD_ROWS - 1;
+      
+      // Bottom row (39): solid except col 4
+      for (let x = 0; x < BOARD_COLS; x++) {
+        if (x !== 4) board[bottom][x] = 'T';
+      }
+      // Row 38: cols 1-8
+      for (let x = 1; x <= 8; x++) {
+        board[bottom - 1][x] = 'J';
+      }
+      // Row 37: cols 2-7
+      for (let x = 2; x <= 7; x++) {
+        board[bottom - 2][x] = 'L';
+      }
+      // Row 36: cols 3-6
+      for (let x = 3; x <= 6; x++) {
+        board[bottom - 3][x] = 'S';
+      }
+      return board;
+    }
+
+    const baseBoard = buildSampleBoard();
+
+    // Helpers
+    function getCells(type, rotation, x, y) {
+      return SHAPES[type][rotation].map(([dx, dy]) => ({ x: x + dx, y: y + dy }));
+    }
+
+    function collides(board, type, rotation, x, y) {
+      for (const cell of getCells(type, rotation, x, y)) {
+        if (cell.x < 0 || cell.x >= BOARD_COLS || cell.y >= BOARD_ROWS) return true;
+        if (cell.y >= 0 && board[cell.y][cell.x] !== null) return true;
+      }
+      return false;
+    }
+
+    function hardDropY(board, type, rotation, x, startY) {
+      if (collides(board, type, rotation, x, startY)) return null;
+      let y = startY;
+      while (!collides(board, type, rotation, x, y + 1)) y++;
+      return y;
+    }
+
+    function runPoisonSpread(board, poisonBoard, variant) {
+      const waves = POISON_GENERATIONS - 1; // 3 extra spread waves
+      for (let gen = 0; gen < waves; gen++) {
+        const newlyPoisoned = [];
+        for (let y = 0; y < BOARD_ROWS; y++) {
+          for (let x = 0; x < BOARD_COLS; x++) {
+            if (poisonBoard[y][x] !== 0) continue;
+            if (board[y][x] === null) continue;
+            const adj =
+              (y > 0 && poisonBoard[y - 1][x] !== 0) ||
+              (y < BOARD_ROWS - 1 && poisonBoard[y + 1][x] !== 0) ||
+              (x > 0 && poisonBoard[y][x - 1] !== 0) ||
+              (x < BOARD_COLS - 1 && poisonBoard[y][x + 1] !== 0);
+            if (adj) newlyPoisoned.push([y, x]);
+          }
+        }
+        if (newlyPoisoned.length === 0) break;
+        for (const [y, x] of newlyPoisoned) poisonBoard[y][x] = variant;
+      }
+    }
+
+    function poisonKey(poisonBoard) {
+      const coords = [];
+      for (let y = 0; y < BOARD_ROWS; y++) {
+        for (let x = 0; x < BOARD_COLS; x++) {
+          if (poisonBoard[y][x] !== 0) coords.push(`${y},${x}`);
+        }
+      }
+      return coords.join('|');
+    }
+
+    // Generate variations database
+    const variationsDb = {};
+    let grandTotal = 0;
+
+    TYPES.forEach((type) => {
+      const seen = new Map();
+      const ROTATIONS = [0, 1, 2, 3];
+      
+      for (const rot of ROTATIONS) {
+        for (let x = -2; x < BOARD_COLS + 2; x++) {
+          const landY = hardDropY(baseBoard, type, rot, x, 0);
+          if (landY === null) continue;
+
+          // Check if locks inside bounds
+          const cells = getCells(type, rot, x, landY);
+          let valid = true;
+          for (const cell of cells) {
+            if (cell.y < 0 || cell.y >= BOARD_ROWS || cell.x < 0 || cell.x >= BOARD_COLS) {
+              valid = false;
+              break;
+            }
+          }
+          if (!valid) continue;
+
+          // Clone stack & poison board
+          const board = baseBoard.map((row) => [...row]);
+          const poison = Array.from({ length: BOARD_ROWS }, () => Array(BOARD_COLS).fill(0));
+
+          // Seed locked piece
+          for (const cell of cells) {
+            board[cell.y][cell.x] = type;
+            poison[cell.y][cell.x] = 1;
+          }
+
+          // Run BFS spread
+          runPoisonSpread(board, poison, 1);
+
+          const key = poisonKey(poison);
+          if (!seen.has(key)) {
+            seen.set(key, { rotation: rot, x, y: landY, cells, board, poison });
+          }
+        }
+      }
+      variationsDb[type] = Array.from(seen.values());
+      grandTotal += seen.size;
+    });
+
+    document.getElementById('total-variations-badge').textContent = grandTotal;
+
+    // Interactive view controller
+    let currentPiece = 'I';
+
+    function renderSelector() {
+      const container = document.getElementById('piece-tabs');
+      container.innerHTML = '';
+      
+      TYPES.forEach((type) => {
+        const count = variationsDb[type].length;
+        const btn = document.createElement('button');
+        btn.className = `flex items-center justify-between px-4 py-2.5 rounded-xl border font-bold text-left transition-all ${
+          currentPiece === type
+            ? 'border-emerald-500 bg-emerald-500/10 text-emerald-400 shadow-[0_0_12px_rgba(16,185,129,0.15)] animate-pulse'
+            : 'border-white/5 bg-zinc-900/50 hover:bg-zinc-800/50 text-zinc-400 hover:text-zinc-200'
+        }`;
+        
+        btn.innerHTML = `
+          <span>Piece: ${type}</span>
+          <span class="font-mono text-xs px-2 py-0.5 rounded-md bg-black/40 border border-white/5">${count}</span>
+        `;
+        
+        btn.onclick = () => selectPiece(type);
+        container.appendChild(btn);
+      });
+    }
+
+    function selectPiece(type) {
+      currentPiece = type;
+      renderSelector();
+      renderVariations();
+    }
+
+    function renderVariations() {
+      const container = document.getElementById('cards-container');
+      document.getElementById('current-piece-display').textContent = currentPiece;
+      
+      const list = variationsDb[currentPiece];
+      document.getElementById('piece-count-badge').textContent = `${list.length} variation(s)`;
+      container.innerHTML = '';
+
+      list.forEach((variant, index) => {
+        const card = document.createElement('div');
+        card.className = 'glass-card p-4 rounded-2xl flex flex-col items-center gap-3 select-none';
+
+        // Calculate total poisoned blocks count
+        const poisonCount = variant.poison.flat().filter((v) => v !== 0).length;
+
+        // Render mini-board Y-lines 31 to 39
+        let boardHtml = '<div class="grid grid-cols-10 gap-0.5 border border-white/5 bg-black/60 p-1.5 rounded-xl">';
+        for (let y = printStartRow; y <= bottomRow; y++) {
+          for (let x = 0; x < BOARD_COLS; x++) {
+            const hasPoison = variant.poison[y][x] !== 0;
+            const isFilled = variant.board[y][x] !== null;
+            
+            let colorClass = 'bg-zinc-900/60';
+            let borderClass = 'border-transparent';
+
+            if (hasPoison) {
+              colorClass = 'bg-gradient-to-br from-emerald-500 to-teal-400 poison-glow';
+              borderClass = 'border-emerald-300/40';
+            } else if (isFilled) {
+              colorClass = 'bg-zinc-600/80';
+            }
+
+            boardHtml += `<div class="w-3.5 h-3.5 rounded-[3px] border ${borderClass} ${colorClass}"></div>`;
+          }
+        }
+        boardHtml += '</div>';
+
+        card.innerHTML = `
+          <div class="flex items-center justify-between w-full border-b border-white/5 pb-2 text-xs font-semibold">
+            <span class="text-zinc-400">Var ${index + 1}</span>
+            <span class="font-mono text-emerald-400 px-1.5 py-0.5 rounded-md bg-emerald-500/10 border border-emerald-500/20">${poisonCount} poisoned</span>
+          </div>
+          ${boardHtml}
+          <div class="w-full flex items-center justify-between text-[10px] font-mono text-zinc-500 mt-1">
+            <span>Rot: <strong class="text-zinc-300 font-bold">${variant.rotation}</strong></span>
+            <span>X: <strong class="text-zinc-300 font-bold">${variant.x}</strong></span>
+            <span>Y: <strong class="text-zinc-300 font-bold">${variant.y}</strong></span>
+          </div>
+        `;
+        container.appendChild(card);
+      });
+    }
+
+    // Initialize Page
+    renderSelector();
+    renderVariations();
+  </script>
+</body>
+</html>

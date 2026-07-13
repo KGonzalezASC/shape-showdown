@@ -52,6 +52,11 @@ export const MAGNET_GRAVITY_TICK_REDUCTION = 5;
 export const MAGNET_MIN_GRAVITY_TICKS = 12;
 // Snag (fortify-frame id): opponent cannot hard-drop current/next piece until lock or hold.
 export const SNAG_COST = 48;
+// Tax Siphon: steals a percentage of the opponent's score/funds if they are ahead.
+export const BOUNTY_TAX_COST = 50;
+export const BOUNTY_TAX_PERCENT = 0.30;
+// Poison Line Clear Penalty Max Ratio: max percentage score is reduced by if lines contain poison
+export const POISON_LINE_CLEAR_PENALTY_MAX_RATIO = 0.50;
 // Satellite (self): delays incoming garbage — immediate push on queued packets + bonus delay on new garbage for a window.
 export const SATELLITE_COST = 80;
 export const SATELLITE_PACKET_DELAY_TICKS = 90; // ~1.5s added per packet on purchase

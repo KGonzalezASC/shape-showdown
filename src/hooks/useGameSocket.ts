@@ -141,6 +141,10 @@ export const useGameSocket = () => {
     socket?.emit('action', action);
   }, [socket]);
 
+  const sendShopOpen = useCallback(() => {
+    socket?.emit('shopOpen');
+  }, [socket]);
+
   const sendShopPurchase = useCallback((itemId: string) => {
     socket?.emit('shopPurchase', itemId);
   }, [socket]);
@@ -152,6 +156,7 @@ export const useGameSocket = () => {
     lastMatchEvent,
     sendInputState,
     sendAction,
+    sendShopOpen,
     sendShopPurchase,
   };
 };

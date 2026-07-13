@@ -21,6 +21,7 @@ import {
   RotationState,
   SOFT_DROP_CELLS_PER_TICK,
   TetrominoType,
+  POISON_LINE_CLEAR_PENALTY_MAX_RATIO,
 } from '../../src/types.js';
 import {
   COMBO_BONUS_TABLE,
@@ -42,6 +43,7 @@ import {
   BOMBER_BLAST_RADIUS,
 } from '../../src/constants.js';
 import { getKickTests, PIECE_SEQUENCE, SHAPES } from './pieces.js';
+import { createInitialPlayerShop } from '../shop.js';
 
 type MutableRng = { seed: number };
 
@@ -134,6 +136,7 @@ export function makePlayer(id: string, rng: MutableRng): PlayerState {
     satelliteArmed: false,
     satelliteDelayUntilTick: undefined,
     bomberNextPiece: false,
+    shop: createInitialPlayerShop(),
   };
   ensureQueue(player, rng);
   player.activePiece = spawnNextPiece(player, rng);
@@ -255,6 +258,9 @@ export function lockResetCapFor(player: PlayerState): number {
 function clearPieceLockResetCap(player: PlayerState): void {
   player.pieceLockResetCap = undefined;
   player.stickyNextPiece = false;
+  if (player.activeEffects) {
+    player.activeEffects = player.activeEffects.filter((e) => !e.id.startsWith('sticky-'));
+  }
 }
 
 export function magnetGravityLevel(player: PlayerState): number {
@@ -387,8 +393,8 @@ export function detonateBomberBlast(player: PlayerState, centers: Array<{ x: num
   }
 }
 
-function lockPiece(player: PlayerState, tick: number): { lines: number; tSpin: 'full' | 'mini' | false; perfectClear: boolean } {
-  if (!player.activePiece) return { lines: 0, tSpin: false, perfectClear: false };
+function lockPiece(player: PlayerState, tick: number): { lines: number; tSpin: 'full' | 'mini' | false; perfectClear: boolean; poisonedRatio: number } {
+  if (!player.activePiece) return { lines: 0, tSpin: false, perfectClear: false, poisonedRatio: 0 };
   const poison = ensurePoisonBoard(player);
   const wasPoisoned = !!player.activePiece.poisoned;
   const poisonVariant = player.activePiece.poisonVariant ?? 1;
@@ -417,6 +423,15 @@ function lockPiece(player: PlayerState, tick: number): { lines: number; tSpin: '
   for (let y = 0; y < BOARD_ROWS; y++) {
     if (player.board[y].every((cell) => cell !== null)) linesToClear.push(y);
   }
+
+  let poisonedCount = 0;
+  for (const y of linesToClear) {
+    for (let x = 0; x < BOARD_COLS; x++) {
+      if (poison[y][x] !== 0) poisonedCount++;
+    }
+  }
+  const poisonedRatio = linesToClear.length > 0 ? (poisonedCount / (linesToClear.length * BOARD_COLS)) : 0;
+
   for (const y of linesToClear) {
     player.board.splice(y, 1);
     player.board.unshift(Array.from({ length: BOARD_COLS }, () => null));
@@ -436,10 +451,12 @@ function lockPiece(player: PlayerState, tick: number): { lines: number; tSpin: '
   player.lowestY = 0;
   player.lastSrsKick = null;
   player.lastActionWasRotate = false;
-  clearPieceLockResetCap(player);
+  if (lines > 0) {
+    clearPieceLockResetCap(player);
+  }
   clearMagnetPieceBoost(player);
   clearSnagHardDrop(player);
-  return { lines, tSpin, perfectClear };
+  return { lines, tSpin, perfectClear, poisonedRatio };
 }
 
 function detectTSpin(player: PlayerState): 'full' | 'mini' | false {
@@ -471,7 +488,13 @@ function detectTSpin(player: PlayerState): 'full' | 'mini' | false {
   return bothFrontOccupied ? 'full' : 'mini';
 }
 
-function attackFromClear(lines: number, tSpin: 'full' | 'mini' | false, perfectClear: boolean, player: PlayerState): number {
+function attackFromClear(
+  lines: number,
+  tSpin: 'full' | 'mini' | false,
+  perfectClear: boolean,
+  player: PlayerState,
+  poisonedRatio: number,
+): number {
   if (lines === 0) {
     player.combo = -1;
     return 0;
@@ -504,7 +527,10 @@ function attackFromClear(lines: number, tSpin: 'full' | 'mini' | false, perfectC
     attack += COMBO_BONUS_TABLE[idx];
   }
   if (perfectClear) attack += ATTACK_TABLE.perfectClear;
-  player.score += lines * 100 + attack * 10;
+  
+  const baseScore = lines * 100 + attack * 10;
+  const penalty = Math.round(baseScore * poisonedRatio * POISON_LINE_CLEAR_PENALTY_MAX_RATIO);
+  player.score += baseScore - penalty;
   return attack;
 }
 
@@ -825,7 +851,13 @@ export function stepPlayer(
     player.lockDelayRemainingTicks -= 1;
     if (player.lockDelayRemainingTicks <= 0) {
       const clearResult = lockPiece(player, gameState.tick);
-      const attackLines = attackFromClear(clearResult.lines, clearResult.tSpin, clearResult.perfectClear, player);
+      const attackLines = attackFromClear(
+        clearResult.lines,
+        clearResult.tSpin,
+        clearResult.perfectClear,
+        player,
+        clearResult.poisonedRatio,
+      );
       if (clearResult.lines > 0) {
         matchEvents.push({
           tick: gameState.tick,

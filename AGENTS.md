@@ -4,6 +4,8 @@
 
 Use this file as shared context when working in this repo on any machine or with any AI assistant. It is the **canonical project overview** for humans and agents.
 
+> **Deeper guides:** see [`BubbleBlitzersCompendium/`](./BubbleBlitzersCompendium/README.md) for task-oriented docs on codebase navigation, online/production networking, Socket.IO gameplay, responsive layouts, and swapping the UI framework.
+
 ## What this is
 
 **Shape Showdown** (fork lineage: **Bubble Blitzers**) is a **two-player, server-authoritative** browser game: parallel breakout-style fields (each player has their own paddle, ball, and bubble grid). Real-time sync via **Socket.IO**. Max **2** players per server instance; identity is **socket.id** (no accounts).

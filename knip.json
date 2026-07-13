@@ -1,0 +1,29 @@
+{
+  "$schema": "https://unpkg.com/knip@6/schema.json",
+  "entry": [
+    "src/replay.tsx",
+    "server/tetris/engine.test.ts"
+  ],
+  "project": [
+    "server/**/*.ts",
+    "src/**/*.{ts,tsx}"
+  ],
+  "vite": {
+    "config": ["vite.config.mjs", "vite.replay.config.mjs"]
+  },
+  "ignoreExportsUsedInFile": {
+    "interface": true,
+    "type": true
+  },
+  "ignoreIssues": {
+    "src/types.ts": ["exports"],
+    "server/loadConfig.ts": ["types"],
+    "server/tetris/engine.ts": ["exports"]
+  },
+  "ignoreDependencies": [
+    "autoprefixer",
+    "esbuild",
+    "react-doctor",
+    "tailwindcss"
+  ]
+}

@@ -42,6 +42,9 @@ import {
   MAGNET_GRAVITY_TICK_REDUCTION,
   MAGNET_MIN_GRAVITY_TICKS,
   SNAG_COST,
+  BOUNTY_TAX_COST,
+  BOUNTY_TAX_PERCENT,
+  POISON_LINE_CLEAR_PENALTY_MAX_RATIO,
   SATELLITE_COST,
   SATELLITE_PACKET_DELAY_TICKS,
   SATELLITE_INCOMING_DELAY_TICKS,
@@ -71,6 +74,24 @@ export interface ShopItem {
   description: string;
   synergyTargetId?: string;
   synergyBoost?: number;
+}
+
+export type ShopPhase = 'waiting' | 'ready' | 'cycling' | 'expired';
+
+export interface ShopBagState {
+  tier1Bag: string[];
+  tier2Bag: string[];
+}
+
+/** Authoritative per-player shop state (rolled and advanced on the server). */
+export interface PlayerShopState {
+  offerIds: string[];
+  bagState: ShopBagState;
+  phase: ShopPhase;
+  cycleIndex: number;
+  cycleStartTick: number | null;
+  lastPurchasedItemId: string | null;
+  ownedIds: string[];
 }
 
 /**
@@ -231,6 +252,8 @@ export interface PlayerState {
   satelliteDelayUntilTick?: number;
   /** Bomber: arm the next spawned piece. */
   bomberNextPiece?: boolean;
+  /** Server-authoritative shop offers and cycle state. */
+  shop: PlayerShopState;
 }
 
 export interface GameState {
@@ -333,6 +356,9 @@ export {
   MAGNET_GRAVITY_TICK_REDUCTION,
   MAGNET_MIN_GRAVITY_TICKS,
   SNAG_COST,
+  BOUNTY_TAX_COST,
+  BOUNTY_TAX_PERCENT,
+  POISON_LINE_CLEAR_PENALTY_MAX_RATIO,
   SATELLITE_COST,
   SATELLITE_PACKET_DELAY_TICKS,
   SATELLITE_INCOMING_DELAY_TICKS,

@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useReducer, useRef } from 'react';
 import { FileUp, Trophy } from 'lucide-react';
 import { GameState, PlayerState, ReplayData, ReplayDataV2 } from './types';
 import GameField from './components/GameField';
@@ -18,12 +18,57 @@ function normalizeReplay(json: ReplayData): ReplayDataV2 | null {
   return null;
 }
 
+interface ReplayState {
+  replay: ReplayDataV2 | null;
+  error: string;
+  playing: boolean;
+  speed: number;
+  tick: number;
+}
+
+type ReplayAction =
+  | { type: 'LOAD_SUCCESS'; payload: ReplayDataV2 }
+  | { type: 'LOAD_ERROR'; payload: string }
+  | { type: 'TOGGLE_PLAY' }
+  | { type: 'SET_PLAYING'; payload: boolean }
+  | { type: 'SET_SPEED'; payload: number }
+  | { type: 'SET_TICK'; payload: number }
+  | { type: 'ADVANCE_TICK'; payload: { delta: number; totalTicks: number } };
+
+function replayReducer(state: ReplayState, action: ReplayAction): ReplayState {
+  switch (action.type) {
+    case 'LOAD_SUCCESS':
+      return { ...state, replay: action.payload, tick: 0, error: '', playing: false };
+    case 'LOAD_ERROR':
+      return { ...state, error: action.payload };
+    case 'TOGGLE_PLAY':
+      return { ...state, playing: !state.playing };
+    case 'SET_PLAYING':
+      return { ...state, playing: action.payload };
+    case 'SET_SPEED':
+      return { ...state, speed: action.payload };
+    case 'SET_TICK':
+      return { ...state, tick: action.payload, playing: false };
+    case 'ADVANCE_TICK': {
+      const nxt = Math.min(action.payload.totalTicks, state.tick + action.payload.delta);
+      return { ...state, tick: nxt, playing: nxt >= action.payload.totalTicks ? false : state.playing };
+    }
+    default:
+      return state;
+  }
+}
+
+const initialReplayState: ReplayState = {
+  replay: null,
+  error: '',
+  playing: false,
+  speed: 1,
+  tick: 0,
+};
+
 export default function ReplayApp() {
-  const [replay, setReplay] = useState<ReplayDataV2 | null>(null);
-  const [error, setError] = useState('');
-  const [playing, setPlaying] = useState(false);
-  const [speed, setSpeed] = useState(1);
-  const [tick, setTick] = useState(0);
+  const [state, dispatch] = useReducer(replayReducer, initialReplayState);
+  const { replay, error, playing, speed, tick } = state;
   const fileInputRef = useRef<HTMLInputElement>(null);
   const rafRef = useRef<number>(0);
   const lastTimeRef = useRef<number>(0);
@@ -37,11 +82,7 @@ export default function ReplayApp() {
       if (lastTimeRef.current === 0) lastTimeRef.current = time;
       const dt = (time - lastTimeRef.current) / 1000;
       lastTimeRef.current = time;
-      setTick((prev) => {
-        const nxt = Math.min(totalTicks, prev + dt * 60 * speed);
-        if (nxt >= totalTicks) setPlaying(false);
-        return nxt;
-      });
+      dispatch({ type: 'ADVANCE_TICK', payload: { delta: dt * 60 * speed, totalTicks } });
       rafRef.current = requestAnimationFrame(update);
     };
     rafRef.current = requestAnimationFrame(update);
@@ -80,14 +121,12 @@ export default function ReplayApp() {
         const raw = JSON.parse(event.target?.result as string) as ReplayData;
         const normalized = normalizeReplay(raw);
         if (!normalized) {
-          setError('Replay viewer currently supports v2 replay files only.');
+          dispatch({ type: 'LOAD_ERROR', payload: 'Replay viewer currently supports v2 replay files only.' });
           return;
         }
-        setReplay(normalized);
-        setTick(0);
-        setError('');
+        dispatch({ type: 'LOAD_SUCCESS', payload: normalized });
       } catch {
-        setError('Invalid replay file.');
+        dispatch({ type: 'LOAD_ERROR', payload: 'Invalid replay file.' });
       }
     };
     reader.readAsText(file);
@@ -114,13 +153,17 @@ export default function ReplayApp() {
           </button>
           <button
             type="button"
-            onClick={() => setPlaying((p) => !p)}
+            onClick={() => dispatch({ type: 'TOGGLE_PLAY' })}
             disabled={!replay}
             className="px-4 py-2 bg-emerald-500/20 text-emerald-400 font-bold rounded-lg hover:bg-emerald-500/30 disabled:opacity-50"
           >
             {playing ? 'PAUSE' : 'PLAY'}
           </button>
-          <select value={speed} onChange={(e) => setSpeed(Number(e.target.value))} className="bg-[#0a0a0f] border border-white/20 rounded p-1">
+          <select
+            value={speed}
+            onChange={(e) => dispatch({ type: 'SET_SPEED', payload: Number(e.target.value) })}
+            className="bg-[#0a0a0f] border border-white/20 rounded p-1"
+          >
             <option value={0.5}>0.5x</option>
             <option value={1}>1x</option>
             <option value={2}>2x</option>
@@ -152,10 +195,7 @@ export default function ReplayApp() {
           min={0}
           max={totalTicks}
           value={tick}
-          onChange={(e) => {
-            setTick(Number(e.target.value));
-            setPlaying(false);
-          }}
+          onChange={(e) => dispatch({ type: 'SET_TICK', payload: Number(e.target.value) })}
           className="flex-1 accent-emerald-500"
         />
         <span className="text-xs font-mono w-12 text-zinc-500">{(totalTicks / 60).toFixed(1)}s</span>

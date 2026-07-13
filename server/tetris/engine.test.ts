@@ -20,9 +20,12 @@ import {
   GRAVITY_TICKS_PER_CELL,
   SATELLITE_PACKET_DELAY_TICKS,
   STICKY_LOCK_RESET_CAP,
+  BOARD_ROWS,
+  BOARD_COLS,
+  COUNTDOWN_SECONDS,
+  GAME_DURATION,
 } from '../../src/constants.js';
 import { GameState, PlayerState } from '../../src/types.js';
-import { COUNTDOWN_SECONDS, GAME_DURATION } from '../../src/constants.js';
 
 function makeGame(players: PlayerState[]): GameState {
   const playerMap: Record<string, PlayerState> = {};
@@ -275,5 +278,47 @@ describe('tetris engine', () => {
     assert.equal(player.board[25][5], null);
     assert.equal(player.board[25][6], null);
     assert.equal(player.score, scoreBefore);
+  });
+
+  it('sticky cap persists across pieces until a line clear occurs', () => {
+    const rng = makeRng(50);
+    const player = makePlayer('a', rng);
+    const opponent = makePlayer('b', rng);
+    const game = makeGame([player, opponent]);
+
+    // 1. Apply sticky and verify it is set.
+    applyStickyToActivePiece(player);
+    assert.equal(player.pieceLockResetCap, STICKY_LOCK_RESET_CAP);
+
+    // 2. Lock the first piece without clearing a line.
+    assert.ok(player.activePiece);
+    const firstType = player.activePiece.type;
+    
+    // Position it at the floor so it is grounded and locks.
+    player.activePiece.y = BOARD_ROWS - 2;
+    player.lockDelayRemainingTicks = 0;
+    stepPlayer(game, player, opponent, rng, []);
+    
+    // The first piece should have locked, and a new one spawned.
+    assert.notEqual(player.activePiece?.type, firstType);
+    // The sticky cap MUST persist because no lines were cleared!
+    assert.equal(player.pieceLockResetCap, STICKY_LOCK_RESET_CAP);
+
+    // 3. Lock the second piece WITH a line clear.
+    const bottom = BOARD_ROWS - 1;
+    for (let x = 1; x < BOARD_COLS; x++) {
+      player.board[bottom][x] = 'I';
+    }
+    player.activePiece = {
+      type: 'I',
+      rotation: 0,
+      x: -1,
+      y: bottom - 1,
+    };
+    player.lockDelayRemainingTicks = 0;
+    stepPlayer(game, player, opponent, rng, []);
+
+    // Line clear has occurred! The sticky cap must be cleared (undefined).
+    assert.equal(player.pieceLockResetCap, undefined);
   });
 });
