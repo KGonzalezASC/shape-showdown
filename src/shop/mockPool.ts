@@ -10,6 +10,8 @@ import {
   SNAG_COST,
   STICKY_COST,
   BOUNTY_TAX_COST,
+  WILDCARD_FOUR_COST,
+  TECTONIC_SHIFT_COST,
   ShopItem,
 } from '../types';
 
@@ -122,15 +124,17 @@ export const SHOP_MOCK_POOL: ShopItem[] = [
     synergyBoost: 2.5,
   },
   {
-    id: 'target-lock',
-    name: 'Target',
-    icon: '🎯',
-    cost: 60,
+    id: 'wildcard-four',
+    name: 'Wildcard +4',
+    icon: '🧩',
+    cost: WILDCARD_FOUR_COST,
     tier: 2,
     baseWeight: 2.25,
-    colorClass: 'bg-fuchsia-900/70',
-    borderColorClass: 'border-fuchsia-300/65',
-    description: 'Commodo consequat lorem ipsum.',
+    colorClass: 'bg-fuchsia-950/70',
+    borderColorClass: 'border-fuchsia-400/65',
+    description: "Copies the largest connected poison blotch on the opponent's stack (up to 6 cells) onto their next falling piece.",
+    synergyTargetId: 'elixir-pulse',
+    synergyBoost: 2.5,
   },
   {
     id: 'fortify-frame',
@@ -169,6 +173,18 @@ export const SHOP_MOCK_POOL: ShopItem[] = [
     borderColorClass: 'border-zinc-300/60',
     description:
       'Arms until garbage arrives — then pushes queued lines back and slows new garbage for 10s.',
+  },
+  {
+    id: 'tectonic-shift',
+    name: 'Tectonic Shift',
+    icon: '🪐',
+    cost: TECTONIC_SHIFT_COST,
+    tier: 2,
+    baseWeight: 2.25,
+    colorClass: 'bg-indigo-950/70',
+    borderColorClass: 'border-indigo-400/65',
+    description:
+      'Animates all columns collapsing downward to fill holes. Cleared lines award no points, garbage, or shop rolls.',
   },
 ];
 

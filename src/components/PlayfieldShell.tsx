@@ -74,6 +74,7 @@ export const PlayfieldShell: React.FC<PlayfieldShellProps> = ({
                 borderColorClass="border-emerald-500/20"
                 shadowColorClass="shadow-[0_0_30px_rgba(16,185,129,0.1)]"
                 cellSize={mobileCellSize}
+                status={playfield.status}
               />
             )}
           </div>
@@ -118,6 +119,7 @@ export const PlayfieldShell: React.FC<PlayfieldShellProps> = ({
                 title="👤 YOUR FIELD"
                 borderColorClass="border-emerald-500/20"
                 shadowColorClass="shadow-[0_0_30px_rgba(16,185,129,0.1)]"
+                status={playfield.status}
               />
             </div>
           )}
@@ -132,6 +134,7 @@ export const PlayfieldShell: React.FC<PlayfieldShellProps> = ({
                 borderColorClass="border-rose-500/20"
                 shadowColorClass="shadow-[0_0_30px_rgba(244,63,94,0.1)]"
                 opacityClass="opacity-80"
+                status={playfield.status}
               />
             ) : (
               <WaitingForOpponentBoard />

@@ -31,6 +31,7 @@ import {
   POISON_GENERATIONS,
   POISON_PURGE_COST,
   POISON_PURGE_TELEGRAPH_TICKS,
+  WILDCARD_FOUR_COST,
   FREEZE_COST,
   FREEZE_DURATION_TICKS,
   STICKY_LOCK_RESET_CAP,
@@ -42,6 +43,11 @@ import {
   MAGNET_GRAVITY_TICK_REDUCTION,
   MAGNET_MIN_GRAVITY_TICKS,
   SNAG_COST,
+  TECTONIC_SHIFT_COST,
+  TECTONIC_SHIFT_MIN_DURATION_MS,
+  TECTONIC_SHIFT_MIN_DURATION_TICKS,
+  TECTONIC_SHIFT_STEP_MS,
+  TECTONIC_SHIFT_STEP_TICKS,
   BOUNTY_TAX_COST,
   BOUNTY_TAX_PERCENT,
   POISON_LINE_CLEAR_PENALTY_MAX_RATIO,
@@ -59,7 +65,7 @@ import {
 export type MatchStatus = 'waiting' | 'countdown' | 'playing' | 'ended';
 export type TetrominoType = 'I' | 'J' | 'L' | 'O' | 'S' | 'T' | 'Z';
 export type RotationState = 0 | 1 | 2 | 3;
-export type CellValue = TetrominoType | 'G' | null;
+export type CellValue = TetrominoType | 'G' | 'W' | null;
 export type ActionType = 'rotateCW' | 'rotateCCW' | 'hardDrop' | 'hold';
 
 export interface ShopItem {
@@ -91,7 +97,7 @@ export interface PlayerShopState {
   cycleIndex: number;
   cycleStartTick: number | null;
   lastPurchasedItemId: string | null;
-  ownedIds: string[];
+  activeSynergySeeds: string[];
 }
 
 /**
@@ -145,6 +151,12 @@ export interface TetrisPiece {
   poisonVariant?: number;
   /** Bomber shop item: detonates in a circle when this piece locks. */
   bomber?: boolean;
+  /** Custom block offsets override when this piece has a custom shape. */
+  customOffsets?: [number, number][];
+  /** When true, this is a wildcard/puzzle piece with custom shape. */
+  isWildcard?: boolean;
+  /** Increments when a wildcard rotation is rejected because it would collide. */
+  rotationBlockedNonce?: number;
 }
 
 /**
@@ -230,6 +242,12 @@ export interface PlayerState {
   poisonNextPiece?: boolean;
   /** Colour variant to assign to the next deferred poison spawn. */
   poisonNextVariant?: number;
+  /** Offsets for the next piece if transformed by Wildcard +4. */
+  customNextPieceOffsets?: [number, number][];
+  /** Poison colour variant for the next custom piece. */
+  customNextPieceVariant?: number;
+  /** Absolute board cells currently outlined as the source for a queued Wildcard +4 piece. */
+  customNextPieceSourceCells?: [number, number][];
   /** Game tick until hold/store/swap is blocked (Freeze shop item). */
   holdFrozenUntilTick?: number;
   /** Per-piece lock reset cap override (Sticky shop item); cleared on lock/hold. */
@@ -252,6 +270,15 @@ export interface PlayerState {
   satelliteDelayUntilTick?: number;
   /** Bomber: arm the next spawned piece. */
   bomberNextPiece?: boolean;
+  /**
+   * Tectonic Shift cascade: next tick to advance one-row gravity (all columns).
+   * Null/undefined when idle. While set, the active piece is paused.
+   */
+  tectonicShiftNextStepTick?: number | null;
+  /** Tick when the cascade started (for min-duration floor). */
+  tectonicShiftStartTick?: number | null;
+  /** Per-cascade spacing between gravity steps (scaled so short falls still last ≥ min duration). */
+  tectonicShiftStepTicks?: number | null;
   /** Server-authoritative shop offers and cycle state. */
   shop: PlayerShopState;
 }
@@ -345,6 +372,7 @@ export {
   POISON_GENERATIONS,
   POISON_PURGE_COST,
   POISON_PURGE_TELEGRAPH_TICKS,
+  WILDCARD_FOUR_COST,
   FREEZE_COST,
   FREEZE_DURATION_TICKS,
   STICKY_LOCK_RESET_CAP,
@@ -356,6 +384,11 @@ export {
   MAGNET_GRAVITY_TICK_REDUCTION,
   MAGNET_MIN_GRAVITY_TICKS,
   SNAG_COST,
+  TECTONIC_SHIFT_COST,
+  TECTONIC_SHIFT_MIN_DURATION_MS,
+  TECTONIC_SHIFT_MIN_DURATION_TICKS,
+  TECTONIC_SHIFT_STEP_MS,
+  TECTONIC_SHIFT_STEP_TICKS,
   BOUNTY_TAX_COST,
   BOUNTY_TAX_PERCENT,
   POISON_LINE_CLEAR_PENALTY_MAX_RATIO,

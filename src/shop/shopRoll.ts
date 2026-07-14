@@ -61,8 +61,8 @@ function drawIdFromTierBag(
   return { itemId: null, nextBagState: { ...bagState, [key]: bag } };
 }
 
-function synergyMultiplier(item: ShopItem, ownedIds: Set<string>): number {
-  if (item.synergyTargetId && item.synergyBoost && ownedIds.has(item.synergyTargetId)) {
+function synergyMultiplier(item: ShopItem, activeSynergySeeds: Set<string>): number {
+  if (item.synergyTargetId && item.synergyBoost && activeSynergySeeds.has(item.synergyTargetId)) {
     return Math.max(1, item.synergyBoost);
   }
   return 1;
@@ -79,10 +79,10 @@ function drawOneWeightedShopItem(
   bagState: ShopBagState,
   excludedIds: Set<string>,
   currentTier1Count: number,
-  ownedIds: Set<string>,
+  activeSynergySeeds: Set<string>,
 ): { item: ShopItem | null; nextBagState: ShopBagState } {
   const byId = new Map(pool.map((item) => [item.id, item]));
-  const effWeight = (item: ShopItem) => item.baseWeight * synergyMultiplier(item, ownedIds);
+  const effWeight = (item: ShopItem) => item.baseWeight * synergyMultiplier(item, activeSynergySeeds);
   const tier1Weight = pool
     .filter((item) => item.tier === 1 && !excludedIds.has(item.id))
     .reduce((sum, item) => sum + effWeight(item), 0);
@@ -105,12 +105,15 @@ function drawOneWeightedShopItem(
     if (tier === 1 && !canTakeTier1) continue;
     if (tier === 2 && !canTakeTier2) continue;
 
-    const synergyItem = pool.find(
-      (it) => it.tier === tier && !excludedIds.has(it.id) && synergyMultiplier(it, ownedIds) > 1,
+    const synergyItems = pool.filter(
+      (it) => it.tier === tier && !excludedIds.has(it.id) && synergyMultiplier(it, activeSynergySeeds) > 1,
     );
-    if (synergyItem && Math.random() < 1 - 1 / synergyMultiplier(synergyItem, ownedIds)) {
-      nextState = removeIdFromTierBag(nextState, tier, synergyItem.id);
-      return { item: synergyItem, nextBagState: nextState };
+    if (synergyItems.length > 0) {
+      const synergyItem = synergyItems[Math.floor(Math.random() * synergyItems.length)];
+      if (Math.random() < 1 - 1 / synergyMultiplier(synergyItem, activeSynergySeeds)) {
+        nextState = removeIdFromTierBag(nextState, tier, synergyItem.id);
+        return { item: synergyItem, nextBagState: nextState };
+      }
     }
 
     const drawn = drawIdFromTierBag(pool, tier, nextState, excludedIds);
@@ -127,7 +130,7 @@ export function drawWeightedShopOffers(
   pool: ShopItem[],
   count: number,
   bagState: ShopBagState,
-  ownedIds: Set<string> = new Set(),
+  activeSynergySeeds: Set<string> = new Set(),
 ): { offers: ShopItem[]; nextBagState: ShopBagState } {
   const target = Math.max(0, Math.min(count, pool.length));
   const offers: ShopItem[] = [];
@@ -136,7 +139,7 @@ export function drawWeightedShopOffers(
   let nextState = bagState;
 
   while (offers.length < target) {
-    const drawn = drawOneWeightedShopItem(pool, nextState, excludedIds, tier1Count, ownedIds);
+    const drawn = drawOneWeightedShopItem(pool, nextState, excludedIds, tier1Count, activeSynergySeeds);
     nextState = drawn.nextBagState;
     if (!drawn.item) break;
     offers.push(drawn.item);
@@ -157,10 +160,10 @@ export function drawWeightedShopOffers(
 export function createInitialShopRoll(
   pool: ShopItem[],
   count: number,
-  ownedIds: Set<string> = new Set(),
+  activeSynergySeeds: Set<string> = new Set(),
 ): { offers: ShopItem[]; bagState: ShopBagState } {
   const freshBag = buildShopBagState(pool);
-  const rolled = drawWeightedShopOffers(pool, count, freshBag, ownedIds);
+  const rolled = drawWeightedShopOffers(pool, count, freshBag, activeSynergySeeds);
   return {
     offers: rolled.offers,
     bagState: rolled.nextBagState,

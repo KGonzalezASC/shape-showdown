@@ -16,11 +16,15 @@ import {
   RETRIM_COST,
   SATELLITE_COST,
   SNAG_COST,
+  TECTONIC_SHIFT_COST,
   STICKY_COST,
   BOUNTY_TAX_COST,
   BOUNTY_TAX_PERCENT,
+  WILDCARD_FOUR_COST,
+  BOARD_COLS,
+  BOARD_ROWS,
 } from '../src/types.js';
-import { SHOP_MOCK_POOL } from '../src/shop/mockPool.js';
+import { SHOP_MOCK_POOL, SHOP_ITEM_BY_ID } from '../src/shop/mockPool.js';
 import {
   createInitialShopRoll,
   drawWeightedShopOffers,
@@ -32,6 +36,7 @@ import {
   applyStickyToActivePiece,
   armSatelliteToBuyer,
   applyBomberToBuyer,
+  startTectonicShift,
 } from './tetris/engine.js';
 
 /** ~700ms highlight interval at 60Hz simulation. */
@@ -49,9 +54,11 @@ const PURCHASABLE_IDS = new Set([
   'satellite-link',
   'nova-charge',
   'bounty-tax',
+  'wildcard-four',
+  'tectonic-shift',
 ]);
 
-const SELF_SHOP_ITEMS = new Set(['satellite-link', 'nova-charge']);
+const SELF_SHOP_ITEMS = new Set(['satellite-link', 'nova-charge', 'tectonic-shift']);
 
 const ITEM_COST: Record<string, number> = {
   retrim: RETRIM_COST,
@@ -65,6 +72,8 @@ const ITEM_COST: Record<string, number> = {
   'satellite-link': SATELLITE_COST,
   'nova-charge': BOMBER_COST,
   'bounty-tax': BOUNTY_TAX_COST,
+  'wildcard-four': WILDCARD_FOUR_COST,
+  'tectonic-shift': TECTONIC_SHIFT_COST,
 };
 
 export function createInitialPlayerShop(): PlayerShopState {
@@ -76,7 +85,7 @@ export function createInitialPlayerShop(): PlayerShopState {
     cycleIndex: -1,
     cycleStartTick: null,
     lastPurchasedItemId: null,
-    ownedIds: [],
+    activeSynergySeeds: [],
   };
 }
 
@@ -89,7 +98,7 @@ export function rollShopOnLineClear(player: PlayerState): void {
     SHOP_MOCK_POOL,
     SHOP_VISIBLE_COUNT,
     player.shop.bagState,
-    new Set(player.shop.ownedIds),
+    new Set(player.shop.activeSynergySeeds),
   );
   player.shop.offerIds = rolled.offers.map((o) => o.id);
   player.shop.bagState = rolled.nextBagState;
@@ -121,6 +130,103 @@ export function openPlayerShop(player: PlayerState, currentTick: number): boolea
   return true;
 }
 
+/** Max cells copied onto a Wildcard +4 puzzle piece. */
+export const WILDCARD_FOUR_MAX_CELLS = 6;
+
+type PoisonCell = { x: number; y: number };
+
+/**
+ * Find the largest 4-connected poison blotch (same variant).
+ * Ties prefer the topmost, then leftmost seed cell.
+ */
+function findLargestPoisonComponent(
+  poison: number[][],
+): { cells: PoisonCell[]; variant: number } | null {
+  const visited = Array.from({ length: BOARD_ROWS }, () =>
+    Array.from({ length: BOARD_COLS }, () => false),
+  );
+  let best: PoisonCell[] | null = null;
+  let bestVariant = 0;
+
+  for (let y = 0; y < BOARD_ROWS; y++) {
+    for (let x = 0; x < BOARD_COLS; x++) {
+      const variant = poison[y]?.[x] ?? 0;
+      if (variant <= 0 || visited[y][x]) continue;
+
+      const cells: PoisonCell[] = [];
+      const queue: PoisonCell[] = [{ x, y }];
+      visited[y][x] = true;
+      while (queue.length > 0) {
+        const cur = queue.shift()!;
+        cells.push(cur);
+        for (const [nx, ny] of [
+          [cur.x + 1, cur.y],
+          [cur.x - 1, cur.y],
+          [cur.x, cur.y + 1],
+          [cur.x, cur.y - 1],
+        ] as const) {
+          if (ny < 0 || ny >= BOARD_ROWS || nx < 0 || nx >= BOARD_COLS) continue;
+          if (visited[ny][nx]) continue;
+          if ((poison[ny]?.[nx] ?? 0) !== variant) continue;
+          visited[ny][nx] = true;
+          queue.push({ x: nx, y: ny });
+        }
+      }
+
+      const betterSize = !best || cells.length > best.length;
+      const betterTie =
+        !!best &&
+        cells.length === best.length &&
+        (cells[0].y < best[0].y || (cells[0].y === best[0].y && cells[0].x < best[0].x));
+      if (betterSize || betterTie) {
+        best = cells;
+        bestVariant = variant;
+      }
+    }
+  }
+
+  if (!best) return null;
+  return { cells: best, variant: bestVariant };
+}
+
+/**
+ * If a blotch exceeds the piece cap, keep a connected subset via BFS from its
+ * topmost-leftmost cell (never row-major chop across disconnected islands).
+ */
+function truncateConnectedPoisonCells(cells: PoisonCell[], maxCells: number): PoisonCell[] {
+  if (cells.length <= maxCells) return cells;
+  const inGroup = new Set(cells.map((c) => `${c.x},${c.y}`));
+  const seed = [...cells].sort((a, b) => a.y - b.y || a.x - b.x)[0];
+  const out: PoisonCell[] = [];
+  const visited = new Set<string>([`${seed.x},${seed.y}`]);
+  const queue: PoisonCell[] = [seed];
+  while (queue.length > 0 && out.length < maxCells) {
+    const cur = queue.shift()!;
+    out.push(cur);
+    const neighbors = [
+      { x: cur.x + 1, y: cur.y },
+      { x: cur.x - 1, y: cur.y },
+      { x: cur.x, y: cur.y + 1 },
+      { x: cur.x, y: cur.y - 1 },
+    ].sort((a, b) => a.y - b.y || a.x - b.x);
+    for (const n of neighbors) {
+      const key = `${n.x},${n.y}`;
+      if (!inGroup.has(key) || visited.has(key)) continue;
+      visited.add(key);
+      queue.push(n);
+    }
+  }
+  return out;
+}
+
+function poisonCellsToOffsets(cells: PoisonCell[]): [number, number][] {
+  const minX = Math.min(...cells.map((c) => c.x));
+  const minY = Math.min(...cells.map((c) => c.y));
+  return cells
+    .map((c) => [c.x - minX, c.y - minY] as [number, number])
+    .sort((a, b) => a[1] - b[1] || a[0] - b[0]);
+}
+
 export function applyShopPurchase(
   gameState: GameState,
   buyer: PlayerState,
@@ -142,12 +248,36 @@ export function applyShopPurchase(
     return false;
   }
 
+  if (itemId === 'wildcard-four') {
+    if (!opponent) return false;
+    const poison = opponent.poisonBoard ?? [];
+    let hasPoison = false;
+    for (let y = 0; y < BOARD_ROWS; y++) {
+      for (let x = 0; x < BOARD_COLS; x++) {
+        if (poison[y]?.[x] > 0) {
+          hasPoison = true;
+          break;
+        }
+      }
+      if (hasPoison) break;
+    }
+    if (!hasPoison) return false;
+  }
+
   buyer.score -= cost;
   shop.phase = 'waiting';
   shop.cycleIndex = -1;
   shop.cycleStartTick = null;
   shop.lastPurchasedItemId = itemId;
-  shop.ownedIds = [...shop.ownedIds, itemId];
+
+  // Add the newly purchased item to active synergy seeds
+  let nextSeeds = [...shop.activeSynergySeeds, itemId];
+  // If this item has a synergy partner it consumes, remove that partner from active seeds
+  const purchasedItem = SHOP_ITEM_BY_ID.get(itemId);
+  if (purchasedItem && purchasedItem.synergyTargetId) {
+    nextSeeds = nextSeeds.filter((id) => id !== purchasedItem.synergyTargetId);
+  }
+  shop.activeSynergySeeds = nextSeeds;
 
   if (!buyer.activeEffects) buyer.activeEffects = [];
   if (opponent && !opponent.activeEffects) opponent.activeEffects = [];
@@ -319,6 +449,39 @@ export function applyShopPurchase(
       textClass: 'text-emerald-100',
       glowClass: 'shadow-[0_0_10px_rgba(52,211,153,0.7)]',
       expiresAtTick: tick + 120,
+    });
+  } else if (itemId === 'wildcard-four' && opponent) {
+    const poison = opponent.poisonBoard ?? [];
+    const component = findLargestPoisonComponent(poison);
+    // hasPoison gate above guarantees a component exists.
+    if (component) {
+      const targetCells = truncateConnectedPoisonCells(component.cells, WILDCARD_FOUR_MAX_CELLS);
+      opponent.customNextPieceOffsets = poisonCellsToOffsets(targetCells);
+      opponent.customNextPieceVariant = component.variant;
+      opponent.customNextPieceSourceCells = targetCells.map((cell) => [cell.x, cell.y]);
+
+      opponent.activeEffects.push({
+        id: `wildcard-four-${tick}`,
+        label: 'Wildcard +4',
+        icon: '🧩',
+        bgClass: 'bg-fuchsia-950/80',
+        borderClass: 'border-fuchsia-400',
+        textClass: 'text-fuchsia-100',
+        glowClass: 'shadow-[0_0_10px_rgba(217,70,239,0.7)]',
+        expiresAtTick: tick + 240,
+      });
+    }
+  } else if (itemId === 'tectonic-shift') {
+    startTectonicShift(buyer, tick);
+    buyer.activeEffects.push({
+      id: `tectonic-shift-${tick}`,
+      label: 'Tectonic Shift',
+      icon: '🪐',
+      bgClass: 'bg-indigo-950/80',
+      borderClass: 'border-indigo-400',
+      textClass: 'text-indigo-100',
+      glowClass: 'shadow-[0_0_10px_rgba(129,140,248,0.7)]',
+      expiresAtTick: tick + 360,
     });
   }
 

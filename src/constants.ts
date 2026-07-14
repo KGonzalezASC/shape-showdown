@@ -34,6 +34,8 @@ export const POISON_GENERATIONS = 4; // total waves incl. the lock wave (also = 
 // opponent cell of that variant as holes (no gravity, no line-clear score for the victim).
 export const POISON_PURGE_COST = 70;
 export const POISON_PURGE_TELEGRAPH_TICKS = 60; // ~1s warning @ 60Hz
+// Wildcard +4: copies the largest 4-connected poison blotch (≤6 cells) onto opponent's next piece.
+export const WILDCARD_FOUR_COST = 60;
 // Freeze (Frost): opponent cannot store into or swap from hold for the duration.
 export const FREEZE_COST = 45;
 export const FREEZE_DURATION_TICKS = 600; // 10s @ 60Hz
@@ -52,6 +54,20 @@ export const MAGNET_GRAVITY_TICK_REDUCTION = 5;
 export const MAGNET_MIN_GRAVITY_TICKS = 12;
 // Snag (fortify-frame id): opponent cannot hard-drop current/next piece until lock or hold.
 export const SNAG_COST = 48;
+// Tectonic Shift: animated column gravity; cleared lines don't score, send garbage, or shop-roll.
+export const TECTONIC_SHIFT_COST = 140;
+/** Floor for the full cascade (start → silent clear / unpause). */
+export const TECTONIC_SHIFT_MIN_DURATION_MS = 300;
+/** Fallback / minimum spacing between one-row gravity steps when the fall is deep. */
+export const TECTONIC_SHIFT_STEP_MS = 75;
+export const TECTONIC_SHIFT_MIN_DURATION_TICKS = Math.max(
+  1,
+  Math.round((GAME_TICK_RATE * TECTONIC_SHIFT_MIN_DURATION_MS) / 1000),
+);
+export const TECTONIC_SHIFT_STEP_TICKS = Math.max(
+  1,
+  Math.round((GAME_TICK_RATE * TECTONIC_SHIFT_STEP_MS) / 1000),
+);
 // Tax Siphon: steals a percentage of the opponent's score/funds if they are ahead.
 export const BOUNTY_TAX_COST = 50;
 export const BOUNTY_TAX_PERCENT = 0.30;

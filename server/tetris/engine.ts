@@ -41,6 +41,8 @@ import {
   SATELLITE_INCOMING_DELAY_TICKS,
   SATELLITE_DURATION_TICKS,
   BOMBER_BLAST_RADIUS,
+  TECTONIC_SHIFT_STEP_TICKS,
+  TECTONIC_SHIFT_MIN_DURATION_TICKS,
 } from '../../src/constants.js';
 import { getKickTests, PIECE_SEQUENCE, SHAPES } from './pieces.js';
 import { createInitialPlayerShop } from '../shop.js';
@@ -136,6 +138,9 @@ export function makePlayer(id: string, rng: MutableRng): PlayerState {
     satelliteArmed: false,
     satelliteDelayUntilTick: undefined,
     bomberNextPiece: false,
+    tectonicShiftNextStepTick: null,
+    tectonicShiftStartTick: null,
+    tectonicShiftStepTicks: null,
     shop: createInitialPlayerShop(),
   };
   ensureQueue(player, rng);
@@ -166,14 +171,64 @@ function spawnNextPiece(player: PlayerState, rng: MutableRng) {
   player.poisonNextVariant = undefined;
   const bomber = !!player.bomberNextPiece;
   player.bomberNextPiece = false;
-  return { type, rotation: 0 as RotationState, x: 3, y: BOARD_HIDDEN_ROWS - 2, poisoned, poisonVariant, bomber };
+
+  const customOffsets = player.customNextPieceOffsets;
+  const customVariant = player.customNextPieceVariant;
+  player.customNextPieceOffsets = undefined;
+  player.customNextPieceVariant = undefined;
+  player.customNextPieceSourceCells = undefined;
+
+  let spawnX = 3;
+  if (customOffsets) {
+    const xs = customOffsets.map(([dx]) => dx);
+    const minX = Math.min(...xs);
+    const maxX = Math.max(...xs);
+    const width = maxX - minX + 1;
+    spawnX = Math.floor((BOARD_COLS - width) / 2) - minX;
+  }
+
+  return {
+    type,
+    rotation: 0 as RotationState,
+    x: spawnX,
+    y: BOARD_HIDDEN_ROWS - 2,
+    poisoned: poisoned,
+    poisonVariant: poisonVariant !== undefined ? poisonVariant : customVariant,
+    bomber,
+    customOffsets,
+    isWildcard: customOffsets !== undefined,
+  };
 }
 
-function getCells(piece: { type: TetrominoType; rotation: RotationState; x: number; y: number }) {
+function getCells(piece: { type: TetrominoType; rotation: RotationState; x: number; y: number; customOffsets?: [number, number][] }) {
+  if (piece.customOffsets) {
+    return piece.customOffsets.map(([dx, dy]) => ({ x: piece.x + dx, y: piece.y + dy }));
+  }
   return SHAPES[piece.type][piece.rotation].map(([dx, dy]) => ({ x: piece.x + dx, y: piece.y + dy }));
 }
 
-function collides(board: CellValue[][], piece: { type: TetrominoType; rotation: RotationState; x: number; y: number }): boolean {
+/**
+ * Rotate a normalized custom polyomino inside its bounding box.
+ * CW:  (dx, dy) -> (height - 1 - dy, dx)
+ * CCW: (dx, dy) -> (dy, width - 1 - dx)
+ */
+function rotateCustomOffsets(offsets: [number, number][], dir: 1 | -1): [number, number][] {
+  const maxX = Math.max(...offsets.map(([dx]) => dx));
+  const maxY = Math.max(...offsets.map(([, dy]) => dy));
+  const width = maxX + 1;
+  const height = maxY + 1;
+  const rotated = offsets.map(([dx, dy]) => {
+    if (dir === 1) return [height - 1 - dy, dx] as [number, number];
+    return [dy, width - 1 - dx] as [number, number];
+  });
+  const minX = Math.min(...rotated.map(([dx]) => dx));
+  const minY = Math.min(...rotated.map(([, dy]) => dy));
+  return rotated
+    .map(([dx, dy]) => [dx - minX, dy - minY] as [number, number])
+    .sort((a, b) => a[1] - b[1] || a[0] - b[0]);
+}
+
+function collides(board: CellValue[][], piece: { type: TetrominoType; rotation: RotationState; x: number; y: number; customOffsets?: [number, number][] }): boolean {
   for (const cell of getCells(piece)) {
     if (cell.x < 0 || cell.x >= BOARD_COLS || cell.y >= BOARD_ROWS) return true;
     if (cell.y >= 0 && board[cell.y][cell.x] !== null) return true;
@@ -214,6 +269,45 @@ function tryRotate(player: PlayerState, dir: 1 | -1): boolean {
   const wasGrounded = isGrounded(player);
   const from = player.activePiece.rotation;
   const to = (((from + dir) % 4) + 4) % 4 as RotationState;
+
+  if (player.activePiece.customOffsets) {
+    const newOffsets = rotateCustomOffsets(player.activePiece.customOffsets, dir);
+    // Bounding-box spin + simple wall kicks (no SRS tables — those assume tetrominoes).
+    const kickTests: Array<[number, number]> = [
+      [0, 0],
+      [-1, 0],
+      [1, 0],
+      [-2, 0],
+      [2, 0],
+      [0, -1],
+      [0, 1],
+    ];
+    for (const [kx, ky] of kickTests) {
+      const candidate = {
+        ...player.activePiece,
+        rotation: to,
+        x: player.activePiece.x + kx,
+        y: player.activePiece.y + ky,
+        customOffsets: newOffsets,
+      };
+      if (!collides(player.board, candidate)) {
+        player.activePiece = candidate;
+        player.lastActionWasRotate = true;
+        if (kx !== 0 || ky !== 0) {
+          player.srsKickNonce += 1;
+          player.lastSrsKick = { kx, ky };
+        }
+        if (wasGrounded && player.lockResetsUsed < lockResetCapFor(player)) {
+          player.lockResetsUsed += 1;
+          player.lockDelayRemainingTicks = LOCK_DELAY_TICKS;
+        }
+        return true;
+      }
+    }
+    player.activePiece.rotationBlockedNonce = (player.activePiece.rotationBlockedNonce ?? 0) + 1;
+    return false;
+  }
+
   const tests = getKickTests(player.activePiece.type, from, to);
   for (const [kx, ky] of tests) {
     const candidate = { ...player.activePiece, rotation: to, x: player.activePiece.x + kx, y: player.activePiece.y - ky };
@@ -402,16 +496,16 @@ function lockPiece(player: PlayerState, tick: number): { lines: number; tSpin: '
   const lockCells = getCells(player.activePiece);
   for (const cell of lockCells) {
     if (cell.y >= 0 && cell.y < BOARD_ROWS && cell.x >= 0 && cell.x < BOARD_COLS) {
-      player.board[cell.y][cell.x] = player.activePiece.type;
+      player.board[cell.y][cell.x] = player.activePiece.isWildcard ? 'W' : player.activePiece.type;
       // Seed the locked cells with the event's variant (not a wave index).
-      if (wasPoisoned) poison[cell.y][cell.x] = poisonVariant;
+      if (wasPoisoned && !player.activePiece.isWildcard) poison[cell.y][cell.x] = poisonVariant;
     }
   }
   if (isBomber) {
     detonateBomberBlast(player, lockCells);
   }
   // Start (or restart) the spread scheduler when a poisoned piece locks.
-  if (wasPoisoned) {
+  if (wasPoisoned && !player.activePiece.isWildcard) {
     player.poisonSpread = {
       generationsRemaining: POISON_GENERATIONS - 1,
       nextSpreadTick: tick + POISON_SPREAD_INTERVAL_TICKS,
@@ -594,6 +688,7 @@ function processActions(player: PlayerState, tick: number): void {
     if (action === 'rotateCCW') tryRotate(player, -1);
     if (action === 'hold') {
       if (isHoldFrozen(player, tick)) continue;
+      if (player.activePiece?.customOffsets) continue; // Block hold for custom pieces
       if (!player.canHold || !player.activePiece || !canHoldAtCurrentHeight(player)) continue;
       player.lastSrsKick = null;
       const current = player.activePiece.type;
@@ -743,6 +838,12 @@ export function stepPlayer(
     player.activeEffects = player.activeEffects.filter(
       (effect) => effect.expiresAtTick === undefined || gameState.tick < effect.expiresAtTick
     );
+  }
+
+  // ── Tectonic Shift cascade: pause piece / inputs until gravity + silent clears finish ──
+  if (player.tectonicShiftNextStepTick != null) {
+    advanceTectonicShift(player, gameState.tick);
+    return;
   }
 
   // ── Process any pending shop effects that have reached their activation tick ──
@@ -914,4 +1015,133 @@ export function replayDateLabel() {
 
 export function tickSeconds() {
   return 1 / GAME_TICK_RATE;
+}
+
+/** One simultaneous gravity step: every unsupported cell drops one row. Returns true if anything moved. */
+function tectonicGravityStep(player: PlayerState): boolean {
+  const poison = ensurePoisonBoard(player);
+  const moves: { x: number; y: number; value: CellValue; poisonVal: number }[] = [];
+  for (let x = 0; x < BOARD_COLS; x++) {
+    for (let y = BOARD_ROWS - 2; y >= 0; y--) {
+      if (player.board[y][x] !== null && player.board[y + 1][x] === null) {
+        moves.push({
+          x,
+          y,
+          value: player.board[y][x],
+          poisonVal: poison[y][x],
+        });
+      }
+    }
+  }
+  if (moves.length === 0) return false;
+
+  for (const m of moves) {
+    player.board[m.y][m.x] = null;
+    poison[m.y][m.x] = 0;
+  }
+  for (const m of moves) {
+    player.board[m.y + 1][m.x] = m.value;
+    poison[m.y + 1][m.x] = m.poisonVal;
+  }
+  return true;
+}
+
+/** Remove all currently full rows at once (silent: no score / garbage / shop via linesCleared). */
+function silentClearFullRows(player: PlayerState): number {
+  const poison = ensurePoisonBoard(player);
+  const retainedBoard: CellValue[][] = [];
+  const retainedPoison: number[][] = [];
+  let cleared = 0;
+
+  for (let y = 0; y < BOARD_ROWS; y++) {
+    if (player.board[y].every((cell) => cell !== null)) {
+      cleared += 1;
+    } else {
+      retainedBoard.push(player.board[y]);
+      retainedPoison.push(poison[y]);
+    }
+  }
+
+  if (cleared > 0) {
+    const emptyRows = Array.from({ length: cleared }, () =>
+      Array.from({ length: BOARD_COLS }, (): CellValue => null),
+    );
+    const emptyPoisonRows = Array.from({ length: cleared }, () =>
+      Array.from({ length: BOARD_COLS }, () => 0),
+    );
+    player.board.splice(0, player.board.length, ...emptyRows, ...retainedBoard);
+    poison.splice(0, poison.length, ...emptyPoisonRows, ...retainedPoison);
+  }
+
+  return cleared;
+}
+
+/** Max rows any cell must fall under full column packing (drives step pacing). */
+function maxTectonicFallRows(player: PlayerState): number {
+  let maxFall = 0;
+  for (let x = 0; x < BOARD_COLS; x++) {
+    const solidYs: number[] = [];
+    for (let y = BOARD_ROWS - 1; y >= 0; y--) {
+      if (player.board[y][x] !== null) solidYs.push(y);
+    }
+    for (let i = 0; i < solidYs.length; i++) {
+      const toY = BOARD_ROWS - 1 - i;
+      maxFall = Math.max(maxFall, toY - solidYs[i]);
+    }
+  }
+  return maxFall;
+}
+
+function clearTectonicShiftState(player: PlayerState): void {
+  player.tectonicShiftNextStepTick = null;
+  player.tectonicShiftStartTick = null;
+  player.tectonicShiftStepTicks = null;
+}
+
+function tectonicStepTicksFor(player: PlayerState): number {
+  return Math.max(1, player.tectonicShiftStepTicks ?? TECTONIC_SHIFT_STEP_TICKS);
+}
+
+/** Begin Magical Tetris–style animated column gravity; piece stays paused until settle. */
+export function startTectonicShift(player: PlayerState, tick: number): void {
+  const fallRows = maxTectonicFallRows(player);
+  // Pace so the fall itself spans ≥ min duration (short 1-row collapses stay readable).
+  const paced = Math.ceil(TECTONIC_SHIFT_MIN_DURATION_TICKS / Math.max(1, fallRows));
+  player.tectonicShiftStepTicks = Math.max(TECTONIC_SHIFT_STEP_TICKS, paced);
+  player.tectonicShiftStartTick = tick;
+  player.tectonicShiftNextStepTick = tick;
+}
+
+/**
+ * Advance cascade when due. While `tectonicShiftNextStepTick` is set, the caller should
+ * pause piece input/gravity. On settle, clears all full rows silently in one pass.
+ */
+export function advanceTectonicShift(player: PlayerState, tick: number): void {
+  if (player.tectonicShiftNextStepTick == null) return;
+  if (tick < player.tectonicShiftNextStepTick) return;
+
+  const moved = tectonicGravityStep(player);
+  if (moved) {
+    player.tectonicShiftNextStepTick = tick + tectonicStepTicksFor(player);
+    return;
+  }
+
+  const start = player.tectonicShiftStartTick ?? tick;
+  const minEnd = start + TECTONIC_SHIFT_MIN_DURATION_TICKS;
+  if (tick < minEnd) {
+    player.tectonicShiftNextStepTick = minEnd;
+    return;
+  }
+
+  silentClearFullRows(player);
+  clearTectonicShiftState(player);
+}
+
+/** Instant settle (tests / tools): run gravity to completion then silent clear. */
+export function applyTectonicShift(player: PlayerState): void {
+  while (tectonicGravityStep(player)) {
+    // collapse
+  }
+  silentClearFullRows(player);
+  clearTectonicShiftState(player);
 }

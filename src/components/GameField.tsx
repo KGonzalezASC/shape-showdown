@@ -1,13 +1,15 @@
-import React, { forwardRef, useContext, useImperativeHandle, useMemo, useState } from 'react';
+import React, { forwardRef, useContext, useEffect, useImperativeHandle, useMemo, useState } from 'react';
 import {
   ActiveFieldEffect,
   BOARD_COLS,
   BOARD_HIDDEN_ROWS,
+  BOARD_ROWS,
   BOARD_VISIBLE_ROWS,
   CellValue,
   HOLD_SWAP_CUTOFF_VISIBLE_ROW,
   PlayerState,
   TetrominoType,
+  MatchStatus,
 } from '../types';
 import { PlayfieldCellSizeContext } from './playfieldCellSizeContext';
 
@@ -20,6 +22,7 @@ interface GameFieldProps {
   opacityClass?: string;
   /** When omitted, uses `PlayfieldCellSizeContext` (desktop layout). */
   cellSize?: number;
+  status?: MatchStatus;
 }
 
 export interface GameFieldRef {
@@ -35,6 +38,26 @@ const COLORS: Record<Exclude<CellValue, null>, string> = {
   T: 'bg-purple-400',
   Z: 'bg-red-500',
   G: 'bg-zinc-500',
+  W: 'bg-fuchsia-500',
+};
+
+const GHOST_COLORS: Record<Exclude<CellValue, null>, string> = {
+  I: 'border-cyan-400/40 bg-cyan-400/10',
+  J: 'border-blue-500/40 bg-blue-500/10',
+  L: 'border-orange-400/40 bg-orange-400/10',
+  O: 'border-yellow-300/40 bg-yellow-300/10',
+  S: 'border-green-400/40 bg-green-400/10',
+  T: 'border-purple-400/40 bg-purple-400/10',
+  Z: 'border-red-500/40 bg-red-500/10',
+  G: 'border-zinc-500/40 bg-zinc-500/10',
+  W: 'border-fuchsia-500/40 bg-fuchsia-500/10',
+};
+
+const POISON_GHOST_COLORS: Record<number, string> = {
+  1: 'border-fuchsia-400/40 bg-fuchsia-500/10',
+  2: 'border-lime-400/40 bg-lime-500/10',
+  3: 'border-indigo-400/40 bg-indigo-500/10',
+  4: 'border-teal-400/40 bg-teal-500/10',
 };
 
 const MemoizedCell = React.memo(
@@ -44,14 +67,20 @@ const MemoizedCell = React.memo(
     bomber,
     magnetAura,
     size,
+    ghostType,
+    ghostPoisonVariant,
+    ghostBomber,
   }: {
     color: CellValue;
     poison: number;
     bomber: boolean;
     magnetAura: boolean;
     size: number;
+    ghostType?: TetrominoType | 'W' | null;
+    ghostPoisonVariant?: number;
+    ghostBomber?: boolean;
   }) => {
-    if (poison > 0) {
+    if (poison > 0 && color !== null) {
       // Synced (no per-cell stagger) so poisoned cells share the same sprite frame,
       // like the Gen III battle poison overlay on a contiguous region.
       return (
@@ -61,6 +90,27 @@ const MemoizedCell = React.memo(
         />
       );
     }
+
+    if (color === null && ghostType) {
+      const isPoisoned = ghostPoisonVariant !== undefined && ghostPoisonVariant > 0;
+      const ghostCls = isPoisoned
+        ? POISON_GHOST_COLORS[Math.min(Math.max(ghostPoisonVariant, 1), 4)]
+        : GHOST_COLORS[ghostType];
+
+      return (
+        <div className="relative" style={{ width: size, height: size }}>
+          <div
+            className={`absolute inset-0 border-2 border-dashed ${ghostCls}`}
+          />
+          {ghostBomber && (
+            <span className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center text-[10px] opacity-35 leading-none">
+              💣
+            </span>
+          )}
+        </div>
+      );
+    }
+
     return (
       <div className="relative" style={{ width: size, height: size }} title={bomber ? 'Bomber' : undefined}>
         <div
@@ -134,11 +184,24 @@ const GameField = forwardRef<GameFieldRef, GameFieldProps>(({
   shadowColorClass,
   opacityClass = '',
   cellSize: cellSizeProp,
+  status = 'playing',
 }, ref) => {
   const activeEffects = player.activeEffects || [];
   const layoutCellSize = useContext(PlayfieldCellSizeContext);
   const cellSize = cellSizeProp ?? layoutCellSize;
   const [shakeClass, setShakeClass] = useState('');
+  const [rotationBlocked, setRotationBlocked] = useState(false);
+
+  useEffect(() => {
+    if (!player.activePiece?.isWildcard || !player.activePiece.rotationBlockedNonce) return;
+    setRotationBlocked(false);
+    const showTimer = window.setTimeout(() => setRotationBlocked(true), 10);
+    const hideTimer = window.setTimeout(() => setRotationBlocked(false), 420);
+    return () => {
+      window.clearTimeout(showTimer);
+      window.clearTimeout(hideTimer);
+    };
+  }, [player.activePiece?.isWildcard, player.activePiece?.rotationBlockedNonce]);
 
   useImperativeHandle(ref, () => ({
     shake(type: 'soft' | 'medium') {
@@ -152,11 +215,12 @@ const GameField = forwardRef<GameFieldRef, GameFieldProps>(({
     const rows = player.board.slice(BOARD_HIDDEN_ROWS, BOARD_HIDDEN_ROWS + BOARD_VISIBLE_ROWS).map((r) => [...r]);
     if (player.activePiece) {
       // This mirrors spawn orientation for client visuals; server remains authority.
-      for (const [dx, dy] of SHAPES[player.activePiece.type][player.activePiece.rotation]) {
+      const offsets = player.activePiece.customOffsets ?? SHAPES[player.activePiece.type][player.activePiece.rotation];
+      for (const [dx, dy] of offsets) {
         const x = player.activePiece.x + dx;
         const y = player.activePiece.y + dy - BOARD_HIDDEN_ROWS;
         if (y >= 0 && y < BOARD_VISIBLE_ROWS && x >= 0 && x < BOARD_COLS) {
-          rows[y][x] = player.activePiece.type;
+          rows[y][x] = player.activePiece.isWildcard ? 'W' : player.activePiece.type;
         }
       }
     }
@@ -176,7 +240,8 @@ const GameField = forwardRef<GameFieldRef, GameFieldProps>(({
       // The whole piece is a single poison type — the variant (1–4) chosen for
       // this Elixir event. Every cell it later infects keeps this same colour.
       const variant = player.activePiece.poisonVariant ?? 1;
-      for (const [dx, dy] of SHAPES[player.activePiece.type][player.activePiece.rotation]) {
+      const offsets = player.activePiece.customOffsets ?? SHAPES[player.activePiece.type][player.activePiece.rotation];
+      for (const [dx, dy] of offsets) {
         const x = player.activePiece.x + dx;
         const y = player.activePiece.y + dy - BOARD_HIDDEN_ROWS;
         if (y >= 0 && y < BOARD_VISIBLE_ROWS && x >= 0 && x < BOARD_COLS) {
@@ -192,7 +257,8 @@ const GameField = forwardRef<GameFieldRef, GameFieldProps>(({
       Array.from({ length: BOARD_COLS }, () => false),
     );
     if (player.activePiece?.bomber) {
-      for (const [dx, dy] of SHAPES[player.activePiece.type][player.activePiece.rotation]) {
+      const offsets = player.activePiece.customOffsets ?? SHAPES[player.activePiece.type][player.activePiece.rotation];
+      for (const [dx, dy] of offsets) {
         const x = player.activePiece.x + dx;
         const y = player.activePiece.y + dy - BOARD_HIDDEN_ROWS;
         if (y >= 0 && y < BOARD_VISIBLE_ROWS && x >= 0 && x < BOARD_COLS) {
@@ -210,7 +276,8 @@ const GameField = forwardRef<GameFieldRef, GameFieldProps>(({
     const pulled =
       (player.magnetPermanentStacks ?? 0) > 0 || (player.magnetPieceBoost ?? 0) > 0;
     if (player.activePiece && pulled) {
-      for (const [dx, dy] of SHAPES[player.activePiece.type][player.activePiece.rotation]) {
+      const offsets = player.activePiece.customOffsets ?? SHAPES[player.activePiece.type][player.activePiece.rotation];
+      for (const [dx, dy] of offsets) {
         const x = player.activePiece.x + dx;
         const y = player.activePiece.y + dy - BOARD_HIDDEN_ROWS;
         if (y >= 0 && y < BOARD_VISIBLE_ROWS && x >= 0 && x < BOARD_COLS) {
@@ -221,10 +288,76 @@ const GameField = forwardRef<GameFieldRef, GameFieldProps>(({
     return rows;
   }, [player.activePiece, player.magnetPermanentStacks, player.magnetPieceBoost]);
 
+  const ghostY = useMemo(() => {
+    if (!player.activePiece) return null;
+    const piece = { ...player.activePiece };
+    const getCellsLocal = (p: typeof piece) => {
+      if (p.customOffsets) {
+        return p.customOffsets.map(([dx, dy]) => ({ x: p.x + dx, y: p.y + dy }));
+      }
+      return SHAPES[p.type][p.rotation].map(([dx, dy]) => ({ x: p.x + dx, y: p.y + dy }));
+    };
+    const collidesLocal = (p: typeof piece) => {
+      for (const cell of getCellsLocal(p)) {
+        if (cell.x < 0 || cell.x >= BOARD_COLS || cell.y >= BOARD_ROWS) return true;
+        if (cell.y >= 0 && player.board[cell.y][cell.x] !== null) return true;
+      }
+      return false;
+    };
+    while (!collidesLocal(piece)) {
+      piece.y += 1;
+    }
+    return piece.y - 1;
+  }, [player.activePiece, player.board]);
+
+  const ghostCells = useMemo(() => {
+    const cells = new Map<string, { type: TetrominoType | 'W'; poisoned?: boolean; poisonVariant?: number; bomber?: boolean }>();
+    if (status !== 'playing' || player.tectonicShiftNextStepTick != null) {
+      return cells;
+    }
+    if (!player.activePiece || ghostY === null || ghostY === player.activePiece.y) {
+      return cells;
+    }
+    const offsets = player.activePiece.customOffsets ?? SHAPES[player.activePiece.type][player.activePiece.rotation];
+    const type = player.activePiece.isWildcard ? 'W' : player.activePiece.type;
+    const poisoned = player.activePiece.poisoned;
+    const poisonVariant = player.activePiece.poisonVariant;
+    const bomber = player.activePiece.bomber;
+
+    for (const [dx, dy] of offsets) {
+      const x = player.activePiece.x + dx;
+      const y = ghostY + dy - BOARD_HIDDEN_ROWS;
+      if (y >= 0 && y < BOARD_VISIBLE_ROWS && x >= 0 && x < BOARD_COLS) {
+        cells.set(`${x},${y}`, { type, poisoned, poisonVariant, bomber });
+      }
+    }
+    return cells;
+  }, [player.activePiece, ghostY, status, player.tectonicShiftNextStepTick]);
+
+  const wildcardSourceOutline = useMemo(() => {
+    const sourceCells = player.customNextPieceSourceCells;
+    if (!sourceCells || sourceCells.length === 0) return [];
+
+    const visible = sourceCells
+      .map(([x, y]) => ({ x, y: y - BOARD_HIDDEN_ROWS }))
+      .filter(({ x, y }) => x >= 0 && x < BOARD_COLS && y >= 0 && y < BOARD_VISIBLE_ROWS);
+    const occupied = new Set(visible.map(({ x, y }) => `${x},${y}`));
+    const edges: Array<[number, number, number, number]> = [];
+
+    for (const { x, y } of visible) {
+      if (!occupied.has(`${x},${y - 1}`)) edges.push([x, y, x + 1, y]);
+      if (!occupied.has(`${x + 1},${y}`)) edges.push([x + 1, y, x + 1, y + 1]);
+      if (!occupied.has(`${x},${y + 1}`)) edges.push([x, y + 1, x + 1, y + 1]);
+      if (!occupied.has(`${x - 1},${y}`)) edges.push([x, y, x, y + 1]);
+    }
+    return edges;
+  }, [player.customNextPieceSourceCells]);
+
   const maxActiveVisibleRow = useMemo(() => {
     if (!player.activePiece) return null;
+    const offsets = player.activePiece.customOffsets ?? SHAPES[player.activePiece.type][player.activePiece.rotation];
     return Math.max(
-      ...SHAPES[player.activePiece.type][player.activePiece.rotation].map(([, dy]) => player.activePiece!.y + dy - BOARD_HIDDEN_ROWS),
+      ...offsets.map(([, dy]) => player.activePiece!.y + dy - BOARD_HIDDEN_ROWS),
     );
   }, [player.activePiece]);
 
@@ -338,18 +471,50 @@ const GameField = forwardRef<GameFieldRef, GameFieldProps>(({
           style={{ gridTemplateColumns: `repeat(${BOARD_COLS}, ${cellSize}px)` }}
         >
           {visibleRows.flatMap((row, y) =>
-            row.map((cell, x) => (
-              <MemoizedCell
-                key={`${x}-${y}`}
-                color={cell}
-                poison={visiblePoison[y][x]}
-                bomber={visibleBomber[y][x]}
-                magnetAura={visibleMagnetAura[y][x]}
-                size={cellSize}
-              />
-            )),
+            row.map((cell, x) => {
+              const ghost = ghostCells.get(`${x},${y}`);
+              return (
+                <MemoizedCell
+                  key={`${x}-${y}`}
+                  color={cell}
+                  poison={visiblePoison[y][x]}
+                  bomber={visibleBomber[y][x]}
+                  magnetAura={visibleMagnetAura[y][x]}
+                  size={cellSize}
+                  ghostType={ghost?.type}
+                  ghostPoisonVariant={ghost?.poisoned ? ghost.poisonVariant : undefined}
+                  ghostBomber={ghost?.bomber}
+                />
+              );
+            }),
           )}
         </div>
+        {wildcardSourceOutline.length > 0 && (
+          <svg
+            className="pointer-events-none absolute inset-0 z-20 overflow-visible"
+            width={BOARD_COLS * cellSize}
+            height={BOARD_VISIBLE_ROWS * cellSize}
+            aria-label="Selected puzzle-piece source shape"
+          >
+            {wildcardSourceOutline.map(([x1, y1, x2, y2], index) => (
+              <line
+                key={`${x1}-${y1}-${x2}-${y2}-${index}`}
+                className="wildcard-source-outline"
+                x1={x1 * cellSize}
+                y1={y1 * cellSize}
+                x2={x2 * cellSize}
+                y2={y2 * cellSize}
+              />
+            ))}
+          </svg>
+        )}
+        {rotationBlocked && (
+          <div className="pointer-events-none absolute inset-x-0 top-2 z-30 flex justify-center">
+            <span className="wildcard-rotation-blocked rounded border border-rose-200/80 bg-rose-950/90 px-2 py-1 font-mono text-[10px] font-bold uppercase tracking-widest text-rose-100">
+              rotation blocked
+            </span>
+          </div>
+        )}
       </div>
       {isMe && (
         <div
@@ -397,7 +562,8 @@ export default React.memo(GameField, (prev, next) => {
   if (
     prev.isMe !== next.isMe ||
     prev.title !== next.title ||
-    prev.cellSize !== next.cellSize
+    prev.cellSize !== next.cellSize ||
+    prev.status !== next.status
   ) {
     return false;
   }
@@ -419,7 +585,8 @@ export default React.memo(GameField, (prev, next) => {
     pA.magnetPermanentStacks !== pB.magnetPermanentStacks ||
     pA.magnetPieceBoost !== pB.magnetPieceBoost ||
     pA.snagHardDropBlocked !== pB.snagHardDropBlocked ||
-    pA.pieceHasHardDropped !== pB.pieceHasHardDropped
+    pA.pieceHasHardDropped !== pB.pieceHasHardDropped ||
+    pA.tectonicShiftNextStepTick !== pB.tectonicShiftNextStepTick
   ) {
     return false;
   }
@@ -435,10 +602,16 @@ export default React.memo(GameField, (prev, next) => {
       aA.type !== aB.type ||
       !!aA.poisoned !== !!aB.poisoned ||
       aA.poisonVariant !== aB.poisonVariant ||
-      !!aA.bomber !== !!aB.bomber
+      !!aA.bomber !== !!aB.bomber ||
+      aA.rotationBlockedNonce !== aB.rotationBlockedNonce ||
+      JSON.stringify(aA.customOffsets) !== JSON.stringify(aB.customOffsets)
     ) {
       return false;
     }
+  }
+
+  if (JSON.stringify(pA.customNextPieceSourceCells) !== JSON.stringify(pB.customNextPieceSourceCells)) {
+    return false;
   }
 
   for (let y = 0; y < pA.board.length; y++) {

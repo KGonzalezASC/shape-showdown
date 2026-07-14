@@ -75,9 +75,15 @@
           An interactive rendering of all unique final poisoned group shapes when a piece lands in different columns and rotations on the sample step-pyramid board.
         </p>
       </div>
-      <div class="glass-panel px-6 py-4 rounded-2xl text-center md:text-right shrink-0">
-        <span class="text-xs uppercase tracking-wider text-zinc-500 font-semibold block">Total Unique Combinations</span>
-        <span id="total-variations-badge" class="text-4xl font-extrabold text-emerald-400 font-mono">---</span>
+      <div class="flex gap-4 shrink-0 flex-wrap justify-center md:justify-end">
+        <div class="glass-panel px-5 py-3.5 rounded-2xl text-center md:text-right">
+          <span class="text-[10px] uppercase tracking-wider text-zinc-500 font-semibold block mb-0.5">Unique Wildcard Shapes (Cap: 6)</span>
+          <span id="total-wildcard-badge" class="text-3xl font-extrabold text-fuchsia-400 font-mono">---</span>
+        </div>
+        <div class="glass-panel px-5 py-3.5 rounded-2xl text-center md:text-right">
+          <span class="text-[10px] uppercase tracking-wider text-zinc-500 font-semibold block mb-0.5">Total Unique Poison Layouts</span>
+          <span id="total-variations-badge" class="text-3xl font-extrabold text-emerald-400 font-mono">---</span>
+        </div>
       </div>
     </header>
 
@@ -99,6 +105,12 @@
           <div>• Bounded by <span class="font-mono text-zinc-300">POISON_GENERATIONS = 4</span> (Seed + 3 waves).</div>
           <div>• Propagates orthogonally (up/down/left/right).</div>
           <div>• Infects existing stack blocks only (no empty cells).</div>
+          <div class="border-t border-white/5 my-1.5"></div>
+          <div class="font-bold text-zinc-400 mb-1">Wildcard Shape Rules:</div>
+          <div>• Selects largest 4-connected component.</div>
+          <div>• Truncated to <span class="font-mono text-zinc-300">max 6 cells</span> via top-left preference BFS.</div>
+          <div class="flex items-center gap-1.5 mt-2"><span class="w-2.5 h-2.5 rounded bg-emerald-500"></span> <span>Poison (discarded)</span></div>
+          <div class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded bg-fuchsia-500 animate-pulse"></span> <span>Extracted Shape (W)</span></div>
         </div>
       </aside>
 
@@ -246,6 +258,163 @@
       }
     }
 
+    // Pre-calculate poison spread step-by-step frames
+    function getPoisonSpreadFrames(board, initialPoison) {
+      const frames = [];
+      let currentPoison = initialPoison.map(row => [...row]);
+      frames.push(currentPoison.map(row => [...row]));
+
+      const waves = POISON_GENERATIONS - 1;
+      for (let gen = 0; gen < waves; gen++) {
+        const newlyPoisoned = [];
+        for (let y = 0; y < BOARD_ROWS; y++) {
+          for (let x = 0; x < BOARD_COLS; x++) {
+            if (currentPoison[y][x] !== 0) continue;
+            if (board[y][x] === null) continue;
+            const adj =
+              (y > 0 && currentPoison[y - 1][x] !== 0) ||
+              (y < BOARD_ROWS - 1 && currentPoison[y + 1][x] !== 0) ||
+              (x > 0 && currentPoison[y][x - 1] !== 0) ||
+              (x < BOARD_COLS - 1 && currentPoison[y][x + 1] !== 0);
+            if (adj) newlyPoisoned.push([y, x]);
+          }
+        }
+        if (newlyPoisoned.length === 0) {
+          while (frames.length < POISON_GENERATIONS) {
+            frames.push(currentPoison.map(row => [...row]));
+          }
+          break;
+        }
+        for (const [y, x] of newlyPoisoned) {
+          currentPoison[y][x] = 1;
+        }
+        frames.push(currentPoison.map(row => [...row]));
+      }
+      return frames;
+    }
+
+    function generateAnimationFrames(board, cells, wildcardCells) {
+      const frames = [];
+      
+      // Frame 0 (Index 0): Piece landed, but no poison seeded yet (draw in silver/white)
+      const emptyPoison = Array.from({ length: BOARD_ROWS }, () => Array(BOARD_COLS).fill(0));
+      frames.push({
+        poison: emptyPoison,
+        wildcardCount: 0,
+        showActivePiece: true
+      });
+
+      // Seed locked piece
+      const poisonFrame0 = Array.from({ length: BOARD_ROWS }, () => Array(BOARD_COLS).fill(0));
+      for (const cell of cells) {
+        poisonFrame0[cell.y][cell.x] = 1;
+      }
+      
+      // Frame 1-4 (Indices 1-4): BFS Spread Waves
+      const poisonSpread = getPoisonSpreadFrames(board, poisonFrame0);
+      for (let f = 0; f < 4; f++) {
+        frames.push({
+          poison: poisonSpread[f],
+          wildcardCount: 0,
+          showActivePiece: false
+        });
+      }
+      
+      // Frame 5+ (Indices 5+): Incremental Wildcard extraction
+      const finalPoison = poisonSpread[3];
+      const wcCount = wildcardCells.length;
+      for (let w = 1; w <= wcCount; w++) {
+        frames.push({
+          poison: finalPoison,
+          wildcardCount: w,
+          showActivePiece: false
+        });
+      }
+      
+      return frames;
+    }
+
+    // New component finding and truncation rules
+    function findLargestPoisonComponent(poison) {
+      const visited = Array.from({ length: BOARD_ROWS }, () => Array(BOARD_COLS).fill(false));
+      let best = null;
+      let bestVariant = 0;
+
+      for (let y = 0; y < BOARD_ROWS; y++) {
+        for (let x = 0; x < BOARD_COLS; x++) {
+          const variant = poison[y]?.[x] ?? 0;
+          if (variant <= 0 || visited[y][x]) continue;
+
+          const cells = [];
+          const queue = [{ x, y }];
+          visited[y][x] = true;
+          while (queue.length > 0) {
+            const cur = queue.shift();
+            cells.push(cur);
+            for (const [nx, ny] of [
+              [cur.x + 1, cur.y],
+              [cur.x - 1, cur.y],
+              [cur.x, cur.y + 1],
+              [cur.x, cur.y - 1],
+            ]) {
+              if (ny < 0 || ny >= BOARD_ROWS || nx < 0 || nx >= BOARD_COLS) continue;
+              if (visited[ny][nx]) continue;
+              if ((poison[ny]?.[nx] ?? 0) !== variant) continue;
+              visited[ny][nx] = true;
+              queue.push({ x: nx, y: ny });
+            }
+          }
+
+          const betterSize = !best || cells.length > best.length;
+          const betterTie =
+            !!best &&
+            cells.length === best.length &&
+            (cells[0].y < best[0].y || (cells[0].y === best[0].y && cells[0].x < best[0].x));
+          if (betterSize || betterTie) {
+            best = cells;
+            bestVariant = variant;
+          }
+        }
+      }
+
+      if (!best) return null;
+      return { cells: best, variant: bestVariant };
+    }
+
+    function truncateConnectedPoisonCells(cells, maxCells) {
+      if (cells.length <= maxCells) return cells;
+      const inGroup = new Set(cells.map((c) => `${c.x},${c.y}`));
+      const seed = [...cells].sort((a, b) => a.y - b.y || a.x - b.x)[0];
+      const out = [];
+      const visited = new Set([`${seed.x},${seed.y}`]);
+      const queue = [seed];
+      while (queue.length > 0 && out.length < maxCells) {
+        const cur = queue.shift();
+        out.push(cur);
+        const neighbors = [
+          { x: cur.x + 1, y: cur.y },
+          { x: cur.x - 1, y: cur.y },
+          { x: cur.x, y: cur.y + 1 },
+          { x: cur.x, y: cur.y - 1 },
+        ].sort((a, b) => a.y - b.y || a.x - b.x);
+        for (const n of neighbors) {
+          const key = `${n.x},${n.y}`;
+          if (!inGroup.has(key) || visited.has(key)) continue;
+          visited.add(key);
+          queue.push(n);
+        }
+      }
+      return out;
+    }
+
+    function poisonCellsToOffsets(cells) {
+      const minX = Math.min(...cells.map((c) => c.x));
+      const minY = Math.min(...cells.map((c) => c.y));
+      return cells
+        .map((c) => [c.x - minX, c.y - minY])
+        .sort((a, b) => a[1] - b[1] || a[0] - b[0]);
+    }
+
     function poisonKey(poisonBoard) {
       const coords = [];
       for (let y = 0; y < BOARD_ROWS; y++) {
@@ -259,6 +428,7 @@
     // Generate variations database
     const variationsDb = {};
     let grandTotal = 0;
+    const globalUniqueWildcards = new Set();
 
     TYPES.forEach((type) => {
       const seen = new Map();
@@ -293,9 +463,32 @@
           // Run BFS spread
           runPoisonSpread(board, poison, 1);
 
+          // Extract wildcard custom offsets under maxCells=6 rules
+          const component = findLargestPoisonComponent(poison);
+          let wildcardCells = [];
+          let wildcardOffsets = [];
+          if (component) {
+            wildcardCells = truncateConnectedPoisonCells(component.cells, 6);
+            wildcardOffsets = poisonCellsToOffsets(wildcardCells);
+            globalUniqueWildcards.add(JSON.stringify(wildcardOffsets));
+          }
+
+          // Pre-generate animation frames (silver lock state + spread waves + extraction BFS)
+          const frames = generateAnimationFrames(board, cells, wildcardCells);
+
           const key = poisonKey(poison);
           if (!seen.has(key)) {
-            seen.set(key, { rotation: rot, x, y: landY, cells, board, poison });
+            seen.set(key, { 
+              rotation: rot, 
+              x, 
+              y: landY, 
+              cells, 
+              board, 
+              poison,
+              wildcardCells,
+              wildcardOffsets,
+              frames
+            });
           }
         }
       }
@@ -304,9 +497,111 @@
     });
 
     document.getElementById('total-variations-badge').textContent = grandTotal;
+    document.getElementById('total-wildcard-badge').textContent = globalUniqueWildcards.size;
 
     // Interactive view controller
     let currentPiece = 'I';
+    const activeIntervals = new Map();
+
+    function runCardAnimation(cardIndex, variant) {
+      // Clear any running interval for this card
+      if (activeIntervals.has(cardIndex)) {
+        clearInterval(activeIntervals.get(cardIndex));
+      }
+
+      let frameIndex = 0;
+      const frames = variant.frames;
+      const totalFrames = frames.length;
+
+      const statusBadge = document.getElementById(`status-badge-${cardIndex}`);
+      const btn = document.getElementById(`replay-btn-${cardIndex}`);
+
+      if (btn) {
+        btn.classList.add('opacity-50', 'pointer-events-none');
+        btn.textContent = 'Playing';
+      }
+
+      function updateFrame() {
+        if (frameIndex >= totalFrames) {
+          clearInterval(activeIntervals.get(cardIndex));
+          activeIntervals.delete(cardIndex);
+          
+          if (statusBadge) {
+            statusBadge.textContent = 'Extracted!';
+            statusBadge.className = 'font-mono text-[9px] px-1.5 py-0.5 rounded-md bg-fuchsia-500/10 border border-fuchsia-500/20 text-fuchsia-400';
+          }
+          if (btn) {
+            btn.classList.remove('opacity-50', 'pointer-events-none');
+            btn.textContent = '🔄 Replay';
+          }
+          return;
+        }
+
+        const frame = frames[frameIndex];
+
+        // Update status text
+        if (statusBadge) {
+          if (frameIndex === 0) {
+            statusBadge.textContent = 'Locking...';
+            statusBadge.className = 'font-mono text-[9px] px-1.5 py-0.5 rounded-md bg-zinc-500/10 border border-zinc-500/20 text-zinc-400';
+          } else if (frameIndex <= 4) {
+            statusBadge.textContent = `Spreading W${frameIndex - 1}...`;
+            statusBadge.className = 'font-mono text-[9px] px-1.5 py-0.5 rounded-md bg-emerald-500/10 border border-emerald-500/20 text-emerald-400';
+          } else {
+            statusBadge.textContent = `Extracting ${frameIndex - 4}/6...`;
+            statusBadge.className = 'font-mono text-[9px] px-1.5 py-0.5 rounded-md bg-fuchsia-500/10 border border-fuchsia-500/20 text-fuchsia-400';
+          }
+        }
+
+        // Render cell styles by element ID
+        for (let y = printStartRow; y <= bottomRow; y++) {
+          for (let x = 0; x < BOARD_COLS; x++) {
+            const cellEl = document.getElementById(`cell-${cardIndex}-${y}-${x}`);
+            if (!cellEl) continue;
+
+            const isLockedPieceCell = variant.cells.some(c => c.x === x && c.y === y);
+            const isFilled = variant.board[y][x] !== null;
+            const hasPoison = frame.poison[y][x] !== 0;
+
+            let colorClass = 'bg-zinc-900/60';
+            let borderClass = 'border-transparent';
+
+            if (frame.showActivePiece && isLockedPieceCell) {
+              colorClass = 'bg-zinc-100 border-zinc-200 shadow-[0_0_8px_rgba(255,255,255,0.4)]';
+              borderClass = 'border-zinc-300';
+            } else if (hasPoison) {
+              let isWildcard = false;
+              for (let i = 0; i < frame.wildcardCount; i++) {
+                if (variant.wildcardCells[i] && variant.wildcardCells[i].x === x && variant.wildcardCells[i].y === y) {
+                  isWildcard = true;
+                  break;
+                }
+              }
+              if (isWildcard) {
+                colorClass = 'bg-gradient-to-br from-fuchsia-500 to-pink-400 poison-glow';
+                borderClass = 'border-fuchsia-300/40';
+              } else {
+                colorClass = 'bg-gradient-to-br from-emerald-500 to-teal-400';
+                borderClass = 'border-emerald-300/20';
+              }
+            } else if (isFilled) {
+              colorClass = 'bg-zinc-600/80';
+            }
+
+            cellEl.className = `w-3.5 h-3.5 rounded-[3px] border ${borderClass} ${colorClass}`;
+          }
+        }
+
+        frameIndex++;
+      }
+
+      // Initial update
+      updateFrame();
+
+      // Run step transitions
+      const interval = setInterval(updateFrame, 280);
+      activeIntervals.set(cardIndex, interval);
+    }
 
     function renderSelector() {
       const container = document.getElementById('piece-tabs');
@@ -332,6 +627,10 @@
     }
 
     function selectPiece(type) {
+      // Clean up running intervals
+      activeIntervals.forEach((interval) => clearInterval(interval));
+      activeIntervals.clear();
+
       currentPiece = type;
       renderSelector();
       renderVariations();
@@ -349,44 +648,50 @@
         const card = document.createElement('div');
         card.className = 'glass-card p-4 rounded-2xl flex flex-col items-center gap-3 select-none';
 
-        // Calculate total poisoned blocks count
-        const poisonCount = variant.poison.flat().filter((v) => v !== 0).length;
-
-        // Render mini-board Y-lines 31 to 39
+        // Render initial empty grids (filled cells in grey, others in empty)
         let boardHtml = '<div class="grid grid-cols-10 gap-0.5 border border-white/5 bg-black/60 p-1.5 rounded-xl">';
         for (let y = printStartRow; y <= bottomRow; y++) {
           for (let x = 0; x < BOARD_COLS; x++) {
-            const hasPoison = variant.poison[y][x] !== 0;
             const isFilled = variant.board[y][x] !== null;
-            
-            let colorClass = 'bg-zinc-900/60';
-            let borderClass = 'border-transparent';
-
-            if (hasPoison) {
-              colorClass = 'bg-gradient-to-br from-emerald-500 to-teal-400 poison-glow';
-              borderClass = 'border-emerald-300/40';
-            } else if (isFilled) {
-              colorClass = 'bg-zinc-600/80';
-            }
-
-            boardHtml += `<div class="w-3.5 h-3.5 rounded-[3px] border ${borderClass} ${colorClass}"></div>`;
+            let colorClass = isFilled ? 'bg-zinc-600/80' : 'bg-zinc-900/60';
+            boardHtml += `<div id="cell-${index}-${y}-${x}" class="w-3.5 h-3.5 rounded-[3px] border border-transparent ${colorClass}"></div>`;
           }
         }
         boardHtml += '</div>';
 
+        // Format wildcard offsets list for display
+        const offsetString = variant.wildcardOffsets.map(o => `[${o[0]},${o[1]}]`).join(', ');
+
         card.innerHTML = `
-          <div class="flex items-center justify-between w-full border-b border-white/5 pb-2 text-xs font-semibold">
-            <span class="text-zinc-400">Var ${index + 1}</span>
-            <span class="font-mono text-emerald-400 px-1.5 py-0.5 rounded-md bg-emerald-500/10 border border-emerald-500/20">${poisonCount} poisoned</span>
+          <div class="flex items-center justify-between w-full border-b border-white/5 pb-2">
+            <span class="text-zinc-400 text-[10px] font-semibold">Var ${index + 1}</span>
+            <div class="flex items-center gap-1.5">
+              <span id="status-badge-${index}" class="font-mono text-[9px] px-1.5 py-0.5 rounded-md bg-zinc-500/10 border border-zinc-500/20 text-zinc-400">Locking...</span>
+              <button id="replay-btn-${index}" class="text-[9px] text-zinc-300 hover:text-white bg-zinc-800 hover:bg-zinc-700 px-1.5 py-0.5 rounded border border-white/5 transition-all">
+                🔄 Replay
+              </button>
+            </div>
           </div>
           ${boardHtml}
-          <div class="w-full flex items-center justify-between text-[10px] font-mono text-zinc-500 mt-1">
-            <span>Rot: <strong class="text-zinc-300 font-bold">${variant.rotation}</strong></span>
-            <span>X: <strong class="text-zinc-300 font-bold">${variant.x}</strong></span>
-            <span>Y: <strong class="text-zinc-300 font-bold">${variant.y}</strong></span>
+          <div class="w-full flex flex-col gap-1 text-[9px] font-mono text-zinc-500 mt-1">
+            <div class="flex items-center justify-between">
+              <span>Rot: <strong class="text-zinc-300 font-bold">${variant.rotation}</strong></span>
+              <span>X: <strong class="text-zinc-300 font-bold">${variant.x}</strong></span>
+              <span>Y: <strong class="text-zinc-300 font-bold">${variant.y}</strong></span>
+            </div>
+            <div class="text-fuchsia-300/80 truncate leading-relaxed mt-0.5">
+              Offsets: ${offsetString}
+            </div>
           </div>
         `;
+        
         container.appendChild(card);
+
+        // Bind Replay Button event listener
+        card.querySelector(`#replay-btn-${index}`).onclick = () => runCardAnimation(index, variant);
+
+        // Trigger animation immediately on load
+        runCardAnimation(index, variant);
       });
     }
 

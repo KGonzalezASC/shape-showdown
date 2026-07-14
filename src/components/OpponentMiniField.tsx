@@ -17,6 +17,7 @@ const COLORS: Record<Exclude<CellValue, null>, string> = {
   T: 'bg-purple-400',
   Z: 'bg-red-500',
   G: 'bg-zinc-500',
+  W: 'bg-fuchsia-500',
 };
 
 const MemoizedMiniCell = React.memo(({ color }: { color: CellValue }) => (
@@ -76,11 +77,12 @@ const OpponentMiniField: React.FC<OpponentMiniFieldProps> = ({ player, pendingGa
     if (!player) return null;
     const rows = player.board.slice(BOARD_HIDDEN_ROWS, BOARD_HIDDEN_ROWS + BOARD_VISIBLE_ROWS).map((r) => [...r]);
     if (player.activePiece) {
-      for (const [dx, dy] of SHAPES[player.activePiece.type][player.activePiece.rotation]) {
+      const offsets = player.activePiece.customOffsets ?? SHAPES[player.activePiece.type][player.activePiece.rotation];
+      for (const [dx, dy] of offsets) {
         const x = player.activePiece.x + dx;
         const y = player.activePiece.y + dy - BOARD_HIDDEN_ROWS;
         if (y >= 0 && y < BOARD_VISIBLE_ROWS && x >= 0 && x < BOARD_COLS) {
-          rows[y][x] = player.activePiece.type;
+          rows[y][x] = player.activePiece.isWildcard ? 'W' : player.activePiece.type;
         }
       }
     }
@@ -151,7 +153,8 @@ export default React.memo(OpponentMiniField, (prev, next) => {
       aA.x !== aB.x ||
       aA.y !== aB.y ||
       aA.rotation !== aB.rotation ||
-      aA.type !== aB.type
+      aA.type !== aB.type ||
+      aA.isWildcard !== aB.isWildcard
     ) {
       return false;
     }

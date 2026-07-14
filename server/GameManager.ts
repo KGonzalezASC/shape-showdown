@@ -124,6 +124,8 @@ export class GameManager {
       const opponentId = pids.find((id) => id !== socket.id);
       const opponent = opponentId ? this.gameState.players[opponentId] : null;
       applyShopPurchase(this.gameState, buyer, opponent, itemId);
+      // Flush immediately so cascade / pills aren't held back by the 30Hz netcast.
+      this.io.emit('gameState', this.gameState);
     });
 
     socket.on("disconnect", () => {
@@ -162,7 +164,11 @@ export class GameManager {
       prevStatus = this.gameState.status;
 
       const active = this.gameState.status === 'playing' || this.gameState.status === 'countdown';
-      const interval = active ? this.netcastEveryNTicks : this.lobbyNetcastEveryNTicks;
+      const cascading = Object.values(this.gameState.players).some(
+        (p) => p.tectonicShiftNextStepTick != null,
+      );
+      // Cascade is only readable if clients see every gravity step (60Hz while active).
+      const interval = cascading ? 1 : active ? this.netcastEveryNTicks : this.lobbyNetcastEveryNTicks;
       if (statusChanged || sinceEmit >= interval) {
         sinceEmit = 0;
         this.io.emit('gameState', this.gameState);
@@ -232,18 +238,8 @@ export class GameManager {
       }
     } else if (this.gameState.status === 'playing') {
       this.gameState.tick += 1;
-      this.gameState.remainingTime -= tickSeconds();
-      if (this.gameState.remainingTime <= 0) {
-        this.gameState.status = 'ended';
-        this.gameState.restartTimer = RESTART_DELAY_SECONDS;
-        const pIds = Object.keys(this.gameState.players);
-        if (pIds.length === 2) {
-          const p1 = this.gameState.players[pIds[0]];
-          const p2 = this.gameState.players[pIds[1]];
-          this.gameState.winnerId = p1.score > p2.score ? p1.id : (p2.score > p1.score ? p2.id : 'draw');
-        }
-        this.saveReplay();
-      }
+      this.gameState.remainingTime = Math.max(0, this.gameState.remainingTime - tickSeconds());
+
 
       const matchEvents: MatchEvent[] = [];
       const pids = Object.keys(this.gameState.players);

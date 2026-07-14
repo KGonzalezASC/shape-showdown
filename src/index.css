@@ -180,6 +180,30 @@ html, body, #root {
   box-shadow: inset 0 0 6px rgba(0, 0, 0, 0.4), 0 0 7px rgba(94, 234, 212, 0.7);
 }
 
+@keyframes wildcard-source-dash {
+  to { stroke-dashoffset: -12; }
+}
+
+@keyframes wildcard-rotation-blocked {
+  0%, 100% { opacity: 0; transform: translateY(-4px) scale(0.94); }
+  18%, 82% { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.wildcard-source-outline {
+  fill: none;
+  stroke: rgb(250 232 255);
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-dasharray: 2 4;
+  filter: drop-shadow(0 0 3px rgba(217, 70, 239, 0.95));
+  animation: wildcard-source-dash 0.7s linear infinite;
+}
+
+.wildcard-rotation-blocked {
+  animation: wildcard-rotation-blocked 0.42s ease-out both;
+  box-shadow: 0 0 12px rgba(251, 113, 133, 0.75);
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
@@ -196,5 +220,10 @@ html, body, #root {
     animation:
       poison-sprite 0.64s steps(8) infinite,
       poison-glow 1.1s ease-in-out infinite !important;
+  }
+
+  .wildcard-source-outline,
+  .wildcard-rotation-blocked {
+    animation: none !important;
   }
 }
