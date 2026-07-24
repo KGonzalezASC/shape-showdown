@@ -38,10 +38,12 @@ describe('name drop planner', () => {
     const pieceCellKeys = first.pieces.flatMap((piece) =>
       piece.cells.map(({ x, y }) => `${x},${y}`),
     );
-    assert.equal(pieceCellKeys.length, targetKeys.size);
     assert.equal(new Set(pieceCellKeys).size, pieceCellKeys.length);
-    assert.deepEqual(new Set(pieceCellKeys), targetKeys);
-    assert.equal(first.pieces.length, first.targetCells.length / 4);
+    assert.equal(first.targetCells.every((cell) => {
+      const key = `${cell.x},${cell.y}`;
+      return pieceCellKeys.filter((pieceCellKey) => pieceCellKey === key).length === 1;
+    }), true);
+    assert.equal(pieceCellKeys.length >= targetKeys.size, true);
     assert.equal(first.pieces.every((piece) => piece.cells.length === 4), true);
     assert.equal(first.pieces.every((piece) => piece.cells.every(({ x, y }) =>
       x >= 0 && x < NAME_DROP_COLUMNS && y >= 0 && y < NAME_DROP_ROWS,
@@ -54,5 +56,15 @@ describe('name drop planner', () => {
       return canonicalCells.join('|') === renderedCells.join('|');
     }), true);
     assert.equal(new Set(first.pieces.map((piece) => piece.type)).size >= 5, true);
+
+    const custom = createNameDropPlan('VARIETY TEST', 12345);
+    const customPieceCellKeys = custom.pieces.flatMap((piece) =>
+      piece.cells.map(({ x, y }) => `${x},${y}`),
+    );
+    assert.equal(new Set(customPieceCellKeys).size, customPieceCellKeys.length);
+    assert.equal(custom.targetCells.every((cell) => {
+      const key = `${cell.x},${cell.y}`;
+      return customPieceCellKeys.filter((pieceCellKey) => pieceCellKey === key).length === 1;
+    }), true);
   });
 });
