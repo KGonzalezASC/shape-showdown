@@ -1,23 +1,27 @@
-import { rngInt, makeRng } from '../rng';
+import { makeRng, rngInt, type MutableRng } from '../rng';
 import { PIECE_SEQUENCE, SHAPES, type ShapeOffset } from '../tetris/shapes';
-import type { TetrominoType } from '../types';
+import type { RotationState, TetrominoType } from '../types';
 
 /**
- * Landing-only adapter: it reuses the engine's canonical shapes and seeded RNG
- * while keeping the decorative page independent of the server match loop. If
- * this becomes interactive, its placement loop should move behind stepPlayer.
+ * Landing-only adapter: use the engine's canonical shapes and seeded RNG while
+ * keeping this decorative page independent of Socket.IO and the match loop.
  */
-export const NAME_DROP_COLUMNS = 32;
-export const NAME_DROP_ROWS = 16;
+export const NAME_DROP_COLUMNS = 64;
+export const NAME_DROP_ROWS = 28;
 export const NAME_DROP_GLYPH_WIDTH = 3;
 export const NAME_DROP_GLYPH_HEIGHT = 5;
-export const NAME_DROP_LINE_GAP = 1;
-export const NAME_DROP_PIECE_GAP_MS = 92;
-export const NAME_DROP_FALL_MS = 560;
+export const NAME_DROP_PIXEL_SCALE = 2;
+export const NAME_DROP_LETTER_GAP = 2;
+export const NAME_DROP_LINE_GAP = 4;
+export const NAME_DROP_PIECE_GAP_MS = 96;
+export const NAME_DROP_FALL_MS = 760;
 
 type Glyph = readonly string[];
 
-/** A compact five-row bitmap font: small enough to fit a full brand name on the showcase grid. */
+/**
+ * Each lit font pixel expands to 2×2 board cells. That guarantees an O-piece
+ * fallback while the exact-cover solver searches for more varied tetrominoes.
+ */
 const GLYPHS: Record<string, Glyph> = {
   A: ['010', '101', '111', '101', '101'],
   B: ['110', '101', '110', '101', '110'],
@@ -66,11 +70,10 @@ export interface NameDropCell {
 
 export interface NameDropPiece {
   type: TetrominoType;
-  rotation: 0 | 1 | 2 | 3;
+  rotation: RotationState;
   x: number;
   y: number;
   cells: NameDropCell[];
-  revealCells: NameDropCell[];
   delayMs: number;
   durationMs: number;
 }
@@ -81,6 +84,19 @@ export interface NameDropPlan {
   targetCells: NameDropCell[];
   pieces: NameDropPiece[];
   totalDurationMs: number;
+}
+
+interface GlyphPlacement {
+  cells: NameDropCell[];
+}
+
+interface TilingCandidate {
+  type: TetrominoType;
+  rotation: RotationState;
+  x: number;
+  y: number;
+  cells: NameDropCell[];
+  candidatePriority: number;
 }
 
 export function normalizeName(value: string): string {
@@ -96,16 +112,24 @@ function glyphFor(character: string): Glyph {
   return GLYPHS[character] ?? GLYPHS[' '];
 }
 
-function glyphWidth(character: string): number {
-  return glyphFor(character)[0]?.length ?? NAME_DROP_GLYPH_WIDTH;
+function scaledGlyphWidth(character: string): number {
+  return (glyphFor(character)[0]?.length ?? NAME_DROP_GLYPH_WIDTH) * NAME_DROP_PIXEL_SCALE;
 }
 
 function lineWidth(line: string): number {
-  return [...line].reduce((width, character, index) => width + glyphWidth(character) + (index > 0 ? 1 : 0), 0);
+  return [...line].reduce(
+    (width, character, index) =>
+      width + scaledGlyphWidth(character) + (index > 0 ? NAME_DROP_LETTER_GAP : 0),
+    0,
+  );
 }
 
 function maxCharactersPerLine(): number {
-  return Math.max(1, Math.floor((NAME_DROP_COLUMNS + 1) / (NAME_DROP_GLYPH_WIDTH + 1)));
+  const scaledWidth = NAME_DROP_GLYPH_WIDTH * NAME_DROP_PIXEL_SCALE;
+  return Math.max(
+    1,
+    Math.floor((NAME_DROP_COLUMNS + NAME_DROP_LETTER_GAP) / (scaledWidth + NAME_DROP_LETTER_GAP)),
+  );
 }
 
 function fitWithEllipsis(value: string): string {
@@ -118,7 +142,7 @@ function fitWithEllipsis(value: string): string {
   return `${result}${ellipsis}`;
 }
 
-/** Wraps a name into the two-line footprint used by the landing-page board. */
+/** Wrap a name into the two-line footprint used by the landing-page board. */
 export function nameLines(value: string): string[] {
   const normalized = normalizeName(value);
   const maxChars = maxCharactersPerLine();
@@ -144,124 +168,200 @@ export function nameLines(value: string): string[] {
   return lines.length > 0 ? lines : ['SHAPE', 'SHOWDOWN'];
 }
 
-function key(cell: NameDropCell): string {
+function cellKey(cell: NameDropCell): string {
   return `${cell.x},${cell.y}`;
 }
 
-export function nameTargetCells(lines: string[]): NameDropCell[] {
-  const totalHeight = lines.length * NAME_DROP_GLYPH_HEIGHT + Math.max(0, lines.length - 1) * NAME_DROP_LINE_GAP;
-  const startY = Math.max(0, Math.floor((NAME_DROP_ROWS - totalHeight) / 2));
+function cellsKey(cells: NameDropCell[]): string {
+  return cells.map(cellKey).sort().join('|');
+}
+
+function glyphCells(character: string, originX: number, originY: number): NameDropCell[] {
+  const glyph = glyphFor(character);
   const cells: NameDropCell[] = [];
 
-  lines.forEach((line, lineIndex) => {
-    const startX = Math.max(0, Math.floor((NAME_DROP_COLUMNS - lineWidth(line)) / 2));
-    const startYForLine = startY + lineIndex * (NAME_DROP_GLYPH_HEIGHT + NAME_DROP_LINE_GAP);
-    let cursorX = startX;
-
-    for (const character of line) {
-      const glyph = glyphFor(character);
-      for (let y = 0; y < glyph.length; y += 1) {
-        for (let x = 0; x < glyph[y].length; x += 1) {
-          if (glyph[y][x] === '1') cells.push({ x: cursorX + x, y: startYForLine + y });
+  for (let glyphY = 0; glyphY < glyph.length; glyphY += 1) {
+    for (let glyphX = 0; glyphX < glyph[glyphY].length; glyphX += 1) {
+      if (glyph[glyphY][glyphX] !== '1') continue;
+      for (let scaleY = 0; scaleY < NAME_DROP_PIXEL_SCALE; scaleY += 1) {
+        for (let scaleX = 0; scaleX < NAME_DROP_PIXEL_SCALE; scaleX += 1) {
+          cells.push({
+            x: originX + glyphX * NAME_DROP_PIXEL_SCALE + scaleX,
+            y: originY + glyphY * NAME_DROP_PIXEL_SCALE + scaleY,
+          });
         }
       }
-      cursorX += glyphWidth(character) + 1;
     }
-  });
+  }
 
   return cells;
 }
 
-function pieceCells(type: TetrominoType, rotation: 0 | 1 | 2 | 3, x: number, y: number): NameDropCell[] {
+function layoutName(lines: string[]): { targetCells: NameDropCell[]; glyphs: GlyphPlacement[] } {
+  const scaledGlyphHeight = NAME_DROP_GLYPH_HEIGHT * NAME_DROP_PIXEL_SCALE;
+  const totalHeight =
+    lines.length * scaledGlyphHeight + Math.max(0, lines.length - 1) * NAME_DROP_LINE_GAP;
+  const startY = Math.max(0, Math.floor((NAME_DROP_ROWS - totalHeight) / 2));
+  const targetCells: NameDropCell[] = [];
+  const glyphs: GlyphPlacement[] = [];
+
+  lines.forEach((line, lineIndex) => {
+    let cursorX = Math.max(0, Math.floor((NAME_DROP_COLUMNS - lineWidth(line)) / 2));
+    const lineY = startY + lineIndex * (scaledGlyphHeight + NAME_DROP_LINE_GAP);
+
+    for (const character of line) {
+      const cells = glyphCells(character, cursorX, lineY);
+      if (cells.length > 0) {
+        targetCells.push(...cells);
+        glyphs.push({ cells });
+      }
+      cursorX += scaledGlyphWidth(character) + NAME_DROP_LETTER_GAP;
+    }
+  });
+
+  return { targetCells, glyphs };
+}
+
+export function nameTargetCells(lines: string[]): NameDropCell[] {
+  return layoutName(lines).targetCells;
+}
+
+function pieceCells(
+  type: TetrominoType,
+  rotation: RotationState,
+  x: number,
+  y: number,
+): NameDropCell[] {
   return SHAPES[type][rotation].map(([dx, dy]) => ({ x: x + dx, y: y + dy }));
 }
 
-function placementForTarget(
-  target: NameDropCell,
-  type: TetrominoType,
-  rotation: 0 | 1 | 2 | 3,
-  remaining: Set<string>,
-): Omit<NameDropPiece, 'delayMs' | 'durationMs'> | null {
-  const offsets: ShapeOffset[] = SHAPES[type][rotation];
-  const maxX = Math.max(...offsets.map(([dx]) => dx));
-  const maxY = Math.max(...offsets.map(([, dy]) => dy));
-  const validAnchors = offsets.filter(([dx, dy]) => {
-    const x = target.x - dx;
-    const y = target.y - dy;
-    return x >= 0 && x <= NAME_DROP_COLUMNS - 1 - maxX && y >= 0 && y <= NAME_DROP_ROWS - 1 - maxY;
-  });
-  if (validAnchors.length === 0) return null;
+function generateCandidates(targetCells: NameDropCell[], rng: MutableRng): TilingCandidate[] {
+  const target = new Set(targetCells.map(cellKey));
+  const minX = Math.min(...targetCells.map(({ x }) => x));
+  const maxX = Math.max(...targetCells.map(({ x }) => x));
+  const minY = Math.min(...targetCells.map(({ y }) => y));
+  const maxY = Math.max(...targetCells.map(({ y }) => y));
+  const candidates = new Map<string, TilingCandidate>();
 
-  const anchor = validAnchors[0];
-  const x = target.x - anchor[0];
-  const y = target.y - anchor[1];
-  const cells = pieceCells(type, rotation, x, y);
-  return {
-    type,
-    rotation,
-    x,
-    y,
-    cells,
-    revealCells: cells.filter((cell) => remaining.has(key(cell))),
-  };
-}
-
-function randomPiecePlacement(target: NameDropCell, remaining: Set<string>, rng: { seed: number }): Omit<NameDropPiece, 'delayMs' | 'durationMs'> {
-  let best: Omit<NameDropPiece, 'delayMs' | 'durationMs'> | null = null;
-
-  for (let attempt = 0; attempt < 16; attempt += 1) {
-    const type = PIECE_SEQUENCE[rngInt(rng, PIECE_SEQUENCE.length)];
-    const rotation = rngInt(rng, 4) as 0 | 1 | 2 | 3;
-    const candidate = placementForTarget(target, type, rotation, remaining);
-    if (!candidate) continue;
-    const revealCells = candidate.revealCells;
-    if (!best || revealCells.length > best.revealCells.length) best = candidate;
-    if (revealCells.length >= 2) break;
-  }
-
-  if (best) return best;
-
-  // Try every canonical shape/rotation before falling back. This keeps the
-  // reveal cell physically covered even when the target sits on an edge.
   for (const type of PIECE_SEQUENCE) {
     for (const rotation of [0, 1, 2, 3] as const) {
-      const candidate = placementForTarget(target, type, rotation, remaining);
-      if (candidate) return candidate;
+      const offsets: ShapeOffset[] = SHAPES[type][rotation];
+      const minDx = Math.min(...offsets.map(([dx]) => dx));
+      const maxDx = Math.max(...offsets.map(([dx]) => dx));
+      const minDy = Math.min(...offsets.map(([, dy]) => dy));
+      const maxDy = Math.max(...offsets.map(([, dy]) => dy));
+
+      for (let y = minY - maxDy; y <= maxY - minDy; y += 1) {
+        for (let x = minX - maxDx; x <= maxX - minDx; x += 1) {
+          const cells = pieceCells(type, rotation, x, y);
+          if (!cells.every((cell) => target.has(cellKey(cell)))) continue;
+          const occupied = cellsKey(cells);
+          const existing = candidates.get(occupied);
+          const candidatePriority =
+            (type === 'O' ? 1_000_000 : 0) + rngInt(rng, 1_000_000);
+          if (!existing || candidatePriority < existing.candidatePriority) {
+            candidates.set(occupied, {
+              type,
+              rotation,
+              x,
+              y,
+              cells,
+              candidatePriority,
+            });
+          }
+        }
+      }
     }
   }
 
-  throw new Error(`Unable to place a tetromino over target cell ${target.x},${target.y}`);
+  return [...candidates.values()];
 }
 
-/** Creates a repeatable stream of standard tetromino drops that reveals the name bitmap. */
-export function createNameDropPlan(value = 'SHAPE SHOWDOWN', seed = 0x53485045): NameDropPlan {
-  const lines = nameLines(value);
-  const targetCells = nameTargetCells(lines);
-  const remaining = new Set(targetCells.map(key));
-  const rng = makeRng(seed);
-  const pieces: NameDropPiece[] = [];
+function tileGlyph(targetCells: NameDropCell[], rng: MutableRng): TilingCandidate[] {
+  const candidates = generateCandidates(targetCells, rng);
+  const candidatesByCell = new Map<string, TilingCandidate[]>();
 
-  while (remaining.size > 0) {
-    const target = targetCells.find((cell) => remaining.has(key(cell))) ?? targetCells[0];
-    const placement = randomPiecePlacement(target, remaining, rng);
-    const revealCells = placement.revealCells.length > 0 ? placement.revealCells : [target];
-    for (const cell of revealCells) remaining.delete(key(cell));
-
-    const index = pieces.length;
-    pieces.push({
-      ...placement,
-      revealCells,
-      delayMs: index * NAME_DROP_PIECE_GAP_MS,
-      durationMs: NAME_DROP_FALL_MS + rngInt(rng, 140),
-    });
+  for (const candidate of candidates) {
+    for (const cell of candidate.cells) {
+      const id = cellKey(cell);
+      const list = candidatesByCell.get(id);
+      if (list) list.push(candidate);
+      else candidatesByCell.set(id, [candidate]);
+    }
+  }
+  for (const list of candidatesByCell.values()) {
+    list.sort((a, b) => a.candidatePriority - b.candidatePriority);
   }
 
+  const remaining = new Set(targetCells.map(cellKey));
+  const solution: TilingCandidate[] = [];
+
+  const search = (): boolean => {
+    if (remaining.size === 0) return true;
+
+    let options: TilingCandidate[] | null = null;
+    for (const id of remaining) {
+      const valid = (candidatesByCell.get(id) ?? []).filter((candidate) =>
+        candidate.cells.every((cell) => remaining.has(cellKey(cell))),
+      );
+      if (valid.length === 0) return false;
+      if (!options || valid.length < options.length) {
+        options = valid;
+        if (valid.length === 1) break;
+      }
+    }
+
+    for (const candidate of options ?? []) {
+      const removed = candidate.cells.map(cellKey);
+      removed.forEach((id) => remaining.delete(id));
+      solution.push(candidate);
+      if (search()) return true;
+      solution.pop();
+      removed.forEach((id) => remaining.add(id));
+    }
+    return false;
+  };
+
+  if (!search()) {
+    throw new Error(`Unable to tile glyph target containing ${targetCells.length} cells`);
+  }
+  return solution;
+}
+
+/** Create a deterministic exact-cover plan made exclusively from playable tetrominoes. */
+export function createNameDropPlan(
+  value = 'SHAPE SHOWDOWN',
+  seed = 0x53485045,
+): NameDropPlan {
+  const lines = nameLines(value);
+  const layout = layoutName(lines);
+  const rng = makeRng(seed);
+  const tiled = layout.glyphs.flatMap((glyph) => tileGlyph(glyph.cells, rng));
+  const ordered = tiled
+    .map((piece) => ({ piece, tieBreak: rngInt(rng, 1_000_000) }))
+    .sort((a, b) => {
+      const aBottom = Math.max(...a.piece.cells.map(({ y }) => y));
+      const bBottom = Math.max(...b.piece.cells.map(({ y }) => y));
+      return bBottom - aBottom || a.piece.x - b.piece.x || a.tieBreak - b.tieBreak;
+    });
+
+  const pieces: NameDropPiece[] = ordered.map(({ piece }, index) => ({
+    type: piece.type,
+    rotation: piece.rotation,
+    x: piece.x,
+    y: piece.y,
+    cells: piece.cells,
+    delayMs: index * NAME_DROP_PIECE_GAP_MS,
+    durationMs: NAME_DROP_FALL_MS + rngInt(rng, 180),
+  }));
   const lastPiece = pieces[pieces.length - 1];
+
   return {
     name: normalizeName(value),
     lines,
-    targetCells,
+    targetCells: layout.targetCells,
     pieces,
-    totalDurationMs: (lastPiece?.delayMs ?? 0) + (lastPiece?.durationMs ?? 0) + 1_000,
+    totalDurationMs:
+      (lastPiece?.delayMs ?? 0) + (lastPiece?.durationMs ?? 0) + 1_800,
   };
 }

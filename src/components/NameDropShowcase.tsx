@@ -4,7 +4,6 @@ import {
   createNameDropPlan,
   NAME_DROP_COLUMNS,
   NAME_DROP_ROWS,
-  type NameDropCell,
   type NameDropPiece,
 } from '../nameDrop/nameDrop';
 
@@ -17,20 +16,6 @@ const PIECE_COLORS: Record<NameDropPiece['type'], string> = {
   T: 'bg-fuchsia-300 shadow-[0_0_14px_rgba(240,171,252,0.85)]',
   Z: 'bg-rose-300 shadow-[0_0_14px_rgba(253,164,175,0.85)]',
 };
-
-const TARGET_COLOR_BY_TYPE: Record<NameDropPiece['type'], string> = {
-  I: 'border-cyan-200/80 bg-cyan-300/80 shadow-[0_0_18px_rgba(103,232,249,0.65)]',
-  J: 'border-blue-200/80 bg-blue-400/80 shadow-[0_0_18px_rgba(96,165,250,0.65)]',
-  L: 'border-orange-100/80 bg-orange-300/80 shadow-[0_0_18px_rgba(253,186,116,0.65)]',
-  O: 'border-yellow-100/80 bg-yellow-200/80 shadow-[0_0_18px_rgba(253,224,71,0.65)]',
-  S: 'border-emerald-100/80 bg-emerald-300/80 shadow-[0_0_18px_rgba(110,231,183,0.65)]',
-  T: 'border-fuchsia-100/80 bg-fuchsia-300/80 shadow-[0_0_18px_rgba(240,171,252,0.65)]',
-  Z: 'border-rose-100/80 bg-rose-300/80 shadow-[0_0_18px_rgba(253,164,175,0.65)]',
-};
-
-function cellKey(cell: NameDropCell): string {
-  return `${cell.x},${cell.y}`;
-}
 
 function useFittedCellSize(containerRef: React.RefObject<HTMLDivElement | null>): number {
   const [cellSize, setCellSize] = useState(12);
@@ -58,16 +43,6 @@ function useFittedCellSize(containerRef: React.RefObject<HTMLDivElement | null>)
   return cellSize;
 }
 
-function targetTypeMap(plan: ReturnType<typeof createNameDropPlan>): Map<string, NameDropPiece['type']> {
-  const types = new Map<string, NameDropPiece['type']>();
-  for (const piece of plan.pieces) {
-    for (const cell of piece.revealCells) {
-      if (!types.has(cellKey(cell))) types.set(cellKey(cell), piece.type);
-    }
-  }
-  return types;
-}
-
 export interface NameDropShowcaseProps {
   name?: string;
   statusLabel?: string;
@@ -88,19 +63,6 @@ export const NameDropShowcase: React.FC<NameDropShowcaseProps> = ({
     return () => window.clearTimeout(timer);
   }, [cycle, plan.totalDurationMs]);
 
-  const revealedAt = useMemo(() => {
-    const result = new Map<string, number>();
-    for (const piece of plan.pieces) {
-      const revealTime = piece.delayMs + Math.round(piece.durationMs * 0.82);
-      for (const cell of piece.revealCells) {
-        const id = cellKey(cell);
-        if (!result.has(id)) result.set(id, revealTime);
-      }
-    }
-    return result;
-  }, [plan]);
-
-  const typeByCell = useMemo(() => targetTypeMap(plan), [plan]);
   const boardStyle = {
     width: NAME_DROP_COLUMNS * cellSize,
     height: NAME_DROP_ROWS * cellSize,
@@ -119,7 +81,9 @@ export const NameDropShowcase: React.FC<NameDropShowcaseProps> = ({
             <p className="truncate text-[10px] font-bold uppercase tracking-[0.28em] text-emerald-300/70 sm:text-xs">
               Shape Showdown
             </p>
-          <p className="truncate text-sm font-semibold text-zinc-200 sm:text-base">Fall into place.</p>
+            <p className="truncate text-sm font-semibold text-zinc-200 sm:text-base">
+              Fall into place.
+            </p>
           </div>
         </div>
         <div className="flex shrink-0 items-center gap-2 rounded-full border border-white/10 bg-white/[0.04] px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.18em] text-zinc-400 sm:px-4 sm:py-2 sm:text-xs">
@@ -148,24 +112,6 @@ export const NameDropShowcase: React.FC<NameDropShowcaseProps> = ({
               <div key={index} className="name-drop-grid-cell" aria-hidden="true" />
             ))}
 
-            {plan.targetCells.map((cell) => {
-              const type = typeByCell.get(cellKey(cell)) ?? 'I';
-              return (
-                <div
-                  key={`target-${cellKey(cell)}`}
-                  className={`name-drop-target absolute z-10 border ${TARGET_COLOR_BY_TYPE[type]}`}
-                  style={{
-                    left: cell.x * cellSize,
-                    top: cell.y * cellSize,
-                    width: cellSize,
-                    height: cellSize,
-                    animationDelay: `${revealedAt.get(cellKey(cell)) ?? 0}ms`,
-                  }}
-                  aria-hidden="true"
-                />
-              );
-            })}
-
             {plan.pieces.map((piece, index) => (
               <div
                 key={`piece-${index}`}
@@ -173,8 +119,8 @@ export const NameDropShowcase: React.FC<NameDropShowcaseProps> = ({
                 style={{
                   left: piece.x * cellSize,
                   top: piece.y * cellSize,
-                  width: cellSize * 5,
-                  height: cellSize * 5,
+                  width: cellSize * 4,
+                  height: cellSize * 4,
                   animationDelay: `${piece.delayMs}ms`,
                   ['--name-drop-start' as string]: `${-Math.max(4, piece.y + 4) * cellSize}px`,
                   ['--name-drop-duration' as string]: `${piece.durationMs}ms`,
@@ -183,7 +129,7 @@ export const NameDropShowcase: React.FC<NameDropShowcaseProps> = ({
               >
                 {piece.cells.map((cell) => (
                   <div
-                    key={cellKey(cell)}
+                    key={`${cell.x},${cell.y}`}
                     className={`absolute border border-white/20 ${PIECE_COLORS[piece.type]}`}
                     style={{
                       left: (cell.x - piece.x) * cellSize,
@@ -202,7 +148,9 @@ export const NameDropShowcase: React.FC<NameDropShowcaseProps> = ({
 
         <div className="mt-5 text-center sm:mt-7">
           <p className="font-mono text-xs uppercase tracking-[0.4em] text-zinc-500 sm:text-sm">{plan.name}</p>
-          <p className="mt-2 text-xs text-zinc-600 sm:text-sm">A tiny Tetris engine, arranged into something bigger.</p>
+          <p className="mt-2 text-xs text-zinc-600 sm:text-sm">
+            {plan.pieces.length} playable tetrominoes, arranged into something bigger.
+          </p>
         </div>
       </div>
     </main>

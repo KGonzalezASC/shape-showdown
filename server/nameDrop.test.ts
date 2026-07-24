@@ -8,6 +8,7 @@ import {
   nameTargetCells,
   normalizeName,
 } from '../src/nameDrop/nameDrop';
+import { SHAPES } from '../src/tetris/shapes';
 
 describe('name drop planner', () => {
   it('normalizes names and provides a useful fallback', () => {
@@ -28,19 +29,30 @@ describe('name drop planner', () => {
     assert.equal(cells.every(({ x, y }) => x >= 0 && x < NAME_DROP_COLUMNS && y >= 0 && y < NAME_DROP_ROWS), true);
   });
 
-  it('creates a deterministic plan that reveals every target cell', () => {
+  it('creates a deterministic exact cover from canonical tetrominoes', () => {
     const first = createNameDropPlan('SHAPE SHOWDOWN', 12345);
     const second = createNameDropPlan('SHAPE SHOWDOWN', 12345);
     assert.deepEqual(second, first);
 
     const targetKeys = new Set(first.targetCells.map(({ x, y }) => `${x},${y}`));
-    const revealKeys = new Set(
-      first.pieces.flatMap((piece) => piece.revealCells.map(({ x, y }) => `${x},${y}`)),
+    const pieceCellKeys = first.pieces.flatMap((piece) =>
+      piece.cells.map(({ x, y }) => `${x},${y}`),
     );
-    assert.deepEqual(revealKeys, targetKeys);
+    assert.equal(pieceCellKeys.length, targetKeys.size);
+    assert.equal(new Set(pieceCellKeys).size, pieceCellKeys.length);
+    assert.deepEqual(new Set(pieceCellKeys), targetKeys);
+    assert.equal(first.pieces.length, first.targetCells.length / 4);
     assert.equal(first.pieces.every((piece) => piece.cells.length === 4), true);
     assert.equal(first.pieces.every((piece) => piece.cells.every(({ x, y }) =>
       x >= 0 && x < NAME_DROP_COLUMNS && y >= 0 && y < NAME_DROP_ROWS,
     )), true);
+    assert.equal(first.pieces.every((piece) => {
+      const canonicalCells = SHAPES[piece.type][piece.rotation]
+        .map(([x, y]) => `${piece.x + x},${piece.y + y}`)
+        .sort();
+      const renderedCells = piece.cells.map(({ x, y }) => `${x},${y}`).sort();
+      return canonicalCells.join('|') === renderedCells.join('|');
+    }), true);
+    assert.equal(new Set(first.pieces.map((piece) => piece.type)).size >= 5, true);
   });
 });
