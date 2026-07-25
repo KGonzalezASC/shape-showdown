@@ -75,7 +75,7 @@ describe('tetris engine', () => {
     player.actionQueue.push('hold');
     stepPlayer(game, player, opponent, rng, []);
 
-    assert.equal(player.holdPiece, beforeType);
+    assert.equal(player.holdPiece?.type, beforeType);
     assert.equal(player.canHold, false);
   });
 
@@ -119,13 +119,66 @@ describe('tetris engine', () => {
     assert.equal(player.activePiece?.type, beforeType);
     assert.equal(isHoldFrozen(player, game.tick), true);
 
-    player.holdPiece = 'T';
+    player.holdPiece = { type: 'T' };
     player.canHold = true;
     player.actionQueue.push('hold');
     stepPlayer(game, player, opponent, rng, []);
 
-    assert.equal(player.holdPiece, 'T');
+    assert.equal(player.holdPiece?.type, 'T');
     assert.equal(player.activePiece?.type, beforeType);
+  });
+
+  it('blocks hold while the active piece is poisoned', () => {
+    const rng = makeRng(31);
+    const player = makePlayer('a', rng);
+    const opponent = makePlayer('b', rng);
+    const game = makeGame([player, opponent]);
+
+    assert.ok(player.activePiece);
+    player.activePiece.y = 20;
+    player.activePiece.poisoned = true;
+    player.activePiece.poisonVariant = 2;
+    const beforeType = player.activePiece.type;
+
+    player.actionQueue.push('hold');
+    stepPlayer(game, player, opponent, rng, []);
+
+    assert.equal(player.holdPiece, null);
+    assert.equal(player.canHold, true);
+    assert.equal(player.activePiece?.type, beforeType);
+    assert.equal(player.activePiece?.poisoned, true);
+  });
+
+  it('preserves bomber through hold store and swap', () => {
+    const rng = makeRng(33);
+    const player = makePlayer('a', rng);
+    const opponent = makePlayer('b', rng);
+    const game = makeGame([player, opponent]);
+
+    assert.ok(player.activePiece);
+    player.activePiece.y = 20;
+    player.activePiece.bomber = true;
+    const bomberType = player.activePiece.type;
+
+    player.actionQueue.push('hold');
+    stepPlayer(game, player, opponent, rng, []);
+
+    assert.equal(player.holdPiece?.type, bomberType);
+    assert.equal(player.holdPiece?.bomber, true);
+    // Hold-into-empty clears active until the next tick's spawn.
+    assert.equal(player.activePiece, null);
+
+    stepPlayer(game, player, opponent, rng, []);
+    assert.ok(player.activePiece);
+    assert.equal(!!player.activePiece.bomber, false);
+
+    player.canHold = true;
+    player.activePiece.y = 20;
+    player.actionQueue.push('hold');
+    stepPlayer(game, player, opponent, rng, []);
+
+    assert.equal(player.activePiece?.type, bomberType);
+    assert.equal(!!player.activePiece?.bomber, true);
   });
 
   it('limits lock resets to sticky cap for the current piece only', () => {

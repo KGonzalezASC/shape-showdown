@@ -15,20 +15,7 @@ import {
   POISON_GENERATIONS,
 } from '../../src/constants.js';
 import type { CellValue, TetrominoType, RotationState } from '../../src/types.js';
-
-// ── Helpers mirroring the real engine ────────────────────────────────────
-
-function createEmptyBoard(): CellValue[][] {
-  return Array.from({ length: BOARD_ROWS }, () =>
-    Array.from({ length: BOARD_COLS }, () => null),
-  );
-}
-
-function createEmptyPoisonBoard(): number[][] {
-  return Array.from({ length: BOARD_ROWS }, () =>
-    Array.from({ length: BOARD_COLS }, () => 0),
-  );
-}
+import { createEmptyBoard, createEmptyPoisonBoard, spreadPoisonWaveOnce } from './engine.js';
 
 function getCells(piece: { type: TetrominoType; rotation: RotationState; x: number; y: number }) {
   return SHAPES[piece.type][piece.rotation].map(([dx, dy]) => ({
@@ -54,25 +41,11 @@ function hardDropY(board: CellValue[][], type: TetrominoType, rotation: Rotation
   return y;
 }
 
-/** Run the full 4-generation BFS poison spread (mirrors processPoisonSpread). */
+/** Run the full 4-generation BFS poison spread using the production wave helper. */
 export function runPoisonSpread(board: CellValue[][], poisonBoard: number[][], variant: number): void {
-  const GENERATIONS = POISON_GENERATIONS - 1; // wave 0 = lock-seed; 3 more spread waves
-  for (let gen = 0; gen < GENERATIONS; gen++) {
-    const newlyPoisoned: Array<[number, number]> = [];
-    for (let y = 0; y < BOARD_ROWS; y++) {
-      for (let x = 0; x < BOARD_COLS; x++) {
-        if (poisonBoard[y][x] !== 0) continue;
-        if (board[y][x] === null) continue;
-        const adj =
-          (y > 0 && poisonBoard[y - 1][x] !== 0) ||
-          (y < BOARD_ROWS - 1 && poisonBoard[y + 1][x] !== 0) ||
-          (x > 0 && poisonBoard[y][x - 1] !== 0) ||
-          (x < BOARD_COLS - 1 && poisonBoard[y][x + 1] !== 0);
-        if (adj) newlyPoisoned.push([y, x]);
-      }
-    }
-    if (newlyPoisoned.length === 0) break;
-    for (const [y, x] of newlyPoisoned) poisonBoard[y][x] = variant;
+  const generations = POISON_GENERATIONS - 1; // wave 0 = lock-seed; remaining are spread waves
+  for (let gen = 0; gen < generations; gen++) {
+    if (spreadPoisonWaveOnce(board, poisonBoard, variant) === 0) break;
   }
 }
 

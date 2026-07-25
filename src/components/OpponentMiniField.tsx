@@ -1,8 +1,10 @@
 import React, { useMemo } from 'react';
-import { BOARD_COLS, BOARD_HIDDEN_ROWS, BOARD_VISIBLE_ROWS, CellValue, PlayerState, TetrominoType } from '../types';
+import { BOARD_COLS, BOARD_HIDDEN_ROWS, BOARD_VISIBLE_ROWS, CellValue } from '../types';
+import { SHAPES } from '../tetris/shapes';
+import { PublicPlayerState } from '../state/publicSnapshots';
 
 interface OpponentMiniFieldProps {
-  player: PlayerState | null;
+  player: PublicPlayerState | null;
   pendingGarbage: number;
 }
 
@@ -26,51 +28,6 @@ const MemoizedMiniCell = React.memo(({ color }: { color: CellValue }) => (
     style={{ width: MINI_CELL_SIZE, height: MINI_CELL_SIZE }}
   />
 ));
-
-const SHAPES: Record<TetrominoType, [number, number][][]> = {
-  I: [
-    [[0, 1], [1, 1], [2, 1], [3, 1]],
-    [[2, 0], [2, 1], [2, 2], [2, 3]],
-    [[0, 2], [1, 2], [2, 2], [3, 2]],
-    [[1, 0], [1, 1], [1, 2], [1, 3]],
-  ],
-  J: [
-    [[0, 0], [0, 1], [1, 1], [2, 1]],
-    [[1, 0], [2, 0], [1, 1], [1, 2]],
-    [[0, 1], [1, 1], [2, 1], [2, 2]],
-    [[1, 0], [1, 1], [0, 2], [1, 2]],
-  ],
-  L: [
-    [[2, 0], [0, 1], [1, 1], [2, 1]],
-    [[1, 0], [1, 1], [1, 2], [2, 2]],
-    [[0, 1], [1, 1], [2, 1], [0, 2]],
-    [[0, 0], [1, 0], [1, 1], [1, 2]],
-  ],
-  O: [
-    [[1, 0], [2, 0], [1, 1], [2, 1]],
-    [[1, 0], [2, 0], [1, 1], [2, 1]],
-    [[1, 0], [2, 0], [1, 1], [2, 1]],
-    [[1, 0], [2, 0], [1, 1], [2, 1]],
-  ],
-  S: [
-    [[1, 0], [2, 0], [0, 1], [1, 1]],
-    [[1, 0], [1, 1], [2, 1], [2, 2]],
-    [[1, 1], [2, 1], [0, 2], [1, 2]],
-    [[0, 0], [0, 1], [1, 1], [1, 2]],
-  ],
-  T: [
-    [[1, 0], [0, 1], [1, 1], [2, 1]],
-    [[1, 0], [1, 1], [2, 1], [1, 2]],
-    [[0, 1], [1, 1], [2, 1], [1, 2]],
-    [[1, 0], [0, 1], [1, 1], [1, 2]],
-  ],
-  Z: [
-    [[0, 0], [1, 0], [1, 1], [2, 1]],
-    [[2, 0], [1, 1], [2, 1], [1, 2]],
-    [[0, 1], [1, 1], [1, 2], [2, 2]],
-    [[1, 0], [0, 1], [1, 1], [0, 2]],
-  ],
-};
 
 const OpponentMiniField: React.FC<OpponentMiniFieldProps> = ({ player, pendingGarbage }) => {
   const visibleRows = useMemo(() => {

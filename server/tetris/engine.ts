@@ -18,6 +18,8 @@ import {
   PendingGarbagePacket,
   PendingShopEffect,
   PlayerState,
+  HeldPiece,
+  TetrisPiece,
   RotationState,
   SOFT_DROP_CELLS_PER_TICK,
   TetrominoType,
@@ -45,9 +47,11 @@ import {
   TECTONIC_SHIFT_MIN_DURATION_TICKS,
 } from '../../src/constants.js';
 import { getKickTests, PIECE_SEQUENCE, SHAPES } from './pieces.js';
-import { createInitialPlayerShop } from '../shop.js';
+import { createInitialPlayerShop } from '../../src/shop/playerShop.js';
+import { pushFieldEffect } from '../../src/shop/fieldEffects.js';
+import { MutableRng, makeRng as makeSharedRng, rngNext } from '../../src/rng.js';
 
-type MutableRng = { seed: number };
+export type { MutableRng };
 
 export function createEmptyBoard(): CellValue[][] {
   return Array.from({ length: BOARD_ROWS }, () => Array.from({ length: BOARD_COLS }, () => null));
@@ -63,15 +67,6 @@ function ensurePoisonBoard(player: PlayerState): number[][] {
     player.poisonBoard = createEmptyPoisonBoard();
   }
   return player.poisonBoard;
-}
-
-function rngNext(rng: MutableRng): number {
-  let x = rng.seed | 0;
-  x ^= x << 13;
-  x ^= x >> 17;
-  x ^= x << 5;
-  rng.seed = x | 0;
-  return (x >>> 0) / 0xffffffff;
 }
 
 function shuffledBag(rng: MutableRng): TetrominoType[] {
@@ -141,7 +136,7 @@ export function makePlayer(id: string, rng: MutableRng): PlayerState {
     tectonicShiftNextStepTick: null,
     tectonicShiftStartTick: null,
     tectonicShiftStepTicks: null,
-    shop: createInitialPlayerShop(),
+    shop: createInitialPlayerShop(rng),
   };
   ensureQueue(player, rng);
   player.activePiece = spawnNextPiece(player, rng);
@@ -353,7 +348,7 @@ function clearPieceLockResetCap(player: PlayerState): void {
   player.pieceLockResetCap = undefined;
   player.stickyNextPiece = false;
   if (player.activeEffects) {
-    player.activeEffects = player.activeEffects.filter((e) => !e.id.startsWith('sticky-'));
+    player.activeEffects = player.activeEffects.filter((e) => e.kind !== 'sticky');
   }
 }
 
@@ -679,6 +674,30 @@ function pieceWouldTopOut(player: PlayerState): boolean {
   return collides(player.board, player.activePiece);
 }
 
+/** Snapshot piece-level flags into storage (type + poison/bomber). */
+function toHeldPiece(piece: TetrisPiece): HeldPiece {
+  const held: HeldPiece = { type: piece.type };
+  if (piece.poisoned) {
+    held.poisoned = true;
+    if (piece.poisonVariant !== undefined) held.poisonVariant = piece.poisonVariant;
+  }
+  if (piece.bomber) held.bomber = true;
+  return held;
+}
+
+/** Restore a held piece as a fresh active spawn (rotation/x/y reset). */
+function activeFromHeld(held: HeldPiece): TetrisPiece {
+  return {
+    type: held.type,
+    rotation: 0,
+    x: 3,
+    y: BOARD_HIDDEN_ROWS - 2,
+    poisoned: held.poisoned,
+    poisonVariant: held.poisonVariant,
+    bomber: held.bomber,
+  };
+}
+
 function processActions(player: PlayerState, tick: number): void {
   if (!player.activePiece) return;
   while (player.actionQueue.length > 0) {
@@ -689,14 +708,15 @@ function processActions(player: PlayerState, tick: number): void {
     if (action === 'hold') {
       if (isHoldFrozen(player, tick)) continue;
       if (player.activePiece?.customOffsets) continue; // Block hold for custom pieces
+      if (player.activePiece?.poisoned) continue; // Poisoned active pieces cannot be stored/swapped away
       if (!player.canHold || !player.activePiece || !canHoldAtCurrentHeight(player)) continue;
       player.lastSrsKick = null;
-      const current = player.activePiece.type;
+      const stored = toHeldPiece(player.activePiece);
       if (player.holdPiece) {
-        player.activePiece = { type: player.holdPiece, rotation: 0, x: 3, y: BOARD_HIDDEN_ROWS - 2 };
-        player.holdPiece = current;
+        player.activePiece = activeFromHeld(player.holdPiece);
+        player.holdPiece = stored;
       } else {
-        player.holdPiece = current;
+        player.holdPiece = stored;
         player.activePiece = null;
       }
       player.canHold = false;
@@ -780,6 +800,10 @@ export function purgePoisonVariant(player: PlayerState, variant: number): void {
     player.activePiece.poisoned = false;
     player.activePiece.poisonVariant = undefined;
   }
+  if (player.holdPiece?.poisonVariant === variant) {
+    player.holdPiece.poisoned = false;
+    player.holdPiece.poisonVariant = undefined;
+  }
   if (player.poisonNextVariant === variant) {
     player.poisonNextPiece = false;
     player.poisonNextVariant = undefined;
@@ -787,6 +811,32 @@ export function purgePoisonVariant(player: PlayerState, variant: number): void {
   if (player.poisonSpread?.variant === variant) {
     player.poisonSpread = null;
   }
+}
+
+/**
+ * One orthogonal BFS generation of poison onto filled neighbours.
+ * Returns how many cells were newly poisoned.
+ */
+export function spreadPoisonWaveOnce(
+  board: CellValue[][],
+  poison: number[][],
+  variant: number,
+): number {
+  const newlyPoisoned: Array<[number, number]> = [];
+  for (let y = 0; y < BOARD_ROWS; y++) {
+    for (let x = 0; x < BOARD_COLS; x++) {
+      if (poison[y][x] !== 0) continue;
+      if (board[y][x] === null) continue;
+      const neighbourPoisoned =
+        (y > 0 && poison[y - 1][x] !== 0) ||
+        (y < BOARD_ROWS - 1 && poison[y + 1][x] !== 0) ||
+        (x > 0 && poison[y][x - 1] !== 0) ||
+        (x < BOARD_COLS - 1 && poison[y][x + 1] !== 0);
+      if (neighbourPoisoned) newlyPoisoned.push([y, x]);
+    }
+  }
+  for (const [y, x] of newlyPoisoned) poison[y][x] = variant;
+  return newlyPoisoned.length;
 }
 
 /**
@@ -801,25 +851,10 @@ function processPoisonSpread(player: PlayerState, tick: number): void {
   if (!spread || tick < spread.nextSpreadTick) return;
 
   const poison = ensurePoisonBoard(player);
-  const { variant } = spread;
-  const newlyPoisoned: Array<[number, number]> = [];
-  for (let y = 0; y < BOARD_ROWS; y++) {
-    for (let x = 0; x < BOARD_COLS; x++) {
-      if (poison[y][x] !== 0) continue; // already poisoned
-      if (player.board[y][x] === null) continue; // empty cell can't be poisoned
-      const neighbourPoisoned =
-        (y > 0 && poison[y - 1][x] !== 0) ||
-        (y < BOARD_ROWS - 1 && poison[y + 1][x] !== 0) ||
-        (x > 0 && poison[y][x - 1] !== 0) ||
-        (x < BOARD_COLS - 1 && poison[y][x + 1] !== 0);
-      if (neighbourPoisoned) newlyPoisoned.push([y, x]);
-    }
-  }
-  // All cells from this event share the same variant — consistent colour throughout.
-  for (const [y, x] of newlyPoisoned) poison[y][x] = variant;
+  const newly = spreadPoisonWaveOnce(player.board, poison, spread.variant);
 
   spread.generationsRemaining -= 1;
-  if (spread.generationsRemaining <= 0 || newlyPoisoned.length === 0) {
+  if (spread.generationsRemaining <= 0 || newly === 0) {
     player.poisonSpread = null;
   } else {
     spread.nextSpreadTick = tick + POISON_SPREAD_INTERVAL_TICKS;
@@ -854,35 +889,18 @@ export function stepPlayer(
         if (effect.itemId === 'retrim') {
           player.swapCutoffRow = Math.max(0, player.swapCutoffRow - 1);
         } else if (effect.itemId === 'curtain') {
-          // Telegraph elapsed — drop the frost overlay. The client renders an
-          // overlay whenever an active effect with this id prefix is present,
-          // and the prune above removes it automatically at expiresAtTick.
-          if (!player.activeEffects) player.activeEffects = [];
-          player.activeEffects.push({
-            id: `curtain-active-${gameState.tick}`,
-            label: 'Curtain',
-            icon: '🎭',
-            bgClass: 'bg-indigo-900/80',
-            borderClass: 'border-indigo-400',
-            textClass: 'text-indigo-100',
-            glowClass: 'shadow-[0_0_10px_rgba(129,140,248,0.7)]',
-            expiresAtTick: gameState.tick + CURTAIN_DURATION_TICKS,
-          });
+          pushFieldEffect(
+            player,
+            'curtain',
+            gameState.tick,
+            'Curtain',
+            '🎭',
+            gameState.tick + CURTAIN_DURATION_TICKS,
+          );
         } else if (effect.itemId === 'vortex-step' && effect.poisonVariant) {
           purgePoisonVariant(player, effect.poisonVariant);
-          if (!player.activeEffects) player.activeEffects = [];
-          player.activeEffects.push({
-            id: `purge-hit-${gameState.tick}`,
-            label: 'Purged',
-            icon: '🃏',
-            bgClass: 'bg-fuchsia-900/80',
-            borderClass: 'border-fuchsia-400',
-            textClass: 'text-fuchsia-100',
-            glowClass: 'shadow-[0_0_10px_rgba(217,70,239,0.7)]',
-            expiresAtTick: gameState.tick + 120,
-          });
+          pushFieldEffect(player, 'purge', gameState.tick, 'Purged', '🃏', gameState.tick + 120);
         }
-        // Future effects can be dispatched here with additional else-if branches.
       } else {
         remaining.push(effect);
       }
@@ -999,7 +1017,7 @@ export function initialSeed(): number {
 }
 
 export function makeRng(seed: number): MutableRng {
-  return { seed };
+  return makeSharedRng(seed);
 }
 
 export function replayDateLabel() {

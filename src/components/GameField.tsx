@@ -1,20 +1,21 @@
 import React, { forwardRef, useContext, useEffect, useImperativeHandle, useMemo, useState } from 'react';
 import {
-  ActiveFieldEffect,
   BOARD_COLS,
   BOARD_HIDDEN_ROWS,
   BOARD_ROWS,
   BOARD_VISIBLE_ROWS,
   CellValue,
   HOLD_SWAP_CUTOFF_VISIBLE_ROW,
-  PlayerState,
   TetrominoType,
   MatchStatus,
 } from '../types';
+import { SHAPES } from '../tetris/shapes';
+import { styleForFieldEffect } from '../shop/effectStyles';
+import { normalizeHeldPiece, PublicPlayerState } from '../state/publicSnapshots';
 import { PlayfieldCellSizeContext } from './playfieldCellSizeContext';
 
 interface GameFieldProps {
-  player: PlayerState;
+  player: PublicPlayerState;
   isMe: boolean;
   title: string;
   borderColorClass: string;
@@ -126,51 +127,6 @@ const MemoizedCell = React.memo(
     );
   },
 );
-
-const SHAPES: Record<TetrominoType, [number, number][][]> = {
-  I: [
-    [[0, 1], [1, 1], [2, 1], [3, 1]],
-    [[2, 0], [2, 1], [2, 2], [2, 3]],
-    [[0, 2], [1, 2], [2, 2], [3, 2]],
-    [[1, 0], [1, 1], [1, 2], [1, 3]],
-  ],
-  J: [
-    [[0, 0], [0, 1], [1, 1], [2, 1]],
-    [[1, 0], [2, 0], [1, 1], [1, 2]],
-    [[0, 1], [1, 1], [2, 1], [2, 2]],
-    [[1, 0], [1, 1], [0, 2], [1, 2]],
-  ],
-  L: [
-    [[2, 0], [0, 1], [1, 1], [2, 1]],
-    [[1, 0], [1, 1], [1, 2], [2, 2]],
-    [[0, 1], [1, 1], [2, 1], [0, 2]],
-    [[0, 0], [1, 0], [1, 1], [1, 2]],
-  ],
-  O: [
-    [[1, 0], [2, 0], [1, 1], [2, 1]],
-    [[1, 0], [2, 0], [1, 1], [2, 1]],
-    [[1, 0], [2, 0], [1, 1], [2, 1]],
-    [[1, 0], [2, 0], [1, 1], [2, 1]],
-  ],
-  S: [
-    [[1, 0], [2, 0], [0, 1], [1, 1]],
-    [[1, 0], [1, 1], [2, 1], [2, 2]],
-    [[1, 1], [2, 1], [0, 2], [1, 2]],
-    [[0, 0], [0, 1], [1, 1], [1, 2]],
-  ],
-  T: [
-    [[1, 0], [0, 1], [1, 1], [2, 1]],
-    [[1, 0], [1, 1], [2, 1], [1, 2]],
-    [[0, 1], [1, 1], [2, 1], [1, 2]],
-    [[1, 0], [0, 1], [1, 1], [1, 2]],
-  ],
-  Z: [
-    [[0, 0], [1, 0], [1, 1], [2, 1]],
-    [[2, 0], [1, 1], [2, 1], [1, 2]],
-    [[0, 1], [1, 1], [1, 2], [2, 2]],
-    [[1, 0], [0, 1], [1, 1], [0, 2]],
-  ],
-};
 
 const HOLD_PREVIEW_SIZE = 4;
 /** Curtain: rows just below the swap line that stay frosted/semi-visible; everything deeper is fully opaque. */
@@ -363,13 +319,17 @@ const GameField = forwardRef<GameFieldRef, GameFieldProps>(({
 
   const cutoffRow = player.swapCutoffRow ?? HOLD_SWAP_CUTOFF_VISIBLE_ROW;
   const canHoldByHeight = maxActiveVisibleRow !== null && maxActiveVisibleRow < cutoffRow;
+  const heldPiece = useMemo(() => normalizeHeldPiece(player.holdPiece), [player.holdPiece]);
   const holdPreview = useMemo(() => {
-    if (!player.holdPiece) return null;
-    const occupied = new Set(SHAPES[player.holdPiece][0].map(([dx, dy]) => `${dx},${dy}`));
+    if (!heldPiece) return null;
+    const rotations = SHAPES[heldPiece.type];
+    const cells = rotations?.[0];
+    if (!cells) return null;
+    const occupied = new Set(cells.map(([dx, dy]) => `${dx},${dy}`));
     return Array.from({ length: HOLD_PREVIEW_SIZE }, (_, y) =>
       Array.from({ length: HOLD_PREVIEW_SIZE }, (_, x) => occupied.has(`${x},${y}`)),
     );
-  }, [player.holdPiece]);
+  }, [heldPiece]);
   const holdPreviewCell = Math.max(5, Math.round(cellSize * 0.31));
   const compactStorageLayout = cellSize <= 20;
   const swapZoneText = compactStorageLayout
@@ -378,10 +338,13 @@ const GameField = forwardRef<GameFieldRef, GameFieldProps>(({
   const swapLineY = cutoffRow * cellSize;
   const showSwapLine = isMe && cutoffRow > 0 && cutoffRow < BOARD_VISIBLE_ROWS;
 
-  const storageFrozen = isMe && activeEffects.some((e) => e.id.startsWith('freeze-active'));
+  const storageFrozen = isMe && activeEffects.some((e) => e.kind === 'freeze');
   const snagged = isMe && !!player.snagHardDropBlocked;
+  const holdPoisoned = !!player.activePiece?.poisoned;
   const holdStatus = storageFrozen
     ? { text: 'Frozen — no store/swap', tone: 'text-sky-300' }
+    : holdPoisoned
+      ? { text: 'Poisoned — no hold', tone: 'text-fuchsia-300' }
     : snagged
       ? { text: 'Snagged — no hard drop', tone: 'text-orange-300' }
       : !player.activePiece
@@ -405,23 +368,26 @@ const GameField = forwardRef<GameFieldRef, GameFieldProps>(({
         {/* Active-effect pills — only renders when effects are present */}
         {isMe && activeEffects.length > 0 && (
           <div className="flex min-w-0 flex-1 flex-wrap items-center justify-center gap-1 overflow-hidden px-1">
-            {activeEffects.map((effect) => (
+            {activeEffects.map((effect) => {
+              const style = styleForFieldEffect(effect);
+              return (
               <span
                 key={effect.id}
                 className={[
                   'inline-flex items-center gap-0.5 rounded-full border px-2 py-0.5',
                   'font-mono text-[9px] font-bold uppercase tracking-wider leading-none',
                   'animate-pulse',
-                  effect.bgClass,
-                  effect.borderClass,
-                  effect.textClass ?? 'text-white',
-                  effect.glowClass ?? '',
+                  style.bgClass,
+                  style.borderClass,
+                  style.textClass,
+                  style.glowClass ?? '',
                 ].join(' ')}
               >
                 {effect.icon && <span className="text-[10px] leading-none">{effect.icon}</span>}
                 {effect.label}
               </span>
-            ))}
+              );
+            })}
           </div>
         )}
 
@@ -448,7 +414,7 @@ const GameField = forwardRef<GameFieldRef, GameFieldProps>(({
           </>
         )}
         {/* ── Curtain: a frosted band right below the swap line, fully opaque beyond it ── */}
-        {isMe && activeEffects.some((e) => e.id.startsWith('curtain-active')) && (
+        {isMe && activeEffects.some((e) => e.kind === 'curtain') && (
           <>
             {/* Frosted/blurred transition band — semi-visible for the first few rows */}
             <div
@@ -529,19 +495,45 @@ const GameField = forwardRef<GameFieldRef, GameFieldProps>(({
           </div>
           <div className={`${compactStorageLayout ? 'self-end' : 'shrink-0'} rounded border border-white/15 bg-zinc-950/80 p-1`}>
             {holdPreview ? (
-              <div
-                className="grid"
-                style={{ gridTemplateColumns: `repeat(${HOLD_PREVIEW_SIZE}, ${holdPreviewCell}px)` }}
-              >
-                {holdPreview.flatMap((row, y) =>
-                  row.map((filled, x) => (
-                    <div
-                      key={`hold-${x}-${y}`}
-                      className={`border border-black/30 ${filled && player.holdPiece ? COLORS[player.holdPiece] : 'bg-zinc-900'}`}
-                      style={{ width: holdPreviewCell, height: holdPreviewCell }}
-                    />
-                  )),
-                )}
+              <div className="relative">
+                <div
+                  className="grid"
+                  style={{ gridTemplateColumns: `repeat(${HOLD_PREVIEW_SIZE}, ${holdPreviewCell}px)` }}
+                >
+                  {holdPreview.flatMap((row, y) =>
+                    row.map((filled, x) => {
+                      const poisonVariant =
+                        filled && heldPiece?.poisoned ? (heldPiece.poisonVariant ?? 1) : 0;
+                      if (poisonVariant > 0) {
+                        return (
+                          <div
+                            key={`hold-${x}-${y}`}
+                            className={`poison-cell poison-cell-v${Math.min(poisonVariant, 4)}`}
+                            style={{ width: holdPreviewCell, height: holdPreviewCell }}
+                          />
+                        );
+                      }
+                      return (
+                        <div
+                          key={`hold-${x}-${y}`}
+                          className="relative border border-black/30"
+                          style={{ width: holdPreviewCell, height: holdPreviewCell }}
+                        >
+                          <div
+                            className={`absolute inset-0 ${
+                              filled && heldPiece ? COLORS[heldPiece.type] : 'bg-zinc-900'
+                            }`}
+                          />
+                          {filled && heldPiece?.bomber && (
+                            <span className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center text-[8px] leading-none">
+                              💣
+                            </span>
+                          )}
+                        </div>
+                      );
+                    }),
+                  )}
+                </div>
               </div>
             ) : (
               <div
@@ -577,7 +569,10 @@ export default React.memo(GameField, (prev, next) => {
   }
 
   if (
-    pA.holdPiece !== pB.holdPiece ||
+    pA.holdPiece?.type !== pB.holdPiece?.type ||
+    !!pA.holdPiece?.poisoned !== !!pB.holdPiece?.poisoned ||
+    pA.holdPiece?.poisonVariant !== pB.holdPiece?.poisonVariant ||
+    !!pA.holdPiece?.bomber !== !!pB.holdPiece?.bomber ||
     pA.canHold !== pB.canHold ||
     pA.linesCleared !== pB.linesCleared ||
     pA.swapCutoffRow !== pB.swapCutoffRow ||

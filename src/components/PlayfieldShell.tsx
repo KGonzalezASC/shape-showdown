@@ -5,7 +5,7 @@ import ShopRail from './ShopRail';
 import { GameFieldsLayout } from './GameFieldsLayout';
 import { PlayfieldCellSizeContext } from './playfieldCellSizeContext';
 import { BOARD_COLS, BOARD_VISIBLE_ROWS } from '../types';
-import { resolveShopOffers, SHOP_ITEM_BY_ID } from '../shop/mockPool';
+import { resolveShopOffers, SHOP_ITEM_BY_ID } from '../shop/shopCatalog';
 import { useMatchChromeSnapshot, usePlayfieldSnapshot } from '../state/GameStateProvider';
 import { useShopConfirm } from '../hooks/useShopConfirm';
 
@@ -78,7 +78,10 @@ export const PlayfieldShell: React.FC<PlayfieldShellProps> = ({
               />
             )}
           </div>
-          <div ref={railRef} className="flex shrink-0 flex-col gap-2 overflow-y-auto">
+          <div
+            ref={railRef}
+            className="flex w-[5.75rem] shrink-0 flex-col gap-2 overflow-y-auto"
+          >
             <OpponentMiniField player={opponentPlayer} pendingGarbage={chrome.oppPendingGarbage} />
             <ShopRail
               items={shopOffers}

@@ -245,7 +245,7 @@ describe('poison spread variations', () => {
     buyer.shop.cycleIndex = 0;
 
     opponent.poisonBoard = createEmptyPoisonBoard();
-    const purchaseResult1 = applyShopPurchase(game, buyer, opponent, 'wildcard-four');
+    const purchaseResult1 = applyShopPurchase(game, buyer, opponent, 'wildcard-four', makeRng(1));
     assert.equal(purchaseResult1, false, 'Should not purchase wildcard-four if opponent has no poisoned cells');
 
     opponent.poisonBoard[35][4] = 2;
@@ -253,7 +253,7 @@ describe('poison spread variations', () => {
     opponent.board[35][4] = 'T';
     opponent.board[35][5] = 'T';
 
-    const purchaseResult2 = applyShopPurchase(game, buyer, opponent, 'wildcard-four');
+    const purchaseResult2 = applyShopPurchase(game, buyer, opponent, 'wildcard-four', makeRng(1));
     assert.equal(purchaseResult2, true, 'Should successfully purchase wildcard-four if opponent has poisoned cells');
     assert.equal(buyer.score, 500 - 60, 'Cost of wildcard-four (60) should be deducted');
 
@@ -356,7 +356,7 @@ describe('poison spread variations', () => {
     // Bottom row (row 39) was cleared; row 38 slid down to row 39.
     // The poisoned cell at (39, 4) was cleared.
     // The poisoned cell at (38, 4) slid down to (39, 4).
-    const purchaseResult = applyShopPurchase(game, buyer, opponent, 'wildcard-four');
+    const purchaseResult = applyShopPurchase(game, buyer, opponent, 'wildcard-four', makeRng(1));
     assert.equal(purchaseResult, true, 'Purchase should succeed after partial clear');
     assert.ok(opponent.customNextPieceOffsets, 'Should have custom offsets');
     assert.equal(opponent.customNextPieceOffsets.length, 1, 'Only 1 cell should remain after partial clear');
@@ -411,7 +411,7 @@ describe('poison spread variations', () => {
     stepPlayer(game, opponent, buyer, rng, []);
 
     // The only poisoned cell is now cleared. Purchase should fizzle.
-    const purchaseResult = applyShopPurchase(game, buyer, opponent, 'wildcard-four');
+    const purchaseResult = applyShopPurchase(game, buyer, opponent, 'wildcard-four', makeRng(1));
     assert.equal(purchaseResult, false, 'Purchase should fizzle since no poisoned cells remain');
     assert.equal(buyer.score, 500, 'Score should NOT be deducted');
   });
@@ -453,7 +453,7 @@ describe('poison spread variations', () => {
     opponent.poisonBoard[bottom][4] = 2;
     opponent.board[bottom][4] = 'G';
 
-    const purchaseResult = applyShopPurchase(game, buyer, opponent, 'wildcard-four');
+    const purchaseResult = applyShopPurchase(game, buyer, opponent, 'wildcard-four', makeRng(1));
     assert.equal(purchaseResult, true, 'Purchase should succeed');
     assert.ok(opponent.customNextPieceOffsets, 'Should have custom offsets');
     assert.equal(opponent.customNextPieceOffsets.length, 3, 'Should capture all 3 mixed cells');
@@ -494,7 +494,7 @@ describe('poison spread variations', () => {
       opponent.board[bottom][x] = 'T';
     }
 
-    const purchaseResult = applyShopPurchase(game, buyer, opponent, 'wildcard-four');
+    const purchaseResult = applyShopPurchase(game, buyer, opponent, 'wildcard-four', makeRng(1));
     assert.equal(purchaseResult, true, 'Purchase should succeed');
     assert.ok(opponent.customNextPieceOffsets, 'Should have custom offsets');
     assert.equal(opponent.customNextPieceOffsets.length, 6, 'Custom shape should be capped at exactly 6 cells');
@@ -556,7 +556,7 @@ describe('poison spread variations', () => {
       opponent.board[y][x] = 'T';
     }
 
-    const purchaseResult = applyShopPurchase(game, buyer, opponent, 'wildcard-four');
+    const purchaseResult = applyShopPurchase(game, buyer, opponent, 'wildcard-four', makeRng(1));
     assert.equal(purchaseResult, true, 'Purchase should succeed');
     assert.equal(opponent.customNextPieceVariant, 2, 'Should use the large blotch variant');
     assert.ok(opponent.customNextPieceOffsets, 'Should have custom offsets');
@@ -612,7 +612,7 @@ describe('poison spread variations', () => {
     opponent.board[bottom][8] = 'T';
     opponent.board[bottom][9] = 'T';
 
-    const purchaseResult = applyShopPurchase(game, buyer, opponent, 'wildcard-four');
+    const purchaseResult = applyShopPurchase(game, buyer, opponent, 'wildcard-four', makeRng(1));
     assert.equal(purchaseResult, true, 'Purchase should succeed');
     assert.equal(opponent.customNextPieceVariant, 3, 'Largest component wins regardless of colour');
     assert.deepEqual(opponent.customNextPieceOffsets, [[0, 0], [1, 0], [2, 0]]);
@@ -648,7 +648,7 @@ describe('poison spread variations', () => {
     opponent.poisonBoard[bottom][9] = 3;
     opponent.board[bottom][9] = 'T';
 
-    const purchaseResult = applyShopPurchase(game, buyer, opponent, 'wildcard-four');
+    const purchaseResult = applyShopPurchase(game, buyer, opponent, 'wildcard-four', makeRng(1));
     assert.equal(purchaseResult, true, 'Purchase should succeed');
     assert.ok(opponent.customNextPieceOffsets, 'Should have custom offsets');
     assert.equal(opponent.customNextPieceOffsets.length, 1, 'Extracted component should have exactly 1 cell');
@@ -687,7 +687,7 @@ describe('poison spread variations', () => {
     opponent.board[bottom - 1][5] = 'T';
     opponent.board[bottom][4] = 'T';
 
-    assert.equal(applyShopPurchase(game, buyer, opponent, 'wildcard-four'), true);
+    assert.equal(applyShopPurchase(game, buyer, opponent, 'wildcard-four', makeRng(1)), true);
     assert.deepEqual(opponent.customNextPieceOffsets, [[0, 0], [1, 0], [0, 1]]);
 
     opponent.activePiece = null;
@@ -730,7 +730,7 @@ describe('poison spread variations', () => {
     opponent.board[bottom][4] = 'T';
 
     // Purchase the synergy item wildcard-four
-    const purchaseResult = applyShopPurchase(game, buyer, opponent, 'wildcard-four');
+    const purchaseResult = applyShopPurchase(game, buyer, opponent, 'wildcard-four', makeRng(1));
     assert.equal(purchaseResult, true, 'Purchase should succeed');
 
     // Verify that elixir-pulse is consumed and removed from activeSynergySeeds

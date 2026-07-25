@@ -1,144 +1,56 @@
 import {
-  BOMBER_COST,
-  CURTAIN_COST,
-  CURTAIN_TELEGRAPH_TICKS,
-  FREEZE_COST,
-  FREEZE_DURATION_TICKS,
-  GameState,
-  MAGNET_COST,
-  PlayerShopState,
-  PlayerState,
-  POISON_COST,
-  POISON_GENERATIONS,
-  POISON_PURGE_COST,
-  POISON_PURGE_TELEGRAPH_TICKS,
-  RETRIM_ACTIVATION_TICKS,
-  RETRIM_COST,
-  SATELLITE_COST,
-  SNAG_COST,
-  TECTONIC_SHIFT_COST,
-  STICKY_COST,
-  BOUNTY_TAX_COST,
-  BOUNTY_TAX_PERCENT,
-  WILDCARD_FOUR_COST,
   BOARD_COLS,
   BOARD_ROWS,
+  BOUNTY_TAX_PERCENT,
+  CURTAIN_TELEGRAPH_TICKS,
+  FREEZE_DURATION_TICKS,
+  GameState,
+  PlayerState,
+  POISON_GENERATIONS,
+  POISON_PURGE_TELEGRAPH_TICKS,
+  RETRIM_ACTIVATION_TICKS,
 } from '../src/types.js';
-import { SHOP_MOCK_POOL, SHOP_ITEM_BY_ID } from '../src/shop/mockPool.js';
+import { MutableRng, rngInt } from '../src/rng.js';
+import { SHOP_ITEM_BY_ID } from '../src/shop/shopCatalog.js';
+import { pushFieldEffect } from '../src/shop/fieldEffects.js';
 import {
-  createInitialShopRoll,
-  drawWeightedShopOffers,
-  SHOP_VISIBLE_COUNT,
-} from '../src/shop/shopRoll.js';
-import {
+  applyBomberToBuyer,
   applyMagnetToOpponent,
   applySnagToOpponent,
   applyStickyToActivePiece,
   armSatelliteToBuyer,
-  applyBomberToBuyer,
   startTectonicShift,
 } from './tetris/engine.js';
 
-/** ~700ms highlight interval at 60Hz simulation. */
-export const SHOP_CYCLE_TICKS = 42;
-
-const PURCHASABLE_IDS = new Set([
-  'retrim',
-  'curtain',
-  'elixir-pulse',
-  'vortex-step',
-  'frost-shift',
-  'quickstep-clock',
-  'gravity-lure',
-  'fortify-frame',
-  'satellite-link',
-  'nova-charge',
-  'bounty-tax',
-  'wildcard-four',
-  'tectonic-shift',
-]);
-
-const SELF_SHOP_ITEMS = new Set(['satellite-link', 'nova-charge', 'tectonic-shift']);
-
-const ITEM_COST: Record<string, number> = {
-  retrim: RETRIM_COST,
-  curtain: CURTAIN_COST,
-  'elixir-pulse': POISON_COST,
-  'vortex-step': POISON_PURGE_COST,
-  'frost-shift': FREEZE_COST,
-  'quickstep-clock': STICKY_COST,
-  'gravity-lure': MAGNET_COST,
-  'fortify-frame': SNAG_COST,
-  'satellite-link': SATELLITE_COST,
-  'nova-charge': BOMBER_COST,
-  'bounty-tax': BOUNTY_TAX_COST,
-  'wildcard-four': WILDCARD_FOUR_COST,
-  'tectonic-shift': TECTONIC_SHIFT_COST,
-};
-
-export function createInitialPlayerShop(): PlayerShopState {
-  const rolled = createInitialShopRoll(SHOP_MOCK_POOL, SHOP_VISIBLE_COUNT);
-  return {
-    offerIds: rolled.offers.map((o) => o.id),
-    bagState: rolled.bagState,
-    phase: 'waiting',
-    cycleIndex: -1,
-    cycleStartTick: null,
-    lastPurchasedItemId: null,
-    activeSynergySeeds: [],
-  };
-}
-
-export function resetPlayerShop(player: PlayerState): void {
-  player.shop = createInitialPlayerShop();
-}
-
-export function rollShopOnLineClear(player: PlayerState): void {
-  const rolled = drawWeightedShopOffers(
-    SHOP_MOCK_POOL,
-    SHOP_VISIBLE_COUNT,
-    player.shop.bagState,
-    new Set(player.shop.activeSynergySeeds),
-  );
-  player.shop.offerIds = rolled.offers.map((o) => o.id);
-  player.shop.bagState = rolled.nextBagState;
-  player.shop.phase = 'ready';
-  player.shop.cycleIndex = -1;
-  player.shop.cycleStartTick = null;
-  player.shop.lastPurchasedItemId = null;
-}
-
-export function tickPlayerShop(player: PlayerState, currentTick: number): void {
-  if (player.shop.phase !== 'cycling' || player.shop.cycleStartTick === null) return;
-  const elapsed = currentTick - player.shop.cycleStartTick;
-  const nextIndex = Math.floor(elapsed / SHOP_CYCLE_TICKS);
-  if (nextIndex >= player.shop.offerIds.length) {
-    player.shop.phase = 'expired';
-    player.shop.cycleIndex = -1;
-    player.shop.cycleStartTick = null;
-    return;
-  }
-  player.shop.cycleIndex = nextIndex;
-}
-
-export function openPlayerShop(player: PlayerState, currentTick: number): boolean {
-  if (player.shop.phase !== 'ready' && player.shop.phase !== 'expired') return false;
-  if (player.shop.offerIds.length === 0) return false;
-  player.shop.phase = 'cycling';
-  player.shop.cycleIndex = 0;
-  player.shop.cycleStartTick = currentTick;
-  return true;
-}
+export {
+  createInitialPlayerShop,
+  openPlayerShop,
+  resetPlayerShop,
+  rollShopOnLineClear,
+  SHOP_CYCLE_TICKS,
+  tickPlayerShop,
+} from '../src/shop/playerShop.js';
 
 /** Max cells copied onto a Wildcard +4 puzzle piece. */
 export const WILDCARD_FOUR_MAX_CELLS = 6;
 
+const POISON_VARIANT_LABELS = ['Magenta', 'Lime', 'Indigo', 'Teal'] as const;
+
+type PurchaseCtx = {
+  gameState: GameState;
+  buyer: PlayerState;
+  opponent: PlayerState | null;
+  tick: number;
+  rng: MutableRng;
+};
+
+type ShopHandler = {
+  canPurchase?: (ctx: PurchaseCtx) => boolean;
+  onPurchase: (ctx: PurchaseCtx) => void;
+};
+
 type PoisonCell = { x: number; y: number };
 
-/**
- * Find the largest 4-connected poison blotch (same variant).
- * Ties prefer the topmost, then leftmost seed cell.
- */
 function findLargestPoisonComponent(
   poison: number[][],
 ): { cells: PoisonCell[]; variant: number } | null {
@@ -189,10 +101,6 @@ function findLargestPoisonComponent(
   return { cells: best, variant: bestVariant };
 }
 
-/**
- * If a blotch exceeds the piece cap, keep a connected subset via BFS from its
- * topmost-leftmost cell (never row-major chop across disconnected islands).
- */
 function truncateConnectedPoisonCells(cells: PoisonCell[], maxCells: number): PoisonCell[] {
   if (cells.length <= maxCells) return cells;
   const inGroup = new Set(cells.map((c) => `${c.x},${c.y}`));
@@ -227,263 +135,205 @@ function poisonCellsToOffsets(cells: PoisonCell[]): [number, number][] {
     .sort((a, b) => a[1] - b[1] || a[0] - b[0]);
 }
 
+function opponentHasPoison(opponent: PlayerState): boolean {
+  const poison = opponent.poisonBoard ?? [];
+  for (let y = 0; y < BOARD_ROWS; y++) {
+    for (let x = 0; x < BOARD_COLS; x++) {
+      if (poison[y]?.[x] > 0) return true;
+    }
+  }
+  return false;
+}
+
+const SHOP_HANDLERS: Record<string, ShopHandler> = {
+  retrim: {
+    onPurchase: ({ opponent, tick }) => {
+      if (!opponent) return;
+      opponent.pendingShopEffects.push({
+        itemId: 'retrim',
+        activationTick: tick + RETRIM_ACTIVATION_TICKS,
+      });
+      pushFieldEffect(opponent, 'retrim', tick, 'Retrimmed', '✂️', tick + 240);
+    },
+  },
+  curtain: {
+    onPurchase: ({ opponent, tick }) => {
+      if (!opponent) return;
+      opponent.pendingShopEffects.push({
+        itemId: 'curtain',
+        activationTick: tick + CURTAIN_TELEGRAPH_TICKS,
+      });
+      pushFieldEffect(opponent, 'curtain-warn', tick, 'Curtain incoming', '🎭', tick + CURTAIN_TELEGRAPH_TICKS);
+    },
+  },
+  'elixir-pulse': {
+    onPurchase: ({ opponent, tick, rng }) => {
+      if (!opponent) return;
+      const variant = rngInt(rng, 4) + 1;
+      if (opponent.activePiece) {
+        opponent.activePiece.poisoned = true;
+        opponent.activePiece.poisonVariant = variant;
+      } else {
+        const stackEmpty = opponent.board.every((row) => row.every((cell) => cell === null));
+        if (!stackEmpty) {
+          opponent.poisonNextPiece = true;
+          opponent.poisonNextVariant = variant;
+        }
+      }
+      pushFieldEffect(opponent, 'poison', tick, 'Poisoned', '🧪', tick + 180);
+    },
+  },
+  'storage-toxin': {
+    canPurchase: ({ opponent }) => !!opponent?.holdPiece,
+    onPurchase: ({ opponent, tick, rng }) => {
+      if (!opponent?.holdPiece) return;
+      const variant = rngInt(rng, 4) + 1;
+      opponent.holdPiece.poisoned = true;
+      opponent.holdPiece.poisonVariant = variant;
+      pushFieldEffect(opponent, 'storage-poison', tick, 'Storage poisoned', '🦠', tick + 180);
+    },
+  },
+  'vortex-step': {
+    onPurchase: ({ opponent, tick, rng }) => {
+      if (!opponent) return;
+      const variant = rngInt(rng, POISON_GENERATIONS) + 1;
+      opponent.pendingShopEffects.push({
+        itemId: 'vortex-step',
+        activationTick: tick + POISON_PURGE_TELEGRAPH_TICKS,
+        poisonVariant: variant,
+      });
+      pushFieldEffect(
+        opponent,
+        'purge-warn',
+        tick,
+        `Wild ${POISON_VARIANT_LABELS[variant - 1]}`,
+        '🃏',
+        tick + POISON_PURGE_TELEGRAPH_TICKS,
+      );
+    },
+  },
+  'frost-shift': {
+    onPurchase: ({ opponent, tick }) => {
+      if (!opponent) return;
+      const until = tick + FREEZE_DURATION_TICKS;
+      opponent.holdFrozenUntilTick = Math.max(opponent.holdFrozenUntilTick ?? 0, until);
+      pushFieldEffect(opponent, 'freeze', tick, 'Frozen', '❄️', until);
+    },
+  },
+  'gravity-lure': {
+    onPurchase: ({ opponent, tick }) => {
+      if (!opponent) return;
+      applyMagnetToOpponent(opponent);
+      const permanent = opponent.magnetPermanentStacks ?? 0;
+      const pieceBoost = opponent.magnetPieceBoost ?? 0;
+      const pull = permanent * 2 + pieceBoost;
+      const label = pieceBoost > 0 ? `Magnet +${pull}` : `Magnet ×${permanent} (+${pull})`;
+      pushFieldEffect(opponent, 'magnet', tick, label, '🧲', tick + 180);
+    },
+  },
+  'fortify-frame': {
+    onPurchase: ({ opponent, tick }) => {
+      if (!opponent) return;
+      applySnagToOpponent(opponent);
+      pushFieldEffect(opponent, 'snag', tick, 'Snagged', '🪝', tick + 180);
+    },
+  },
+  'quickstep-clock': {
+    onPurchase: ({ opponent, tick }) => {
+      if (!opponent) return;
+      applyStickyToActivePiece(opponent);
+      pushFieldEffect(opponent, 'sticky', tick, 'Sticky', '⏱️');
+    },
+  },
+  'satellite-link': {
+    onPurchase: ({ buyer, tick }) => {
+      armSatelliteToBuyer(buyer, tick);
+      const activated = (buyer.satelliteDelayUntilTick ?? 0) > tick;
+      pushFieldEffect(
+        buyer,
+        'satellite',
+        tick,
+        activated ? 'Satellite' : 'Satellite armed',
+        '🛰️',
+        activated ? buyer.satelliteDelayUntilTick! : tick + 3600,
+      );
+    },
+  },
+  'nova-charge': {
+    onPurchase: ({ buyer, tick }) => {
+      applyBomberToBuyer(buyer);
+      pushFieldEffect(buyer, 'bomber', tick, 'Bomber', '💣', tick + 240);
+    },
+  },
+  'bounty-tax': {
+    canPurchase: ({ buyer, opponent }) => !!opponent && opponent.score > buyer.score,
+    onPurchase: ({ buyer, opponent, tick }) => {
+      if (!opponent) return;
+      const stolen = Math.floor(opponent.score * BOUNTY_TAX_PERCENT);
+      opponent.score -= stolen;
+      buyer.score += stolen;
+      pushFieldEffect(opponent, 'taxed', tick, `Taxed (-${stolen})`, '💸', tick + 120);
+      pushFieldEffect(buyer, 'tax-siphon', tick, `Siphoned (+${stolen})`, '💸', tick + 120);
+    },
+  },
+  'wildcard-four': {
+    canPurchase: ({ opponent }) => !!opponent && opponentHasPoison(opponent),
+    onPurchase: ({ opponent, tick }) => {
+      if (!opponent) return;
+      const poison = opponent.poisonBoard ?? [];
+      const component = findLargestPoisonComponent(poison);
+      if (!component) return;
+      const targetCells = truncateConnectedPoisonCells(component.cells, WILDCARD_FOUR_MAX_CELLS);
+      opponent.customNextPieceOffsets = poisonCellsToOffsets(targetCells);
+      opponent.customNextPieceVariant = component.variant;
+      opponent.customNextPieceSourceCells = targetCells.map((cell) => [cell.x, cell.y]);
+      pushFieldEffect(opponent, 'wildcard-four', tick, 'Wildcard +4', '🧩', tick + 240);
+    },
+  },
+  'tectonic-shift': {
+    onPurchase: ({ buyer, tick }) => {
+      startTectonicShift(buyer, tick);
+      pushFieldEffect(buyer, 'tectonic-shift', tick, 'Tectonic Shift', '🪐', tick + 360);
+    },
+  },
+};
+
 export function applyShopPurchase(
   gameState: GameState,
   buyer: PlayerState,
   opponent: PlayerState | null,
   itemId: string,
+  rng: MutableRng,
 ): boolean {
   const shop = buyer.shop;
   if (shop.phase !== 'cycling') return false;
   if (shop.cycleIndex < 0 || shop.cycleIndex >= shop.offerIds.length) return false;
   const selectedId = shop.offerIds[shop.cycleIndex];
   if (selectedId !== itemId) return false;
-  if (!PURCHASABLE_IDS.has(itemId)) return false;
 
-  const cost = ITEM_COST[itemId];
-  if (cost === undefined || buyer.score < cost) return false;
-  if (!SELF_SHOP_ITEMS.has(itemId) && !opponent) return false;
+  const catalogItem = SHOP_ITEM_BY_ID.get(itemId);
+  if (!catalogItem || !catalogItem.purchasable) return false;
+  if (buyer.score < catalogItem.cost) return false;
+  if (catalogItem.target === 'opponent' && !opponent) return false;
 
-  if (itemId === 'bounty-tax' && (!opponent || opponent.score <= buyer.score)) {
-    return false;
-  }
+  const handler = SHOP_HANDLERS[itemId];
+  if (!handler) return false;
 
-  if (itemId === 'wildcard-four') {
-    if (!opponent) return false;
-    const poison = opponent.poisonBoard ?? [];
-    let hasPoison = false;
-    for (let y = 0; y < BOARD_ROWS; y++) {
-      for (let x = 0; x < BOARD_COLS; x++) {
-        if (poison[y]?.[x] > 0) {
-          hasPoison = true;
-          break;
-        }
-      }
-      if (hasPoison) break;
-    }
-    if (!hasPoison) return false;
-  }
+  const ctx: PurchaseCtx = { gameState, buyer, opponent, tick: gameState.tick, rng };
+  if (handler.canPurchase && !handler.canPurchase(ctx)) return false;
 
-  buyer.score -= cost;
+  buyer.score -= catalogItem.cost;
   shop.phase = 'waiting';
   shop.cycleIndex = -1;
   shop.cycleStartTick = null;
   shop.lastPurchasedItemId = itemId;
 
-  // Add the newly purchased item to active synergy seeds
   let nextSeeds = [...shop.activeSynergySeeds, itemId];
-  // If this item has a synergy partner it consumes, remove that partner from active seeds
-  const purchasedItem = SHOP_ITEM_BY_ID.get(itemId);
-  if (purchasedItem && purchasedItem.synergyTargetId) {
-    nextSeeds = nextSeeds.filter((id) => id !== purchasedItem.synergyTargetId);
+  if (catalogItem.synergyTargetId) {
+    nextSeeds = nextSeeds.filter((id) => id !== catalogItem.synergyTargetId);
   }
   shop.activeSynergySeeds = nextSeeds;
 
-  if (!buyer.activeEffects) buyer.activeEffects = [];
-  if (opponent && !opponent.activeEffects) opponent.activeEffects = [];
-
-  const tick = gameState.tick;
-
-  if (itemId === 'retrim' && opponent) {
-    opponent.pendingShopEffects.push({ itemId: 'retrim', activationTick: tick + RETRIM_ACTIVATION_TICKS });
-    opponent.activeEffects.push({
-      id: `retrim-${tick}`,
-      label: 'Retrimmed',
-      icon: '✂️',
-      bgClass: 'bg-rose-900/80',
-      borderClass: 'border-rose-400',
-      textClass: 'text-rose-100',
-      glowClass: 'shadow-[0_0_10px_rgba(244,63,94,0.7)]',
-      expiresAtTick: tick + 240,
-    });
-  } else if (itemId === 'curtain' && opponent) {
-    opponent.pendingShopEffects.push({ itemId: 'curtain', activationTick: tick + CURTAIN_TELEGRAPH_TICKS });
-    opponent.activeEffects.push({
-      id: `curtain-warn-${tick}`,
-      label: 'Curtain incoming',
-      icon: '🎭',
-      bgClass: 'bg-indigo-900/80',
-      borderClass: 'border-indigo-400',
-      textClass: 'text-indigo-100',
-      glowClass: 'shadow-[0_0_10px_rgba(129,140,248,0.7)]',
-      expiresAtTick: tick + CURTAIN_TELEGRAPH_TICKS,
-    });
-  } else if (itemId === 'elixir-pulse' && opponent) {
-    const variant = Math.floor(Math.random() * 4) + 1;
-    if (opponent.activePiece) {
-      opponent.activePiece.poisoned = true;
-      opponent.activePiece.poisonVariant = variant;
-    } else {
-      const stackEmpty = opponent.board.every((row) => row.every((cell) => cell === null));
-      if (!stackEmpty) {
-        opponent.poisonNextPiece = true;
-        opponent.poisonNextVariant = variant;
-      }
-    }
-    opponent.activeEffects.push({
-      id: `poison-${tick}`,
-      label: 'Poisoned',
-      icon: '🧪',
-      bgClass: 'bg-fuchsia-900/80',
-      borderClass: 'border-fuchsia-400',
-      textClass: 'text-fuchsia-100',
-      glowClass: 'shadow-[0_0_10px_rgba(217,70,239,0.7)]',
-      expiresAtTick: tick + 180,
-    });
-  } else if (itemId === 'vortex-step' && opponent) {
-    const variant = Math.floor(Math.random() * POISON_GENERATIONS) + 1;
-    opponent.pendingShopEffects.push({
-      itemId: 'vortex-step',
-      activationTick: tick + POISON_PURGE_TELEGRAPH_TICKS,
-      poisonVariant: variant,
-    });
-    const variantLabels = ['Magenta', 'Lime', 'Indigo', 'Teal'] as const;
-    opponent.activeEffects.push({
-      id: `purge-warn-${tick}`,
-      label: `Wild ${variantLabels[variant - 1]}`,
-      icon: '🃏',
-      bgClass: 'bg-fuchsia-900/80',
-      borderClass: 'border-fuchsia-400',
-      textClass: 'text-fuchsia-100',
-      glowClass: 'shadow-[0_0_10px_rgba(217,70,239,0.7)]',
-      expiresAtTick: tick + POISON_PURGE_TELEGRAPH_TICKS,
-    });
-  } else if (itemId === 'frost-shift' && opponent) {
-    const until = tick + FREEZE_DURATION_TICKS;
-    opponent.holdFrozenUntilTick = Math.max(opponent.holdFrozenUntilTick ?? 0, until);
-    opponent.activeEffects.push({
-      id: `freeze-active-${tick}`,
-      label: 'Frozen',
-      icon: '❄️',
-      bgClass: 'bg-sky-900/80',
-      borderClass: 'border-sky-300',
-      textClass: 'text-sky-100',
-      glowClass: 'shadow-[0_0_10px_rgba(56,189,248,0.7)]',
-      expiresAtTick: until,
-    });
-  } else if (itemId === 'gravity-lure' && opponent) {
-    applyMagnetToOpponent(opponent);
-    const permanent = opponent.magnetPermanentStacks ?? 0;
-    const pieceBoost = opponent.magnetPieceBoost ?? 0;
-    const pull = permanent * 2 + pieceBoost;
-    const label = pieceBoost > 0 ? `Magnet +${pull}` : `Magnet ×${permanent} (+${pull})`;
-    opponent.activeEffects.push({
-      id: `magnet-${tick}`,
-      label,
-      icon: '🧲',
-      bgClass: 'bg-violet-900/80',
-      borderClass: 'border-violet-400',
-      textClass: 'text-violet-100',
-      glowClass: 'shadow-[0_0_10px_rgba(167,139,250,0.7)]',
-      expiresAtTick: tick + 180,
-    });
-  } else if (itemId === 'fortify-frame' && opponent) {
-    applySnagToOpponent(opponent);
-    opponent.activeEffects.push({
-      id: `snag-${tick}`,
-      label: 'Snagged',
-      icon: '🪝',
-      bgClass: 'bg-orange-900/80',
-      borderClass: 'border-orange-400',
-      textClass: 'text-orange-100',
-      glowClass: 'shadow-[0_0_10px_rgba(251,146,60,0.7)]',
-      expiresAtTick: tick + 180,
-    });
-  } else if (itemId === 'quickstep-clock' && opponent) {
-    applyStickyToActivePiece(opponent);
-    opponent.activeEffects!.push({
-      id: `sticky-${tick}`,
-      label: 'Sticky',
-      icon: '⏱️',
-      bgClass: 'bg-teal-900/80',
-      borderClass: 'border-teal-300',
-      textClass: 'text-teal-100',
-      glowClass: 'shadow-[0_0_10px_rgba(45,212,191,0.7)]',
-    });
-  } else if (itemId === 'satellite-link') {
-    armSatelliteToBuyer(buyer, tick);
-    const activated = (buyer.satelliteDelayUntilTick ?? 0) > tick;
-    buyer.activeEffects.push({
-      id: `satellite-${tick}`,
-      label: activated ? 'Satellite' : 'Satellite armed',
-      icon: '🛰️',
-      bgClass: 'bg-zinc-800/90',
-      borderClass: 'border-zinc-300',
-      textClass: 'text-zinc-100',
-      glowClass: 'shadow-[0_0_10px_rgba(212,212,216,0.5)]',
-      expiresAtTick: activated ? buyer.satelliteDelayUntilTick! : tick + 3600,
-    });
-  } else if (itemId === 'nova-charge') {
-    applyBomberToBuyer(buyer);
-    buyer.activeEffects.push({
-      id: `bomber-${tick}`,
-      label: 'Bomber',
-      icon: '💣',
-      bgClass: 'bg-rose-900/80',
-      borderClass: 'border-rose-400',
-      textClass: 'text-rose-100',
-      glowClass: 'shadow-[0_0_10px_rgba(251,113,133,0.7)]',
-      expiresAtTick: tick + 240,
-    });
-  } else if (itemId === 'bounty-tax' && opponent) {
-    const stolen = Math.floor(opponent.score * BOUNTY_TAX_PERCENT);
-    opponent.score -= stolen;
-    buyer.score += stolen;
-
-    opponent.activeEffects.push({
-      id: `taxed-${tick}`,
-      label: `Taxed (-${stolen})`,
-      icon: '💸',
-      bgClass: 'bg-rose-900/80',
-      borderClass: 'border-rose-400',
-      textClass: 'text-rose-100',
-      glowClass: 'shadow-[0_0_10px_rgba(244,63,94,0.7)]',
-      expiresAtTick: tick + 120,
-    });
-    buyer.activeEffects.push({
-      id: `tax-siphon-${tick}`,
-      label: `Siphoned (+${stolen})`,
-      icon: '💸',
-      bgClass: 'bg-emerald-900/80',
-      borderClass: 'border-emerald-400',
-      textClass: 'text-emerald-100',
-      glowClass: 'shadow-[0_0_10px_rgba(52,211,153,0.7)]',
-      expiresAtTick: tick + 120,
-    });
-  } else if (itemId === 'wildcard-four' && opponent) {
-    const poison = opponent.poisonBoard ?? [];
-    const component = findLargestPoisonComponent(poison);
-    // hasPoison gate above guarantees a component exists.
-    if (component) {
-      const targetCells = truncateConnectedPoisonCells(component.cells, WILDCARD_FOUR_MAX_CELLS);
-      opponent.customNextPieceOffsets = poisonCellsToOffsets(targetCells);
-      opponent.customNextPieceVariant = component.variant;
-      opponent.customNextPieceSourceCells = targetCells.map((cell) => [cell.x, cell.y]);
-
-      opponent.activeEffects.push({
-        id: `wildcard-four-${tick}`,
-        label: 'Wildcard +4',
-        icon: '🧩',
-        bgClass: 'bg-fuchsia-950/80',
-        borderClass: 'border-fuchsia-400',
-        textClass: 'text-fuchsia-100',
-        glowClass: 'shadow-[0_0_10px_rgba(217,70,239,0.7)]',
-        expiresAtTick: tick + 240,
-      });
-    }
-  } else if (itemId === 'tectonic-shift') {
-    startTectonicShift(buyer, tick);
-    buyer.activeEffects.push({
-      id: `tectonic-shift-${tick}`,
-      label: 'Tectonic Shift',
-      icon: '🪐',
-      bgClass: 'bg-indigo-950/80',
-      borderClass: 'border-indigo-400',
-      textClass: 'text-indigo-100',
-      glowClass: 'shadow-[0_0_10px_rgba(129,140,248,0.7)]',
-      expiresAtTick: tick + 360,
-    });
-  }
-
+  handler.onPurchase(ctx);
   return true;
 }

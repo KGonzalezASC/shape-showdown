@@ -47,7 +47,7 @@ export const MatchChrome: React.FC = () => {
       />
       {chrome.lastMatchEvent && (
         <div
-          className={`mb-1 self-center rounded-full border border-white/10 bg-white/5 px-2.5 py-0.5 text-[10px] uppercase tracking-wider sm:mb-2 sm:px-3 sm:py-1 sm:text-[11px] ${eventUi.tone}`}
+          className={`pointer-events-none fixed left-1/2 top-12 z-30 -translate-x-1/2 whitespace-nowrap rounded-full border border-white/10 bg-zinc-950/90 px-2.5 py-0.5 text-[10px] uppercase tracking-wider shadow-lg sm:top-24 sm:px-3 sm:py-1 sm:text-[11px] ${eventUi.tone}`}
         >
           {eventUi.text}
         </div>

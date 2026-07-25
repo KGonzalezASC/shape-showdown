@@ -30,6 +30,8 @@ export const CURTAIN_DURATION_TICKS = 240; // 4s blackout once active
 export const POISON_COST = 55;
 export const POISON_SPREAD_INTERVAL_TICKS = 60; // ~1s between waves @ 60Hz
 export const POISON_GENERATIONS = 4; // total waves incl. the lock wave (also = # of color variants)
+// Contagion (storage-toxin): poisons the opponent's held piece; gated on non-empty storage.
+export const STORAGE_POISON_COST = 50;
 // Wild Purge (Uno-style): rolls one poison colour, then after a telegraph removes every
 // opponent cell of that variant as holes (no gravity, no line-clear score for the victim).
 export const POISON_PURGE_COST = 70;

@@ -1,4 +1,9 @@
 import { GameState, MatchEvent, MatchStatus, PlayerState, ShopPhase } from '../types';
+import {
+  PublicPlayerState,
+  publicPlayersEqual,
+  toPublicPlayerState,
+} from './publicSnapshots';
 
 export interface MatchChromeSnapshot {
   status: MatchStatus;
@@ -24,8 +29,8 @@ export interface MatchChromeSnapshot {
 export interface PlayfieldSnapshot {
   status: MatchStatus;
   myId: string | null;
-  myPlayer: PlayerState | null;
-  opponentPlayer: PlayerState | null;
+  myPlayer: PublicPlayerState | null;
+  opponentPlayer: PublicPlayerState | null;
 }
 
 type Listener = () => void;
@@ -110,12 +115,14 @@ function buildPlayfieldSnapshot(): PlayfieldSnapshot {
   if (!gameState) return emptyPlayfieldSnapshot();
 
   const opponentId = myId ? Object.keys(gameState.players).find((id) => id !== myId) : null;
+  const me = myId ? gameState.players[myId] : null;
+  const opponent = opponentId ? gameState.players[opponentId] : null;
 
   return {
     status: gameState.status,
     myId,
-    myPlayer: myId ? gameState.players[myId] ?? null : null,
-    opponentPlayer: opponentId ? gameState.players[opponentId] ?? null : null,
+    myPlayer: me ? toPublicPlayerState(me) : null,
+    opponentPlayer: opponent ? toPublicPlayerState(opponent) : null,
   };
 }
 
@@ -152,6 +159,15 @@ function chromeSnapshotsEqual(a: MatchChromeSnapshot, b: MatchChromeSnapshot): b
   );
 }
 
+function playfieldSnapshotsEqual(a: PlayfieldSnapshot, b: PlayfieldSnapshot): boolean {
+  if (a.status !== b.status) return false;
+  if (a.myId !== b.myId) return false;
+  return (
+    publicPlayersEqual(a.myPlayer, b.myPlayer) &&
+    publicPlayersEqual(a.opponentPlayer, b.opponentPlayer)
+  );
+}
+
 function publishSnapshots() {
   const nextChrome = buildChromeSnapshot();
   if (!chromeSnapshotsEqual(chromeSnapshot, nextChrome)) {
@@ -159,8 +175,11 @@ function publishSnapshots() {
     chromeListeners.forEach((listener) => listener());
   }
 
-  playfieldSnapshot = buildPlayfieldSnapshot();
-  playfieldListeners.forEach((listener) => listener());
+  const nextPlayfield = buildPlayfieldSnapshot();
+  if (!playfieldSnapshotsEqual(playfieldSnapshot, nextPlayfield)) {
+    playfieldSnapshot = nextPlayfield;
+    playfieldListeners.forEach((listener) => listener());
+  }
 }
 
 export function setGameStateStore(state: GameState | null, id: string | null) {

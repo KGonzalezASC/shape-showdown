@@ -99,8 +99,11 @@ const AppShell: React.FC = () => {
     const measure = () => {
       const ob = outer.getBoundingClientRect();
       if (ob.width < 8 || ob.height < 8) return;
-      const railW = railRef.current?.getBoundingClientRect().width ?? 0;
       const scale = (parseFloat(getComputedStyle(document.documentElement).fontSize) || 16) / 16;
+      // Keep the board footprint independent of shop content. The first line
+      // clear adds the Start button, which can create a rail scrollbar; using
+      // the measured rail width here made every board cell shrink in response.
+      const railW = 92 * scale; // ShopRail mobile width: 5.75rem
       const boardChromeReserve = 118 * scale;
       const GAP_AND_SAFETY = 16;
       const availW = ob.width - railW - GAP_AND_SAFETY;
@@ -115,7 +118,6 @@ const AppShell: React.FC = () => {
     measure();
     const ro = new ResizeObserver(measure);
     ro.observe(outer);
-    if (railRef.current) ro.observe(railRef.current);
     return () => ro.disconnect();
   }, [connected]);
 
@@ -232,9 +234,9 @@ const AppShell: React.FC = () => {
   return (
     <div className="flex h-dvh max-h-dvh min-h-0 flex-col overflow-hidden bg-[#0a0a0a] px-2 py-2 font-sans text-white sm:px-4 sm:py-3">
       <MatchChrome />
-      {playfield.myPlayer && (
+      {gameState && myId && gameState.players[myId] && (
         <DrillConsole
-          player={playfield.myPlayer}
+          player={gameState.players[myId]}
           enabled={drill.enabled}
           onToggle={() => drillDispatch({ type: 'TOGGLE' })}
           result={drill.result}

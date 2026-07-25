@@ -29,6 +29,7 @@ import {
   POISON_COST,
   POISON_SPREAD_INTERVAL_TICKS,
   POISON_GENERATIONS,
+  STORAGE_POISON_COST,
   POISON_PURGE_COST,
   POISON_PURGE_TELEGRAPH_TICKS,
   WILDCARD_FOUR_COST,
@@ -68,6 +69,9 @@ export type RotationState = 0 | 1 | 2 | 3;
 export type CellValue = TetrominoType | 'G' | 'W' | null;
 export type ActionType = 'rotateCW' | 'rotateCCW' | 'hardDrop' | 'hold';
 
+/** Who the purchased effect primarily affects. */
+export type ShopItemTarget = 'self' | 'opponent';
+
 export interface ShopItem {
   id: string;
   name: string;
@@ -75,12 +79,38 @@ export interface ShopItem {
   cost: number;
   tier: 1 | 2;
   baseWeight: number;
+  /** When false, item may exist for docs/UI stubs but never appears in rolls. */
+  purchasable: boolean;
+  target: ShopItemTarget;
   colorClass: string;
   borderColorClass: string;
   description: string;
   synergyTargetId?: string;
   synergyBoost?: number;
 }
+
+/**
+ * Semantic field-effect kinds. Presentation (Tailwind) lives in a client adapter;
+ * the server only emits kind + label + timing.
+ */
+export type FieldEffectKind =
+  | 'retrim'
+  | 'curtain-warn'
+  | 'curtain'
+  | 'poison'
+  | 'storage-poison'
+  | 'purge-warn'
+  | 'purge'
+  | 'freeze'
+  | 'magnet'
+  | 'snag'
+  | 'sticky'
+  | 'satellite'
+  | 'bomber'
+  | 'taxed'
+  | 'tax-siphon'
+  | 'wildcard-four'
+  | 'tectonic-shift';
 
 export type ShopPhase = 'waiting' | 'ready' | 'cycling' | 'expired';
 
@@ -101,33 +131,18 @@ export interface PlayerShopState {
 }
 
 /**
- * An effect currently being applied to a player's field by the opponent.
- * All styling is driven by Tailwind class strings so each shop item can
- * have its own visual identity without hard-coding colours in the component.
+ * An effect currently being applied to a player's field.
+ * Styling is owned by the client adapter (`effectStyles`); the wire payload is semantic.
  */
 export interface ActiveFieldEffect {
-  /** Unique ID matching the originating ShopItem.id */
+  /** Unique instance id (kind + tick), not necessarily ShopItem.id */
   id: string;
+  kind: FieldEffectKind;
   /** Short display label shown in the pill (e.g. "Frost", "Nova") */
   label: string;
   /** Optional emoji / icon prefix */
   icon?: string;
-  /**
-   * Tailwind bg class(es) for the pill body.
-   * Supports gradients: e.g. "bg-gradient-to-r from-sky-600 to-cyan-400"
-   * or simple: "bg-rose-600/80"
-   */
-  bgClass: string;
-  /** Border colour class, e.g. "border-sky-300/60" */
-  borderClass: string;
-  /** Text colour class, defaults to "text-white" when omitted */
-  textClass?: string;
-  /**
-   * Optional glow / shadow class applied to the pill wrapper.
-   * e.g. "shadow-[0_0_10px_rgba(56,189,248,0.7)]"
-   */
-  glowClass?: string;
-  /** Tick at which this effect expires (for future countdown display) */
+  /** Tick at which this effect expires (for countdown / prune) */
   expiresAtTick?: number;
 }
 
@@ -157,6 +172,14 @@ export interface TetrisPiece {
   isWildcard?: boolean;
   /** Increments when a wildcard rotation is rejected because it would collide. */
   rotationBlockedNonce?: number;
+}
+
+/** Piece parked in storage — carries type plus piece-level flags that survive hold. */
+export interface HeldPiece {
+  type: TetrominoType;
+  poisoned?: boolean;
+  poisonVariant?: number;
+  bomber?: boolean;
 }
 
 /**
@@ -197,7 +220,7 @@ export interface PlayerState {
   id: string;
   board: CellValue[][];
   activePiece: TetrisPiece | null;
-  holdPiece: TetrominoType | null;
+  holdPiece: HeldPiece | null;
   canHold: boolean;
   nextQueue: TetrominoType[];
   bag: TetrominoType[];
@@ -370,6 +393,7 @@ export {
   POISON_COST,
   POISON_SPREAD_INTERVAL_TICKS,
   POISON_GENERATIONS,
+  STORAGE_POISON_COST,
   POISON_PURGE_COST,
   POISON_PURGE_TELEGRAPH_TICKS,
   WILDCARD_FOUR_COST,

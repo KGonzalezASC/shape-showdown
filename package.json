@@ -16,6 +16,7 @@
     "preview": "bunx vite preview",
     "clean": "rimraf dist dist-server .dev-server.mjs",
     "lint": "tsc --noEmit",
+    "test": "bun test server/**/*.test.ts server/tetris/**/*.test.ts",
     "knip": "knip",
     "lint:dead-code": "knip",
     "start": "cross-env NODE_ENV=production bun dist-server/server.mjs",

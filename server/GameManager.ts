@@ -61,8 +61,18 @@ export class GameManager {
       seed: this.rng.seed,
     };
 
-    this.startLoop();
+    this.loopHandle = this.startLoop();
   }
+
+  /** Test / shutdown hook — stops the 60Hz interval. */
+  public stopLoop() {
+    if (this.loopHandle !== null) {
+      clearInterval(this.loopHandle);
+      this.loopHandle = null;
+    }
+  }
+
+  private loopHandle: ReturnType<typeof setInterval> | null = null;
 
   public handleConnection(socket: Socket) {
     if (Object.keys(this.gameState.players).length < 2) {
@@ -123,7 +133,7 @@ export class GameManager {
       const pids = Object.keys(this.gameState.players);
       const opponentId = pids.find((id) => id !== socket.id);
       const opponent = opponentId ? this.gameState.players[opponentId] : null;
-      applyShopPurchase(this.gameState, buyer, opponent, itemId);
+      applyShopPurchase(this.gameState, buyer, opponent, itemId, this.rng);
       // Flush immediately so cascade / pills aren't held back by the 30Hz netcast.
       this.io.emit('gameState', this.gameState);
     });
@@ -154,7 +164,7 @@ export class GameManager {
   private startLoop() {
     let sinceEmit = 0;
     let prevStatus = this.gameState.status;
-    setInterval(() => {
+    return setInterval(() => {
       this.update();
       sinceEmit += 1;
 
@@ -176,6 +186,11 @@ export class GameManager {
     }, 1000 / 60);
   }
 
+  /** Exposed for interface-level lifecycle harnesses. */
+  public tickOnceForTests() {
+    this.update();
+  }
+
   private clearInputs() {
     for (const id in this.gameState.players) {
       this.gameState.players[id].inputState = { left: false, right: false, softDrop: false };
@@ -192,7 +207,7 @@ export class GameManager {
 
     if (status === 'waiting' || status === 'countdown') {
       for (const id in this.gameState.players) {
-        resetPlayerShop(this.gameState.players[id]);
+        resetPlayerShop(this.gameState.players[id], this.rng);
       }
       this.prevLinesCleared = {};
     }
@@ -244,13 +259,14 @@ export class GameManager {
       const matchEvents: MatchEvent[] = [];
       const pids = Object.keys(this.gameState.players);
       for (const id in this.gameState.players) {
+        if (this.gameState.status !== 'playing') break;
         const player = this.gameState.players[id];
         const opponentId = pids.find((pid) => pid !== id);
         const opponent = opponentId ? this.gameState.players[opponentId] : null;
         const prevLines = this.prevLinesCleared[id] ?? player.linesCleared;
         stepPlayer(this.gameState, player, opponent, this.rng, matchEvents);
         if (player.linesCleared > prevLines) {
-          rollShopOnLineClear(player);
+          rollShopOnLineClear(player, this.rng);
         }
         this.prevLinesCleared[id] = player.linesCleared;
         tickPlayerShop(player, this.gameState.tick);
@@ -259,6 +275,7 @@ export class GameManager {
           this.gameState.winnerId = opponent?.id ?? null;
           this.gameState.restartTimer = RESTART_DELAY_SECONDS;
           this.saveReplay();
+          break;
         }
       }
 

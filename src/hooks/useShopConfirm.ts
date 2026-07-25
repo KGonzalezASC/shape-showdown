@@ -1,5 +1,5 @@
 import { useCallback } from 'react';
-import { SHOP_ITEM_BY_ID } from '../shop/mockPool';
+import { SHOP_ITEM_BY_ID } from '../shop/shopCatalog';
 import { useGameActions, useMatchChromeSnapshot } from '../state/GameStateProvider';
 
 export function useShopConfirm() {

@@ -2,11 +2,11 @@ import React, { useState, useEffect } from 'react';
 import { ShopItem } from '../types';
 
 const MOCK_ITEMS: ShopItem[] = [
-  { id: '1', name: 'Time Slow', icon: '⏰', cost: 50, tier: 1, baseWeight: 1, colorClass: 'text-amber-300', borderColorClass: 'border-amber-500/30', description: 'Slows time briefly.' },
-  { id: '2', name: 'Freeze', icon: '❄️', cost: 75, tier: 1, baseWeight: 1, colorClass: 'text-blue-300', borderColorClass: 'border-blue-500/30', description: 'Freezes opponent field.' },
-  { id: '3', name: 'Target', icon: '🎯', cost: 60, tier: 1, baseWeight: 1, colorClass: 'text-rose-300', borderColorClass: 'border-rose-500/30', description: 'Targets opponent piece.' },
-  { id: '4', name: 'Shield', icon: '🛡️', cost: 40, tier: 1, baseWeight: 1, colorClass: 'text-emerald-300', borderColorClass: 'border-emerald-500/30', description: 'Blocks incoming attack.' },
-  { id: '5', name: 'Bomb', icon: '💣', cost: 90, tier: 2, baseWeight: 1, colorClass: 'text-purple-300', borderColorClass: 'border-purple-500/30', description: 'Clears nearby cells.' },
+  { id: '1', name: 'Time Slow', icon: '⏰', cost: 50, tier: 1, baseWeight: 1, purchasable: false, target: 'self', colorClass: 'text-amber-300', borderColorClass: 'border-amber-500/30', description: 'Slows time briefly.' },
+  { id: '2', name: 'Freeze', icon: '❄️', cost: 75, tier: 1, baseWeight: 1, purchasable: false, target: 'opponent', colorClass: 'text-blue-300', borderColorClass: 'border-blue-500/30', description: 'Freezes opponent field.' },
+  { id: '3', name: 'Target', icon: '🎯', cost: 60, tier: 1, baseWeight: 1, purchasable: false, target: 'opponent', colorClass: 'text-rose-300', borderColorClass: 'border-rose-500/30', description: 'Targets opponent piece.' },
+  { id: '4', name: 'Shield', icon: '🛡️', cost: 40, tier: 1, baseWeight: 1, purchasable: false, target: 'self', colorClass: 'text-emerald-300', borderColorClass: 'border-emerald-500/30', description: 'Blocks incoming attack.' },
+  { id: '5', name: 'Bomb', icon: '💣', cost: 90, tier: 2, baseWeight: 1, purchasable: false, target: 'self', colorClass: 'text-purple-300', borderColorClass: 'border-purple-500/30', description: 'Clears nearby cells.' },
 ];
 
 const baseItemClass = 'flex w-full items-center justify-between border-2 h-9 px-2 transition-all duration-200 opacity-95';
