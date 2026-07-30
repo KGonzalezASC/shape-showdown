@@ -1,6 +1,6 @@
 # Shape Showdown
 
-Fork of **[BubbleBlitzersJS](https://github.com/AVLitskevich/BubbleBlitzersJS)** — a two-player, server-authoritative browser game (Socket.IO). This fork keeps the same connection/match shell while evolving into **Shape Showdown**, a competitive falling-shape puzzle with a broad 12×18 arena, tactical shop, and field-changing powerups; see [FORK.md](./FORK.md) for repository lineage.
+Fork of **[BubbleBlitzersJS](https://github.com/AVLitskevich/BubbleBlitzersJS)** — a two-player, server-authoritative browser game (Socket.IO). This fork keeps the same connection/match shell while evolving into **Shape Showdown**, a competitive falling-shape puzzle with a compact 10×18 arena, tactical shop, and field-changing powerups; see [FORK.md](./FORK.md) for repository lineage.
 
 **This repo on GitHub:** [KGonzalezASC/shape-showdown](https://github.com/KGonzalezASC/shape-showdown)
 

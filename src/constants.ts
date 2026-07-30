@@ -1,7 +1,7 @@
-// Shape Showdown uses a broad 12×18 arena instead of the familiar 10×20 well.
+// Shape Showdown uses a 10×18 arena instead of the familiar 10×20 well.
 // The shorter hidden buffer is sufficient for spawn/kick space while keeping
 // serialized snapshots smaller.
-export const BOARD_COLS = 12;
+export const BOARD_COLS = 10;
 export const BOARD_VISIBLE_ROWS = 18;
 export const BOARD_HIDDEN_ROWS = 12;
 export const BOARD_ROWS = BOARD_VISIBLE_ROWS + BOARD_HIDDEN_ROWS;

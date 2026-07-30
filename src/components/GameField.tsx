@@ -306,7 +306,7 @@ const GameField = forwardRef<GameFieldRef, GameFieldProps>(({
 
         <div className="flex shrink-0 items-center gap-1.5">
           <span className="rounded-full border border-white/10 bg-zinc-900/80 px-2 py-0.5 font-mono text-[9px] uppercase tracking-wider text-zinc-500">
-            12×18 arena
+            {BOARD_COLS}×{BOARD_VISIBLE_ROWS} arena
           </span>
           <span className="rounded-full bg-zinc-800 px-2 py-0.5 font-mono text-[10px] tabular-nums text-zinc-300">
             {player.linesCleared} clears

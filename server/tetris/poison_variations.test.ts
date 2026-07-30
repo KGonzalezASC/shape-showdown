@@ -213,15 +213,15 @@ describe('poison spread variations', () => {
     p2.score = 0;
 
     // Step the player to lock it.
-    // Cleared line has 12 cells total, 5 are poisoned.
-    // poisonedRatio = 5 / 12.
+    // Cleared line has 10 cells total, 4 are poisoned.
+    // poisonedRatio = 4 / 10 = 0.4.
     // POISON_LINE_CLEAR_PENALTY_MAX_RATIO = 0.50.
-    // penalty multiplier = (5 / 12) * 0.50.
+    // penalty multiplier = 0.4 * 0.50 = 0.20.
     // base score = 210.
-    // penalty = Math.round(210 * (5 / 12) * 0.50) = 44.
-    // expected score = 210 - 44 = 166.
+    // penalty = Math.round(210 * 0.20) = 42.
+    // expected score = 210 - 42 = 168.
     stepPlayer(game, p2, opponent, rng, []);
-    assert.equal(p2.score, 166, 'Five poisoned cells on a 12-cell clear should award 166 points');
+    assert.equal(p2.score, 168, 'Four poisoned cells on a 10-cell clear should award 168 points');
   });
 
   it('Wildcard +4 item purchase, shape copying, centering, blocked rotation/hold, and locking/poison spreading', () => {
@@ -277,7 +277,7 @@ describe('poison spread variations', () => {
     assert.equal(active.customOffsets.length, 2, 'Custom shape should have 2 cells');
     assert.deepEqual(active.customOffsets, [[0, 0], [1, 0]], 'Offsets should be [0,0] and [1,0]');
     
-    assert.equal(active.x, 5, 'Two-cell piece should be centered in the 12-column arena');
+    assert.equal(active.x, 4, 'Two-cell piece should be centered in the 10-column arena');
     assert.equal(active.y, BOARD_HIDDEN_ROWS - 2, 'Piece should spawn at standard height');
     assert.equal(active.poisoned, false, 'Piece should not be marked poisoned');
     assert.equal(active.isWildcard, true, 'Piece should be marked wildcard');
