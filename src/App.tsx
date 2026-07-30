@@ -7,6 +7,7 @@ import { PlayfieldShell } from './components/PlayfieldShell';
 import { ShopRailVariations } from './components/ShopRailVariations';
 import MobileControls from './components/MobileControls';
 import { GameFieldRef } from './components/GameField';
+import { BackgroundPrototype } from './components/BackgroundPrototype';
 import { useLockDrill } from './hooks/useLockDrill';
 import { useShopConfirm } from './hooks/useShopConfirm';
 import {
@@ -61,6 +62,7 @@ const AppShell: React.FC = () => {
   const railRef = useRef<HTMLDivElement>(null);
   const [mobileCellSize, setMobileCellSize] = useState(28);
   const [showVariations, setShowVariations] = useState(false);
+  const [hatchingEnabled, setHatchingEnabled] = useState(false);
   const [drill, drillDispatch] = useReducer(drillReducer, { enabled: false, result: null });
 
   const myMobileFieldRef = useRef<GameFieldRef>(null);
@@ -250,6 +252,8 @@ const AppShell: React.FC = () => {
         myMobileFieldRef={myMobileFieldRef}
         myDesktopFieldRef={myDesktopFieldRef}
         oppDesktopFieldRef={oppDesktopFieldRef}
+        hatchingEnabled={hatchingEnabled}
+        onToggleHatching={() => setHatchingEnabled((enabled) => !enabled)}
       />
 
       <LazyMotion features={domAnimation}>
@@ -343,9 +347,13 @@ const AppShell: React.FC = () => {
 };
 
 const App: React.FC = () => (
-  <GameStateProvider>
-    <AppShell />
-  </GameStateProvider>
+  new URLSearchParams(window.location.search).get('prototype') === 'background' ? (
+    <BackgroundPrototype />
+  ) : (
+    <GameStateProvider>
+      <AppShell />
+    </GameStateProvider>
+  )
 );
 
 export default App;

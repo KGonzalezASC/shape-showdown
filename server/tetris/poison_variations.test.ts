@@ -194,11 +194,11 @@ describe('poison spread variations', () => {
     p2.board = createEmptyBoard();
     p2.poisonBoard = Array.from({ length: BOARD_ROWS }, () => Array.from({ length: BOARD_COLS }, () => 0));
     
-    // Fill bottom row: 5 clean cells, 4 poisoned cells, col 0 empty.
+    // Fill the bottom row except col 0. Even columns are poisoned.
     for (let x = 1; x < BOARD_COLS; x++) {
       p2.board[bottom][x] = 'I';
       if (x % 2 === 0) {
-        p2.poisonBoard[bottom][x] = 1; // 4 cells poisoned: cols 2, 4, 6, 8
+        p2.poisonBoard[bottom][x] = 1;
       }
     }
     
@@ -213,15 +213,15 @@ describe('poison spread variations', () => {
     p2.score = 0;
 
     // Step the player to lock it.
-    // Cleared line has 10 cells total, 4 are poisoned.
-    // poisonedRatio = 4 / 10 = 0.40.
+    // Cleared line has 12 cells total, 5 are poisoned.
+    // poisonedRatio = 5 / 12.
     // POISON_LINE_CLEAR_PENALTY_MAX_RATIO = 0.50.
-    // penalty multiplier = 0.40 * 0.50 = 0.20 (20% reduction).
+    // penalty multiplier = (5 / 12) * 0.50.
     // base score = 210.
-    // penalty = Math.round(210 * 0.20) = 42.
-    // expected score = 210 - 42 = 168.
+    // penalty = Math.round(210 * (5 / 12) * 0.50) = 44.
+    // expected score = 210 - 44 = 166.
     stepPlayer(game, p2, opponent, rng, []);
-    assert.equal(p2.score, 168, 'Poisoned single line clear (40% poisoned) should award 168 points (20% reduction)');
+    assert.equal(p2.score, 166, 'Five poisoned cells on a 12-cell clear should award 166 points');
   });
 
   it('Wildcard +4 item purchase, shape copying, centering, blocked rotation/hold, and locking/poison spreading', () => {
@@ -248,17 +248,22 @@ describe('poison spread variations', () => {
     const purchaseResult1 = applyShopPurchase(game, buyer, opponent, 'wildcard-four', makeRng(1));
     assert.equal(purchaseResult1, false, 'Should not purchase wildcard-four if opponent has no poisoned cells');
 
-    opponent.poisonBoard[35][4] = 2;
-    opponent.poisonBoard[35][5] = 2;
-    opponent.board[35][4] = 'T';
-    opponent.board[35][5] = 'T';
+    const sourceRow = BOARD_ROWS - 5;
+    opponent.poisonBoard[sourceRow][4] = 2;
+    opponent.poisonBoard[sourceRow][5] = 2;
+    opponent.board[sourceRow][4] = 'T';
+    opponent.board[sourceRow][5] = 'T';
 
     const purchaseResult2 = applyShopPurchase(game, buyer, opponent, 'wildcard-four', makeRng(1));
     assert.equal(purchaseResult2, true, 'Should successfully purchase wildcard-four if opponent has poisoned cells');
     assert.equal(buyer.score, 500 - 60, 'Cost of wildcard-four (60) should be deducted');
 
     assert.ok(opponent.customNextPieceOffsets, 'Opponent should have customNextPieceOffsets set');
-    assert.deepEqual(opponent.customNextPieceSourceCells, [[4, 35], [5, 35]], 'Source cells should be saved for the board outline');
+    assert.deepEqual(
+      opponent.customNextPieceSourceCells,
+      [[4, sourceRow], [5, sourceRow]],
+      'Source cells should be saved for the board outline',
+    );
     assert.equal(opponent.customNextPieceVariant, 2, 'Should capture variant 2');
     
     opponent.activePiece = null;
@@ -272,7 +277,7 @@ describe('poison spread variations', () => {
     assert.equal(active.customOffsets.length, 2, 'Custom shape should have 2 cells');
     assert.deepEqual(active.customOffsets, [[0, 0], [1, 0]], 'Offsets should be [0,0] and [1,0]');
     
-    assert.equal(active.x, 4, 'Piece should be centered horizontally');
+    assert.equal(active.x, 5, 'Two-cell piece should be centered in the 12-column arena');
     assert.equal(active.y, BOARD_HIDDEN_ROWS - 2, 'Piece should spawn at standard height');
     assert.equal(active.poisoned, false, 'Piece should not be marked poisoned');
     assert.equal(active.isWildcard, true, 'Piece should be marked wildcard');

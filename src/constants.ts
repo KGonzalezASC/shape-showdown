@@ -1,6 +1,9 @@
-export const BOARD_COLS = 10;
-export const BOARD_VISIBLE_ROWS = 20;
-export const BOARD_HIDDEN_ROWS = 20;
+// Shape Showdown uses a broad 12×18 arena instead of the familiar 10×20 well.
+// The shorter hidden buffer is sufficient for spawn/kick space while keeping
+// serialized snapshots smaller.
+export const BOARD_COLS = 12;
+export const BOARD_VISIBLE_ROWS = 18;
+export const BOARD_HIDDEN_ROWS = 12;
 export const BOARD_ROWS = BOARD_VISIBLE_ROWS + BOARD_HIDDEN_ROWS;
 
 export const CELL_SIZE = 28;
@@ -15,7 +18,7 @@ export const RESTART_DELAY_SECONDS = 5;
 export const NEXT_PREVIEW_COUNT = 5;
 export const LOCK_DELAY_TICKS = 24; // 0.4s @ 60hz
 export const LOCK_RESET_CAP = 10;
-export const HOLD_SWAP_CUTOFF_VISIBLE_ROW = 10;
+export const HOLD_SWAP_CUTOFF_VISIBLE_ROW = 8;
 export const GARBAGE_ARRIVAL_DELAY_TICKS = 18; // 300ms @ 60hz
 export const RETRIM_ACTIVATION_TICKS = 60; // 2 rows of gravity (1s @ 60Hz)
 export const RETRIM_COST = 120;

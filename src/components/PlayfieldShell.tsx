@@ -33,6 +33,8 @@ interface PlayfieldShellProps {
   myMobileFieldRef: React.RefObject<GameFieldRef | null>;
   myDesktopFieldRef: React.RefObject<GameFieldRef | null>;
   oppDesktopFieldRef: React.RefObject<GameFieldRef | null>;
+  hatchingEnabled: boolean;
+  onToggleHatching: () => void;
 }
 
 export const PlayfieldShell: React.FC<PlayfieldShellProps> = ({
@@ -42,6 +44,8 @@ export const PlayfieldShell: React.FC<PlayfieldShellProps> = ({
   myMobileFieldRef,
   myDesktopFieldRef,
   oppDesktopFieldRef,
+  hatchingEnabled,
+  onToggleHatching,
 }) => {
   const playfield = usePlayfieldSnapshot();
   const chrome = useMatchChromeSnapshot();
@@ -75,6 +79,7 @@ export const PlayfieldShell: React.FC<PlayfieldShellProps> = ({
                 shadowColorClass="shadow-[0_0_30px_rgba(16,185,129,0.1)]"
                 cellSize={mobileCellSize}
                 status={playfield.status}
+                hatchingEnabled={hatchingEnabled}
               />
             )}
           </div>
@@ -82,7 +87,11 @@ export const PlayfieldShell: React.FC<PlayfieldShellProps> = ({
             ref={railRef}
             className="flex w-[5.75rem] shrink-0 flex-col gap-2 overflow-y-auto"
           >
-            <OpponentMiniField player={opponentPlayer} pendingGarbage={chrome.oppPendingGarbage} />
+            <OpponentMiniField
+              player={opponentPlayer}
+              pendingGarbage={chrome.oppPendingGarbage}
+              hatchingEnabled={hatchingEnabled}
+            />
             <ShopRail
               items={shopOffers}
               isPlaying={isPlaying}
@@ -93,6 +102,8 @@ export const PlayfieldShell: React.FC<PlayfieldShellProps> = ({
               onConfirm={handleShopConfirm}
               availableScore={chrome.availableShopScore}
               viewportMode="mobile"
+              hatchingEnabled={hatchingEnabled}
+              onToggleHatching={onToggleHatching}
             />
           </div>
         </div>
@@ -113,6 +124,8 @@ export const PlayfieldShell: React.FC<PlayfieldShellProps> = ({
                   onConfirm={handleShopConfirm}
                   availableScore={chrome.availableShopScore}
                   viewportMode="tabletDesktop"
+                  hatchingEnabled={hatchingEnabled}
+                  onToggleHatching={onToggleHatching}
                 />
               </div>
               <GameField
@@ -123,6 +136,7 @@ export const PlayfieldShell: React.FC<PlayfieldShellProps> = ({
                 borderColorClass="border-emerald-500/20"
                 shadowColorClass="shadow-[0_0_30px_rgba(16,185,129,0.1)]"
                 status={playfield.status}
+                hatchingEnabled={hatchingEnabled}
               />
             </div>
           )}
@@ -138,6 +152,7 @@ export const PlayfieldShell: React.FC<PlayfieldShellProps> = ({
                 shadowColorClass="shadow-[0_0_30px_rgba(244,63,94,0.1)]"
                 opacityClass="opacity-80"
                 status={playfield.status}
+                hatchingEnabled={hatchingEnabled}
               />
             ) : (
               <WaitingForOpponentBoard />

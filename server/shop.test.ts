@@ -10,6 +10,7 @@ import {
 } from './shop.js';
 import { SHOP_ROLL_POOL, SHOP_ITEM_BY_ID } from '../src/shop/shopCatalog.js';
 import { createInitialShopRoll, drawWeightedShopOffers, SHOP_VISIBLE_COUNT } from '../src/shop/shopRoll.js';
+import { BOARD_HIDDEN_ROWS } from '../src/constants.js';
 import type { GameState } from '../src/types.js';
 
 function blankGame(seed = 42): { game: GameState; rng: ReturnType<typeof makeRng> } {
@@ -187,7 +188,7 @@ describe('shop purchase / phase harness', () => {
 
     assert.ok(opponent.activePiece);
     opponent.canHold = true;
-    opponent.activePiece!.y = 20;
+    opponent.activePiece!.y = BOARD_HIDDEN_ROWS;
     opponent.actionQueue.push('hold');
     stepPlayer(game, opponent, buyer, rng, []);
 

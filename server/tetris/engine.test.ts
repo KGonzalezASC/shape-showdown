@@ -22,6 +22,7 @@ import {
   STICKY_LOCK_RESET_CAP,
   BOARD_ROWS,
   BOARD_COLS,
+  BOARD_HIDDEN_ROWS,
   COUNTDOWN_SECONDS,
   GAME_DURATION,
 } from '../../src/constants.js';
@@ -70,7 +71,7 @@ describe('tetris engine', () => {
     assert.ok(player.activePiece);
     if (!player.activePiece) return;
 
-    player.activePiece.y = 20;
+    player.activePiece.y = BOARD_HIDDEN_ROWS;
     const beforeType = player.activePiece.type;
     player.actionQueue.push('hold');
     stepPlayer(game, player, opponent, rng, []);
@@ -88,7 +89,7 @@ describe('tetris engine', () => {
     assert.ok(player.activePiece);
     if (!player.activePiece) return;
 
-    player.activePiece.y = 30;
+    player.activePiece.y = BOARD_HIDDEN_ROWS + player.swapCutoffRow;
     const beforeType = player.activePiece.type;
     const beforeQueue = [...player.nextQueue];
     player.actionQueue.push('hold');
@@ -108,7 +109,7 @@ describe('tetris engine', () => {
 
     assert.ok(player.activePiece);
     player.holdFrozenUntilTick = 9999;
-    player.activePiece.y = 20;
+    player.activePiece.y = BOARD_HIDDEN_ROWS;
     const beforeType = player.activePiece.type;
 
     player.actionQueue.push('hold');
@@ -135,7 +136,7 @@ describe('tetris engine', () => {
     const game = makeGame([player, opponent]);
 
     assert.ok(player.activePiece);
-    player.activePiece.y = 20;
+    player.activePiece.y = BOARD_HIDDEN_ROWS;
     player.activePiece.poisoned = true;
     player.activePiece.poisonVariant = 2;
     const beforeType = player.activePiece.type;
@@ -156,7 +157,7 @@ describe('tetris engine', () => {
     const game = makeGame([player, opponent]);
 
     assert.ok(player.activePiece);
-    player.activePiece.y = 20;
+    player.activePiece.y = BOARD_HIDDEN_ROWS;
     player.activePiece.bomber = true;
     const bomberType = player.activePiece.type;
 
@@ -173,7 +174,7 @@ describe('tetris engine', () => {
     assert.equal(!!player.activePiece.bomber, false);
 
     player.canHold = true;
-    player.activePiece.y = 20;
+    player.activePiece.y = BOARD_HIDDEN_ROWS;
     player.actionQueue.push('hold');
     stepPlayer(game, player, opponent, rng, []);
 
