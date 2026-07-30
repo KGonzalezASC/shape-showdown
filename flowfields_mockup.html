@@ -1,0 +1,482 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Shape Showdown — Voronoi Tissue Cell & Poison Studio</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;700;800&family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg-main: #07090E;
+      --bg-card: #121622;
+      --bg-card-hover: #1A2030;
+      --border-color: #222B3D;
+      --text-main: #F1F5F9;
+      --text-muted: #94A3B8;
+      --accent: #6366F1;
+      
+      --cols: 10;
+      --rows: 12;
+      --cell-size: 40px;
+    }
+
+    [data-theme="light"] {
+      --bg-main: #F8FAFC;
+      --bg-card: #FFFFFF;
+      --bg-card-hover: #F1F5F9;
+      --border-color: #E2E8F0;
+      --text-main: #0F172A;
+      --text-muted: #64748B;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: 'Outfit', -apple-system, BlinkMacSystemFont, sans-serif;
+      background-color: var(--bg-main);
+      color: var(--text-main);
+      min-height: 100vh;
+      padding: 2rem;
+    }
+
+    header {
+      max-width: 1280px;
+      margin: 0 auto 2rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+    }
+
+    .title-area h1 {
+      font-size: 2.2rem;
+      font-weight: 800;
+      letter-spacing: -0.02em;
+      background: linear-gradient(135deg, #F1F5F9 0%, #A5B4FC 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .title-area p {
+      color: var(--text-muted);
+      font-size: 1rem;
+      margin-top: 0.35rem;
+    }
+
+    .toolbar {
+      display: flex;
+      gap: 0.75rem;
+    }
+
+    .btn {
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      color: var(--text-main);
+      padding: 0.6rem 1.2rem;
+      border-radius: 8px;
+      font-family: inherit;
+      font-size: 0.875rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .btn:hover {
+      background: var(--bg-card-hover);
+      border-color: var(--accent);
+    }
+
+    .btn.active {
+      background: var(--accent);
+      border-color: var(--accent);
+      color: #fff;
+    }
+
+    .main-container {
+      max-width: 1280px;
+      margin: 0 auto;
+      display: grid;
+      grid-template-columns: 340px 1fr;
+      gap: 2rem;
+    }
+
+    .controls-panel {
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: 16px;
+      padding: 1.5rem;
+      display: flex;
+      flex-direction: column;
+      gap: 1.5rem;
+      height: fit-content;
+    }
+
+    .control-group {
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+    }
+
+    .control-group label {
+      font-size: 0.875rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--text-muted);
+    }
+
+    .legend-list {
+      display: flex;
+      flex-direction: column;
+      gap: 0.6rem;
+    }
+
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      background: var(--bg-main);
+      border: 1px solid var(--border-color);
+      padding: 0.6rem 0.85rem;
+      border-radius: 8px;
+      font-size: 0.85rem;
+      font-weight: 600;
+    }
+
+    .swatch {
+      width: 18px;
+      height: 18px;
+      border-radius: 4px;
+      box-shadow: 0 0 8px currentColor;
+    }
+
+    .slider-container input[type="range"] {
+      width: 100%;
+      accent-color: var(--accent);
+    }
+
+    .showcase-area {
+      display: flex;
+      flex-direction: column;
+      gap: 2rem;
+    }
+
+    .board-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: 16px;
+      padding: 2rem;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 1.5rem;
+      position: relative;
+    }
+
+    .board-header {
+      width: 100%;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 1px solid var(--border-color);
+      padding-bottom: 0.75rem;
+    }
+
+    .board-title {
+      font-size: 1.25rem;
+      font-weight: 700;
+    }
+
+    .arena-container {
+      position: relative;
+      width: calc(var(--cols) * var(--cell-size));
+      height: calc(var(--rows) * var(--cell-size));
+      background-color: #05070B;
+      background-image: 
+        linear-gradient(to right, rgba(255, 255, 255, 0.08) 1px, transparent 1px),
+        linear-gradient(to bottom, rgba(255, 255, 255, 0.08) 1px, transparent 1px);
+      background-size: var(--cell-size) var(--cell-size);
+      border: 2px solid #1E293B;
+      border-radius: 12px;
+      box-shadow: 0 12px 36px rgba(0, 0, 0, 0.6), inset 0 0 20px rgba(0, 0, 0, 0.8);
+      overflow: hidden;
+    }
+
+    canvas {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      filter: drop-shadow(0 0 6px rgba(0, 0, 0, 0.4));
+    }
+  </style>
+</head>
+<body data-theme="dark">
+
+  <header>
+    <div class="title-area">
+      <h1>Shape Showdown — Voronoi & Poison Studio</h1>
+      <p>Official production Voronoi N-gon tissue cell matrix & toxic bio-poison visualization</p>
+    </div>
+    <div class="toolbar">
+      <button class="btn active" id="toggleGrid">Toggle Board Grid</button>
+      <button class="btn" id="toggleTheme">Toggle Theme Mode</button>
+    </div>
+  </header>
+
+  <div class="main-container">
+    
+    <!-- Controls Sidebar -->
+    <aside class="controls-panel">
+      
+      <div class="control-group">
+        <label>Poison Variants Palette</label>
+        <div class="legend-list">
+          <div class="legend-item">
+            <div class="swatch" style="background-color: #EF4444; color: #EF4444;"></div>
+            <span>V1 Bio-Toxin Crimson (#EF4444)</span>
+          </div>
+          <div class="legend-item">
+            <div class="swatch" style="background-color: #EC4899; color: #EC4899;"></div>
+            <span>V2 Cyber-Glitch Magenta (#EC4899)</span>
+          </div>
+          <div class="legend-item">
+            <div class="swatch" style="background-color: #6D28D9; color: #6D28D9;"></div>
+            <span>V3 EMP Dark Violet (#6D28D9)</span>
+          </div>
+          <div class="legend-item">
+            <div class="swatch" style="background-color: #059669; color: #059669;"></div>
+            <span>V4 Quantum Decay Slime (#059669)</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="control-group">
+        <label>Animation Speeds</label>
+        <div class="legend-list">
+          <div class="legend-item">
+            <span style="font-family: 'JetBrains Mono', monospace; font-weight: 700; color: #38bdf8;">0.3325x</span>
+            <span>Regular Piece Wobble Speed</span>
+          </div>
+          <div class="legend-item">
+            <span style="font-family: 'JetBrains Mono', monospace; font-weight: 700; color: #EF4444;">0.5500x</span>
+            <span>Poison Cell Wobble Speed</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="control-group slider-container">
+        <label>Global Speed Multiplier: <span id="speedVal">1.0</span>x</label>
+        <input type="range" id="speedSlider" min="0.2" max="2.5" step="0.1" value="1.0">
+      </div>
+
+      <div class="control-group">
+        <button class="btn active" id="togglePoison" style="width: 100%; justify-content: center;">
+          🧪 Toggle Bio-Poison Cells
+        </button>
+      </div>
+
+    </aside>
+
+    <!-- Main Showcase Area -->
+    <main class="showcase-area">
+      <section class="board-card">
+        <div class="board-header">
+          <h2 class="board-title">Voronoi Tissue Cell Matrix with Bio-Poison Overlays</h2>
+          <span style="font-family: 'JetBrains Mono', monospace; font-size: 0.8rem; color: #94A3B8; background: #0F172A; padding: 0.25rem 0.6rem; border-radius: 6px; border: 1px solid #1E293B;">
+            10×12 Arena Grid
+          </span>
+        </div>
+
+        <div class="arena-container" id="arenaBox">
+          <canvas id="flowCanvas"></canvas>
+        </div>
+      </section>
+    </main>
+
+  </div>
+
+  <script>
+    const COLS = 10;
+    const ROWS = 12;
+    const CELL = 40;
+
+    const SHAPE_COLORS = {
+      I: '#fb7185', // Rose pink
+      J: '#facc15', // Yellow
+      L: '#2dd4bf', // Teal
+      O: '#a78bfa', // Purple
+      S: '#38bdf8', // Cyan
+      T: '#a3e635', // Lime Green
+      Z: '#f97316', // Orange
+    };
+
+    const POISON_COLORS = {
+      1: '#EF4444', // Bio-Toxin Crimson Red
+      2: '#EC4899', // Cyber-Glitch Neon Magenta
+      3: '#6D28D9', // EMP Dark Plasma Violet
+      4: '#059669', // Quantum Decay Slime Emerald
+    };
+
+    // Pre-computed polygon unit circle angles
+    const POLYGON_BASE_ANGLES = {};
+    for (let sides = 5; sides <= 7; sides++) {
+      POLYGON_BASE_ANGLES[sides] = Array.from({ length: sides }, (_, i) => {
+        const a = (i * 2 * Math.PI) / sides;
+        return { cos: Math.cos(a), sin: Math.sin(a) };
+      });
+    }
+
+    // Playfield Stack layout containing regular Voronoi pieces + poison overlay cells
+    const STACK = [
+      [null, null, null, null, 'S', null, null, null, null, null],
+      [null, null, null, null, 'S', 'O', 'O', 'O', null, null],
+      [null, null, 'S', null, 'S', null, 'O', null, null, null],
+      [null, 'S', 'S', 'S', 'J', 'J', null, 'L', 'L', null],
+      [null, 'S', 'Z', 'Z', 'J', 'J', 'L', 'L', 'I', null],
+      ['Z', 'Z', null, 'Z', 'S', 'S', 'S', 'I', 'I', null],
+      ['O', 'O', 'O', 'J', 'J', null, 'S', 'S', 'S', 'I'],
+      ['O', 'L', 'L', 'J', 'J', 'S', null, 'Z', 'Z', 'Z'],
+      ['I', 'I', 'L', 'L', 'S', 'S', 'S', 'S', null, 'Z'],
+    ];
+
+    // Poison overlay matrix (0 = clean, 1..4 = poison variant)
+    const POISON_GRID = [
+      [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+      [0, 0, 0, 0, 0, 1, 1, 1, 0, 0], // Variant 1 Crimson on O piece
+      [0, 0, 0, 0, 0, 0, 1, 0, 0, 0],
+      [0, 0, 0, 0, 2, 2, 0, 0, 0, 0], // Variant 2 Magenta on J piece
+      [0, 0, 0, 0, 2, 2, 0, 0, 0, 0],
+      [0, 0, 0, 0, 0, 0, 0, 3, 3, 0], // Variant 3 Violet on I piece
+      [0, 0, 0, 0, 0, 0, 0, 0, 3, 3],
+      [4, 4, 4, 0, 0, 0, 0, 0, 0, 0], // Variant 4 Emerald Slime on bottom
+      [4, 4, 4, 0, 0, 0, 0, 0, 0, 0],
+    ];
+
+    let speedMult = 1.0;
+    let showPoison = true;
+    const canvas = document.getElementById('flowCanvas');
+    const ctx = canvas.getContext('2d');
+
+    const dpr = window.devicePixelRatio || 1;
+    canvas.width = COLS * CELL * dpr;
+    canvas.height = ROWS * CELL * dpr;
+
+    let time = 0;
+    let lastTimestamp = null;
+
+    function tracePolygon(ctx, cx, cy, sides, cellSize, animTime, wobbleSpeed, r) {
+      const baseAngles = POLYGON_BASE_ANGLES[sides];
+      for (let i = 0; i < sides; i++) {
+        const base = baseAngles[i];
+        // Per-vertex organic morphing formula matching production canvas
+        const angleOffset = Math.sin(animTime * wobbleSpeed + i) * 0.15;
+        const rad = cellSize * 0.42 + Math.cos(animTime * wobbleSpeed * 2 + r + i) * 3;
+
+        const cosO = Math.cos(angleOffset);
+        const sinO = Math.sin(angleOffset);
+        const cosVal = base.cos * cosO - base.sin * sinO;
+        const sinVal = base.sin * cosO + base.cos * sinO;
+
+        const px = cx + rad * cosVal;
+        const py = cy + rad * sinVal;
+
+        if (i === 0) ctx.moveTo(px, py);
+        else ctx.lineTo(px, py);
+      }
+      ctx.closePath();
+    }
+
+    function draw(timestamp) {
+      if (!lastTimestamp) lastTimestamp = timestamp;
+      const deltaSec = Math.min((timestamp - lastTimestamp) / 1000, 0.05);
+      lastTimestamp = timestamp;
+
+      time += deltaSec * speedMult;
+
+      ctx.save();
+      ctx.scale(dpr, dpr);
+      ctx.clearRect(0, 0, COLS * CELL, ROWS * CELL);
+
+      for (let r = 0; r < ROWS; r++) {
+        for (let c = 0; c < COLS; c++) {
+          const cell = STACK[r]?.[c];
+          const poison = showPoison ? (POISON_GRID[r]?.[c] ?? 0) : 0;
+
+          if (!cell && poison === 0) continue; // 100% transparent cutout hole!
+
+          const isPoison = poison > 0;
+          const wobbleSpeed = isPoison ? 0.55 : 0.3325;
+          const color = isPoison
+            ? POISON_COLORS[poison] || '#EF4444'
+            : (cell ? SHAPE_COLORS[cell] || '#38bdf8' : '#38bdf8');
+
+          const cx = c * CELL + CELL / 2;
+          const cy = r * CELL + CELL / 2;
+          const sides = 5 + ((r + c) % 3);
+
+          // Render Voronoi Tissue N-gon cell body
+          ctx.fillStyle = color;
+          ctx.strokeStyle = isPoison ? 'rgba(255, 255, 255, 0.75)' : 'rgba(255, 255, 255, 0.35)';
+          ctx.lineWidth = isPoison ? 2 : 1.5;
+
+          ctx.beginPath();
+          tracePolygon(ctx, cx, cy, sides, CELL, time, wobbleSpeed, r);
+          ctx.fill();
+          ctx.stroke();
+
+          // Poison toxic white circle overlay — bounces aggressively (+10%)
+          if (isPoison) {
+            ctx.strokeStyle = '#FFFFFF';
+            ctx.lineWidth = 1.3;
+
+            const bX = cx + Math.sin(time * 3.6 + r + c) * 2.2;
+            const bY = cy + Math.cos(time * 3.6 + r) * 2.2;
+            const bRad = Math.max(2, CELL * 0.22 + Math.sin(time * 4.2 + r) * 2.8);
+
+            ctx.beginPath();
+            ctx.arc(bX, bY, bRad, 0, Math.PI * 2);
+            ctx.stroke();
+          }
+        }
+      }
+
+      ctx.restore();
+      requestAnimationFrame(draw);
+    }
+
+    // Event handlers
+    document.getElementById('speedSlider').addEventListener('input', (e) => {
+      speedMult = parseFloat(e.target.value);
+      document.getElementById('speedVal').textContent = speedMult.toFixed(1);
+    });
+
+    document.getElementById('togglePoison').addEventListener('click', (e) => {
+      showPoison = !showPoison;
+      e.target.classList.toggle('active', showPoison);
+    });
+
+    document.getElementById('toggleGrid').addEventListener('click', (e) => {
+      const box = document.getElementById('arenaBox');
+      const active = box.style.backgroundImage !== 'none';
+      box.style.backgroundImage = active ? 'none' : 'linear-gradient(to right, rgba(255, 255, 255, 0.08) 1px, transparent 1px), linear-gradient(to bottom, rgba(255, 255, 255, 0.08) 1px, transparent 1px)';
+      e.target.classList.toggle('active', !active);
+    });
+
+    document.getElementById('toggleTheme').addEventListener('click', () => {
+      const current = document.body.getAttribute('data-theme');
+      document.body.setAttribute('data-theme', current === 'dark' ? 'light' : 'dark');
+    });
+
+    requestAnimationFrame(draw);
+  </script>
+</body>
+</html>

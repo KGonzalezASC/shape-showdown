@@ -13,6 +13,7 @@ import { SHAPE_COLORS } from '../presentation/shapePalette';
 import { styleForFieldEffect } from '../shop/effectStyles';
 import { normalizeHeldPiece, PublicPlayerState } from '../state/publicSnapshots';
 import { PlayfieldCellSizeContext } from './playfieldCellSizeContext';
+import { VoronoiFlowfieldCanvas } from './VoronoiFlowfieldCanvas';
 
 interface GameFieldProps {
   player: PublicPlayerState;
@@ -47,29 +48,14 @@ const MemoizedCell = React.memo(
     size: number;
     hatchingEnabled: boolean;
   }) => {
-    if (poison > 0 && color !== null) {
-      // Synced (no per-cell stagger) so poisoned cells share the same sprite frame,
-      // like the Gen III battle poison overlay on a contiguous region.
-      return (
-        <div
-          className={`poison-cell poison-cell-v${Math.min(Math.max(poison, 1), 4)}`}
-          style={{ width: size, height: size }}
-        />
-      );
-    }
-
     return (
       <div
-        className={`arena-cell relative ${color ? '' : 'arena-cell-empty'}`}
+        className={`arena-cell relative pointer-events-none ${color || poison > 0 ? '' : 'arena-cell-empty'}`}
         style={{ width: size, height: size }}
         title={bomber ? 'Bomber' : undefined}
       >
-        {color && (
-          <div
-            className="shape-token absolute inset-[7%]"
-            style={{ backgroundColor: SHAPE_COLORS[color] }}
-          >
-            <div className="shape-token-highlight pointer-events-none absolute inset-0" aria-hidden />
+        {(color || poison > 0) && (
+          <div className="pointer-events-none absolute inset-0">
             {hatchingEnabled && !poison && !bomber && !magnetAura && (
               <div className="tetromino-hatch pointer-events-none absolute inset-0" aria-hidden />
             )}
@@ -351,9 +337,14 @@ const GameField = forwardRef<GameFieldRef, GameFieldProps>(({
           </>
         )}
         <div
-          className="arena-grid grid"
+          className="arena-grid grid relative"
           style={{ gridTemplateColumns: `repeat(${BOARD_COLS}, ${cellSize}px)` }}
         >
+          <VoronoiFlowfieldCanvas
+            visibleRows={visibleRows}
+            visiblePoison={visiblePoison}
+            cellSize={cellSize}
+          />
           {visibleRows.flatMap((row, y) =>
             row.map((cell, x) => (
                 <MemoizedCell
