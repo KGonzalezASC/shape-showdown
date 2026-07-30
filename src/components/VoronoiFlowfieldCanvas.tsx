@@ -1,5 +1,5 @@
 import React, { useEffect, useRef } from 'react';
-import { BOARD_COLS, BOARD_VISIBLE_ROWS, CellValue } from '../types';
+import { BOARD_COLS, BOARD_VISIBLE_ROWS, CellValue, PoisonSpreadState } from '../types';
 import { SHAPE_COLORS } from '../presentation/shapePalette';
 
 /**
@@ -12,6 +12,12 @@ const POISON_COLORS: Record<number, string> = {
   3: '#6D28D9', // EMP Dark Plasma Violet
   4: '#059669', // Quantum Decay Slime Emerald
 };
+const POISON_RGB: Record<number, [number, number, number]> = Object.fromEntries(
+  Object.entries(POISON_COLORS).map(([variant, color]) => {
+    const value = Number.parseInt(color.slice(1), 16);
+    return [Number(variant), [(value >> 16) & 255, (value >> 8) & 255, value & 255]];
+  }),
+);
 
 // Pre-computed static polygon unit circle angles for N=5, N=6, N=7
 const POLYGON_BASE_ANGLES: Record<number, { cos: number; sin: number }[]> = {};
@@ -29,17 +35,20 @@ interface CellEntry {
   c: number;
   sides: number;
   isPoison: boolean;
+  variant: number;
 }
 
 interface CellMap {
-  /** Occupied cells grouped by fill color for batched path rendering. */
-  colorBuckets: Map<string, CellEntry[]>;
+  /** Regular cells grouped by fill color for batched Voronoi path rendering. */
+  regularColorBuckets: Map<string, CellEntry[]>;
   /** Subset of cells that are poisoned (for poison-specific overlays). */
   poisonCells: CellEntry[];
+  /** Poison groups cached until the board snapshot changes. */
+  poisonGroupsByVariant: Map<number, CellEntry[][]>;
 }
 
 function buildCellMap(rows: CellValue[][], poison: number[][]): CellMap {
-  const colorBuckets = new Map<string, CellEntry[]>();
+  const regularColorBuckets = new Map<string, CellEntry[]>();
   const poisonCells: CellEntry[] = [];
 
   for (let r = 0; r < BOARD_VISIBLE_ROWS; r++) {
@@ -53,20 +62,33 @@ function buildCellMap(rows: CellValue[][], poison: number[][]): CellMap {
         ? POISON_COLORS[p] || '#EF4444'
         : (cell ? SHAPE_COLORS[cell] || '#38bdf8' : '#38bdf8');
       const sides = 5 + ((r + c) % 3);
-      const entry: CellEntry = { r, c, sides, isPoison };
+      const entry: CellEntry = { r, c, sides, isPoison, variant: isPoison ? p : 0 };
 
-      let bucket = colorBuckets.get(color);
-      if (!bucket) {
-        bucket = [];
-        colorBuckets.set(color, bucket);
+      if (isPoison) {
+        poisonCells.push(entry);
+      } else {
+        let bucket = regularColorBuckets.get(color);
+        if (!bucket) {
+          bucket = [];
+          regularColorBuckets.set(color, bucket);
+        }
+        bucket.push(entry);
       }
-      bucket.push(entry);
-
-      if (isPoison) poisonCells.push(entry);
     }
   }
 
-  return { colorBuckets, poisonCells };
+  const poisonCellsByVariant = new Map<number, CellEntry[]>();
+  for (const cell of poisonCells) {
+    const variantCells = poisonCellsByVariant.get(cell.variant) ?? [];
+    variantCells.push(cell);
+    poisonCellsByVariant.set(cell.variant, variantCells);
+  }
+  const poisonGroupsByVariant = new Map<number, CellEntry[][]>();
+  for (const [variant, variantCells] of poisonCellsByVariant) {
+    poisonGroupsByVariant.set(variant, connectedPoisonGroups(variantCells));
+  }
+
+  return { regularColorBuckets, poisonCells, poisonGroupsByVariant };
 }
 
 // ── Polygon tracing: matches the exact per-vertex morphing math from flowfields_mockup.html ──
@@ -108,12 +130,229 @@ interface VoronoiFlowfieldCanvasProps {
   visibleRows: CellValue[][];
   visiblePoison: number[][];
   cellSize: number;
+  poisonSpread?: PoisonSpreadState | null;
+}
+
+interface PoisonAnimationCell {
+  r: number;
+  c: number;
+  variant: number;
+  sourceX: number;
+  sourceY: number;
+}
+
+interface PoisonAnimation {
+  startedAt: number;
+  cells: PoisonAnimationCell[];
+}
+
+interface VisualPoisonCell extends CellEntry {
+  weight: number;
+  x: number;
+  y: number;
+}
+
+function poisonSnapshotEqual(a: number[][] | null, b: number[][]): boolean {
+  if (!a || a.length !== b.length) return false;
+  for (let y = 0; y < b.length; y++) {
+    const rowA = a[y];
+    const rowB = b[y];
+    if (!rowA || rowA.length !== rowB.length) return false;
+    for (let x = 0; x < rowB.length; x++) {
+      if (rowA[x] !== rowB[x]) return false;
+    }
+  }
+  return true;
+}
+
+function findPreviousPoisonNeighbour(
+  previous: number[][],
+  r: number,
+  c: number,
+): [number, number] | null {
+  const neighbours: Array<[number, number]> = [
+    [r - 1, c],
+    [r + 1, c],
+    [r, c - 1],
+    [r, c + 1],
+  ];
+  return neighbours.find(([ny, nx]) => previous[ny]?.[nx] > 0) ?? null;
+}
+
+function connectedPoisonGroups(cells: CellEntry[]): CellEntry[][] {
+  const byKey = new Map(cells.map((cell) => [`${cell.r},${cell.c}`, cell]));
+  const visited = new Set<string>();
+  const groups: CellEntry[][] = [];
+
+  for (const start of cells) {
+    const startKey = `${start.r},${start.c}`;
+    if (visited.has(startKey)) continue;
+    const group: CellEntry[] = [];
+    const queue = [start];
+    visited.add(startKey);
+
+    while (queue.length > 0) {
+      const current = queue.pop()!;
+      group.push(current);
+      for (const [dr, dc] of [[-1, 0], [1, 0], [0, -1], [0, 1]]) {
+        const nextKey = `${current.r + dr},${current.c + dc}`;
+        const next = byKey.get(nextKey);
+        if (next && !visited.has(nextKey)) {
+          visited.add(nextKey);
+          queue.push(next);
+        }
+      }
+    }
+    groups.push(group);
+  }
+  return groups;
+}
+
+function drawPoisonBlob(
+  ctx: CanvasRenderingContext2D,
+  blobCtx: CanvasRenderingContext2D,
+  cells: VisualPoisonCell[],
+  cellSize: number,
+  time: number,
+): void {
+  if (cells.length === 0) return;
+
+  const cellKeys = new Set(cells.map(({ r, c }) => r * BOARD_COLS + c));
+  const hasCell = (r: number, c: number): boolean => cellKeys.has(r * BOARD_COLS + c);
+  const first = cells[0];
+  const phase = (first.r * 1.7 + first.c * 0.9) % (Math.PI * 2);
+  const sharedX = Math.sin(time * 0.77 + phase) * cellSize * 0.04;
+  const sharedY = Math.cos(time * 0.66 + phase) * cellSize * 0.04;
+  const pulse = 1 + Math.sin(time * 0.88 + phase) * 0.045;
+  const influence = cellSize * 0.82;
+  const influence2 = influence * influence;
+  const threshold = 1.7;
+  const edgeInset = Math.max(2, cellSize * 0.075);
+  const cornerRadius = cellSize * 0.22;
+  const rgb = POISON_RGB[first.variant] || POISON_RGB[1];
+  const animatedCells = cells.map((cell, index) => ({
+    ...cell,
+    x: cell.x + sharedX + Math.sin(time * 1.1 + index + cell.r) * cellSize * 0.045,
+    y: cell.y + sharedY + Math.cos(time * 0.95 + index + cell.c) * cellSize * 0.045,
+    weight: cell.weight * (pulse + Math.sin(time * 1.3 + index) * 0.025),
+  }));
+
+  let minC = BOARD_COLS;
+  let maxC = 0;
+  let minR = BOARD_VISIBLE_ROWS;
+  let maxR = 0;
+  for (const { r, c } of animatedCells) {
+    minC = Math.min(minC, c);
+    maxC = Math.max(maxC, c);
+    minR = Math.min(minR, r);
+    maxR = Math.max(maxR, r);
+  }
+  const pad = Math.ceil(cellSize * 0.15);
+  const x0 = Math.max(0, minC * cellSize - pad);
+  const y0 = Math.max(0, minR * cellSize - pad);
+  const x1 = Math.min(BOARD_COLS * cellSize, (maxC + 1) * cellSize + pad);
+  const y1 = Math.min(BOARD_VISIBLE_ROWS * cellSize, (maxR + 1) * cellSize + pad);
+  const width = Math.max(1, x1 - x0);
+  const height = Math.max(1, y1 - y0);
+  const image = blobCtx.createImageData(width, height);
+  const pixels = image.data;
+  const mask = new Uint8Array(width * height);
+
+  for (let py = 0; py < height; py++) {
+    for (let px = 0; px < width; px++) {
+      const x = x0 + px + 0.5;
+      const y = y0 + py + 0.5;
+      const c = Math.floor(x / cellSize);
+      const r = Math.floor(y / cellSize);
+      if (!hasCell(r, c)) continue;
+      const localX = x - c * cellSize;
+      const localY = y - r * cellSize;
+      const outerLeft = !hasCell(r, c - 1);
+      const outerRight = !hasCell(r, c + 1);
+      const outerTop = !hasCell(r - 1, c);
+      const outerBottom = !hasCell(r + 1, c);
+      if (
+        (outerLeft && localX < edgeInset) ||
+        (outerRight && localX > cellSize - edgeInset) ||
+        (outerTop && localY < edgeInset) ||
+        (outerBottom && localY > cellSize - edgeInset)
+      ) continue;
+      if (
+        (outerLeft && outerTop && Math.hypot(localX, localY) < cornerRadius) ||
+        (outerRight && outerTop && Math.hypot(localX - cellSize, localY) < cornerRadius) ||
+        (outerLeft && outerBottom && Math.hypot(localX, localY - cellSize) < cornerRadius) ||
+        (outerRight && outerBottom && Math.hypot(localX - cellSize, localY - cellSize) < cornerRadius)
+      ) continue;
+
+      let field = 0;
+      for (const cell of animatedCells) {
+        const dx = x - cell.x;
+        const dy = y - cell.y;
+        field += influence2 * cell.weight / (dx * dx + dy * dy + 1);
+        if (field >= threshold) break;
+      }
+      if (field < threshold) continue;
+      const index = py * width + px;
+      mask[index] = 1;
+      const i = index * 4;
+      pixels[i] = rgb[0];
+      pixels[i + 1] = rgb[1];
+      pixels[i + 2] = rgb[2];
+      pixels[i + 3] = 255;
+    }
+  }
+
+  for (let py = 0; py < height; py++) {
+    for (let px = 0; px < width; px++) {
+      const index = py * width + px;
+      if (!mask[index]) continue;
+      let edge = false;
+      for (const [dx, dy] of [
+        [-1, -1], [0, -1], [1, -1],
+        [-1, 0],            [1, 0],
+        [-1, 1],  [0, 1],  [1, 1],
+      ]) {
+        for (let distance = 1; distance <= 2; distance++) {
+          const nx = px + dx * distance;
+          const ny = py + dy * distance;
+          if (nx < 0 || ny < 0 || nx >= width || ny >= height || !mask[ny * width + nx]) {
+            edge = true;
+            break;
+          }
+        }
+        if (edge) break;
+      }
+      if (edge) {
+        const i = index * 4;
+        pixels[i] = 255;
+        pixels[i + 1] = 255;
+        pixels[i + 2] = 255;
+        pixels[i + 3] = 225;
+      }
+    }
+  }
+
+  blobCtx.putImageData(image, x0, y0);
+  ctx.drawImage(blobCtx.canvas, x0, y0, width, height, x0, y0, width, height);
+  ctx.strokeStyle = 'rgba(255,255,255,.82)';
+  ctx.lineWidth = Math.max(1, cellSize * 0.03);
+  ctx.fillStyle = '#fff';
+  for (const cell of animatedCells) {
+    const radius = Math.max(2, cellSize * 0.19 * Math.min(1, cell.weight));
+    ctx.beginPath();
+    ctx.arc(cell.x, cell.y, radius, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.arc(cell.x, cell.y, Math.max(1.5, cellSize * 0.05), 0, Math.PI * 2);
+    ctx.fill();
+  }
 }
 
 export const VoronoiFlowfieldCanvas: React.FC<VoronoiFlowfieldCanvasProps> = React.memo(({
   visibleRows,
   visiblePoison,
   cellSize,
+  poisonSpread,
 }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
@@ -122,17 +361,54 @@ export const VoronoiFlowfieldCanvas: React.FC<VoronoiFlowfieldCanvasProps> = Rea
   const visiblePoisonRef = useRef(visiblePoison);
   const cellSizeRef = useRef(cellSize);
   const timeRef = useRef(0);
+  const previousPoisonRef = useRef<number[][] | null>(null);
+  const previousSpreadRef = useRef<PoisonSpreadState | null>(null);
+  const poisonAnimationRef = useRef<PoisonAnimation | null>(null);
 
   // Cached cell map — rebuilt only when board occupancy changes
   const cellMapRef = useRef<CellMap | null>(null);
   const cellMapDirtyRef = useRef(true);
 
   useEffect(() => {
+    const previousPoison = previousPoisonRef.current;
+    const previousSpread = previousSpreadRef.current;
+    const spreadAdvanced = previousSpread && (
+      poisonSpread == null ||
+      poisonSpread.nextSpreadTick !== previousSpread.nextSpreadTick ||
+      poisonSpread.generationsRemaining < previousSpread.generationsRemaining
+    );
+
+    if (previousPoison && spreadAdvanced && !poisonSnapshotEqual(previousPoison, visiblePoison)) {
+      const animationCells: PoisonAnimationCell[] = [];
+      for (let r = 0; r < visiblePoison.length; r++) {
+        for (let c = 0; c < (visiblePoison[r]?.length ?? 0); c++) {
+          if ((visiblePoison[r]?.[c] ?? 0) === 0 || (previousPoison[r]?.[c] ?? 0) !== 0) continue;
+          const source = findPreviousPoisonNeighbour(previousPoison, r, c);
+          if (!source) continue;
+          animationCells.push({
+            r,
+            c,
+            variant: visiblePoison[r][c],
+            sourceX: source[1] * cellSize + cellSize / 2,
+            sourceY: source[0] * cellSize + cellSize / 2,
+          });
+        }
+      }
+      if (animationCells.length > 0) {
+        poisonAnimationRef.current = {
+          startedAt: performance.now(),
+          cells: animationCells,
+        };
+      }
+    }
+
+    previousPoisonRef.current = visiblePoison;
+    previousSpreadRef.current = poisonSpread ?? null;
     visibleRowsRef.current = visibleRows;
     visiblePoisonRef.current = visiblePoison;
     cellSizeRef.current = cellSize;
     cellMapDirtyRef.current = true;
-  }, [visibleRows, visiblePoison, cellSize]);
+  }, [visibleRows, visiblePoison, cellSize, poisonSpread]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -146,6 +422,11 @@ export const VoronoiFlowfieldCanvas: React.FC<VoronoiFlowfieldCanvasProps> = Rea
     const dpr = window.devicePixelRatio || 1;
     const cssWidth = BOARD_COLS * cellSizeRef.current;
     const cssHeight = BOARD_VISIBLE_ROWS * cellSizeRef.current;
+    const blobCanvas = document.createElement('canvas');
+    const blobCtx = blobCanvas.getContext('2d');
+    if (!blobCtx) return;
+    blobCanvas.width = cssWidth;
+    blobCanvas.height = cssHeight;
 
     canvas.width = cssWidth * dpr;
     canvas.height = cssHeight * dpr;
@@ -171,12 +452,13 @@ export const VoronoiFlowfieldCanvas: React.FC<VoronoiFlowfieldCanvasProps> = Rea
       ctx.scale(dpr, dpr);
       ctx.clearRect(0, 0, cssWidth, cssHeight);
 
-      // ── Pass 1: Color-batched polygon fills ──
-      for (const [color, cells] of cellMap.colorBuckets) {
+      // ── Pass 1: Color-batched regular polygon fills ──
+      for (const [color, cells] of cellMap.regularColorBuckets) {
+        if (cells.length === 0) continue;
         ctx.fillStyle = color;
         ctx.beginPath();
-        for (const { r, c, sides, isPoison } of cells) {
-          const wobbleSpeed = isPoison ? 0.55 : 0.3325;
+        for (const { r, c, sides } of cells) {
+          const wobbleSpeed = 0.3325;
           const cx = c * cs + halfCs;
           const cy = r * cs + halfCs;
           tracePolygon(ctx, cx, cy, sides, cs, time, wobbleSpeed, r);
@@ -188,7 +470,7 @@ export const VoronoiFlowfieldCanvas: React.FC<VoronoiFlowfieldCanvasProps> = Rea
       ctx.strokeStyle = 'rgba(255, 255, 255, 0.35)';
       ctx.lineWidth = 1.5;
       ctx.beginPath();
-      for (const [, cells] of cellMap.colorBuckets) {
+      for (const [, cells] of cellMap.regularColorBuckets) {
         for (const { r, c, sides, isPoison } of cells) {
           if (isPoison) continue;
           const wobbleSpeed = 0.3325;
@@ -199,33 +481,39 @@ export const VoronoiFlowfieldCanvas: React.FC<VoronoiFlowfieldCanvasProps> = Rea
       }
       ctx.stroke();
 
-      // ── Pass 3: Batched poison-cell strokes ──
+      // ── Pass 3: Continuous animated poison blobs ──
       if (cellMap.poisonCells.length > 0) {
-        ctx.strokeStyle = 'rgba(255, 255, 255, 0.75)';
-        ctx.lineWidth = 2;
-        ctx.beginPath();
-        for (const { r, c, sides } of cellMap.poisonCells) {
-          const wobbleSpeed = 0.55;
-          const cx = c * cs + halfCs;
-          const cy = r * cs + halfCs;
-          tracePolygon(ctx, cx, cy, sides, cs, time, wobbleSpeed, r);
+        const animation = poisonAnimationRef.current;
+        const progress = animation
+          ? Math.min(1, (timestamp - animation.startedAt) / 720)
+          : 1;
+        const growth = 1 - Math.pow(1 - progress, 3);
+        const animatedByKey = new Map<string, PoisonAnimationCell>(
+          animation?.cells.map((cell) => [`${cell.r},${cell.c}`, cell]) ?? [],
+        );
+        for (const groups of cellMap.poisonGroupsByVariant.values()) {
+          for (const group of groups) {
+            const visualCells: VisualPoisonCell[] = group.map((cell) => {
+              const animated = animatedByKey.get(`${cell.r},${cell.c}`);
+              if (!animated || progress >= 1) {
+                return {
+                  ...cell,
+                  weight: 1,
+                  x: cell.c * cs + halfCs,
+                  y: cell.r * cs + halfCs,
+                };
+              }
+              return {
+                ...cell,
+                weight: Math.max(0.12, growth),
+                x: animated.sourceX + (cell.c * cs + halfCs - animated.sourceX) * growth,
+                y: animated.sourceY + (cell.r * cs + halfCs - animated.sourceY) * growth,
+              };
+            });
+            drawPoisonBlob(ctx, blobCtx, visualCells, cs, time);
+          }
         }
-        ctx.stroke();
-
-        // ── Pass 4: Batched poison toxic white circles ──
-        ctx.strokeStyle = '#FFFFFF';
-        ctx.lineWidth = 1.3;
-        ctx.beginPath();
-        for (const { r, c } of cellMap.poisonCells) {
-          const cx = c * cs + halfCs;
-          const cy = r * cs + halfCs;
-          const bX = cx + Math.sin(time * 3.6 + r + c) * 2.2;
-          const bY = cy + Math.cos(time * 3.6 + r) * 2.2;
-          const bRad = Math.max(2, cs * 0.22 + Math.sin(time * 4.2 + r) * 2.8);
-          ctx.moveTo(bX + bRad, bY);
-          ctx.arc(bX, bY, bRad, 0, Math.PI * 2);
-        }
-        ctx.stroke();
+        if (animation && progress >= 1) poisonAnimationRef.current = null;
       }
 
       ctx.restore();

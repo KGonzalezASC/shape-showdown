@@ -344,6 +344,7 @@ const GameField = forwardRef<GameFieldRef, GameFieldProps>(({
             visibleRows={visibleRows}
             visiblePoison={visiblePoison}
             cellSize={cellSize}
+            poisonSpread={player.poisonSpread}
           />
           {visibleRows.flatMap((row, y) =>
             row.map((cell, x) => (
