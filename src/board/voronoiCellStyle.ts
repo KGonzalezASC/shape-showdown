@@ -11,6 +11,13 @@ export interface ActiveVoronoiCellMorph {
   progress: number;
 }
 
+export interface ActiveVoronoiCellHandoff {
+  sourceMorph: ActiveVoronoiCellMorph;
+  sourceWobblePhase: number;
+  targetSides: number;
+  targetWobblePhase: number;
+}
+
 export function voronoiCellSides(
   row: number,
   column: number,
@@ -52,5 +59,19 @@ export function activeVoronoiCellMorph(
     fromSides,
     toSides: 5 + ((activeOffsetIndex + stage + 1) % 3),
     progress,
+  };
+}
+
+export function activeVoronoiCellHandoff(
+  row: number,
+  column: number,
+  activeOffsetIndex: number,
+  lifetimeSeconds: number,
+): ActiveVoronoiCellHandoff {
+  return {
+    sourceMorph: activeVoronoiCellMorph(lifetimeSeconds, activeOffsetIndex),
+    sourceWobblePhase: voronoiCellWobblePhase(row, activeOffsetIndex),
+    targetSides: voronoiCellSides(row, column),
+    targetWobblePhase: voronoiCellWobblePhase(row),
   };
 }

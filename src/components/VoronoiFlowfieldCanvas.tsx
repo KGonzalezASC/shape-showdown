@@ -8,14 +8,18 @@ import { BOARD_COLS, BOARD_VISIBLE_ROWS, CellValue, PoisonSpreadState } from '..
 import { SHAPE_COLORS } from '../presentation/shapePalette';
 import {
   ACTIVE_PIECE_MOTION_MS,
+  collectActivePieceStackHandoffs,
   interpolateActivePiecePoint,
   shouldRestartActivePieceVisualLifetime,
   shouldSnapActivePieceMotion,
+  type ActivePieceMotion,
   type ActivePiecePoint,
 } from '../board/activePieceMotion';
 import type { ActiveVisualCell } from '../board/boardVisualModel';
 import {
+  activeVoronoiCellHandoff,
   activeVoronoiCellMorph,
+  type ActiveVoronoiCellHandoff,
   voronoiCellSides,
   voronoiCellWobblePhase,
 } from '../board/voronoiCellStyle';
@@ -65,6 +69,10 @@ interface CellMap {
 interface ActivePolygonGeometry {
   points: ActivePiecePoint[] | null;
   sides: number;
+}
+
+interface ActiveStackHandoff extends ActiveVoronoiCellHandoff {
+  motion: ActivePieceMotion;
 }
 
 function buildCellMap(
@@ -204,6 +212,39 @@ function resampleClosedPolygon(
   return samples;
 }
 
+function samplePolygonMorph(
+  cx: number,
+  cy: number,
+  cellSize: number,
+  time: number,
+  wobbleSpeed: number,
+  fromWobblePhase: number,
+  fromSides: number,
+  toWobblePhase: number,
+  toSides: number,
+  progress: number,
+): ActivePiecePoint[] {
+  const clamped = Math.max(0, Math.min(1, progress));
+  const fromVertices = resampleClosedPolygon(
+    polygonVertices(cx, cy, fromSides, cellSize, time, wobbleSpeed, fromWobblePhase),
+    ACTIVE_MORPH_VERTEX_COUNT,
+  );
+  if (clamped === 0 && fromSides === toSides && fromWobblePhase === toWobblePhase) {
+    return fromVertices;
+  }
+  const toVertices = resampleClosedPolygon(
+    polygonVertices(cx, cy, toSides, cellSize, time, wobbleSpeed, toWobblePhase),
+    ACTIVE_MORPH_VERTEX_COUNT,
+  );
+  return fromVertices.map((from, index) => {
+    const to = toVertices[index];
+    return {
+      x: from.x + (to.x - from.x) * clamped,
+      y: from.y + (to.y - from.y) * clamped,
+    };
+  });
+}
+
 function traceMorphedActivePolygon(
   ctx: CanvasRenderingContext2D,
   cx: number,
@@ -266,6 +307,70 @@ function traceMorphedActivePolygon(
   ctx.closePath();
 }
 
+function traceStackHandoffPolygon(
+  ctx: CanvasRenderingContext2D,
+  cx: number,
+  cy: number,
+  cellSize: number,
+  time: number,
+  wobbleSpeed: number,
+  handoff: ActiveStackHandoff,
+  timestamp: number,
+  geometryCache: Map<string, ActivePolygonGeometry>,
+  cacheKey: string,
+): void {
+  let geometry = geometryCache.get(cacheKey);
+  if (!geometry) {
+    const handoffProgress = Math.max(
+      0,
+      Math.min(1, (timestamp - handoff.motion.startedAt) / ACTIVE_PIECE_MOTION_MS),
+    );
+    const easedProgress = 1 - Math.pow(1 - handoffProgress, 3);
+    const sourcePoints = samplePolygonMorph(
+      cx,
+      cy,
+      cellSize,
+      time,
+      wobbleSpeed,
+      handoff.sourceWobblePhase,
+      handoff.sourceMorph.fromSides,
+      handoff.sourceWobblePhase,
+      handoff.sourceMorph.toSides,
+      handoff.sourceMorph.progress,
+    );
+    const targetPoints = samplePolygonMorph(
+      cx,
+      cy,
+      cellSize,
+      time,
+      wobbleSpeed,
+      handoff.targetWobblePhase,
+      handoff.targetSides,
+      handoff.targetWobblePhase,
+      handoff.targetSides,
+      1,
+    );
+    geometry = {
+      points: sourcePoints.map((source, index) => {
+        const target = targetPoints[index];
+        return {
+          x: source.x + (target.x - source.x) * easedProgress,
+          y: source.y + (target.y - source.y) * easedProgress,
+        };
+      }),
+      sides: ACTIVE_MORPH_VERTEX_COUNT,
+    };
+    geometryCache.set(cacheKey, geometry);
+  }
+
+  for (let i = 0; i < geometry.points!.length; i++) {
+    const point = geometry.points![i];
+    if (i === 0) ctx.moveTo(point.x, point.y);
+    else ctx.lineTo(point.x, point.y);
+  }
+  ctx.closePath();
+}
+
 function traceCellPolygon(
   ctx: CanvasRenderingContext2D,
   cell: CellEntry,
@@ -276,6 +381,10 @@ function traceCellPolygon(
   wobbleSpeed: number,
   activeLifetimeSeconds: number,
   geometryCache: Array<ActivePolygonGeometry | undefined>,
+  stackHandoff: ActiveStackHandoff | undefined,
+  handoffGeometryCache: Map<string, ActivePolygonGeometry>,
+  handoffCacheKey: string,
+  timestamp: number,
 ): void {
   if (cell.activeOffsetIndex !== undefined) {
     traceMorphedActivePolygon(
@@ -289,6 +398,21 @@ function traceCellPolygon(
       activeLifetimeSeconds,
       cell.activeOffsetIndex,
       geometryCache,
+    );
+    return;
+  }
+  if (stackHandoff) {
+    traceStackHandoffPolygon(
+      ctx,
+      cx,
+      cy,
+      cellSize,
+      time,
+      wobbleSpeed,
+      stackHandoff,
+      timestamp,
+      handoffGeometryCache,
+      handoffCacheKey,
     );
     return;
   }
@@ -561,6 +685,7 @@ export const VoronoiFlowfieldCanvas: React.FC<VoronoiFlowfieldCanvasProps> = Rea
     to: ActivePiecePoint;
     startedAt: number;
   }>());
+  const activeStackHandoffRef = useRef(new Map<string, ActiveStackHandoff>());
   const activeVisualStartedAtRef = useRef<number | null>(null);
   const previousActiveCellsRef = useRef<readonly ActiveVisualCell[]>([]);
   const previousActivePieceKeyRef = useRef<string | null>(null);
@@ -609,6 +734,38 @@ export const VoronoiFlowfieldCanvas: React.FC<VoronoiFlowfieldCanvasProps> = Rea
       activeCells,
     );
     const pieceChanged = previousActivePieceKeyRef.current !== activePieceKey;
+    if ((pieceChanged || activeSequenceRestarted) && priorActiveCells.length > 0) {
+      const sourceLifetimeSeconds = activeVisualStartedAtRef.current === null
+        ? 0
+        : Math.max(0, (now - activeVisualStartedAtRef.current) / 1000);
+      for (const cell of collectActivePieceStackHandoffs(
+        priorActiveCells,
+        activeCells,
+        ({ x, y }) => visibleRows[y]?.[x] != null || (visiblePoison[y]?.[x] ?? 0) > 0,
+      )) {
+        const existing = activeMotionRef.current.get(cell.offsetIndex);
+        const from = existing
+          ? interpolateActivePiecePoint(
+            existing.from,
+            existing.to,
+            (now - existing.startedAt) / ACTIVE_PIECE_MOTION_MS,
+          )
+          : cell;
+        activeStackHandoffRef.current.set(`${cell.y},${cell.x}`, {
+          motion: {
+            from,
+            to: { x: cell.x, y: cell.y },
+            startedAt: now,
+          },
+          ...activeVoronoiCellHandoff(
+            cell.y,
+            cell.x,
+            cell.offsetIndex,
+            sourceLifetimeSeconds,
+          ),
+        });
+      }
+    }
     if (pieceChanged) {
       activeMotionRef.current.clear();
       previousActiveCellsRef.current = [];
@@ -692,8 +849,14 @@ export const VoronoiFlowfieldCanvas: React.FC<VoronoiFlowfieldCanvasProps> = Rea
         ? 0
         : Math.max(0, (timestamp - activeVisualStartedAtRef.current) / 1000);
       const activeGeometryCache: Array<ActivePolygonGeometry | undefined> = [];
+      const handoffGeometryCache = new Map<string, ActivePolygonGeometry>();
       const cs = cellSizeRef.current;
       const halfCs = cs / 2;
+      for (const [key, handoff] of activeStackHandoffRef.current) {
+        if (timestamp - handoff.motion.startedAt >= ACTIVE_PIECE_MOTION_MS) {
+          activeStackHandoffRef.current.delete(key);
+        }
+      }
       const size = syncCanvasBackingStore(
         canvas,
         cs,
@@ -719,12 +882,19 @@ export const VoronoiFlowfieldCanvas: React.FC<VoronoiFlowfieldCanvasProps> = Rea
         const motion = cell.activeOffsetIndex === undefined
           ? null
           : activeMotionRef.current.get(cell.activeOffsetIndex);
+        const handoff = activeStackHandoffRef.current.get(`${cell.r},${cell.c}`);
         const point = motion
           ? interpolateActivePiecePoint(
             motion.from,
             motion.to,
             (timestamp - motion.startedAt) / ACTIVE_PIECE_MOTION_MS,
           )
+          : handoff
+            ? interpolateActivePiecePoint(
+              handoff.motion.from,
+              handoff.motion.to,
+              (timestamp - handoff.motion.startedAt) / ACTIVE_PIECE_MOTION_MS,
+            )
           : { x: cell.c, y: cell.r };
         return {
           x: point.x * cs + halfCs,
@@ -755,6 +925,10 @@ export const VoronoiFlowfieldCanvas: React.FC<VoronoiFlowfieldCanvasProps> = Rea
             wobbleSpeed,
             activeLifetimeSeconds,
             activeGeometryCache,
+            activeStackHandoffRef.current.get(`${cell.r},${cell.c}`),
+            handoffGeometryCache,
+            `${cell.r},${cell.c}`,
+            timestamp,
           );
         }
         ctx.fill();
@@ -779,6 +953,10 @@ export const VoronoiFlowfieldCanvas: React.FC<VoronoiFlowfieldCanvasProps> = Rea
             wobbleSpeed,
             activeLifetimeSeconds,
             activeGeometryCache,
+            activeStackHandoffRef.current.get(`${cell.r},${cell.c}`),
+            handoffGeometryCache,
+            `${cell.r},${cell.c}`,
+            timestamp,
           );
         }
       }
@@ -805,12 +983,13 @@ export const VoronoiFlowfieldCanvas: React.FC<VoronoiFlowfieldCanvasProps> = Rea
           for (const group of connectedPoisonGroups(variantCells)) {
             const visualCells: VisualPoisonCell[] = group.map((cell) => {
               const animated = animatedByKey.get(`${cell.r},${cell.c}`);
+              const center = cellCenter(cell);
               if (!animated || progress >= 1) {
                 return {
                   ...cell,
                   weight: 1,
-                  x: cell.c * cs + halfCs,
-                  y: cell.r * cs + halfCs,
+                  x: center.x,
+                  y: center.y,
                 };
               }
               return {
@@ -818,10 +997,10 @@ export const VoronoiFlowfieldCanvas: React.FC<VoronoiFlowfieldCanvasProps> = Rea
                 weight: Math.max(0.12, growth),
                 x:
                   (animated.sourceC * cs + halfCs) +
-                  (cell.c * cs - animated.sourceC * cs) * growth,
+                  (center.x - animated.sourceC * cs - halfCs) * growth,
                 y:
                   (animated.sourceR * cs + halfCs) +
-                  (cell.r * cs - animated.sourceR * cs) * growth,
+                  (center.y - animated.sourceR * cs - halfCs) * growth,
               };
             });
             drawPoisonBlob(ctx, blobCtx, visualCells, cs, time);

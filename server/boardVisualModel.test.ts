@@ -10,6 +10,7 @@ import {
 import {
   ACTIVE_VORONOI_SHAPE_HOLD_SECONDS,
   ACTIVE_VORONOI_SHAPE_MORPH_SECONDS,
+  activeVoronoiCellHandoff,
   activeVoronoiCellMorph,
   voronoiCellSides,
 } from '../src/board/voronoiCellStyle';
@@ -114,6 +115,15 @@ describe('buildBoardVisualModel', () => {
     assert.equal(midpoint.fromSides, 5);
     assert.equal(midpoint.toSides, 6);
     assert.ok(Math.abs(midpoint.progress - 0.5) < 1e-9);
+  });
+
+  test('preserves active Voronoi identity as the source of the stack handoff', () => {
+    assert.deepEqual(activeVoronoiCellHandoff(8, 4, 1, 0), {
+      sourceMorph: { fromSides: 6, toSides: 6, progress: 0 },
+      sourceWobblePhase: 1,
+      targetSides: 5,
+      targetWobblePhase: 8,
+    });
   });
 
   test('marks hard-drop state in the active-piece identity so it cannot animate as soft drop', () => {

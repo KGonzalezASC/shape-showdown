@@ -11,6 +11,12 @@ export interface IndexedActivePiecePoint extends ActivePiecePoint {
   offsetIndex: number;
 }
 
+export interface ActivePieceMotion {
+  from: ActivePiecePoint;
+  to: ActivePiecePoint;
+  startedAt: number;
+}
+
 /**
  * Normal play snapshots can be two simulation ticks apart while soft drop is
  * held (60Hz simulation versus the 30Hz play netcast). Keep that movement
@@ -38,6 +44,16 @@ export function shouldRestartActivePieceVisualLifetime(
     if (shouldSnapActivePieceMotion(prior, cell)) return true;
   }
   return matched === 0;
+}
+
+export function collectActivePieceStackHandoffs(
+  previous: readonly IndexedActivePiecePoint[],
+  next: readonly ActivePiecePoint[],
+  isOccupied: (point: ActivePiecePoint) => boolean,
+): IndexedActivePiecePoint[] {
+  const nextKeys = new Set(next.map((cell) => `${cell.x},${cell.y}`));
+  return previous.filter((cell) =>
+    !nextKeys.has(`${cell.x},${cell.y}`) && isOccupied(cell));
 }
 
 export function interpolateActivePiecePoint(
