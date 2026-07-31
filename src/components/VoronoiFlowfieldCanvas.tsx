@@ -9,11 +9,16 @@ import { SHAPE_COLORS } from '../presentation/shapePalette';
 import {
   ACTIVE_PIECE_MOTION_MS,
   interpolateActivePiecePoint,
+  shouldRestartActivePieceVisualLifetime,
   shouldSnapActivePieceMotion,
   type ActivePiecePoint,
 } from '../board/activePieceMotion';
 import type { ActiveVisualCell } from '../board/boardVisualModel';
-import { voronoiCellSides, voronoiCellWobblePhase } from '../board/voronoiCellStyle';
+import {
+  activeVoronoiCellMorph,
+  voronoiCellSides,
+  voronoiCellWobblePhase,
+} from '../board/voronoiCellStyle';
 
 /**
  * Toxic poison color variants chosen to contrast distinctly against all piece colors,
@@ -27,6 +32,7 @@ const POISON_COLORS: Record<number, string> = {
 };
 
 const REGULAR_PIECE_WOBBLE_SPEED = 0.3325 * 1.05;
+const ACTIVE_MORPH_VERTEX_COUNT = 24;
 
 // Pre-computed static polygon unit circle angles for N=5, N=6, N=7
 const POLYGON_BASE_ANGLES: Record<number, { cos: number; sin: number }[]> = {};
@@ -54,6 +60,11 @@ interface CellMap {
   colorBuckets: Map<string, CellEntry[]>;
   /** Subset of cells that are poisoned (for poison-specific overlays). */
   poisonCells: CellEntry[];
+}
+
+interface ActivePolygonGeometry {
+  points: ActivePiecePoint[] | null;
+  sides: number;
 }
 
 function buildCellMap(
@@ -133,6 +144,155 @@ function tracePolygon(
     else ctx.lineTo(px, py);
   }
   ctx.closePath();
+}
+
+function polygonVertices(
+  cx: number,
+  cy: number,
+  sides: number,
+  cellSize: number,
+  time: number,
+  wobbleSpeed: number,
+  wobblePhase: number,
+): ActivePiecePoint[] {
+  return POLYGON_BASE_ANGLES[sides].map((base, index) => {
+    const angleOffset = Math.sin(time * wobbleSpeed + index) * 0.15;
+    const rad =
+      cellSize * 0.42 +
+      Math.cos(time * wobbleSpeed * 2 + wobblePhase + index) * 3;
+    const cosO = Math.cos(angleOffset);
+    const sinO = Math.sin(angleOffset);
+    return {
+      x: cx + rad * (base.cos * cosO - base.sin * sinO),
+      y: cy + rad * (base.sin * cosO + base.cos * sinO),
+    };
+  });
+}
+
+function resampleClosedPolygon(
+  vertices: readonly ActivePiecePoint[],
+  sampleCount: number,
+): ActivePiecePoint[] {
+  const lengths = vertices.map((point, index) => {
+    const next = vertices[(index + 1) % vertices.length];
+    return Math.hypot(next.x - point.x, next.y - point.y);
+  });
+  const perimeter = lengths.reduce((sum, length) => sum + length, 0);
+  const samples: ActivePiecePoint[] = [];
+  let segmentIndex = 0;
+  let segmentStart = 0;
+
+  for (let sampleIndex = 0; sampleIndex < sampleCount; sampleIndex++) {
+    const distance = (perimeter * sampleIndex) / sampleCount;
+    while (
+      segmentIndex < lengths.length - 1 &&
+      segmentStart + lengths[segmentIndex] < distance
+    ) {
+      segmentStart += lengths[segmentIndex];
+      segmentIndex += 1;
+    }
+    const start = vertices[segmentIndex];
+    const end = vertices[(segmentIndex + 1) % vertices.length];
+    const segmentLength = lengths[segmentIndex];
+    const progress = segmentLength > 0 ? (distance - segmentStart) / segmentLength : 0;
+    samples.push({
+      x: start.x + (end.x - start.x) * progress,
+      y: start.y + (end.y - start.y) * progress,
+    });
+  }
+
+  return samples;
+}
+
+function traceMorphedActivePolygon(
+  ctx: CanvasRenderingContext2D,
+  cx: number,
+  cy: number,
+  cellSize: number,
+  time: number,
+  wobbleSpeed: number,
+  wobblePhase: number,
+  lifetimeSeconds: number,
+  activeOffsetIndex: number,
+  geometryCache: Array<ActivePolygonGeometry | undefined>,
+): void {
+  let geometry = geometryCache[activeOffsetIndex];
+  if (!geometry) {
+    const morph = activeVoronoiCellMorph(lifetimeSeconds, activeOffsetIndex);
+    if (morph.fromSides === morph.toSides || morph.progress <= 0) {
+      geometry = { points: null, sides: morph.fromSides };
+    } else {
+      const fromVertices = resampleClosedPolygon(
+        polygonVertices(cx, cy, morph.fromSides, cellSize, time, wobbleSpeed, wobblePhase),
+        ACTIVE_MORPH_VERTEX_COUNT,
+      );
+      const toVertices = resampleClosedPolygon(
+        polygonVertices(cx, cy, morph.toSides, cellSize, time, wobbleSpeed, wobblePhase),
+        ACTIVE_MORPH_VERTEX_COUNT,
+      );
+      geometry = {
+        sides: morph.toSides,
+        points: fromVertices.map((from, index) => {
+          const to = toVertices[index];
+          return {
+            x: from.x + (to.x - from.x) * morph.progress,
+            y: from.y + (to.y - from.y) * morph.progress,
+          };
+        }),
+      };
+    }
+    geometryCache[activeOffsetIndex] = geometry;
+  }
+
+  if (!geometry.points) {
+    tracePolygon(
+      ctx,
+      cx,
+      cy,
+      geometry.sides,
+      cellSize,
+      time,
+      wobbleSpeed,
+      wobblePhase,
+    );
+    return;
+  }
+
+  for (let i = 0; i < geometry.points.length; i++) {
+    const point = geometry.points[i];
+    if (i === 0) ctx.moveTo(point.x, point.y);
+    else ctx.lineTo(point.x, point.y);
+  }
+  ctx.closePath();
+}
+
+function traceCellPolygon(
+  ctx: CanvasRenderingContext2D,
+  cell: CellEntry,
+  cx: number,
+  cy: number,
+  cellSize: number,
+  time: number,
+  wobbleSpeed: number,
+  activeLifetimeSeconds: number,
+  geometryCache: Array<ActivePolygonGeometry | undefined>,
+): void {
+  if (cell.activeOffsetIndex !== undefined) {
+    traceMorphedActivePolygon(
+      ctx,
+      cx,
+      cy,
+      cellSize,
+      time,
+      wobbleSpeed,
+      cell.wobblePhase,
+      activeLifetimeSeconds,
+      cell.activeOffsetIndex,
+      geometryCache,
+    );
+    return;
+  }
+  tracePolygon(ctx, cx, cy, cell.sides, cellSize, time, wobbleSpeed, cell.wobblePhase);
 }
 
 // ── Component ──
@@ -401,6 +561,7 @@ export const VoronoiFlowfieldCanvas: React.FC<VoronoiFlowfieldCanvasProps> = Rea
     to: ActivePiecePoint;
     startedAt: number;
   }>());
+  const activeVisualStartedAtRef = useRef<number | null>(null);
   const previousActiveCellsRef = useRef<readonly ActiveVisualCell[]>([]);
   const previousActivePieceKeyRef = useRef<string | null>(null);
 
@@ -442,10 +603,20 @@ export const VoronoiFlowfieldCanvas: React.FC<VoronoiFlowfieldCanvasProps> = Rea
     visibleRowsRef.current = visibleRows;
     visiblePoisonRef.current = visiblePoison;
     const now = performance.now();
+    const priorActiveCells = previousActiveCellsRef.current;
+    const activeSequenceRestarted = shouldRestartActivePieceVisualLifetime(
+      priorActiveCells,
+      activeCells,
+    );
     const pieceChanged = previousActivePieceKeyRef.current !== activePieceKey;
     if (pieceChanged) {
       activeMotionRef.current.clear();
       previousActiveCellsRef.current = [];
+    }
+    if (activeCells.length === 0) {
+      activeVisualStartedAtRef.current = null;
+    } else if (activeSequenceRestarted || activeVisualStartedAtRef.current === null) {
+      activeVisualStartedAtRef.current = now;
     }
     const previousById = new Map<number, ActiveVisualCell>(
       previousActiveCellsRef.current.map((cell) => [cell.offsetIndex, cell]),
@@ -486,7 +657,7 @@ export const VoronoiFlowfieldCanvas: React.FC<VoronoiFlowfieldCanvasProps> = Rea
     activeCellsRef.current = activeCells;
     cellSizeRef.current = cellSize;
     cellMapDirtyRef.current = true;
-  }, [visibleRows, visiblePoison, activeCells, cellSize, poisonSpread]);
+  }, [visibleRows, visiblePoison, activeCells, activePieceKey, cellSize, poisonSpread]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -517,6 +688,10 @@ export const VoronoiFlowfieldCanvas: React.FC<VoronoiFlowfieldCanvasProps> = Rea
 
       timeRef.current += deltaSec;
       const time = timeRef.current;
+      const activeLifetimeSeconds = activeVisualStartedAtRef.current === null
+        ? 0
+        : Math.max(0, (timestamp - activeVisualStartedAtRef.current) / 1000);
+      const activeGeometryCache: Array<ActivePolygonGeometry | undefined> = [];
       const cs = cellSizeRef.current;
       const halfCs = cs / 2;
       const size = syncCanvasBackingStore(
@@ -570,7 +745,17 @@ export const VoronoiFlowfieldCanvas: React.FC<VoronoiFlowfieldCanvasProps> = Rea
         for (const cell of regularCells) {
           const wobbleSpeed = REGULAR_PIECE_WOBBLE_SPEED;
           const { x: cx, y: cy } = cellCenter(cell);
-          tracePolygon(ctx, cx, cy, cell.sides, cs, time, wobbleSpeed, cell.wobblePhase);
+          traceCellPolygon(
+            ctx,
+            cell,
+            cx,
+            cy,
+            cs,
+            time,
+            wobbleSpeed,
+            activeLifetimeSeconds,
+            activeGeometryCache,
+          );
         }
         ctx.fill();
       }
@@ -584,7 +769,17 @@ export const VoronoiFlowfieldCanvas: React.FC<VoronoiFlowfieldCanvasProps> = Rea
           if (cell.isPoison) continue;
           const wobbleSpeed = REGULAR_PIECE_WOBBLE_SPEED;
           const { x: cx, y: cy } = cellCenter(cell);
-          tracePolygon(ctx, cx, cy, cell.sides, cs, time, wobbleSpeed, cell.wobblePhase);
+          traceCellPolygon(
+            ctx,
+            cell,
+            cx,
+            cy,
+            cs,
+            time,
+            wobbleSpeed,
+            activeLifetimeSeconds,
+            activeGeometryCache,
+          );
         }
       }
       ctx.stroke();

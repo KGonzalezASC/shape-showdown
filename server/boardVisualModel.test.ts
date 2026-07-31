@@ -4,9 +4,15 @@ import { buildBoardVisualModel } from '../src/board/boardVisualModel';
 import {
   ACTIVE_PIECE_MOTION_MS,
   interpolateActivePiecePoint,
+  shouldRestartActivePieceVisualLifetime,
   shouldSnapActivePieceMotion,
 } from '../src/board/activePieceMotion';
-import { voronoiCellSides } from '../src/board/voronoiCellStyle';
+import {
+  ACTIVE_VORONOI_SHAPE_HOLD_SECONDS,
+  ACTIVE_VORONOI_SHAPE_MORPH_SECONDS,
+  activeVoronoiCellMorph,
+  voronoiCellSides,
+} from '../src/board/voronoiCellStyle';
 import {
   canvasBackingSize,
   isCanvasLayoutVisible,
@@ -73,9 +79,41 @@ describe('buildBoardVisualModel', () => {
     assert.deepEqual(ACTIVE_PIECE_MOTION_MS, 90);
   });
 
+  test('keeps Voronoi lifetime through rotation-sized movement but resets on a new spawn', () => {
+    const before = [{ offsetIndex: 0, x: 4, y: 8 }];
+    assert.equal(
+      shouldRestartActivePieceVisualLifetime(before, [{ offsetIndex: 0, x: 5, y: 7 }]),
+      false,
+    );
+    assert.equal(
+      shouldRestartActivePieceVisualLifetime(before, [{ offsetIndex: 0, x: 4, y: 0 }]),
+      true,
+    );
+  });
+
   test('keeps an active cell polygon shape stable while it moves between rows', () => {
     assert.equal(voronoiCellSides(4, 3, 2), voronoiCellSides(5, 3, 2));
     assert.equal(voronoiCellSides(4, 3, 2), 7);
+  });
+
+  test('holds active cell identity before gently morphing to the next variation', () => {
+    assert.deepEqual(activeVoronoiCellMorph(0, 0), {
+      fromSides: 5,
+      toSides: 5,
+      progress: 0,
+    });
+    assert.deepEqual(activeVoronoiCellMorph(ACTIVE_VORONOI_SHAPE_HOLD_SECONDS, 0), {
+      fromSides: 5,
+      toSides: 6,
+      progress: 0,
+    });
+    const midpoint = activeVoronoiCellMorph(
+      ACTIVE_VORONOI_SHAPE_HOLD_SECONDS + ACTIVE_VORONOI_SHAPE_MORPH_SECONDS / 2,
+      0,
+    );
+    assert.equal(midpoint.fromSides, 5);
+    assert.equal(midpoint.toSides, 6);
+    assert.ok(Math.abs(midpoint.progress - 0.5) < 1e-9);
   });
 
   test('marks hard-drop state in the active-piece identity so it cannot animate as soft drop', () => {
