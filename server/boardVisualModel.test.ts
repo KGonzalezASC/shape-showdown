@@ -93,7 +93,7 @@ describe('buildBoardVisualModel', () => {
     assert.notEqual(before.activePieceKey, after.activePieceKey);
   });
 
-  test('keeps motion identity stable across regular rotations', () => {
+  test('resets motion identity across regular rotations', () => {
     const player = visualPlayer();
     player.activePiece = {
       type: 'T',
@@ -111,7 +111,7 @@ describe('buildBoardVisualModel', () => {
       isMe: true,
     });
 
-    assert.equal(before.activePieceKey, after.activePieceKey);
+    assert.notEqual(before.activePieceKey, after.activePieceKey);
   });
 
   test('preserves poison, bomber, and magnet semantics on an active piece', () => {

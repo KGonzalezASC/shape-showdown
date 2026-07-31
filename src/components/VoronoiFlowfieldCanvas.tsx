@@ -45,6 +45,7 @@ interface CellEntry {
   isPoison: boolean;
   variant: number;
   activeOffsetIndex?: number;
+  wobblePhase: number;
 }
 
 interface CellMap {
@@ -76,13 +77,18 @@ function buildCellMap(
         ? POISON_COLORS[p] || '#EF4444'
         : (cell ? SHAPE_COLORS[cell] || '#38bdf8' : '#38bdf8');
       const sides = 5 + ((r + c) % 3);
+      const activeOffsetIndex = activeByKey.get(`${r},${c}`);
       const entry: CellEntry = {
         r,
         c,
         sides,
         isPoison,
         variant: isPoison ? p : 0,
-        activeOffsetIndex: activeByKey.get(`${r},${c}`),
+        activeOffsetIndex,
+        // Locked cells can use their fixed board row. Active cells need a
+        // piece-local phase so moving down does not abruptly change their
+        // polygon radius on every server snapshot.
+        wobblePhase: activeOffsetIndex ?? r,
       };
 
       let bucket = colorBuckets.get(color);
@@ -567,7 +573,7 @@ export const VoronoiFlowfieldCanvas: React.FC<VoronoiFlowfieldCanvasProps> = Rea
         for (const cell of regularCells) {
           const wobbleSpeed = REGULAR_PIECE_WOBBLE_SPEED;
           const { x: cx, y: cy } = cellCenter(cell);
-          tracePolygon(ctx, cx, cy, cell.sides, cs, time, wobbleSpeed, cell.r);
+          tracePolygon(ctx, cx, cy, cell.sides, cs, time, wobbleSpeed, cell.wobblePhase);
         }
         ctx.fill();
       }
@@ -581,7 +587,7 @@ export const VoronoiFlowfieldCanvas: React.FC<VoronoiFlowfieldCanvasProps> = Rea
           if (cell.isPoison) continue;
           const wobbleSpeed = REGULAR_PIECE_WOBBLE_SPEED;
           const { x: cx, y: cy } = cellCenter(cell);
-          tracePolygon(ctx, cx, cy, cell.sides, cs, time, wobbleSpeed, cell.r);
+          tracePolygon(ctx, cx, cy, cell.sides, cs, time, wobbleSpeed, cell.wobblePhase);
         }
       }
       ctx.stroke();
