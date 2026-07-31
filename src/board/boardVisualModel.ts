@@ -15,6 +15,13 @@ export interface BoardVisualCell {
   bomber: boolean;
   magnetAura: boolean;
   hatched: boolean;
+  activeId: number | null;
+}
+
+export interface ActiveVisualCell {
+  id: number;
+  x: number;
+  y: number;
 }
 
 export interface BoardCurtainVisual {
@@ -26,6 +33,7 @@ export interface BoardVisualModel {
   columns: number;
   rows: number;
   cells: BoardVisualCell[];
+  activeCells: ActiveVisualCell[];
   wildcardOutline: Array<[number, number, number, number]>;
   curtain: BoardCurtainVisual | null;
   cellAt(x: number, y: number): BoardVisualCell | undefined;
@@ -84,11 +92,13 @@ export function buildBoardVisualModel(
         bomber: false,
         magnetAura: false,
         hatched: options.hatchingEnabled && value !== null && poisonVariant === 0,
+        activeId: null,
       };
     },
   );
 
   const activePiece = player.activePiece;
+  const activeCells: ActiveVisualCell[] = [];
   if (activePiece) {
     const offsets =
       activePiece.customOffsets ?? SHAPES[activePiece.type][activePiece.rotation];
@@ -99,11 +109,12 @@ export function buildBoardVisualModel(
       (player.magnetPermanentStacks ?? 0) > 0 ||
       (player.magnetPieceBoost ?? 0) > 0;
 
-    for (const [dx, dy] of offsets) {
+    offsets.forEach(([dx, dy], id) => {
       const x = activePiece.x + dx;
       const y = activePiece.y + dy - BOARD_HIDDEN_ROWS;
-      if (!isVisibleCell(x, y)) continue;
+      if (!isVisibleCell(x, y)) return;
       const cell = cells[visibleCellIndex(x, y)];
+      cell.activeId = id;
       cell.value = activePiece.isWildcard ? 'W' : activePiece.type;
       cell.poisonVariant = poisonVariant;
       cell.bomber = !!activePiece.bomber;
@@ -113,7 +124,8 @@ export function buildBoardVisualModel(
         poisonVariant === 0 &&
         !cell.bomber &&
         !cell.magnetAura;
-    }
+      activeCells.push({ id, x, y });
+    });
   }
 
   const curtain =
@@ -128,6 +140,7 @@ export function buildBoardVisualModel(
     columns: BOARD_COLS,
     rows: BOARD_VISIBLE_ROWS,
     cells,
+    activeCells,
     wildcardOutline: buildWildcardOutline(player.customNextPieceSourceCells),
     curtain,
     cellAt(x, y) {

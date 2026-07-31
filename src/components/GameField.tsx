@@ -247,6 +247,7 @@ const GameField = forwardRef<GameFieldRef, GameFieldProps>(({
           <VoronoiFlowfieldCanvas
             visibleRows={visibleRows}
             visiblePoison={visiblePoison}
+            activeCells={visualModel.activeCells}
             cellSize={cellSize}
             poisonSpread={player.poisonSpread}
             performanceId={performanceId}

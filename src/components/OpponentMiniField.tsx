@@ -87,6 +87,7 @@ const OpponentMiniField: React.FC<OpponentMiniFieldProps> = ({
           <VoronoiFlowfieldCanvas
             visibleRows={visibleRows}
             visiblePoison={visiblePoison}
+            activeCells={visualModel.activeCells}
             cellSize={MINI_CELL_SIZE}
             poisonSpread={player.poisonSpread}
             performanceId="mobile-opponent-mini"

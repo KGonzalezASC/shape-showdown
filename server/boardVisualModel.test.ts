@@ -2,6 +2,10 @@ import { describe, test } from 'node:test';
 import assert from 'node:assert/strict';
 import { buildBoardVisualModel } from '../src/board/boardVisualModel';
 import {
+  ACTIVE_PIECE_MOTION_MS,
+  interpolateActivePiecePoint,
+} from '../src/board/activePieceMotion';
+import {
   canvasBackingSize,
   isCanvasLayoutVisible,
   syncCanvasBackingStore,
@@ -53,6 +57,16 @@ describe('buildBoardVisualModel', () => {
         [5, 3],
       ],
     );
+    assert.deepEqual(
+      model.activeCells.map(({ id, x, y }) => [id, x, y]),
+      [[0, 4, 2], [1, 3, 3], [2, 4, 3], [3, 5, 3]],
+    );
+  });
+
+  test('eases active-piece visual motion without changing its target cell', () => {
+    assert.deepEqual(interpolateActivePiecePoint({ x: 1, y: 4 }, { x: 2, y: 5 }, 0), { x: 1, y: 4 });
+    assert.deepEqual(interpolateActivePiecePoint({ x: 1, y: 4 }, { x: 2, y: 5 }, 1), { x: 2, y: 5 });
+    assert.deepEqual(ACTIVE_PIECE_MOTION_MS, 90);
   });
 
   test('preserves poison, bomber, and magnet semantics on an active piece', () => {

@@ -6,6 +6,12 @@ import {
 } from '../board/boardRenderer';
 import { BOARD_COLS, BOARD_VISIBLE_ROWS, CellValue, PoisonSpreadState } from '../types';
 import { SHAPE_COLORS } from '../presentation/shapePalette';
+import {
+  ACTIVE_PIECE_MOTION_MS,
+  interpolateActivePiecePoint,
+  type ActivePiecePoint,
+} from '../board/activePieceMotion';
+import type { ActiveVisualCell } from '../board/boardVisualModel';
 
 /**
  * Toxic poison color variants chosen to contrast distinctly against all piece colors,
@@ -37,6 +43,7 @@ interface CellEntry {
   sides: number;
   isPoison: boolean;
   variant: number;
+  activeId?: number;
 }
 
 interface CellMap {
@@ -46,9 +53,14 @@ interface CellMap {
   poisonCells: CellEntry[];
 }
 
-function buildCellMap(rows: CellValue[][], poison: number[][]): CellMap {
+function buildCellMap(
+  rows: CellValue[][],
+  poison: number[][],
+  activeCells: readonly ActiveVisualCell[],
+): CellMap {
   const colorBuckets = new Map<string, CellEntry[]>();
   const poisonCells: CellEntry[] = [];
+  const activeByKey = new Map(activeCells.map((cell) => [`${cell.y},${cell.x}`, cell.id]));
 
   for (let r = 0; r < BOARD_VISIBLE_ROWS; r++) {
     for (let c = 0; c < BOARD_COLS; c++) {
@@ -61,7 +73,14 @@ function buildCellMap(rows: CellValue[][], poison: number[][]): CellMap {
         ? POISON_COLORS[p] || '#EF4444'
         : (cell ? SHAPE_COLORS[cell] || '#38bdf8' : '#38bdf8');
       const sides = 5 + ((r + c) % 3);
-      const entry: CellEntry = { r, c, sides, isPoison, variant: isPoison ? p : 0 };
+      const entry: CellEntry = {
+        r,
+        c,
+        sides,
+        isPoison,
+        variant: isPoison ? p : 0,
+        activeId: activeByKey.get(`${r},${c}`),
+      };
 
       let bucket = colorBuckets.get(color);
       if (!bucket) {
@@ -115,6 +134,7 @@ function tracePolygon(
 interface VoronoiFlowfieldCanvasProps {
   visibleRows: CellValue[][];
   visiblePoison: number[][];
+  activeCells: readonly ActiveVisualCell[];
   cellSize: number;
   poisonSpread?: PoisonSpreadState | null;
   performanceId: string;
@@ -348,6 +368,7 @@ function drawPoisonBlob(
 export const VoronoiFlowfieldCanvas: React.FC<VoronoiFlowfieldCanvasProps> = React.memo(({
   visibleRows,
   visiblePoison,
+  activeCells,
   cellSize,
   poisonSpread,
   performanceId,
@@ -357,6 +378,7 @@ export const VoronoiFlowfieldCanvas: React.FC<VoronoiFlowfieldCanvasProps> = Rea
   // Stable refs prevent animation loop teardown on 60Hz state updates
   const visibleRowsRef = useRef(visibleRows);
   const visiblePoisonRef = useRef(visiblePoison);
+  const activeCellsRef = useRef(activeCells);
   const cellSizeRef = useRef(cellSize);
   const timeRef = useRef(0);
   const previousPoisonRef = useRef<number[][] | null>(null);
@@ -366,6 +388,12 @@ export const VoronoiFlowfieldCanvas: React.FC<VoronoiFlowfieldCanvasProps> = Rea
   // Cached cell map — rebuilt only when board occupancy changes
   const cellMapRef = useRef<CellMap | null>(null);
   const cellMapDirtyRef = useRef(true);
+  const activeMotionRef = useRef(new Map<number, {
+    from: ActivePiecePoint;
+    to: ActivePiecePoint;
+    startedAt: number;
+  }>());
+  const previousActiveCellsRef = useRef<readonly ActiveVisualCell[]>([]);
 
   useEffect(() => {
     const previousPoison = previousPoisonRef.current;
@@ -404,9 +432,45 @@ export const VoronoiFlowfieldCanvas: React.FC<VoronoiFlowfieldCanvasProps> = Rea
     previousSpreadRef.current = poisonSpread ?? null;
     visibleRowsRef.current = visibleRows;
     visiblePoisonRef.current = visiblePoison;
+    const now = performance.now();
+    const previousById = new Map<number, ActiveVisualCell>(
+      previousActiveCellsRef.current.map((cell) => [cell.id, cell]),
+    );
+    const nextMotion = new Map<number, {
+      from: ActivePiecePoint;
+      to: ActivePiecePoint;
+      startedAt: number;
+    }>();
+    for (const cell of activeCells) {
+      const previous = previousById.get(cell.id);
+      const existing = activeMotionRef.current.get(cell.id);
+      if (!previous || (previous.x === cell.x && previous.y === cell.y)) {
+        nextMotion.set(cell.id, existing ?? {
+          from: cell,
+          to: cell,
+          startedAt: now,
+        });
+        continue;
+      }
+      const from = existing
+        ? interpolateActivePiecePoint(
+          existing.from,
+          existing.to,
+          (now - existing.startedAt) / ACTIVE_PIECE_MOTION_MS,
+        )
+        : previous;
+      nextMotion.set(cell.id, {
+        from,
+        to: cell,
+        startedAt: now,
+      });
+    }
+    activeMotionRef.current = nextMotion;
+    previousActiveCellsRef.current = activeCells;
+    activeCellsRef.current = activeCells;
     cellSizeRef.current = cellSize;
     cellMapDirtyRef.current = true;
-  }, [visibleRows, visiblePoison, cellSize, poisonSpread]);
+  }, [visibleRows, visiblePoison, activeCells, cellSize, poisonSpread]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -452,10 +516,30 @@ export const VoronoiFlowfieldCanvas: React.FC<VoronoiFlowfieldCanvasProps> = Rea
 
       // Rebuild cell map only when board state changed
       if (cellMapDirtyRef.current) {
-        cellMapRef.current = buildCellMap(visibleRowsRef.current, visiblePoisonRef.current);
+        cellMapRef.current = buildCellMap(
+          visibleRowsRef.current,
+          visiblePoisonRef.current,
+          activeCellsRef.current,
+        );
         cellMapDirtyRef.current = false;
       }
       const cellMap = cellMapRef.current!;
+      const cellCenter = (cell: CellEntry): ActivePiecePoint => {
+        const motion = cell.activeId === undefined
+          ? null
+          : activeMotionRef.current.get(cell.activeId);
+        const point = motion
+          ? interpolateActivePiecePoint(
+            motion.from,
+            motion.to,
+            (timestamp - motion.startedAt) / ACTIVE_PIECE_MOTION_MS,
+          )
+          : { x: cell.c, y: cell.r };
+        return {
+          x: point.x * cs + halfCs,
+          y: point.y * cs + halfCs,
+        };
+      };
 
       ctx.save();
       ctx.scale(dpr, dpr);
@@ -467,11 +551,10 @@ export const VoronoiFlowfieldCanvas: React.FC<VoronoiFlowfieldCanvasProps> = Rea
         if (regularCells.length === 0) continue;
         ctx.fillStyle = color;
         ctx.beginPath();
-        for (const { r, c, sides } of regularCells) {
+        for (const cell of regularCells) {
           const wobbleSpeed = REGULAR_PIECE_WOBBLE_SPEED;
-          const cx = c * cs + halfCs;
-          const cy = r * cs + halfCs;
-          tracePolygon(ctx, cx, cy, sides, cs, time, wobbleSpeed, r);
+          const { x: cx, y: cy } = cellCenter(cell);
+          tracePolygon(ctx, cx, cy, cell.sides, cs, time, wobbleSpeed, cell.r);
         }
         ctx.fill();
       }
@@ -481,12 +564,11 @@ export const VoronoiFlowfieldCanvas: React.FC<VoronoiFlowfieldCanvasProps> = Rea
       ctx.lineWidth = 1.5;
       ctx.beginPath();
       for (const [, cells] of cellMap.colorBuckets) {
-        for (const { r, c, sides, isPoison } of cells) {
-          if (isPoison) continue;
+        for (const cell of cells) {
+          if (cell.isPoison) continue;
           const wobbleSpeed = REGULAR_PIECE_WOBBLE_SPEED;
-          const cx = c * cs + halfCs;
-          const cy = r * cs + halfCs;
-          tracePolygon(ctx, cx, cy, sides, cs, time, wobbleSpeed, r);
+          const { x: cx, y: cy } = cellCenter(cell);
+          tracePolygon(ctx, cx, cy, cell.sides, cs, time, wobbleSpeed, cell.r);
         }
       }
       ctx.stroke();
