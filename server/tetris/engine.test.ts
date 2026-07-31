@@ -50,6 +50,22 @@ describe('tetris engine', () => {
     assert.equal(player.nextQueue.length >= 5, true);
   });
 
+  it('advances one cell per simulation tick while soft drop is held', () => {
+    const rng = makeRng(43);
+    const player = makePlayer('a', rng);
+    const opponent = makePlayer('b', rng);
+    const game = makeGame([player, opponent]);
+    assert.ok(player.activePiece);
+
+    const startY = player.activePiece!.y;
+    player.inputState.softDrop = true;
+    stepPlayer(game, player, opponent, rng, []);
+    stepPlayer(game, player, opponent, rng, []);
+
+    assert.equal(player.activePiece?.y, startY + 2);
+    assert.equal(player.score, 2);
+  });
+
   it('supports hold swapping and maintains cooldown until lock', () => {
     const rng = makeRng(7);
     const player = makePlayer('a', rng);

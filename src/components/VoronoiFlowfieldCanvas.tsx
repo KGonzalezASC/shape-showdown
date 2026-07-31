@@ -9,6 +9,7 @@ import { SHAPE_COLORS } from '../presentation/shapePalette';
 import {
   ACTIVE_PIECE_MOTION_MS,
   interpolateActivePiecePoint,
+  shouldSnapActivePieceMotion,
   type ActivePiecePoint,
 } from '../board/activePieceMotion';
 import type { ActiveVisualCell } from '../board/boardVisualModel';
@@ -454,9 +455,7 @@ export const VoronoiFlowfieldCanvas: React.FC<VoronoiFlowfieldCanvasProps> = Rea
     for (const cell of activeCells) {
       const previous = previousById.get(cell.offsetIndex);
       const existing = activeMotionRef.current.get(cell.offsetIndex);
-      const jumped = previous && (
-        Math.abs(previous.x - cell.x) > 1 || Math.abs(previous.y - cell.y) > 1
-      );
+      const jumped = previous && shouldSnapActivePieceMotion(previous, cell);
       if (!previous || jumped || (previous.x === cell.x && previous.y === cell.y)) {
         nextMotion.set(cell.offsetIndex, existing ?? {
           from: cell,

@@ -108,6 +108,7 @@ export function buildBoardVisualModel(
       activePiece.isWildcard ? 'wildcard' : 'regular',
       activePiece.poisoned ? `poison-${activePiece.poisonVariant ?? 1}` : 'clean',
       activePiece.bomber ? 'bomber' : 'normal',
+      player.pieceHasHardDropped ? 'hard-dropped' : 'falling',
     ].join('|')
     : null;
   if (activePiece) {

@@ -4,6 +4,7 @@ import { buildBoardVisualModel } from '../src/board/boardVisualModel';
 import {
   ACTIVE_PIECE_MOTION_MS,
   interpolateActivePiecePoint,
+  shouldSnapActivePieceMotion,
 } from '../src/board/activePieceMotion';
 import {
   canvasBackingSize,
@@ -66,7 +67,30 @@ describe('buildBoardVisualModel', () => {
   test('eases active-piece visual motion without changing its target cell', () => {
     assert.deepEqual(interpolateActivePiecePoint({ x: 1, y: 4 }, { x: 2, y: 5 }, 0), { x: 1, y: 4 });
     assert.deepEqual(interpolateActivePiecePoint({ x: 1, y: 4 }, { x: 2, y: 5 }, 1), { x: 2, y: 5 });
+    assert.equal(shouldSnapActivePieceMotion({ x: 4, y: 2 }, { x: 4, y: 4 }), false);
+    assert.equal(shouldSnapActivePieceMotion({ x: 4, y: 2 }, { x: 4, y: 5 }), true);
     assert.deepEqual(ACTIVE_PIECE_MOTION_MS, 90);
+  });
+
+  test('marks hard-drop state in the active-piece identity so it cannot animate as soft drop', () => {
+    const player = visualPlayer();
+    player.activePiece = {
+      type: 'I',
+      rotation: 0,
+      x: 3,
+      y: BOARD_HIDDEN_ROWS + 2,
+    };
+    const before = buildBoardVisualModel(toPublicPlayerState(player), {
+      hatchingEnabled: false,
+      isMe: true,
+    });
+    player.pieceHasHardDropped = true;
+    const after = buildBoardVisualModel(toPublicPlayerState(player), {
+      hatchingEnabled: false,
+      isMe: true,
+    });
+
+    assert.notEqual(before.activePieceKey, after.activePieceKey);
   });
 
   test('preserves poison, bomber, and magnet semantics on an active piece', () => {
