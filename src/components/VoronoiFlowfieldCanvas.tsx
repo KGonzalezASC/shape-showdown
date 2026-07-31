@@ -18,6 +18,8 @@ const POISON_COLORS: Record<number, string> = {
   4: '#059669', // Quantum Decay Slime Emerald
 };
 
+const REGULAR_PIECE_WOBBLE_SPEED = 0.3325 * 1.05;
+
 // Pre-computed static polygon unit circle angles for N=5, N=6, N=7
 const POLYGON_BASE_ANGLES: Record<number, { cos: number; sin: number }[]> = {};
 for (let sides = 5; sides <= 7; sides++) {
@@ -466,7 +468,7 @@ export const VoronoiFlowfieldCanvas: React.FC<VoronoiFlowfieldCanvasProps> = Rea
         ctx.fillStyle = color;
         ctx.beginPath();
         for (const { r, c, sides } of regularCells) {
-          const wobbleSpeed = 0.3325;
+          const wobbleSpeed = REGULAR_PIECE_WOBBLE_SPEED;
           const cx = c * cs + halfCs;
           const cy = r * cs + halfCs;
           tracePolygon(ctx, cx, cy, sides, cs, time, wobbleSpeed, r);
@@ -481,7 +483,7 @@ export const VoronoiFlowfieldCanvas: React.FC<VoronoiFlowfieldCanvasProps> = Rea
       for (const [, cells] of cellMap.colorBuckets) {
         for (const { r, c, sides, isPoison } of cells) {
           if (isPoison) continue;
-          const wobbleSpeed = 0.3325;
+          const wobbleSpeed = REGULAR_PIECE_WOBBLE_SPEED;
           const cx = c * cs + halfCs;
           const cy = r * cs + halfCs;
           tracePolygon(ctx, cx, cy, sides, cs, time, wobbleSpeed, r);
