@@ -13,6 +13,7 @@ import {
   type ActivePiecePoint,
 } from '../board/activePieceMotion';
 import type { ActiveVisualCell } from '../board/boardVisualModel';
+import { voronoiCellSides, voronoiCellWobblePhase } from '../board/voronoiCellStyle';
 
 /**
  * Toxic poison color variants chosen to contrast distinctly against all piece colors,
@@ -76,19 +77,15 @@ function buildCellMap(
       const color = isPoison
         ? POISON_COLORS[p] || '#EF4444'
         : (cell ? SHAPE_COLORS[cell] || '#38bdf8' : '#38bdf8');
-      const sides = 5 + ((r + c) % 3);
       const activeOffsetIndex = activeByKey.get(`${r},${c}`);
       const entry: CellEntry = {
         r,
         c,
-        sides,
+        sides: voronoiCellSides(r, c, activeOffsetIndex),
         isPoison,
         variant: isPoison ? p : 0,
         activeOffsetIndex,
-        // Locked cells can use their fixed board row. Active cells need a
-        // piece-local phase so moving down does not abruptly change their
-        // polygon radius on every server snapshot.
-        wobblePhase: activeOffsetIndex ?? r,
+        wobblePhase: voronoiCellWobblePhase(r, activeOffsetIndex),
       };
 
       let bucket = colorBuckets.get(color);

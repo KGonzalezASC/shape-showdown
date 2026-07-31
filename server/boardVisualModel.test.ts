@@ -6,6 +6,7 @@ import {
   interpolateActivePiecePoint,
   shouldSnapActivePieceMotion,
 } from '../src/board/activePieceMotion';
+import { voronoiCellSides } from '../src/board/voronoiCellStyle';
 import {
   canvasBackingSize,
   isCanvasLayoutVisible,
@@ -70,6 +71,11 @@ describe('buildBoardVisualModel', () => {
     assert.equal(shouldSnapActivePieceMotion({ x: 4, y: 2 }, { x: 4, y: 4 }), false);
     assert.equal(shouldSnapActivePieceMotion({ x: 4, y: 2 }, { x: 4, y: 5 }), true);
     assert.deepEqual(ACTIVE_PIECE_MOTION_MS, 90);
+  });
+
+  test('keeps an active cell polygon shape stable while it moves between rows', () => {
+    assert.equal(voronoiCellSides(4, 3, 2), voronoiCellSides(5, 3, 2));
+    assert.equal(voronoiCellSides(4, 3, 2), 7);
   });
 
   test('marks hard-drop state in the active-piece identity so it cannot animate as soft drop', () => {
