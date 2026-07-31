@@ -4,7 +4,15 @@ import {
   isCanvasLayoutVisible,
   syncCanvasBackingStore,
 } from '../board/boardRenderer';
-import { BOARD_COLS, BOARD_VISIBLE_ROWS, CellValue, PoisonSpreadState } from '../types';
+import {
+  BOARD_COLS,
+  BOARD_HIDDEN_ROWS,
+  BOARD_VISIBLE_ROWS,
+  CellValue,
+  PoisonSpreadState,
+  TetrisPiece,
+} from '../types';
+import { SHAPES } from '../tetris/shapes';
 import { SHAPE_COLORS } from '../presentation/shapePalette';
 import {
   ACTIVE_PIECE_MOTION_MS,
@@ -73,6 +81,66 @@ interface ActivePolygonGeometry {
 
 interface ActiveStackHandoff extends ActiveVoronoiCellHandoff {
   motion: ActivePieceMotion;
+}
+
+interface ExplosionShardPoint {
+  x: number;
+  y: number;
+}
+
+interface ExplosionShard {
+  points: [ExplosionShardPoint, ExplosionShardPoint, ExplosionShardPoint];
+  vx: number;
+  vy: number;
+  color: string;
+  ageSeconds: number;
+}
+
+function createExplosionShardsForCell(
+  row: number,
+  column: number,
+  color: string,
+  cellSize: number,
+  time: number,
+): ExplosionShard[] {
+  const centerX = column * cellSize + cellSize / 2;
+  const centerY = row * cellSize + cellSize / 2;
+  const sides = voronoiCellSides(row, column);
+  const vertices = polygonVertices(
+    centerX,
+    centerY,
+    sides,
+    cellSize,
+    time,
+    REGULAR_PIECE_WOBBLE_SPEED,
+    voronoiCellWobblePhase(row),
+  );
+  const shards: ExplosionShard[] = [];
+
+  for (let index = 0; index < vertices.length; index += 1) {
+    const first = vertices[index];
+    const second = vertices[(index + 1) % vertices.length];
+    const shardCenterX = (centerX + first.x + second.x) / 3;
+    const shardCenterY = (centerY + first.y + second.y) / 3;
+    const angle = Math.atan2(shardCenterY - centerY, shardCenterX - centerX);
+    const random = Math.abs(
+      Math.sin((row + 1) * 12.9898 + (column + 1) * 78.233 + (index + 1) * 37.719),
+    );
+    const speed = 60 + (random - Math.floor(random)) * 80;
+
+    shards.push({
+      points: [
+        { x: centerX, y: centerY },
+        { x: first.x, y: first.y },
+        { x: second.x, y: second.y },
+      ],
+      vx: Math.cos(angle) * speed * (cellSize / 33),
+      vy: Math.sin(angle) * speed * (cellSize / 33),
+      color,
+      ageSeconds: 0,
+    });
+  }
+  return shards;
 }
 
 function buildCellMap(
@@ -428,6 +496,8 @@ interface VoronoiFlowfieldCanvasProps {
   activePieceKey: string | null;
   cellSize: number;
   poisonSpread?: PoisonSpreadState | null;
+  board?: CellValue[][];
+  activePiece?: TetrisPiece | null;
   performanceId: string;
 }
 
@@ -663,6 +733,8 @@ export const VoronoiFlowfieldCanvas: React.FC<VoronoiFlowfieldCanvasProps> = Rea
   activePieceKey,
   cellSize,
   poisonSpread,
+  board,
+  activePiece,
   performanceId,
 }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -676,6 +748,9 @@ export const VoronoiFlowfieldCanvas: React.FC<VoronoiFlowfieldCanvasProps> = Rea
   const previousPoisonRef = useRef<number[][] | null>(null);
   const previousSpreadRef = useRef<PoisonSpreadState | null>(null);
   const poisonAnimationRef = useRef<PoisonAnimation | null>(null);
+  const previousBoardRef = useRef<CellValue[][] | null>(null);
+  const previousActivePieceRef = useRef<TetrisPiece | null>(null);
+  const explosionShardsRef = useRef<ExplosionShard[]>([]);
 
   // Cached cell map — rebuilt only when board occupancy changes
   const cellMapRef = useRef<CellMap | null>(null);
@@ -691,6 +766,8 @@ export const VoronoiFlowfieldCanvas: React.FC<VoronoiFlowfieldCanvasProps> = Rea
   const previousActivePieceKeyRef = useRef<string | null>(null);
 
   useEffect(() => {
+    const previousBoard = previousBoardRef.current;
+    const previousActivePiece = previousActivePieceRef.current;
     const previousPoison = previousPoisonRef.current;
     const previousSpread = previousSpreadRef.current;
     const spreadAdvanced = previousSpread && (
@@ -698,6 +775,46 @@ export const VoronoiFlowfieldCanvas: React.FC<VoronoiFlowfieldCanvasProps> = Rea
       poisonSpread.nextSpreadTick !== previousSpread.nextSpreadTick ||
       poisonSpread.generationsRemaining < previousSpread.generationsRemaining
     );
+
+    const pieceLocked = previousActivePiece != null && (
+      activePiece == null ||
+      activePiece.type !== previousActivePiece.type ||
+      activePiece.y < previousActivePiece.y
+    );
+    if (previousBoard && board && pieceLocked && previousActivePiece?.bomber) {
+      for (let row = 0; row < BOARD_VISIBLE_ROWS; row += 1) {
+        const boardRow = BOARD_HIDDEN_ROWS + row;
+        for (let column = 0; column < BOARD_COLS; column += 1) {
+          const previousValue = previousBoard[boardRow]?.[column] ?? null;
+          const currentValue = board[boardRow]?.[column] ?? null;
+          if (previousValue === null || currentValue !== null) continue;
+          const poisonVariant = previousPoison?.[row]?.[column] ?? 0;
+          const color = poisonVariant > 0
+            ? POISON_COLORS[poisonVariant] || '#EF4444'
+            : SHAPE_COLORS[previousValue] || '#38bdf8';
+          explosionShardsRef.current.push(
+            ...createExplosionShardsForCell(row, column, color, cellSize, timeRef.current),
+          );
+        }
+      }
+
+      const offsets = previousActivePiece.customOffsets ??
+        SHAPES[previousActivePiece.type][previousActivePiece.rotation];
+      for (const [dx, dy] of offsets) {
+        const column = previousActivePiece.x + dx;
+        const boardRow = previousActivePiece.y + dy;
+        const row = boardRow - BOARD_HIDDEN_ROWS;
+        if (
+          row < 0 || row >= BOARD_VISIBLE_ROWS ||
+          column < 0 || column >= BOARD_COLS ||
+          (board[boardRow]?.[column] ?? null) !== null
+        ) continue;
+        const color = SHAPE_COLORS[previousActivePiece.type] || '#38bdf8';
+        explosionShardsRef.current.push(
+          ...createExplosionShardsForCell(row, column, color, cellSize, timeRef.current),
+        );
+      }
+    }
 
     if (previousPoison && spreadAdvanced && !poisonSnapshotEqual(previousPoison, visiblePoison)) {
       const animationCells: PoisonAnimationCell[] = [];
@@ -723,6 +840,8 @@ export const VoronoiFlowfieldCanvas: React.FC<VoronoiFlowfieldCanvasProps> = Rea
       }
     }
 
+    previousBoardRef.current = board ?? null;
+    previousActivePieceRef.current = activePiece ?? null;
     previousPoisonRef.current = visiblePoison;
     previousSpreadRef.current = poisonSpread ?? null;
     visibleRowsRef.current = visibleRows;
@@ -814,7 +933,16 @@ export const VoronoiFlowfieldCanvas: React.FC<VoronoiFlowfieldCanvasProps> = Rea
     activeCellsRef.current = activeCells;
     cellSizeRef.current = cellSize;
     cellMapDirtyRef.current = true;
-  }, [visibleRows, visiblePoison, activeCells, activePieceKey, cellSize, poisonSpread]);
+  }, [
+    visibleRows,
+    visiblePoison,
+    activeCells,
+    activePieceKey,
+    cellSize,
+    poisonSpread,
+    board,
+    activePiece,
+  ]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -1007,6 +1135,42 @@ export const VoronoiFlowfieldCanvas: React.FC<VoronoiFlowfieldCanvasProps> = Rea
           }
         }
         if (animation && progress >= 1) poisonAnimationRef.current = null;
+      }
+
+      // ── Pass 4: Bomber Voronoi shards ──
+      if (explosionShardsRef.current.length > 0) {
+        const shards = explosionShardsRef.current;
+        let writeIndex = 0;
+        ctx.save();
+        for (let readIndex = 0; readIndex < shards.length; readIndex += 1) {
+          const shard = shards[readIndex];
+          for (const point of shard.points) {
+            point.x += shard.vx * deltaSec;
+            point.y += shard.vy * deltaSec;
+          }
+          const drag = Math.pow(0.88, deltaSec * 60);
+          shard.vx *= drag;
+          shard.vy = shard.vy * drag + 60 * (cs / 33) * deltaSec;
+          shard.ageSeconds += deltaSec;
+          const alpha = Math.max(0, 1 - shard.ageSeconds * 1.4);
+          if (alpha <= 0) continue;
+
+          ctx.globalAlpha = alpha;
+          ctx.fillStyle = shard.color;
+          ctx.strokeStyle = `rgba(255, 255, 255, ${0.5 * alpha})`;
+          ctx.lineWidth = 1;
+          ctx.beginPath();
+          ctx.moveTo(shard.points[0].x, shard.points[0].y);
+          ctx.lineTo(shard.points[1].x, shard.points[1].y);
+          ctx.lineTo(shard.points[2].x, shard.points[2].y);
+          ctx.closePath();
+          ctx.fill();
+          ctx.stroke();
+          shards[writeIndex] = shard;
+          writeIndex += 1;
+        }
+        ctx.restore();
+        shards.length = writeIndex;
       }
 
       ctx.restore();

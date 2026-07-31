@@ -89,6 +89,17 @@ html, body, #root {
   animation: shop-cycle-pulse 0.7s ease-in-out infinite;
 }
 
+@keyframes bomb-wiggle {
+  0%, 100% { transform: rotate(0deg) scale(1); }
+  25% { transform: rotate(-12deg) scale(1.15); }
+  50% { transform: rotate(0deg) scale(1.05); }
+  75% { transform: rotate(12deg) scale(1.15); }
+}
+
+.animate-bomb-wiggle {
+  animation: bomb-wiggle 0.5s ease-in-out infinite;
+}
+
 @keyframes rainbow-bg {
   0% { background-position: 0% 50%; }
   100% { background-position: -200% 50%; }

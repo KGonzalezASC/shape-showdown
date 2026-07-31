@@ -251,6 +251,8 @@ const GameField = forwardRef<GameFieldRef, GameFieldProps>(({
             activePieceKey={visualModel.activePieceKey}
             cellSize={cellSize}
             poisonSpread={player.poisonSpread}
+            board={player.board}
+            activePiece={player.activePiece}
             performanceId={performanceId}
           />
           <BoardCanvasOverlay
@@ -314,7 +316,7 @@ const GameField = forwardRef<GameFieldRef, GameFieldProps>(({
                                 <div className="tetromino-hatch pointer-events-none absolute inset-0" aria-hidden />
                               )}
                               {heldPiece.bomber && (
-                                <span className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center text-[8px] leading-none">
+                                <span className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center text-[8px] leading-none animate-bomb-wiggle">
                                   💣
                                 </span>
                               )}
