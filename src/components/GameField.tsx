@@ -248,6 +248,7 @@ const GameField = forwardRef<GameFieldRef, GameFieldProps>(({
             visibleRows={visibleRows}
             visiblePoison={visiblePoison}
             activeCells={visualModel.activeCells}
+            activePieceKey={visualModel.activePieceKey}
             cellSize={cellSize}
             poisonSpread={player.poisonSpread}
             performanceId={performanceId}

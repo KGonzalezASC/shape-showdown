@@ -15,11 +15,11 @@ export interface BoardVisualCell {
   bomber: boolean;
   magnetAura: boolean;
   hatched: boolean;
-  activeId: number | null;
+  activeOffsetIndex: number | null;
 }
 
 export interface ActiveVisualCell {
-  id: number;
+  offsetIndex: number;
   x: number;
   y: number;
 }
@@ -34,6 +34,7 @@ export interface BoardVisualModel {
   rows: number;
   cells: BoardVisualCell[];
   activeCells: ActiveVisualCell[];
+  activePieceKey: string | null;
   wildcardOutline: Array<[number, number, number, number]>;
   curtain: BoardCurtainVisual | null;
   cellAt(x: number, y: number): BoardVisualCell | undefined;
@@ -92,13 +93,23 @@ export function buildBoardVisualModel(
         bomber: false,
         magnetAura: false,
         hatched: options.hatchingEnabled && value !== null && poisonVariant === 0,
-        activeId: null,
+        activeOffsetIndex: null,
       };
     },
   );
 
   const activePiece = player.activePiece;
   const activeCells: ActiveVisualCell[] = [];
+  const activePieceKey = activePiece
+    ? [
+      activePiece.type,
+      activePiece.rotation,
+      activePiece.customOffsets?.map(([dx, dy]) => `${dx},${dy}`).join(';') ?? '',
+      activePiece.isWildcard ? 'wildcard' : 'regular',
+      activePiece.poisoned ? `poison-${activePiece.poisonVariant ?? 1}` : 'clean',
+      activePiece.bomber ? 'bomber' : 'normal',
+    ].join('|')
+    : null;
   if (activePiece) {
     const offsets =
       activePiece.customOffsets ?? SHAPES[activePiece.type][activePiece.rotation];
@@ -109,12 +120,12 @@ export function buildBoardVisualModel(
       (player.magnetPermanentStacks ?? 0) > 0 ||
       (player.magnetPieceBoost ?? 0) > 0;
 
-    offsets.forEach(([dx, dy], id) => {
+    offsets.forEach(([dx, dy], offsetIndex) => {
       const x = activePiece.x + dx;
       const y = activePiece.y + dy - BOARD_HIDDEN_ROWS;
       if (!isVisibleCell(x, y)) return;
       const cell = cells[visibleCellIndex(x, y)];
-      cell.activeId = id;
+      cell.activeOffsetIndex = offsetIndex;
       cell.value = activePiece.isWildcard ? 'W' : activePiece.type;
       cell.poisonVariant = poisonVariant;
       cell.bomber = !!activePiece.bomber;
@@ -124,7 +135,7 @@ export function buildBoardVisualModel(
         poisonVariant === 0 &&
         !cell.bomber &&
         !cell.magnetAura;
-      activeCells.push({ id, x, y });
+      activeCells.push({ offsetIndex, x, y });
     });
   }
 
@@ -141,6 +152,7 @@ export function buildBoardVisualModel(
     rows: BOARD_VISIBLE_ROWS,
     cells,
     activeCells,
+    activePieceKey,
     wildcardOutline: buildWildcardOutline(player.customNextPieceSourceCells),
     curtain,
     cellAt(x, y) {

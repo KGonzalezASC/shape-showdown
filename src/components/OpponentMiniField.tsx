@@ -88,6 +88,7 @@ const OpponentMiniField: React.FC<OpponentMiniFieldProps> = ({
             visibleRows={visibleRows}
             visiblePoison={visiblePoison}
             activeCells={visualModel.activeCells}
+            activePieceKey={visualModel.activePieceKey}
             cellSize={MINI_CELL_SIZE}
             poisonSpread={player.poisonSpread}
             performanceId="mobile-opponent-mini"

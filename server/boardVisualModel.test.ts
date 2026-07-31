@@ -58,7 +58,7 @@ describe('buildBoardVisualModel', () => {
       ],
     );
     assert.deepEqual(
-      model.activeCells.map(({ id, x, y }) => [id, x, y]),
+      model.activeCells.map(({ offsetIndex, x, y }) => [offsetIndex, x, y]),
       [[0, 4, 2], [1, 3, 3], [2, 4, 3], [3, 5, 3]],
     );
   });

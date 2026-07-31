@@ -43,7 +43,7 @@ interface CellEntry {
   sides: number;
   isPoison: boolean;
   variant: number;
-  activeId?: number;
+  activeOffsetIndex?: number;
 }
 
 interface CellMap {
@@ -60,7 +60,9 @@ function buildCellMap(
 ): CellMap {
   const colorBuckets = new Map<string, CellEntry[]>();
   const poisonCells: CellEntry[] = [];
-  const activeByKey = new Map(activeCells.map((cell) => [`${cell.y},${cell.x}`, cell.id]));
+  const activeByKey = new Map(
+    activeCells.map((cell) => [`${cell.y},${cell.x}`, cell.offsetIndex]),
+  );
 
   for (let r = 0; r < BOARD_VISIBLE_ROWS; r++) {
     for (let c = 0; c < BOARD_COLS; c++) {
@@ -79,7 +81,7 @@ function buildCellMap(
         sides,
         isPoison,
         variant: isPoison ? p : 0,
-        activeId: activeByKey.get(`${r},${c}`),
+        activeOffsetIndex: activeByKey.get(`${r},${c}`),
       };
 
       let bucket = colorBuckets.get(color);
@@ -135,6 +137,7 @@ interface VoronoiFlowfieldCanvasProps {
   visibleRows: CellValue[][];
   visiblePoison: number[][];
   activeCells: readonly ActiveVisualCell[];
+  activePieceKey: string | null;
   cellSize: number;
   poisonSpread?: PoisonSpreadState | null;
   performanceId: string;
@@ -369,6 +372,7 @@ export const VoronoiFlowfieldCanvas: React.FC<VoronoiFlowfieldCanvasProps> = Rea
   visibleRows,
   visiblePoison,
   activeCells,
+  activePieceKey,
   cellSize,
   poisonSpread,
   performanceId,
@@ -394,6 +398,7 @@ export const VoronoiFlowfieldCanvas: React.FC<VoronoiFlowfieldCanvasProps> = Rea
     startedAt: number;
   }>());
   const previousActiveCellsRef = useRef<readonly ActiveVisualCell[]>([]);
+  const previousActivePieceKeyRef = useRef<string | null>(null);
 
   useEffect(() => {
     const previousPoison = previousPoisonRef.current;
@@ -433,8 +438,13 @@ export const VoronoiFlowfieldCanvas: React.FC<VoronoiFlowfieldCanvasProps> = Rea
     visibleRowsRef.current = visibleRows;
     visiblePoisonRef.current = visiblePoison;
     const now = performance.now();
+    const pieceChanged = previousActivePieceKeyRef.current !== activePieceKey;
+    if (pieceChanged) {
+      activeMotionRef.current.clear();
+      previousActiveCellsRef.current = [];
+    }
     const previousById = new Map<number, ActiveVisualCell>(
-      previousActiveCellsRef.current.map((cell) => [cell.id, cell]),
+      previousActiveCellsRef.current.map((cell) => [cell.offsetIndex, cell]),
     );
     const nextMotion = new Map<number, {
       from: ActivePiecePoint;
@@ -442,10 +452,13 @@ export const VoronoiFlowfieldCanvas: React.FC<VoronoiFlowfieldCanvasProps> = Rea
       startedAt: number;
     }>();
     for (const cell of activeCells) {
-      const previous = previousById.get(cell.id);
-      const existing = activeMotionRef.current.get(cell.id);
-      if (!previous || (previous.x === cell.x && previous.y === cell.y)) {
-        nextMotion.set(cell.id, existing ?? {
+      const previous = previousById.get(cell.offsetIndex);
+      const existing = activeMotionRef.current.get(cell.offsetIndex);
+      const jumped = previous && (
+        Math.abs(previous.x - cell.x) > 1 || Math.abs(previous.y - cell.y) > 1
+      );
+      if (!previous || jumped || (previous.x === cell.x && previous.y === cell.y)) {
+        nextMotion.set(cell.offsetIndex, existing ?? {
           from: cell,
           to: cell,
           startedAt: now,
@@ -459,7 +472,7 @@ export const VoronoiFlowfieldCanvas: React.FC<VoronoiFlowfieldCanvasProps> = Rea
           (now - existing.startedAt) / ACTIVE_PIECE_MOTION_MS,
         )
         : previous;
-      nextMotion.set(cell.id, {
+      nextMotion.set(cell.offsetIndex, {
         from,
         to: cell,
         startedAt: now,
@@ -467,6 +480,7 @@ export const VoronoiFlowfieldCanvas: React.FC<VoronoiFlowfieldCanvasProps> = Rea
     }
     activeMotionRef.current = nextMotion;
     previousActiveCellsRef.current = activeCells;
+    previousActivePieceKeyRef.current = activePieceKey;
     activeCellsRef.current = activeCells;
     cellSizeRef.current = cellSize;
     cellMapDirtyRef.current = true;
@@ -525,9 +539,9 @@ export const VoronoiFlowfieldCanvas: React.FC<VoronoiFlowfieldCanvasProps> = Rea
       }
       const cellMap = cellMapRef.current!;
       const cellCenter = (cell: CellEntry): ActivePiecePoint => {
-        const motion = cell.activeId === undefined
+        const motion = cell.activeOffsetIndex === undefined
           ? null
-          : activeMotionRef.current.get(cell.activeId);
+          : activeMotionRef.current.get(cell.activeOffsetIndex);
         const point = motion
           ? interpolateActivePiecePoint(
             motion.from,
