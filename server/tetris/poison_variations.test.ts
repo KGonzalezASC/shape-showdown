@@ -308,6 +308,55 @@ describe('poison spread variations', () => {
     assert.equal(opponent.poisonBoard[BOARD_ROWS - 1][0], 0, 'Landed cell 2 should NOT be poisoned on lock');
   });
 
+  it('Wildcard +4 varies the starting seed and copied shape across successive purchases', () => {
+    const rng = makeRng(1);
+    const buyer = makePlayer('a', rng);
+    const opponent = makePlayer('b', rng);
+    const game = {
+      players: { a: buyer, b: opponent },
+      status: 'playing' as const,
+      countdown: 0,
+      remainingTime: 120,
+      winnerId: null,
+      tick: 1,
+      seed: 1,
+    };
+
+    buyer.score = 1000;
+    buyer.shop.phase = 'cycling';
+    buyer.shop.offerIds = ['wildcard-four'];
+    buyer.shop.cycleIndex = 0;
+    opponent.poisonBoard = createEmptyPoisonBoard();
+    opponent.board = createEmptyBoard();
+
+    const bottom = BOARD_ROWS - 1;
+    const blotch: Array<[number, number]> = [
+      [1, bottom - 2], [2, bottom - 2],
+      [0, bottom - 1], [1, bottom - 1], [2, bottom - 1],
+      [0, bottom], [1, bottom], [2, bottom], [3, bottom],
+    ];
+    for (const [x, y] of blotch) {
+      opponent.poisonBoard[y][x] = 2;
+      opponent.board[y][x] = 'T';
+    }
+
+    assert.equal(applyShopPurchase(game, buyer, opponent, 'wildcard-four', makeRng(1)), true);
+    const firstShape = opponent.customNextPieceOffsets;
+    const firstSeed = opponent.wildcardLastSeed;
+
+    buyer.shop.phase = 'cycling';
+    buyer.shop.offerIds = ['wildcard-four'];
+    buyer.shop.cycleIndex = 0;
+    assert.equal(applyShopPurchase(game, buyer, opponent, 'wildcard-four', makeRng(1)), true);
+
+    assert.notDeepEqual(opponent.wildcardLastSeed, firstSeed, 'Successive purchases should try a new seed cell');
+    assert.notDeepEqual(
+      opponent.customNextPieceOffsets,
+      firstShape,
+      'Successive purchases should prefer a different normalized puzzle shape',
+    );
+  });
+
   it('Wildcard +4 line clear reduction', () => {
     const rng = makeRng(1);
     const buyer = makePlayer('a', rng);

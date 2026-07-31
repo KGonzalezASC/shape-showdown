@@ -12,6 +12,7 @@ import { SHAPES } from '../src/tetris/shapes';
 import { getPrebakedNameDropPlan } from '../src/nameDrop/nameDropPrebaked';
 import {
   collectNewlySettledPieceIndices,
+  pieceMotion,
   pieceSettledAt,
 } from '../src/nameDrop/nameDropRenderCore';
 import { syncNameDropPlaybackClock } from '../src/nameDrop/nameDropPlayback';
@@ -97,6 +98,17 @@ describe('name drop planner', () => {
 
     assert.equal(newlySettled.includes(laterIndex), true);
     assert.equal(newlySettled.includes(laterIndex - 1), false);
+  });
+
+  it('keeps a falling piece moving until its actual settlement time', () => {
+    const [piece] = createNameDropPlan('SHAPE SHOWDOWN').pieces;
+    const nearSettlement = pieceMotion(piece, 10, piece.delayMs + piece.durationMs * 0.9);
+    const settled = pieceMotion(piece, 10, piece.delayMs + piece.durationMs);
+
+    assert.equal(nearSettlement.settled, false);
+    assert.ok(nearSettlement.translateY < 0);
+    assert.equal(settled.settled, true);
+    assert.equal(Math.abs(settled.translateY), 0);
   });
 
   it('preserves playback time across redraws and resets it only for a new cycle', () => {

@@ -193,7 +193,11 @@ export function createNameDropPlan(
   const occupied = new Set<string>();
   const tiled = layout.glyphs.flatMap((glyph) => {
     const pieces = tileGlyph(glyph.cells, rng, occupied);
-    pieces.flatMap((piece) => piece.cells).forEach((cell) => occupied.add(cellKey(cell)));
+    for (const piece of pieces) {
+      for (const cell of piece.cells) {
+        occupied.add(cellKey(cell));
+      }
+    }
     return pieces;
   });
   const ordered = tiled

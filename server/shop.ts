@@ -101,10 +101,14 @@ function findLargestPoisonComponent(
   return { cells: best, variant: bestVariant };
 }
 
-function truncateConnectedPoisonCells(cells: PoisonCell[], maxCells: number): PoisonCell[] {
+function truncateConnectedPoisonCells(
+  cells: PoisonCell[],
+  maxCells: number,
+  requestedSeed?: PoisonCell,
+): PoisonCell[] {
   if (cells.length <= maxCells) return cells;
   const inGroup = new Set(cells.map((c) => `${c.x},${c.y}`));
-  const seed = [...cells].sort((a, b) => a.y - b.y || a.x - b.x)[0];
+  const seed = requestedSeed ?? [...cells].sort((a, b) => a.y - b.y || a.x - b.x)[0];
   const out: PoisonCell[] = [];
   const visited = new Set<string>([`${seed.x},${seed.y}`]);
   const queue: PoisonCell[] = [seed];
@@ -133,6 +137,47 @@ function poisonCellsToOffsets(cells: PoisonCell[]): [number, number][] {
   return cells
     .map((c) => [c.x - minX, c.y - minY] as [number, number])
     .sort((a, b) => a[1] - b[1] || a[0] - b[0]);
+}
+
+type WildcardCandidate = {
+  seed: PoisonCell;
+  cells: PoisonCell[];
+  shapeKey: string;
+};
+
+function wildcardCandidates(cells: PoisonCell[], maxCells: number): WildcardCandidate[] {
+  return [...cells]
+    .sort((a, b) => a.y - b.y || a.x - b.x)
+    .map((seed) => {
+      const selected = truncateConnectedPoisonCells(cells, maxCells, seed);
+      const offsets = poisonCellsToOffsets(selected);
+      return {
+        seed,
+        cells: selected,
+        shapeKey: offsets.map(([x, y]) => `${x},${y}`).join('|'),
+      };
+    });
+}
+
+function chooseWildcardCandidate(
+  opponent: PlayerState,
+  candidates: WildcardCandidate[],
+  rng: MutableRng,
+): WildcardCandidate {
+  const previousSeed = opponent.wildcardLastSeed;
+  const previousShapeKey = opponent.wildcardLastShapeKey;
+  if (!previousSeed && !previousShapeKey) return candidates[0];
+
+  const differentShape = candidates.filter((candidate) => candidate.shapeKey !== previousShapeKey);
+  const differentSeed = candidates.filter(
+    (candidate) => candidate.seed.x !== previousSeed?.[0] || candidate.seed.y !== previousSeed?.[1],
+  );
+  const pool = differentShape.length > 0
+    ? differentShape
+    : differentSeed.length > 0
+      ? differentSeed
+      : candidates;
+  return pool[rngInt(rng, pool.length)] ?? pool[0];
 }
 
 function opponentHasPoison(opponent: PlayerState): boolean {
@@ -278,15 +323,19 @@ const SHOP_HANDLERS: Record<string, ShopHandler> = {
   },
   'wildcard-four': {
     canPurchase: ({ opponent }) => !!opponent && opponentHasPoison(opponent),
-    onPurchase: ({ opponent, tick }) => {
+    onPurchase: ({ opponent, tick, rng }) => {
       if (!opponent) return;
       const poison = opponent.poisonBoard ?? [];
       const component = findLargestPoisonComponent(poison);
       if (!component) return;
-      const targetCells = truncateConnectedPoisonCells(component.cells, WILDCARD_FOUR_MAX_CELLS);
+      const candidates = wildcardCandidates(component.cells, WILDCARD_FOUR_MAX_CELLS);
+      const candidate = chooseWildcardCandidate(opponent, candidates, rng);
+      const targetCells = candidate.cells;
       opponent.customNextPieceOffsets = poisonCellsToOffsets(targetCells);
       opponent.customNextPieceVariant = component.variant;
       opponent.customNextPieceSourceCells = targetCells.map((cell) => [cell.x, cell.y]);
+      opponent.wildcardLastSeed = [candidate.seed.x, candidate.seed.y];
+      opponent.wildcardLastShapeKey = candidate.shapeKey;
       pushFieldEffect(opponent, 'wildcard-four', tick, 'Wildcard +4', '🧩', tick + 240);
     },
   },

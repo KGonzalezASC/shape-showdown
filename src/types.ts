@@ -271,6 +271,9 @@ export interface PlayerState {
   customNextPieceVariant?: number;
   /** Absolute board cells currently outlined as the source for a queued Wildcard +4 piece. */
   customNextPieceSourceCells?: [number, number][];
+  /** Last Wildcard +4 seed/shape, used to avoid repeating the same puzzle piece. */
+  wildcardLastSeed?: [number, number];
+  wildcardLastShapeKey?: string;
   /** Game tick until hold/store/swap is blocked (Freeze shop item). */
   holdFrozenUntilTick?: number;
   /** Per-piece lock reset cap override (Sticky shop item); cleared on lock/hold. */

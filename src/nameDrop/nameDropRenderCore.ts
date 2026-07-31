@@ -4,13 +4,20 @@ import {
   type NameDropPiece,
   type NameDropPlan,
 } from './nameDropShared';
-import { LANDING_PAGE_SHAPE_COLORS } from '../presentation/shapePalette';
 
 const BOARD_FILL = '#10131a';
 const GRID_LINE = 'rgba(255, 255, 255, 0.035)';
 const CELL_BORDER = 'rgba(255, 255, 255, 0.2)';
 
-export const PIECE_COLORS: Record<NameDropPiece['type'], string> = LANDING_PAGE_SHAPE_COLORS;
+export const PIECE_COLORS: Record<NameDropPiece['type'], string> = {
+  I: '#67e8f9',
+  J: '#60a5fa',
+  L: '#fdba74',
+  O: '#fef08a',
+  S: '#6ee7b7',
+  T: '#f0abfc',
+  Z: '#fda4af',
+};
 
 export type CanvasLike = OffscreenCanvas | HTMLCanvasElement;
 
@@ -59,8 +66,9 @@ export function pieceMotion(piece: NameDropPiece, cellSize: number, elapsedMs: n
 
   const progress = Math.min(1, local);
   const opacity = progress < 0.12 ? progress / 0.12 : 1;
-  const motionProgress = Math.min(1, progress / 0.82);
-  const eased = cubicBezierEase(motionProgress, 0.18, 0.82, 0.24, 1);
+  // Canvas has no separate target layer, so keep the piece moving until its
+  // actual settlement time instead of leaving it visibly paused above the letter.
+  const eased = cubicBezierEase(progress, 0.18, 0.82, 0.24, 1);
   const startY = -Math.max(4, piece.y + 4) * cellSize;
 
   return {
@@ -339,18 +347,4 @@ export class NameDropLayeredRenderer {
     ctx.fillStyle = BOARD_FILL;
     ctx.fillRect(0, 0, width, height);
   }
-}
-
-/** Legacy single-pass draw for tests and main-thread fallback entry. */
-export function drawNameDropFrame(
-  ctx: CanvasContext,
-  plan: NameDropPlan,
-  cellSize: number,
-  elapsedMs: number,
-): void {
-  const renderer = new NameDropLayeredRenderer();
-  const display = createLayer(NAME_DROP_COLUMNS * cellSize, NAME_DROP_ROWS * cellSize).canvas;
-  renderer.configure(display, cellSize, 1);
-  renderer.begin(plan);
-  renderer.paint(ctx, elapsedMs);
 }

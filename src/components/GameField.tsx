@@ -4,14 +4,19 @@ import {
   BOARD_HIDDEN_ROWS,
   BOARD_ROWS,
   BOARD_VISIBLE_ROWS,
-  CellValue,
   HOLD_SWAP_CUTOFF_VISIBLE_ROW,
   MatchStatus,
 } from '../types';
 import { SHAPES } from '../tetris/shapes';
 import { SHAPE_COLORS } from '../presentation/shapePalette';
+import { BoardCanvasOverlay } from '../board/BoardCanvasOverlay';
+import { buildBoardVisualModel } from '../board/boardVisualModel';
 import { styleForFieldEffect } from '../shop/effectStyles';
-import { normalizeHeldPiece, PublicPlayerState } from '../state/publicSnapshots';
+import {
+  normalizeHeldPiece,
+  publicPlayersEqual,
+  PublicPlayerState,
+} from '../state/publicSnapshots';
 import { PlayfieldCellSizeContext } from './playfieldCellSizeContext';
 import { VoronoiFlowfieldCanvas } from './VoronoiFlowfieldCanvas';
 
@@ -26,51 +31,12 @@ interface GameFieldProps {
   cellSize?: number;
   status?: MatchStatus;
   hatchingEnabled: boolean;
+  performanceId?: string;
 }
 
 export interface GameFieldRef {
   shake: (type: 'soft' | 'medium') => void;
 }
-
-const MemoizedCell = React.memo(
-  ({
-    color,
-    poison,
-    bomber,
-    magnetAura,
-    size,
-    hatchingEnabled,
-  }: {
-    color: CellValue;
-    poison: number;
-    bomber: boolean;
-    magnetAura: boolean;
-    size: number;
-    hatchingEnabled: boolean;
-  }) => {
-    return (
-      <div
-        className={`arena-cell relative pointer-events-none ${color || poison > 0 ? '' : 'arena-cell-empty'}`}
-        style={{ width: size, height: size }}
-        title={bomber ? 'Bomber' : undefined}
-      >
-        {(color || poison > 0) && (
-          <div className="pointer-events-none absolute inset-0">
-            {hatchingEnabled && !poison && !bomber && !magnetAura && (
-              <div className="tetromino-hatch pointer-events-none absolute inset-0" aria-hidden />
-            )}
-            {magnetAura && <div className="magnet-pull-ring pointer-events-none absolute inset-0 z-10" aria-hidden />}
-            {bomber && (
-              <span className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center text-[11px] leading-none drop-shadow-[0_1px_2px_rgba(0,0,0,0.95)]">
-                💣
-              </span>
-            )}
-          </div>
-        )}
-      </div>
-    );
-  },
-);
 
 const HOLD_PREVIEW_SIZE = 4;
 /** Curtain: rows just below the swap line that stay frosted/semi-visible; everything deeper is fully opaque. */
@@ -86,6 +52,7 @@ const GameField = forwardRef<GameFieldRef, GameFieldProps>(({
   cellSize: cellSizeProp,
   status = 'playing',
   hatchingEnabled,
+  performanceId = title,
 }, ref) => {
   const activeEffects = player.activeEffects || [];
   const layoutCellSize = useContext(PlayfieldCellSizeContext);
@@ -112,102 +79,30 @@ const GameField = forwardRef<GameFieldRef, GameFieldProps>(({
       setTimeout(() => setShakeClass(''), 400);
     }
   }));
-  const visibleRows = useMemo(() => {
-    const rows = player.board.slice(BOARD_HIDDEN_ROWS, BOARD_HIDDEN_ROWS + BOARD_VISIBLE_ROWS).map((r) => [...r]);
-    if (player.activePiece) {
-      // This mirrors spawn orientation for client visuals; server remains authority.
-      const offsets = player.activePiece.customOffsets ?? SHAPES[player.activePiece.type][player.activePiece.rotation];
-      for (const [dx, dy] of offsets) {
-        const x = player.activePiece.x + dx;
-        const y = player.activePiece.y + dy - BOARD_HIDDEN_ROWS;
-        if (y >= 0 && y < BOARD_VISIBLE_ROWS && x >= 0 && x < BOARD_COLS) {
-          rows[y][x] = player.activePiece.isWildcard ? 'W' : player.activePiece.type;
-        }
-      }
-    }
-    return rows;
-  }, [player.board, player.activePiece]);
-
-  // Parallel poison overlay grid (0 = clean, 1..4 = poison variant), mirroring
-  // visibleRows. The poisoned active piece previews as wave-1 poison.
-  const visiblePoison = useMemo(() => {
-    const src = player.poisonBoard;
-    const rows: number[][] = Array.from({ length: BOARD_VISIBLE_ROWS }, (_, y) =>
-      Array.from({ length: BOARD_COLS }, (_, x) =>
-        src ? (src[BOARD_HIDDEN_ROWS + y]?.[x] ?? 0) : 0,
+  const visualModel = useMemo(
+    () => buildBoardVisualModel(player, { hatchingEnabled, isMe }),
+    [player, hatchingEnabled, isMe],
+  );
+  const visibleRows = useMemo(
+    () =>
+      Array.from({ length: BOARD_VISIBLE_ROWS }, (_, y) =>
+        Array.from(
+          { length: BOARD_COLS },
+          (_, x) => visualModel.cellAt(x, y)?.value ?? null,
+        ),
       ),
-    );
-    if (player.activePiece?.poisoned) {
-      // The whole piece is a single poison type — the variant (1–4) chosen for
-      // this Elixir event. Every cell it later infects keeps this same colour.
-      const variant = player.activePiece.poisonVariant ?? 1;
-      const offsets = player.activePiece.customOffsets ?? SHAPES[player.activePiece.type][player.activePiece.rotation];
-      for (const [dx, dy] of offsets) {
-        const x = player.activePiece.x + dx;
-        const y = player.activePiece.y + dy - BOARD_HIDDEN_ROWS;
-        if (y >= 0 && y < BOARD_VISIBLE_ROWS && x >= 0 && x < BOARD_COLS) {
-          rows[y][x] = variant;
-        }
-      }
-    }
-    return rows;
-  }, [player.poisonBoard, player.activePiece]);
-
-  const visibleBomber = useMemo(() => {
-    const rows: boolean[][] = Array.from({ length: BOARD_VISIBLE_ROWS }, () =>
-      Array.from({ length: BOARD_COLS }, () => false),
-    );
-    if (player.activePiece?.bomber) {
-      const offsets = player.activePiece.customOffsets ?? SHAPES[player.activePiece.type][player.activePiece.rotation];
-      for (const [dx, dy] of offsets) {
-        const x = player.activePiece.x + dx;
-        const y = player.activePiece.y + dy - BOARD_HIDDEN_ROWS;
-        if (y >= 0 && y < BOARD_VISIBLE_ROWS && x >= 0 && x < BOARD_COLS) {
-          rows[y][x] = true;
-        }
-      }
-    }
-    return rows;
-  }, [player.activePiece]);
-
-  const visibleMagnetAura = useMemo(() => {
-    const rows: boolean[][] = Array.from({ length: BOARD_VISIBLE_ROWS }, () =>
-      Array.from({ length: BOARD_COLS }, () => false),
-    );
-    const pulled =
-      (player.magnetPermanentStacks ?? 0) > 0 || (player.magnetPieceBoost ?? 0) > 0;
-    if (player.activePiece && pulled) {
-      const offsets = player.activePiece.customOffsets ?? SHAPES[player.activePiece.type][player.activePiece.rotation];
-      for (const [dx, dy] of offsets) {
-        const x = player.activePiece.x + dx;
-        const y = player.activePiece.y + dy - BOARD_HIDDEN_ROWS;
-        if (y >= 0 && y < BOARD_VISIBLE_ROWS && x >= 0 && x < BOARD_COLS) {
-          rows[y][x] = true;
-        }
-      }
-    }
-    return rows;
-  }, [player.activePiece, player.magnetPermanentStacks, player.magnetPieceBoost]);
-
-  const wildcardSourceOutline = useMemo(() => {
-    const sourceCells = player.customNextPieceSourceCells;
-    if (!sourceCells || sourceCells.length === 0) return [];
-
-    const visible = sourceCells
-      .map(([x, y]) => ({ x, y: y - BOARD_HIDDEN_ROWS }))
-      .filter(({ x, y }) => x >= 0 && x < BOARD_COLS && y >= 0 && y < BOARD_VISIBLE_ROWS);
-    const occupied = new Set(visible.map(({ x, y }) => `${x},${y}`));
-    const edges: Array<[number, number, number, number]> = [];
-
-    for (const { x, y } of visible) {
-      if (!occupied.has(`${x},${y - 1}`)) edges.push([x, y, x + 1, y]);
-      if (!occupied.has(`${x + 1},${y}`)) edges.push([x + 1, y, x + 1, y + 1]);
-      if (!occupied.has(`${x},${y + 1}`)) edges.push([x, y + 1, x + 1, y + 1]);
-      if (!occupied.has(`${x - 1},${y}`)) edges.push([x, y, x, y + 1]);
-    }
-    return edges;
-  }, [player.customNextPieceSourceCells]);
-
+    [visualModel],
+  );
+  const visiblePoison = useMemo(
+    () =>
+      Array.from({ length: BOARD_VISIBLE_ROWS }, (_, y) =>
+        Array.from(
+          { length: BOARD_COLS },
+          (_, x) => visualModel.cellAt(x, y)?.poisonVariant ?? 0,
+        ),
+      ),
+    [visualModel],
+  );
   const maxActiveVisibleRow = useMemo(() => {
     if (!player.activePiece) return null;
     const offsets = player.activePiece.customOffsets ?? SHAPES[player.activePiece.type][player.activePiece.rotation];
@@ -306,11 +201,11 @@ const GameField = forwardRef<GameFieldRef, GameFieldProps>(({
         {showSwapLine && (
           <>
             <div
-              className="pointer-events-none absolute left-0 right-0 z-10 border-t-2 border-dashed border-white/90"
+              className="pointer-events-none absolute left-0 right-0 z-20 border-t-2 border-dashed border-white/90"
               style={{ top: swapLineY }}
             />
             <div
-              className="pointer-events-none absolute right-1 z-10 -translate-y-1/2 rounded bg-black/70 px-1 py-0.5 font-mono text-[9px] uppercase tracking-wide text-white/80"
+              className="pointer-events-none absolute right-1 z-20 -translate-y-1/2 rounded bg-black/70 px-1 py-0.5 font-mono text-[9px] uppercase tracking-wide text-white/80"
               style={{ top: swapLineY }}
             >
               swap line
@@ -318,7 +213,7 @@ const GameField = forwardRef<GameFieldRef, GameFieldProps>(({
           </>
         )}
         {/* ── Curtain: a frosted band right below the swap line, fully opaque beyond it ── */}
-        {isMe && activeEffects.some((e) => e.kind === 'curtain') && (
+        {visualModel.curtain && (
           <>
             {/* Frosted/blurred transition band — semi-visible for the first few rows */}
             <div
@@ -338,47 +233,30 @@ const GameField = forwardRef<GameFieldRef, GameFieldProps>(({
         )}
         <div
           className="arena-grid grid relative"
-          style={{ gridTemplateColumns: `repeat(${BOARD_COLS}, ${cellSize}px)` }}
+          data-board-renderer="canvas"
+          style={{
+            gridTemplateColumns: `repeat(${BOARD_COLS}, ${cellSize}px)`,
+            width: BOARD_COLS * cellSize,
+            height: BOARD_VISIBLE_ROWS * cellSize,
+            backgroundColor: '#101112',
+            backgroundImage:
+              'linear-gradient(rgba(255,255,255,0.045) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.045) 1px, transparent 1px)',
+            backgroundSize: `${cellSize}px ${cellSize}px`,
+          }}
         >
           <VoronoiFlowfieldCanvas
             visibleRows={visibleRows}
             visiblePoison={visiblePoison}
             cellSize={cellSize}
             poisonSpread={player.poisonSpread}
+            performanceId={performanceId}
           />
-          {visibleRows.flatMap((row, y) =>
-            row.map((cell, x) => (
-                <MemoizedCell
-                  key={`${x}-${y}`}
-                  color={cell}
-                  poison={visiblePoison[y][x]}
-                  bomber={visibleBomber[y][x]}
-                  magnetAura={visibleMagnetAura[y][x]}
-                  size={cellSize}
-                  hatchingEnabled={hatchingEnabled}
-                />
-              )),
-          )}
+          <BoardCanvasOverlay
+            model={visualModel}
+            cellSize={cellSize}
+            performanceId={performanceId}
+          />
         </div>
-        {wildcardSourceOutline.length > 0 && (
-          <svg
-            className="pointer-events-none absolute inset-0 z-20 overflow-visible"
-            width={BOARD_COLS * cellSize}
-            height={BOARD_VISIBLE_ROWS * cellSize}
-            aria-label="Selected puzzle-piece source shape"
-          >
-            {wildcardSourceOutline.map(([x1, y1, x2, y2], index) => (
-              <line
-                key={`${x1}-${y1}-${x2}-${y2}-${index}`}
-                className="wildcard-source-outline"
-                x1={x1 * cellSize}
-                y1={y1 * cellSize}
-                x2={x2 * cellSize}
-                y2={y2 * cellSize}
-              />
-            ))}
-          </svg>
-        )}
         {rotationBlocked && (
           <div className="pointer-events-none absolute inset-x-0 top-2 z-30 flex justify-center">
             <span className="wildcard-rotation-blocked rounded border border-rose-200/80 bg-rose-950/90 px-2 py-1 font-mono text-[10px] font-bold uppercase tracking-widest text-rose-100">
@@ -472,76 +350,5 @@ export default React.memo(GameField, (prev, next) => {
     return false;
   }
 
-  const pA = prev.player;
-  const pB = next.player;
-  if (pA === pB) return true;
-
-  if (JSON.stringify(pA.activeEffects) !== JSON.stringify(pB.activeEffects)) {
-    return false;
-  }
-
-  if (
-    pA.holdPiece?.type !== pB.holdPiece?.type ||
-    !!pA.holdPiece?.poisoned !== !!pB.holdPiece?.poisoned ||
-    pA.holdPiece?.poisonVariant !== pB.holdPiece?.poisonVariant ||
-    !!pA.holdPiece?.bomber !== !!pB.holdPiece?.bomber ||
-    pA.canHold !== pB.canHold ||
-    pA.linesCleared !== pB.linesCleared ||
-    pA.swapCutoffRow !== pB.swapCutoffRow ||
-    pA.holdFrozenUntilTick !== pB.holdFrozenUntilTick ||
-    pA.magnetPermanentStacks !== pB.magnetPermanentStacks ||
-    pA.magnetPieceBoost !== pB.magnetPieceBoost ||
-    pA.snagHardDropBlocked !== pB.snagHardDropBlocked ||
-    pA.pieceHasHardDropped !== pB.pieceHasHardDropped ||
-    pA.tectonicShiftNextStepTick !== pB.tectonicShiftNextStepTick
-  ) {
-    return false;
-  }
-
-  const aA = pA.activePiece;
-  const aB = pB.activePiece;
-  if ((!aA && aB) || (aA && !aB)) return false;
-  if (aA && aB) {
-    if (
-      aA.x !== aB.x ||
-      aA.y !== aB.y ||
-      aA.rotation !== aB.rotation ||
-      aA.type !== aB.type ||
-      !!aA.poisoned !== !!aB.poisoned ||
-      aA.poisonVariant !== aB.poisonVariant ||
-      !!aA.bomber !== !!aB.bomber ||
-      aA.rotationBlockedNonce !== aB.rotationBlockedNonce ||
-      JSON.stringify(aA.customOffsets) !== JSON.stringify(aB.customOffsets)
-    ) {
-      return false;
-    }
-  }
-
-  if (JSON.stringify(pA.customNextPieceSourceCells) !== JSON.stringify(pB.customNextPieceSourceCells)) {
-    return false;
-  }
-
-  for (let y = 0; y < pA.board.length; y++) {
-    const rowA = pA.board[y];
-    const rowB = pB.board[y];
-    for (let x = 0; x < rowA.length; x++) {
-      if (rowA[x] !== rowB[x]) return false;
-    }
-  }
-
-  // Diff the poison overlay — the spread changes it without touching `board`.
-  const poA = pA.poisonBoard;
-  const poB = pB.poisonBoard;
-  if (poA || poB) {
-    if (!poA || !poB || poA.length !== poB.length) return false;
-    for (let y = 0; y < poA.length; y++) {
-      const rowA = poA[y];
-      const rowB = poB[y];
-      for (let x = 0; x < rowA.length; x++) {
-        if (rowA[x] !== rowB[x]) return false;
-      }
-    }
-  }
-
-  return true;
+  return publicPlayersEqual(prev.player, next.player);
 });

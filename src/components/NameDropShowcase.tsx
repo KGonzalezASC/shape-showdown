@@ -267,7 +267,7 @@ export interface NameDropShowcaseProps {
   statusLabel?: string;
 }
 
-/** Landing-page visual: deterministic falling-shape drops reveal a compact block-letter name. */
+/** Landing-page visual: deterministic tetromino drops reveal a compact block-letter name. */
 export const NameDropShowcase: React.FC<NameDropShowcaseProps> = ({
   name = 'KEITH GONZALEZ',
   statusLabel = 'Live name drop',
@@ -337,8 +337,8 @@ export const NameDropShowcase: React.FC<NameDropShowcaseProps> = ({
               role="img"
               aria-busy={!plan}
               aria-label={plan
-                ? `Animated falling-shape showcase spelling ${plan.name}`
-                : `Preparing falling-shape showcase spelling ${normalizedName}`}
+                ? `Animated tetromino showcase spelling ${plan.name}`
+                : `Preparing tetromino showcase spelling ${normalizedName}`}
             />
           </div>
         </div>
@@ -350,8 +350,8 @@ export const NameDropShowcase: React.FC<NameDropShowcaseProps> = ({
             </p>
             <p className="mt-1 text-xs text-zinc-600 sm:text-sm">
               {plan
-                ? `${plan.pieces.length} shape clusters. One name.`
-                : 'Preparing the shape arrangement…'}
+                ? `${plan.pieces.length} tetrominoes. One name.`
+                : 'Preparing the tetromino arrangement…'}
             </p>
           </div>
 

@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { io, Socket } from 'socket.io-client';
 import { ActionType, GameState, InputState, MatchEvent } from '../types';
+import { localDevelopmentGameServerUrl } from '../network/localGameServer';
 
 type GameRuntimeConfig = {
   /** Full origin, e.g. https://api.example.com:10106 — highest priority when non-empty */
@@ -35,6 +36,16 @@ function parseEnvPort(raw: string | undefined): number | null {
  * 5) window.location.origin
  */
 async function resolveGameServerUrl(): Promise<string> {
+  const localDevelopmentUrl = localDevelopmentGameServerUrl(
+    window.location.origin,
+    window.location.hostname,
+    import.meta.env.DEV,
+  );
+  if (localDevelopmentUrl) {
+    console.log('[Socket] Using local development origin:', localDevelopmentUrl);
+    return localDevelopmentUrl;
+  }
+
   const configPath = `${import.meta.env.BASE_URL}game-config.json`;
   try {
     const res = await fetch(configPath, { cache: 'no-store' });

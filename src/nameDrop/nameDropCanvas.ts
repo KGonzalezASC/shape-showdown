@@ -1,5 +1,4 @@
 export {
-  drawNameDropFrame,
   NameDropLayeredRenderer,
   PIECE_COLORS,
   pieceMotion,
