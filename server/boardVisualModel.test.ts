@@ -93,6 +93,27 @@ describe('buildBoardVisualModel', () => {
     assert.notEqual(before.activePieceKey, after.activePieceKey);
   });
 
+  test('keeps motion identity stable across regular rotations', () => {
+    const player = visualPlayer();
+    player.activePiece = {
+      type: 'T',
+      rotation: 0,
+      x: 3,
+      y: BOARD_HIDDEN_ROWS + 2,
+    };
+    const before = buildBoardVisualModel(toPublicPlayerState(player), {
+      hatchingEnabled: false,
+      isMe: true,
+    });
+    player.activePiece = { ...player.activePiece, rotation: 1 };
+    const after = buildBoardVisualModel(toPublicPlayerState(player), {
+      hatchingEnabled: false,
+      isMe: true,
+    });
+
+    assert.equal(before.activePieceKey, after.activePieceKey);
+  });
+
   test('preserves poison, bomber, and magnet semantics on an active piece', () => {
     const player = visualPlayer();
     player.activePiece = {

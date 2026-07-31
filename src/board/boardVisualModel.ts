@@ -103,7 +103,6 @@ export function buildBoardVisualModel(
   const activePieceKey = activePiece
     ? [
       activePiece.type,
-      activePiece.rotation,
       activePiece.customOffsets?.map(([dx, dy]) => `${dx},${dy}`).join(';') ?? '',
       activePiece.isWildcard ? 'wildcard' : 'regular',
       activePiece.poisoned ? `poison-${activePiece.poisonVariant ?? 1}` : 'clean',
