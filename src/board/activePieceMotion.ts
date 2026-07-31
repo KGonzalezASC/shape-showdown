@@ -1,4 +1,6 @@
-export const ACTIVE_PIECE_MOTION_MS = 90;
+// Keep the active piece visually close to its authoritative cell while still
+// smoothing the 30 Hz snapshot cadence between simulation updates.
+export const ACTIVE_PIECE_MOTION_MS = 72;
 
 export interface ActivePiecePoint {
   x: number;

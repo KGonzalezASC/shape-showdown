@@ -76,7 +76,7 @@ describe('buildBoardVisualModel', () => {
     assert.deepEqual(interpolateActivePiecePoint({ x: 1, y: 4 }, { x: 2, y: 5 }, 1), { x: 2, y: 5 });
     assert.equal(shouldSnapActivePieceMotion({ x: 4, y: 2 }, { x: 4, y: 4 }), false);
     assert.equal(shouldSnapActivePieceMotion({ x: 4, y: 2 }, { x: 4, y: 5 }), true);
-    assert.deepEqual(ACTIVE_PIECE_MOTION_MS, 90);
+    assert.deepEqual(ACTIVE_PIECE_MOTION_MS, 72);
   });
 
   test('keeps Voronoi lifetime through rotation-sized movement but resets on a new spawn', () => {
