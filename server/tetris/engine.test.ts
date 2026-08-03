@@ -310,6 +310,20 @@ describe('tetris engine', () => {
     assert.equal(player.pieceHasHardDropped, true);
   });
 
+  it('treats hard drop as terminal before a queued hold', () => {
+    const rng = makeRng(30);
+    const player = makePlayer('a', rng);
+    const opponent = makePlayer('b', rng);
+    const game = makeGame([player, opponent]);
+
+    player.actionQueue.push('hardDrop', 'hold');
+    stepPlayer(game, player, opponent, rng, []);
+
+    assert.equal(player.holdPiece, null);
+    assert.equal(player.actionQueue.length, 0);
+    assert.equal(player.activePiece, null);
+  });
+
   it('satellite arms and lingers until incoming garbage is queued', () => {
     const rng = makeRng(30);
     const player = makePlayer('a', rng);

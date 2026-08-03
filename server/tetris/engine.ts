@@ -485,29 +485,36 @@ export function detonateBomberBlast(player: PlayerState, centers: Array<{ x: num
 function lockPiece(player: PlayerState, tick: number): { lines: number; tSpin: 'full' | 'mini' | false; perfectClear: boolean; poisonedRatio: number } {
   if (!player.activePiece) return { lines: 0, tSpin: false, perfectClear: false, poisonedRatio: 0 };
   const poison = ensurePoisonBoard(player);
-  const wasPoisoned = !!player.activePiece.poisoned;
-  const poisonVariant = player.activePiece.poisonVariant ?? 1;
-  const isBomber = !!player.activePiece.bomber;
-  const lockCells = getCells(player.activePiece);
+  const piece = player.activePiece;
+  const wasPoisoned = !!piece.poisoned;
+  const poisonVariant = piece.poisonVariant ?? 1;
+  const lockCells = getCells(piece);
   for (const cell of lockCells) {
     if (cell.y >= 0 && cell.y < BOARD_ROWS && cell.x >= 0 && cell.x < BOARD_COLS) {
-      player.board[cell.y][cell.x] = player.activePiece.isWildcard ? 'W' : player.activePiece.type;
+      player.board[cell.y][cell.x] = piece.isWildcard ? 'W' : piece.type;
       // Seed the locked cells with the event's variant (not a wave index).
-      if (wasPoisoned && !player.activePiece.isWildcard) poison[cell.y][cell.x] = poisonVariant;
+      if (wasPoisoned && !piece.isWildcard) poison[cell.y][cell.x] = poisonVariant;
     }
   }
-  if (isBomber) {
-    detonateBomberBlast(player, lockCells);
-  }
-  // Start (or restart) the spread scheduler when a poisoned piece locks.
-  if (wasPoisoned && !player.activePiece.isWildcard) {
+  if (piece.bomber) detonateBomberBlast(player, lockCells);
+  // Start (or restart) the spread scheduler when a poisoned piece settles.
+  if (wasPoisoned && !piece.isWildcard) {
     player.poisonSpread = {
       generationsRemaining: POISON_GENERATIONS - 1,
       nextSpreadTick: tick + POISON_SPREAD_INTERVAL_TICKS,
       variant: poisonVariant,
     };
   }
+  return resolveBoardAfterLock(player, tick, piece, player.lastActionWasRotate);
+}
 
+function resolveBoardAfterLock(
+  player: PlayerState,
+  tick: number,
+  piece: TetrisPiece,
+  lastActionWasRotate: boolean,
+): { lines: number; tSpin: 'full' | 'mini' | false; perfectClear: boolean; poisonedRatio: number } {
+  const poison = ensurePoisonBoard(player);
   const linesToClear: number[] = [];
   for (let y = 0; y < BOARD_ROWS; y++) {
     if (player.board[y].every((cell) => cell !== null)) linesToClear.push(y);
@@ -530,7 +537,7 @@ function lockPiece(player: PlayerState, tick: number): { lines: number; tSpin: '
   }
 
   const lines = linesToClear.length;
-  const tSpin = detectTSpin(player);
+  const tSpin = detectTSpinFor(player.board, piece, lastActionWasRotate);
   const perfectClear = player.board.every((row) => row.every((cell) => cell === null));
   player.linesCleared += lines;
   player.activePiece = null;
@@ -548,9 +555,12 @@ function lockPiece(player: PlayerState, tick: number): { lines: number; tSpin: '
   return { lines, tSpin, perfectClear, poisonedRatio };
 }
 
-function detectTSpin(player: PlayerState): 'full' | 'mini' | false {
-  const piece = player.activePiece;
-  if (!piece || piece.type !== 'T' || !player.lastActionWasRotate) return false;
+function detectTSpinFor(
+  board: CellValue[][],
+  piece: TetrisPiece,
+  lastActionWasRotate: boolean,
+): 'full' | 'mini' | false {
+  if (piece.type !== 'T' || !lastActionWasRotate) return false;
   const cx = piece.x + 1;
   const cy = piece.y + 1;
   // Corners indexed: 0=top-left, 1=top-right, 2=bottom-left, 3=bottom-right
@@ -561,7 +571,7 @@ function detectTSpin(player: PlayerState): 'full' | 'mini' | false {
     [cx + 1, cy + 1],
   ];
   const occupied = corners.map(([x, y]) =>
-    x < 0 || x >= BOARD_COLS || y >= BOARD_ROWS || y < 0 || player.board[y][x] !== null,
+    x < 0 || x >= BOARD_COLS || y >= BOARD_ROWS || y < 0 || board[y][x] !== null,
   );
   const occupiedCount = occupied.filter(Boolean).length;
   if (occupiedCount < 3) return false;
@@ -669,6 +679,53 @@ function applyGarbageIfReady(player: PlayerState, tick: number, rng: MutableRng)
   return applied;
 }
 
+function applyLockResult(
+  gameState: GameState,
+  player: PlayerState,
+  opponent: PlayerState | null,
+  rng: MutableRng,
+  matchEvents: MatchEvent[],
+  clearResult: { lines: number; tSpin: 'full' | 'mini' | false; perfectClear: boolean; poisonedRatio: number },
+): void {
+  const attackLines = attackFromClear(
+    clearResult.lines,
+    clearResult.tSpin,
+    clearResult.perfectClear,
+    player,
+    clearResult.poisonedRatio,
+  );
+  if (clearResult.lines > 0) {
+    matchEvents.push({
+      tick: gameState.tick,
+      type: 'lineClear',
+      playerId: player.id,
+      lines: clearResult.lines,
+      tSpin: clearResult.tSpin,
+    });
+  }
+
+  const remainingAttack = cancelOwnGarbage(player, attackLines);
+  if (remainingAttack > 0 && opponent) {
+    enqueueGarbage(opponent, remainingAttack, gameState.tick);
+    matchEvents.push({
+      tick: gameState.tick,
+      type: 'attackSent',
+      playerId: player.id,
+      lines: remainingAttack,
+    });
+  }
+
+  const applied = applyGarbageIfReady(player, gameState.tick, rng);
+  if (applied > 0) {
+    matchEvents.push({
+      tick: gameState.tick,
+      type: 'garbageApplied',
+      playerId: player.id,
+      lines: applied,
+    });
+  }
+}
+
 function pieceWouldTopOut(player: PlayerState): boolean {
   if (!player.activePiece) return true;
   return collides(player.board, player.activePiece);
@@ -698,8 +755,8 @@ function activeFromHeld(held: HeldPiece): TetrisPiece {
   };
 }
 
-function processActions(player: PlayerState, tick: number): void {
-  if (!player.activePiece) return;
+function processActions(player: PlayerState, tick: number): boolean {
+  if (!player.activePiece) return false;
   while (player.actionQueue.length > 0) {
     const action = player.actionQueue.shift();
     if (!action) continue;
@@ -737,8 +794,13 @@ function processActions(player: PlayerState, tick: number): void {
       player.score += dropped * 2;
       player.lockDelayRemainingTicks = 0;
       player.pieceHasHardDropped = true;
+      // A hard drop is terminal for this piece. Discard actions queued after it
+      // so hold cannot bypass or duplicate the lock effect in the same tick.
+      player.actionQueue.length = 0;
+      return true;
     }
   }
+  return false;
 }
 
 function applyHorizontalInput(player: PlayerState): void {
@@ -938,7 +1000,12 @@ export function stepPlayer(
     player.inputState.softDrop = false;
   }
 
-  processActions(player, gameState.tick);
+  const hardDropped = processActions(player, gameState.tick);
+  if (hardDropped) {
+    const clearResult = lockPiece(player, gameState.tick);
+    applyLockResult(gameState, player, opponent, rng, matchEvents, clearResult);
+    return;
+  }
   applyHorizontalInput(player);
 
   const isSoftDrop = !!player.inputState.softDrop;
@@ -970,43 +1037,7 @@ export function stepPlayer(
     player.lockDelayRemainingTicks -= 1;
     if (player.lockDelayRemainingTicks <= 0) {
       const clearResult = lockPiece(player, gameState.tick);
-      const attackLines = attackFromClear(
-        clearResult.lines,
-        clearResult.tSpin,
-        clearResult.perfectClear,
-        player,
-        clearResult.poisonedRatio,
-      );
-      if (clearResult.lines > 0) {
-        matchEvents.push({
-          tick: gameState.tick,
-          type: 'lineClear',
-          playerId: player.id,
-          lines: clearResult.lines,
-          tSpin: clearResult.tSpin,
-        });
-      }
-
-      const remainingAttack = cancelOwnGarbage(player, attackLines);
-      if (remainingAttack > 0 && opponent) {
-        enqueueGarbage(opponent, remainingAttack, gameState.tick);
-        matchEvents.push({
-          tick: gameState.tick,
-          type: 'attackSent',
-          playerId: player.id,
-          lines: remainingAttack,
-        });
-      }
-
-      const applied = applyGarbageIfReady(player, gameState.tick, rng);
-      if (applied > 0) {
-        matchEvents.push({
-          tick: gameState.tick,
-          type: 'garbageApplied',
-          playerId: player.id,
-          lines: applied,
-        });
-      }
+      applyLockResult(gameState, player, opponent, rng, matchEvents, clearResult);
     }
   }
 }
