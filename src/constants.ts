@@ -1,8 +1,8 @@
-// Shape Showdown uses a standard 10×20 visible arena with two hidden spawn rows.
-// The hidden buffer provides spawn/kick space while keeping serialized snapshots
-// smaller than the legacy buffer.
+// Shape Showdown uses a compact 10×18 visible arena with two hidden spawn rows.
+// The hidden buffer provides spawn/kick space while keeping the internal board
+// at 10×20 rows.
 export const BOARD_COLS = 10;
-export const BOARD_VISIBLE_ROWS = 20;
+export const BOARD_VISIBLE_ROWS = 18;
 export const BOARD_HIDDEN_ROWS = 2;
 export const BOARD_ROWS = BOARD_VISIBLE_ROWS + BOARD_HIDDEN_ROWS;
 
@@ -20,7 +20,7 @@ export const NEXT_PREVIEW_COUNT = 5;
 export const LANDING_FORECAST_TICKS = 40;
 export const LOCK_DELAY_TICKS = 24; // 0.4s @ 60hz
 export const LOCK_RESET_CAP = 10;
-export const HOLD_SWAP_CUTOFF_VISIBLE_ROW = 10;
+export const HOLD_SWAP_CUTOFF_VISIBLE_ROW = 8;
 export const GARBAGE_ARRIVAL_DELAY_TICKS = 18; // 300ms @ 60hz
 export const RETRIM_ACTIVATION_TICKS = 60; // 2 rows of gravity (1s @ 60Hz)
 export const RETRIM_COST = 120;

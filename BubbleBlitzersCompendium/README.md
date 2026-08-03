@@ -11,14 +11,14 @@ A task-oriented field guide to the **Shape Showdown** codebase (fork lineage: **
 
 ## What this is
 
-**Shape Showdown** is a **two-player, server-authoritative falling-piece** browser game. Two players each get a 10×20 visible field backed by a 10×22 simulation board with two hidden spawn rows; the **server** runs the entire simulation at 60 Hz and streams authoritative state to both clients. Players attack each other by clearing lines (sending garbage) and by buying **shop powerups** that sabotage the opponent's field.
+**Shape Showdown** is a **two-player, server-authoritative falling-piece** browser game. Two players each get a 10×18 visible field backed by a 10×20 simulation board with two hidden spawn rows; the **server** runs the entire simulation at 60 Hz and streams authoritative state to both clients. Players attack each other by clearing lines (sending garbage) and by buying **shop powerups** that sabotage the opponent's field.
 
 - **Identity** is the raw `socket.id` — no accounts, no rooms.
 - **Max 2 players** per server instance; a 3rd connection is rejected with `"Game is full"`.
 - The client sends input intent and receives full `GameState` JSON. `GameStateProvider` stores it, `gameStateStore` derives chrome and `PublicPlayerState` playfield snapshots, and React renders those snapshots.
 
 > [!IMPORTANT]
-> The live game uses falling pieces, SRS kicks, garbage lines, hold/swap, and a shop layer. Its playfield is **10×20 visually**, backed by a **10×22 simulation board with two hidden spawn rows**. This compendium documents the current implementation.
+> The live game uses falling pieces, SRS kicks, garbage lines, hold/swap, and a shop layer. Its playfield is **10×18 visually**, backed by a **10×20 simulation board with two hidden spawn rows**. This compendium documents the current implementation.
 
 ---
 

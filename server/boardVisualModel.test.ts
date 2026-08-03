@@ -250,9 +250,9 @@ describe('board renderer sizing', () => {
   test('preserves CSS dimensions while scaling backing pixels by device ratio', () => {
     assert.deepEqual(canvasBackingSize(17, 2), {
       cssWidth: 170,
-      cssHeight: 340,
+      cssHeight: 306,
       pixelWidth: 340,
-      pixelHeight: 680,
+      pixelHeight: 612,
       dpr: 2,
     });
   });
@@ -260,15 +260,15 @@ describe('board renderer sizing', () => {
   test('updates an already-mounted backing store after a responsive cell-size change', () => {
     const canvas = { width: 0, height: 0 };
     syncCanvasBackingStore(canvas, 28, 2);
-    assert.deepEqual(canvas, { width: 560, height: 1120 });
+    assert.deepEqual(canvas, { width: 560, height: 1008 });
 
     const resized = syncCanvasBackingStore(canvas, 17, 1.5);
-    assert.deepEqual(canvas, { width: 255, height: 510 });
+    assert.deepEqual(canvas, { width: 255, height: 459 });
     assert.deepEqual(resized, {
       cssWidth: 170,
-      cssHeight: 340,
+      cssHeight: 306,
       pixelWidth: 255,
-      pixelHeight: 510,
+      pixelHeight: 459,
       dpr: 1.5,
     });
   });

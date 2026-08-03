@@ -22,7 +22,9 @@ import {
   STICKY_LOCK_RESET_CAP,
   BOARD_ROWS,
   BOARD_COLS,
+  BOARD_VISIBLE_ROWS,
   BOARD_HIDDEN_ROWS,
+  HOLD_SWAP_CUTOFF_VISIBLE_ROW,
   COUNTDOWN_SECONDS,
   GAME_DURATION,
   LANDING_FORECAST_TICKS,
@@ -44,6 +46,18 @@ function makeGame(players: PlayerState[]): GameState {
 }
 
 describe('tetris engine', () => {
+  it('uses the compact 10x18 field with a 10x20 simulation board', () => {
+    const player = makePlayer('a', makeRng(41));
+
+    assert.equal(BOARD_COLS, 10);
+    assert.equal(BOARD_VISIBLE_ROWS, 18);
+    assert.equal(BOARD_HIDDEN_ROWS, 2);
+    assert.equal(BOARD_ROWS, 20);
+    assert.equal(HOLD_SWAP_CUTOFF_VISIBLE_ROW, 8);
+    assert.equal(player.swapCutoffRow, HOLD_SWAP_CUTOFF_VISIBLE_ROW);
+    assert.equal(player.activePiece?.y, BOARD_HIDDEN_ROWS - 2);
+  });
+
   it('spawns valid active piece for new player', () => {
     const rng = makeRng(42);
     const player = makePlayer('a', rng);

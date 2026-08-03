@@ -66,7 +66,7 @@ samples.
   garbage, poison spread, Wildcard +4, bomber, magnet, curtain activation, and
   other shop effects.
 - Browser QA confirmed falling and settled polygon pieces, the swap-line layer,
-  zero `.arena-cell` nodes, the fixed 10×20 visible aspect ratio, the two hidden
+  zero `.arena-cell` nodes, the fixed 10×18 visible aspect ratio, the two hidden
   simulation rows, and no document overflow.
 - Required commands:
 

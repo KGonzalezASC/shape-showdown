@@ -2,7 +2,7 @@
 
 `[STATUS: ACTIVE]` `[CLIENT]` `[MOBILE]`
 
-A tall 10×20 visible board has to fit everything from a 360px phone to a desktop showing **two** full boards side by side. The simulation adds two hidden spawn rows above the visible field. This guide covers the two-layout split, the scale-to-fit math, and the gotchas that caused every "not responsive" bug report.
+A tall 10×18 visible board has to fit everything from a 360px phone to a desktop showing **two** full boards side by side. The simulation adds two hidden spawn rows above the visible field. This guide covers the two-layout split, the scale-to-fit math, and the gotchas that caused every "not responsive" bug report.
 
 ---
 

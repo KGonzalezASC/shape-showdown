@@ -1,6 +1,6 @@
 # Shape Showdown
 
-**Shape Showdown** is a two-player, server-authoritative browser game descended from **[BubbleBlitzersJS](https://github.com/AVLitskevich/BubbleBlitzersJS)**. It is a competitive falling-shape puzzle with a 10×20 visible arena, a 10×22 simulation board with two hidden spawn rows, a tactical shop, and field-changing powerups.
+**Shape Showdown** is a two-player, server-authoritative browser game descended from **[BubbleBlitzersJS](https://github.com/AVLitskevich/BubbleBlitzersJS)**. It is a competitive falling-shape puzzle with a 10×18 visible arena, a 10×20 simulation board with two hidden spawn rows, a tactical shop, and field-changing powerups.
 
 **This repo on GitHub:** [KGonzalezASC/shape-showdown](https://github.com/KGonzalezASC/shape-showdown)
 
