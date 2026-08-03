@@ -357,6 +357,23 @@ describe('tetris engine', () => {
     assert.equal(player.activePiece, null);
   });
 
+  it('retains the hard-drop tick after the piece locks so a 30Hz client can animate it', () => {
+    const rng = makeRng(31);
+    const player = makePlayer('a', rng);
+    const opponent = makePlayer('b', rng);
+    const game = makeGame([player, opponent]);
+    game.tick = 17;
+
+    player.actionQueue.push('hardDrop');
+    stepPlayer(game, player, opponent, rng, []);
+
+    assert.equal(player.lastHardDropTick, 17);
+
+    game.tick = 18;
+    stepPlayer(game, player, opponent, rng, []);
+    assert.equal(player.lastHardDropTick, 17);
+  });
+
   it('satellite arms and lingers until incoming garbage is queued', () => {
     const rng = makeRng(30);
     const player = makePlayer('a', rng);

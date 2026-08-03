@@ -289,6 +289,8 @@ export interface PlayerState {
   magnetPieceBoost?: number;
   /** True after a successful hard drop on the current active piece. */
   pieceHasHardDropped?: boolean;
+  /** Last simulation tick containing a successful hard drop; retained for visual consumers. */
+  lastHardDropTick?: number;
   /** Snag: hard drop blocked on this piece until lock/hold. */
   snagHardDropBlocked?: boolean;
   /** Snag: apply block to the next spawned piece. */

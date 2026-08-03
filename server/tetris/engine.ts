@@ -130,6 +130,7 @@ export function makePlayer(id: string, rng: MutableRng): PlayerState {
     magnetPermanentStacks: 0,
     magnetPieceBoost: 0,
     pieceHasHardDropped: false,
+    lastHardDropTick: -1,
     snagHardDropBlocked: false,
     snagNextPiece: false,
     satelliteArmed: false,
@@ -799,6 +800,7 @@ function processActions(player: PlayerState, tick: number): boolean {
       player.score += dropped * 2;
       player.lockDelayRemainingTicks = 0;
       player.pieceHasHardDropped = true;
+      player.lastHardDropTick = tick;
       // A hard drop is terminal for this piece. Discard actions queued after it
       // so hold cannot bypass or duplicate the lock effect in the same tick.
       player.actionQueue.length = 0;

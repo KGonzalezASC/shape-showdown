@@ -308,8 +308,48 @@ html, body, #root {
   animation: landing-forecast-dissolve 0.22s cubic-bezier(0.1, 0.9, 0.2, 1) forwards !important;
 }
 
+@keyframes landing-forecast-hard-drop {
+  0% {
+    opacity: 1;
+    stroke: rgba(103, 232, 249, 1);
+    fill: rgba(103, 232, 249, 0.22);
+    stroke-width: 2px;
+  }
+  24% {
+    opacity: 1;
+    stroke: #ffffff;
+    fill: rgba(255, 255, 255, 0.72);
+    stroke-width: 3px;
+    filter: drop-shadow(0 0 18px #ffffff);
+  }
+  58% {
+    opacity: 0.75;
+    stroke: #a78bfa;
+    fill: rgba(167, 139, 250, 0.12);
+    stroke-width: 1px;
+    stroke-dashoffset: -14;
+    filter: drop-shadow(0 0 9px #a78bfa);
+  }
+  100% {
+    opacity: 0;
+    stroke: #c4b5fd;
+    fill: transparent;
+    stroke-width: 0.5px;
+    stroke-dashoffset: -28;
+    filter: drop-shadow(0 0 0 transparent);
+  }
+}
+
+.landing-forecast-hard-drop {
+  animation: landing-forecast-hard-drop 0.24s cubic-bezier(0.18, 0.82, 0.24, 1) forwards !important;
+}
+
 .landing-forecast-layer-dissolving {
   filter: blur(0.35px);
+}
+
+.landing-forecast-layer-hard-drop {
+  filter: brightness(1.2);
 }
 
 .landing-forecast-label {

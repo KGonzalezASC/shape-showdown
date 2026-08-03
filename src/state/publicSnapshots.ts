@@ -13,8 +13,9 @@ import {
 } from '../types';
 
 /**
- * Wire/UI-facing player snapshot: simulation timers and bag internals stay server-local.
- * React and net consumers should prefer this seam over full `PlayerState` when possible.
+ * Local UI-facing player snapshot: simulation timers and bag internals stay out of
+ * the React playfield seam. The Socket.IO wire still carries full `GameState`;
+ * GameStateStore derives this projection for components.
  */
 export interface PublicPlayerState {
   id: string;
@@ -39,6 +40,7 @@ export interface PublicPlayerState {
   magnetPermanentStacks?: number;
   magnetPieceBoost?: number;
   pieceHasHardDropped?: boolean;
+  lastHardDropTick?: number;
   snagHardDropBlocked?: boolean;
   satelliteArmed?: boolean;
   satelliteDelayUntilTick?: number;
@@ -105,6 +107,7 @@ export function toPublicPlayerState(player: PlayerState): PublicPlayerState {
     magnetPermanentStacks: player.magnetPermanentStacks,
     magnetPieceBoost: player.magnetPieceBoost,
     pieceHasHardDropped: player.pieceHasHardDropped,
+    lastHardDropTick: player.lastHardDropTick,
     snagHardDropBlocked: player.snagHardDropBlocked,
     satelliteArmed: player.satelliteArmed,
     satelliteDelayUntilTick: player.satelliteDelayUntilTick,
@@ -249,6 +252,7 @@ export function publicPlayersEqual(a: PublicPlayerState | null, b: PublicPlayerS
     a.magnetPermanentStacks !== b.magnetPermanentStacks ||
     a.magnetPieceBoost !== b.magnetPieceBoost ||
     a.pieceHasHardDropped !== b.pieceHasHardDropped ||
+    a.lastHardDropTick !== b.lastHardDropTick ||
     a.snagHardDropBlocked !== b.snagHardDropBlocked ||
     a.tectonicShiftNextStepTick !== b.tectonicShiftNextStepTick ||
     a.shop.phase !== b.shop.phase ||
