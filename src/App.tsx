@@ -87,8 +87,10 @@ const AppShell: React.FC = () => {
   const handleAction = useCallback(
     (action: ActionType) => {
       const me = stateRef.current.playfield.myPlayer;
-      if (action === 'hardDrop' && !me?.snagHardDropBlocked) {
+      if (action === 'hardDrop' && me?.activePiece && !me.snagHardDropBlocked) {
         triggerShake(true, 'soft');
+        myMobileFieldRef.current?.hardDrop();
+        myDesktopFieldRef.current?.hardDrop();
       }
       sendAction(action);
     },

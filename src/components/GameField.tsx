@@ -36,6 +36,7 @@ interface GameFieldProps {
 
 export interface GameFieldRef {
   shake: (type: 'soft' | 'medium') => void;
+  hardDrop: () => void;
 }
 
 const HOLD_PREVIEW_SIZE = 4;
@@ -94,6 +95,7 @@ const GameField = forwardRef<GameFieldRef, GameFieldProps>(({
   const cellSize = cellSizeProp ?? layoutCellSize;
   const [shakeClass, setShakeClass] = useState('');
   const [rotationBlocked, setRotationBlocked] = useState(false);
+  const startHardDropForecastRef = useRef<() => void>(() => {});
 
   useEffect(() => {
     if (!player.activePiece?.isWildcard || !player.activePiece.rotationBlockedNonce) return;
@@ -112,7 +114,10 @@ const GameField = forwardRef<GameFieldRef, GameFieldProps>(({
       setShakeClass('');
       setTimeout(() => setShakeClass(cls), 10);
       setTimeout(() => setShakeClass(''), 400);
-    }
+    },
+    hardDrop() {
+      startHardDropForecastRef.current();
+    },
   }));
   const visualModel = useMemo(
     () => buildBoardVisualModel(player, { hatchingEnabled, isMe }),
@@ -150,24 +155,40 @@ const GameField = forwardRef<GameFieldRef, GameFieldProps>(({
 
   const prevForecastTicksRef = useRef(landingForecastTicksRemaining);
   const prevHardDropTickRef = useRef(player.lastHardDropTick ?? -1);
+  const lastCalculatedForecastCellsRef = useRef(calculatedLandingForecastCells);
+
+  startHardDropForecastRef.current = () => {
+    const hardDropCells = lastCalculatedForecastCellsRef.current.length > 0
+      ? lastCalculatedForecastCellsRef.current
+      : calculatedLandingForecastCells;
+    setLandingForecastRender((previous) => {
+      const cells = hardDropCells.length > 0 ? hardDropCells : previous.cells;
+      return cells.length > 0 ? { cells, phase: 'hard-drop' } : previous;
+    });
+  };
 
   useEffect(() => {
     if (status !== 'playing' || !isMe) {
       setLandingForecastRender({ cells: [], phase: 'hidden' });
       prevForecastTicksRef.current = landingForecastTicksRemaining;
       prevHardDropTickRef.current = player.lastHardDropTick ?? -1;
+      lastCalculatedForecastCellsRef.current = [];
       return;
     }
 
     const hardDropOccurred = (player.lastHardDropTick ?? -1) !== prevHardDropTickRef.current;
     if (hardDropOccurred) {
+      const hardDropCells = lastCalculatedForecastCellsRef.current;
       setLandingForecastRender((previous) =>
-        previous.cells.length > 0
-          ? { ...previous, phase: 'hard-drop' }
-          : { cells: calculatedLandingForecastCells, phase: 'visible' },
+        hardDropCells.length > 0
+          ? { cells: hardDropCells, phase: 'hard-drop' }
+          : previous.cells.length > 0
+            ? { ...previous, phase: 'hard-drop' }
+            : { cells: calculatedLandingForecastCells, phase: 'visible' },
       );
       prevForecastTicksRef.current = landingForecastTicksRemaining;
       prevHardDropTickRef.current = player.lastHardDropTick ?? -1;
+      lastCalculatedForecastCellsRef.current = calculatedLandingForecastCells;
       return;
     }
 
@@ -179,6 +200,7 @@ const GameField = forwardRef<GameFieldRef, GameFieldProps>(({
           : 'visible',
       });
       prevForecastTicksRef.current = landingForecastTicksRemaining;
+      lastCalculatedForecastCellsRef.current = calculatedLandingForecastCells;
       return;
     }
 
@@ -190,6 +212,7 @@ const GameField = forwardRef<GameFieldRef, GameFieldProps>(({
 
     prevForecastTicksRef.current = landingForecastTicksRemaining;
     prevHardDropTickRef.current = player.lastHardDropTick ?? -1;
+    lastCalculatedForecastCellsRef.current = calculatedLandingForecastCells;
   }, [
     calculatedLandingForecastCells,
     isMe,
