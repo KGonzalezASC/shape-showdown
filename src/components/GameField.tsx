@@ -40,9 +40,8 @@ export interface GameFieldRef {
 }
 
 const HOLD_PREVIEW_SIZE = 4;
-const LANDING_FORECAST_DISSOLVE_TICKS = 2;
-const LANDING_FORECAST_DISSOLVE_STAGGER_MS = 12;
-const LANDING_FORECAST_HARD_DROP_STAGGER_MS = 7;
+const LANDING_FORECAST_FADE_TICKS = 2;
+const LANDING_FORECAST_HARD_DROP_STAGGER_MS = 12;
 /** Curtain: rows just below the swap line that stay frosted/semi-visible; everything deeper is fully opaque. */
 const CURTAIN_FROST_ROWS = 3;
 
@@ -150,7 +149,7 @@ const GameField = forwardRef<GameFieldRef, GameFieldProps>(({
   const landingForecastTicksRemaining = player.landingForecastTicksRemaining ?? 0;
   const [landingForecastRender, setLandingForecastRender] = useState<{
     cells: Array<{ x: number; y: number }>;
-    phase: 'hidden' | 'visible' | 'dissolving' | 'hard-drop';
+    phase: 'hidden' | 'visible' | 'timeout' | 'hard-drop';
   }>({ cells: [], phase: 'hidden' });
 
   const prevForecastTicksRef = useRef(landingForecastTicksRemaining);
@@ -193,12 +192,17 @@ const GameField = forwardRef<GameFieldRef, GameFieldProps>(({
     }
 
     if (landingForecastTicksRemaining > 0) {
-      setLandingForecastRender({
+      const nextPhase: 'timeout' | 'visible' =
+        landingForecastTicksRemaining <= LANDING_FORECAST_FADE_TICKS
+          ? 'timeout'
+          : 'visible';
+      const nextForecastRender = {
         cells: calculatedLandingForecastCells,
-        phase: landingForecastTicksRemaining <= LANDING_FORECAST_DISSOLVE_TICKS
-          ? 'dissolving'
-          : 'visible',
-      });
+        phase: nextPhase,
+      };
+      setLandingForecastRender((previous) =>
+        previous.phase === 'hard-drop' ? previous : nextForecastRender,
+      );
       prevForecastTicksRef.current = landingForecastTicksRemaining;
       lastCalculatedForecastCellsRef.current = calculatedLandingForecastCells;
       return;
@@ -206,7 +210,7 @@ const GameField = forwardRef<GameFieldRef, GameFieldProps>(({
 
     if (prevForecastTicksRef.current > 0 && landingForecastTicksRemaining <= 0) {
       setLandingForecastRender((previous) =>
-        previous.cells.length > 0 ? { ...previous, phase: 'dissolving' } : previous,
+        previous.cells.length > 0 ? { ...previous, phase: 'timeout' } : previous,
       );
     }
 
@@ -382,8 +386,8 @@ const GameField = forwardRef<GameFieldRef, GameFieldProps>(({
         {landingForecastRender.phase !== 'hidden' && landingForecastRender.cells.length > 0 && (
           <svg
             className={`pointer-events-none absolute inset-0 z-10 overflow-visible ${
-              landingForecastRender.phase === 'dissolving'
-                ? 'landing-forecast-layer-dissolving'
+              landingForecastRender.phase === 'timeout'
+                ? 'landing-forecast-layer-timeout'
                 : landingForecastRender.phase === 'hard-drop'
                   ? 'landing-forecast-layer-hard-drop'
                   : ''
@@ -396,27 +400,35 @@ const GameField = forwardRef<GameFieldRef, GameFieldProps>(({
               <rect
                 key={`landing-forecast-${x}-${y}`}
                 className={`landing-forecast-cell ${
-                  landingForecastRender.phase === 'dissolving'
-                    ? 'landing-forecast-dissolving'
+                  landingForecastRender.phase === 'timeout'
+                    ? 'landing-forecast-timeout'
                     : landingForecastRender.phase === 'hard-drop'
                       ? 'landing-forecast-hard-drop'
                       : ''
                 }`}
                 onAnimationEnd={
-                  (landingForecastRender.phase === 'dissolving' || landingForecastRender.phase === 'hard-drop') &&
+                  (landingForecastRender.phase === 'timeout' || landingForecastRender.phase === 'hard-drop') &&
                   index === landingForecastRender.cells.length - 1
-                    ? () => setLandingForecastRender({ cells: [], phase: 'hidden' })
+                    ? () => {
+                        const completedPhase = landingForecastRender.phase;
+                        setLandingForecastRender((previous) => {
+                          if (previous.phase !== completedPhase) return previous;
+                          if (completedPhase === 'hard-drop' && landingForecastTicksRemaining > 0) {
+                            return {
+                              cells: calculatedLandingForecastCells,
+                              phase: landingForecastTicksRemaining <= LANDING_FORECAST_FADE_TICKS
+                                ? 'timeout'
+                                : 'visible',
+                            };
+                          }
+                          return { cells: [], phase: 'hidden' };
+                        });
+                      }
                     : undefined
                 }
                 style={
-                  landingForecastRender.phase === 'dissolving' || landingForecastRender.phase === 'hard-drop'
-                    ? {
-                        animationDelay: `${index * (
-                          landingForecastRender.phase === 'dissolving'
-                            ? LANDING_FORECAST_DISSOLVE_STAGGER_MS
-                            : LANDING_FORECAST_HARD_DROP_STAGGER_MS
-                        )}ms`,
-                      }
+                  landingForecastRender.phase === 'hard-drop'
+                    ? { animationDelay: `${index * LANDING_FORECAST_HARD_DROP_STAGGER_MS}ms` }
                     : undefined
                 }
                 x={x * cellSize + 2}
@@ -431,8 +443,8 @@ const GameField = forwardRef<GameFieldRef, GameFieldProps>(({
         {status === 'playing' && isMe && landingForecastRender.phase !== 'hidden' && (
           <div className="pointer-events-none absolute inset-x-0 top-2 z-20 flex justify-center">
             <span className={`landing-forecast-label ${
-              landingForecastRender.phase === 'dissolving'
-                ? 'landing-forecast-dissolving'
+              landingForecastRender.phase === 'timeout'
+                ? 'landing-forecast-timeout'
                 : landingForecastRender.phase === 'hard-drop'
                   ? 'landing-forecast-hard-drop'
                   : ''
