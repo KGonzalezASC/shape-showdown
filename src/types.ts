@@ -18,6 +18,7 @@ import {
   HORIZONTAL_SPEED_THRESHOLDS,
   LOCK_DELAY_TICKS,
   LOCK_RESET_CAP,
+  LANDING_FORECAST_TICKS,
   NEXT_PREVIEW_COUNT,
   REPLAY_KEYFRAME_INTERVAL_TICKS,
   RESTART_DELAY_SECONDS,
@@ -220,6 +221,8 @@ export interface PlayerState {
   id: string;
   board: CellValue[][];
   activePiece: TetrisPiece | null;
+  /** Server-tick countdown for the temporary Landing Forecast UI. */
+  landingForecastTicksRemaining?: number;
   holdPiece: HeldPiece | null;
   canHold: boolean;
   nextQueue: TetrominoType[];
@@ -385,6 +388,7 @@ export {
   HORIZONTAL_SPEED_THRESHOLDS,
   LOCK_DELAY_TICKS,
   LOCK_RESET_CAP,
+  LANDING_FORECAST_TICKS,
   NEXT_PREVIEW_COUNT,
   REPLAY_KEYFRAME_INTERVAL_TICKS,
   RESTART_DELAY_SECONDS,

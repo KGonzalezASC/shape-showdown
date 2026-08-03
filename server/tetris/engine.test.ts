@@ -25,6 +25,7 @@ import {
   BOARD_HIDDEN_ROWS,
   COUNTDOWN_SECONDS,
   GAME_DURATION,
+  LANDING_FORECAST_TICKS,
 } from '../../src/constants.js';
 import { GameState, PlayerState } from '../../src/types.js';
 
@@ -48,6 +49,22 @@ describe('tetris engine', () => {
     const player = makePlayer('a', rng);
     assert.ok(player.activePiece);
     assert.equal(player.nextQueue.length >= 5, true);
+    assert.equal(player.landingForecastTicksRemaining, LANDING_FORECAST_TICKS);
+  });
+
+  it('expires the Landing Forecast after exactly 60 simulation ticks', () => {
+    const rng = makeRng(43);
+    const player = makePlayer('a', rng);
+    const opponent = makePlayer('b', rng);
+    const game = makeGame([player, opponent]);
+
+    for (let tick = 1; tick <= LANDING_FORECAST_TICKS; tick += 1) {
+      game.tick = tick;
+      stepPlayer(game, player, opponent, rng, []);
+    }
+
+    assert.equal(player.landingForecastTicksRemaining, 0);
+    assert.ok(player.activePiece);
   });
 
   it('advances one cell per simulation tick while soft drop is held', () => {

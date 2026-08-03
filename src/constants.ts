@@ -16,6 +16,8 @@ export const COUNTDOWN_SECONDS = 3;
 export const RESTART_DELAY_SECONDS = 5;
 
 export const NEXT_PREVIEW_COUNT = 5;
+/** Server ticks for the temporary Landing Forecast shown after a piece spawns. */
+export const LANDING_FORECAST_TICKS = 60;
 export const LOCK_DELAY_TICKS = 24; // 0.4s @ 60hz
 export const LOCK_RESET_CAP = 10;
 export const HOLD_SWAP_CUTOFF_VISIBLE_ROW = 8;

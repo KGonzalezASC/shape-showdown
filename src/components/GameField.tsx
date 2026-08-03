@@ -42,6 +42,38 @@ const HOLD_PREVIEW_SIZE = 4;
 /** Curtain: rows just below the swap line that stay frosted/semi-visible; everything deeper is fully opaque. */
 const CURTAIN_FROST_ROWS = 3;
 
+function getPieceOffsets(piece: PublicPlayerState['activePiece']): [number, number][] {
+  if (!piece) return [];
+  return piece.customOffsets ?? SHAPES[piece.type][piece.rotation];
+}
+
+function getLandingForecastCells(player: PublicPlayerState): Array<{ x: number; y: number }> {
+  const piece = player.activePiece;
+  if (!piece) return [];
+
+  const offsets = getPieceOffsets(piece);
+  const collidesAt = (baseY: number): boolean => offsets.some(([dx, dy]) => {
+    const x = piece.x + dx;
+    const y = baseY + dy;
+    return (
+      x < 0 ||
+      x >= BOARD_COLS ||
+      y >= BOARD_ROWS ||
+      (y >= 0 && player.board[y]?.[x] !== null)
+    );
+  });
+
+  let landingY = piece.y;
+  while (!collidesAt(landingY + 1)) landingY += 1;
+
+  return offsets
+    .map(([dx, dy]) => ({
+      x: piece.x + dx,
+      y: landingY + dy - BOARD_HIDDEN_ROWS,
+    }))
+    .filter(({ x, y }) => x >= 0 && x < BOARD_COLS && y >= 0 && y < BOARD_VISIBLE_ROWS);
+}
+
 const GameField = forwardRef<GameFieldRef, GameFieldProps>(({
   player,
   isMe,
@@ -103,6 +135,10 @@ const GameField = forwardRef<GameFieldRef, GameFieldProps>(({
       ),
     [visualModel],
   );
+  const landingForecastCells = useMemo(() => {
+    if (status !== 'playing' || !isMe || (player.landingForecastTicksRemaining ?? 0) <= 0) return [];
+    return getLandingForecastCells(player);
+  }, [status, isMe, player]);
   const maxActiveVisibleRow = useMemo(() => {
     if (!player.activePiece) return null;
     const offsets = player.activePiece.customOffsets ?? SHAPES[player.activePiece.type][player.activePiece.rotation];
@@ -261,6 +297,31 @@ const GameField = forwardRef<GameFieldRef, GameFieldProps>(({
             performanceId={performanceId}
           />
         </div>
+        {landingForecastCells.length > 0 && (
+          <svg
+            className="pointer-events-none absolute inset-0 z-10 overflow-visible"
+            width={BOARD_COLS * cellSize}
+            height={BOARD_VISIBLE_ROWS * cellSize}
+            aria-label="Landing forecast"
+          >
+            {landingForecastCells.map(({ x, y }) => (
+              <rect
+                key={`landing-forecast-${x}-${y}`}
+                className="landing-forecast-cell"
+                x={x * cellSize + 2}
+                y={y * cellSize + 2}
+                width={Math.max(1, cellSize - 4)}
+                height={Math.max(1, cellSize - 4)}
+                rx={Math.max(2, Math.round(cellSize * 0.12))}
+              />
+            ))}
+          </svg>
+        )}
+        {status === 'playing' && isMe && (player.landingForecastTicksRemaining ?? 0) > 0 && (
+          <div className="pointer-events-none absolute inset-x-0 top-2 z-20 flex justify-center">
+            <span className="landing-forecast-label">Landing forecast</span>
+          </div>
+        )}
         {rotationBlocked && (
           <div className="pointer-events-none absolute inset-x-0 top-2 z-30 flex justify-center">
             <span className="wildcard-rotation-blocked rounded border border-rose-200/80 bg-rose-950/90 px-2 py-1 font-mono text-[10px] font-bold uppercase tracking-widest text-rose-100">

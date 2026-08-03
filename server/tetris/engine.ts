@@ -13,6 +13,7 @@ import {
   InputState,
   LOCK_DELAY_TICKS,
   LOCK_RESET_CAP,
+  LANDING_FORECAST_TICKS,
   STICKY_LOCK_RESET_CAP,
   MatchEvent,
   PendingGarbagePacket,
@@ -93,6 +94,7 @@ export function makePlayer(id: string, rng: MutableRng): PlayerState {
     id,
     board: createEmptyBoard(),
     activePiece: null,
+    landingForecastTicksRemaining: 0,
     holdPiece: null,
     canHold: true,
     nextQueue,
@@ -140,6 +142,7 @@ export function makePlayer(id: string, rng: MutableRng): PlayerState {
   };
   ensureQueue(player, rng);
   player.activePiece = spawnNextPiece(player, rng);
+  player.landingForecastTicksRemaining = player.activePiece ? LANDING_FORECAST_TICKS : 0;
   if (player.activePiece) player.lowestY = player.activePiece.y;
   return player;
 }
@@ -541,6 +544,7 @@ function resolveBoardAfterLock(
   const perfectClear = player.board.every((row) => row.every((cell) => cell === null));
   player.linesCleared += lines;
   player.activePiece = null;
+  player.landingForecastTicksRemaining = 0;
   player.canHold = true;
   player.lockDelayRemainingTicks = LOCK_DELAY_TICKS;
   player.lockResetsUsed = 0;
@@ -776,6 +780,7 @@ function processActions(player: PlayerState, tick: number): boolean {
         player.holdPiece = stored;
         player.activePiece = null;
       }
+      player.landingForecastTicksRemaining = player.activePiece ? LANDING_FORECAST_TICKS : 0;
       player.canHold = false;
       player.lockDelayRemainingTicks = LOCK_DELAY_TICKS;
       player.lockResetsUsed = 0;
@@ -930,6 +935,15 @@ export function stepPlayer(
   rng: MutableRng,
   matchEvents: MatchEvent[],
 ): void {
+  if (player.activePiece) {
+    player.landingForecastTicksRemaining = Math.max(
+      0,
+      (player.landingForecastTicksRemaining ?? 0) - 1,
+    );
+  } else {
+    player.landingForecastTicksRemaining = 0;
+  }
+
   // ── Clean up expired visual effect pills ──
   if (player.activeEffects && player.activeEffects.length > 0) {
     player.activeEffects = player.activeEffects.filter(
@@ -977,6 +991,7 @@ export function stepPlayer(
     player.lastSrsKick = null;
     player.activePiece = spawnNextPiece(player, rng);
     if (player.activePiece) {
+      player.landingForecastTicksRemaining = LANDING_FORECAST_TICKS;
       player.pieceHasHardDropped = false;
       if (player.stickyNextPiece) {
         player.pieceLockResetCap = STICKY_LOCK_RESET_CAP;

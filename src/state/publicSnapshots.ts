@@ -20,6 +20,7 @@ export interface PublicPlayerState {
   id: string;
   board: CellValue[][];
   activePiece: TetrisPiece | null;
+  landingForecastTicksRemaining?: number;
   holdPiece: HeldPiece | null;
   canHold: boolean;
   nextQueue: TetrominoType[];
@@ -85,6 +86,7 @@ export function toPublicPlayerState(player: PlayerState): PublicPlayerState {
     id: player.id,
     board: player.board,
     activePiece: player.activePiece,
+    landingForecastTicksRemaining: player.landingForecastTicksRemaining,
     holdPiece: normalizeHeldPiece(player.holdPiece as HeldPiece | TetrominoType | null),
     canHold: player.canHold,
     nextQueue: player.nextQueue,
@@ -241,6 +243,7 @@ export function publicPlayersEqual(a: PublicPlayerState | null, b: PublicPlayerS
     a.combo !== b.combo ||
     a.backToBack !== b.backToBack ||
     a.topOut !== b.topOut ||
+    a.landingForecastTicksRemaining !== b.landingForecastTicksRemaining ||
     a.swapCutoffRow !== b.swapCutoffRow ||
     a.holdFrozenUntilTick !== b.holdFrozenUntilTick ||
     a.magnetPermanentStacks !== b.magnetPermanentStacks ||
