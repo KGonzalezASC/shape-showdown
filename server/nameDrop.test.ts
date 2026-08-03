@@ -9,6 +9,13 @@ import {
   normalizeName,
 } from '../src/nameDrop/nameDrop';
 import { SHAPES } from '../src/tetris/shapes';
+import { getPrebakedNameDropPlan } from '../src/nameDrop/nameDropPrebaked';
+import {
+  collectNewlySettledPieceIndices,
+  pieceMotion,
+  pieceSettledAt,
+} from '../src/nameDrop/nameDropRenderCore';
+import { syncNameDropPlaybackClock } from '../src/nameDrop/nameDropPlayback';
 
 describe('name drop planner', () => {
   it('normalizes names and provides a useful fallback', () => {
@@ -66,5 +73,53 @@ describe('name drop planner', () => {
       const key = `${cell.x},${cell.y}`;
       return customPieceCellKeys.filter((pieceCellKey) => pieceCellKey === key).length === 1;
     }), true);
+  });
+
+  it('keeps the prebaked brand plan identical to the generated default plan', () => {
+    const generated = createNameDropPlan('SHAPE SHOWDOWN');
+    const prebaked = getPrebakedNameDropPlan('SHAPE SHOWDOWN');
+
+    assert.ok(prebaked);
+    assert.equal(prebaked.name, generated.name);
+    assert.deepEqual(prebaked.lines, generated.lines);
+    assert.deepEqual(prebaked.targetCells, generated.targetCells);
+    assert.deepEqual(prebaked.pieces, generated.pieces);
+    assert.equal(prebaked.totalDurationMs, generated.totalDurationMs);
+  });
+
+  it('settles pieces independently when varied durations finish out of order', () => {
+    const plan = createNameDropPlan('SHAPE SHOWDOWN');
+    const laterIndex = plan.pieces.findIndex((piece, index) =>
+      index > 0 && pieceSettledAt(piece) < pieceSettledAt(plan.pieces[index - 1]));
+
+    assert.notEqual(laterIndex, -1);
+    const elapsedMs = pieceSettledAt(plan.pieces[laterIndex]);
+    const newlySettled = collectNewlySettledPieceIndices(plan.pieces, elapsedMs, new Set());
+
+    assert.equal(newlySettled.includes(laterIndex), true);
+    assert.equal(newlySettled.includes(laterIndex - 1), false);
+  });
+
+  it('keeps a falling piece moving until its actual settlement time', () => {
+    const [piece] = createNameDropPlan('SHAPE SHOWDOWN').pieces;
+    const nearSettlement = pieceMotion(piece, 10, piece.delayMs + piece.durationMs * 0.9);
+    const settled = pieceMotion(piece, 10, piece.delayMs + piece.durationMs);
+
+    assert.equal(nearSettlement.settled, false);
+    assert.ok(nearSettlement.translateY < 0);
+    assert.equal(settled.settled, true);
+    assert.equal(Math.abs(settled.translateY), 0);
+  });
+
+  it('preserves playback time across redraws and resets it only for a new cycle', () => {
+    const plan = createNameDropPlan('SHAPE SHOWDOWN');
+    const initial = { plan, cycle: 0, startedAt: 100 };
+
+    assert.deepEqual(syncNameDropPlaybackClock(initial, plan, 0, 500), initial);
+    assert.deepEqual(syncNameDropPlaybackClock(initial, plan, 1, 500), {
+      plan,
+      cycle: 1,
+      startedAt: 500,
+    });
   });
 });

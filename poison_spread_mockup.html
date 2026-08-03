@@ -1,0 +1,608 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Shape Showdown — Poison Spread Prototype</title>
+  <style>
+    :root {
+      --bg: #07090e;
+      --panel: #121622;
+      --panel-hover: #1a2030;
+      --line: #263149;
+      --text: #f1f5f9;
+      --muted: #94a3b8;
+      --poison: #ef4444;
+      --poison-soft: #fb7185;
+      --accent: #818cf8;
+      --cell: 40px;
+      --cols: 10;
+      --rows: 12;
+    }
+
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      padding: 28px;
+      color: var(--text);
+      background:
+        radial-gradient(circle at 72% 20%, rgba(99, 102, 241, 0.12), transparent 32rem),
+        var(--bg);
+      font: 15px/1.45 Inter, ui-sans-serif, system-ui, sans-serif;
+    }
+
+    .layout {
+      width: min(1180px, 100%);
+      margin: 0 auto;
+      display: grid;
+      grid-template-columns: 300px 1fr;
+      gap: 24px;
+    }
+
+    header {
+      width: min(1180px, 100%);
+      margin: 0 auto 24px;
+    }
+    h1, h2, p { margin: 0; }
+    h1 {
+      font-size: clamp(1.7rem, 3vw, 2.5rem);
+      letter-spacing: -0.04em;
+    }
+    header p { margin-top: 6px; color: var(--muted); }
+
+    .panel, .board-card {
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      background: rgba(18, 22, 34, 0.94);
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.25);
+    }
+    .panel {
+      padding: 18px;
+      align-self: start;
+    }
+    .group + .group { margin-top: 20px; }
+    .label {
+      display: block;
+      margin-bottom: 9px;
+      color: var(--muted);
+      font-size: 0.72rem;
+      font-weight: 800;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+    }
+    .button-row { display: grid; gap: 8px; }
+    button {
+      border: 1px solid var(--line);
+      border-radius: 9px;
+      padding: 10px 12px;
+      color: var(--text);
+      background: var(--panel-hover);
+      font: inherit;
+      font-weight: 700;
+      cursor: pointer;
+    }
+    button:hover { border-color: var(--accent); }
+    button.primary {
+      border-color: #6366f1;
+      background: #4f46e5;
+    }
+    button:disabled { cursor: not-allowed; opacity: 0.45; }
+    input[type="range"] { width: 100%; accent-color: var(--accent); }
+
+    .status {
+      display: grid;
+      gap: 8px;
+      padding: 12px;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      background: #0b0e17;
+    }
+    .status-line {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+    }
+    .status-line span:first-child { color: var(--muted); }
+    .status-line strong { color: #fda4af; }
+
+    .rules {
+      padding-left: 18px;
+      margin: 0;
+      color: var(--muted);
+    }
+    .rules li + li { margin-top: 6px; }
+    code {
+      color: #c4b5fd;
+      font: 0.9em ui-monospace, SFMono-Regular, Consolas, monospace;
+    }
+
+    .board-card { padding: 22px; }
+    .board-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: start;
+      gap: 16px;
+      margin-bottom: 18px;
+    }
+    .board-head h2 { font-size: 1.15rem; }
+    .badge {
+      flex: none;
+      padding: 5px 9px;
+      border: 1px solid var(--line);
+      border-radius: 7px;
+      color: var(--muted);
+      background: #0b0e17;
+      font: 0.72rem ui-monospace, SFMono-Regular, Consolas, monospace;
+    }
+    .arena {
+      position: relative;
+      width: calc(var(--cols) * var(--cell));
+      height: calc(var(--rows) * var(--cell));
+      max-width: 100%;
+      overflow: auto;
+      border: 2px solid #1e293b;
+      border-radius: 13px;
+      background-color: #05070b;
+      background-image:
+        linear-gradient(to right, rgba(255,255,255,.08) 1px, transparent 1px),
+        linear-gradient(to bottom, rgba(255,255,255,.08) 1px, transparent 1px);
+      background-size: var(--cell) var(--cell);
+    }
+    canvas {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+    }
+    .legend {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px 16px;
+      margin-top: 15px;
+      color: var(--muted);
+      font-size: 0.82rem;
+    }
+    .legend span { display: inline-flex; align-items: center; gap: 6px; }
+    .dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      display: inline-block;
+    }
+    .dot.seed { background: var(--poison); }
+    .dot.wave { background: #fda4af; box-shadow: 0 0 10px #fb7185; }
+    .dot.hole { border: 2px solid #e2e8f0; }
+
+    @media (max-width: 800px) {
+      body { padding: 16px; }
+      .layout { grid-template-columns: 1fr; }
+      .panel { order: 2; }
+      .board-card { order: 1; padding: 14px; }
+      .arena { transform-origin: top left; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Poison Spread — Animated Prototype</h1>
+    <p>Production BFS rules, visualized as a single animated contagion wave.</p>
+  </header>
+
+  <main class="layout">
+    <aside class="panel">
+      <div class="group">
+        <span class="label">Simulation</span>
+        <div class="button-row">
+          <button class="primary" id="playButton">▶ Play Spread</button>
+          <button id="stepButton">Spread One Wave</button>
+          <button id="resetButton">Reset Seed</button>
+        </div>
+      </div>
+
+      <div class="group">
+        <label class="label" for="speedSlider">Animation Speed: <span id="speedValue">1.0</span>x</label>
+        <input id="speedSlider" type="range" min="0.35" max="2.5" step="0.05" value="1">
+      </div>
+
+      <div class="group status" aria-live="polite">
+        <div class="status-line"><span>Game tick interval</span><strong>60 ticks</strong></div>
+        <div class="status-line"><span>Spread waves left</span><strong id="wavesLeft">3</strong></div>
+        <div class="status-line"><span>Current state</span><strong id="stateLabel">Seeded</strong></div>
+        <div class="status-line"><span>Poisoned cells</span><strong id="cellCount">2</strong></div>
+      </div>
+
+      <div class="group">
+        <span class="label">Copied from engine.ts</span>
+        <ul class="rules">
+          <li>Only occupied cells can be infected.</li>
+          <li>Neighbors are orthogonal only; diagonals do not spread.</li>
+          <li>Each wave batches all new targets before applying them.</li>
+          <li>There are three spread waves after the lock seed.</li>
+          <li>Poison is permanent after spreading stops.</li>
+        </ul>
+      </div>
+    </aside>
+
+    <section class="board-card">
+      <div class="board-head">
+        <div>
+          <h2>Orthogonal Contagion Field</h2>
+          <p style="color: var(--muted); margin-top: 4px;">The pale growth bridges are the next batch before it commits.</p>
+        </div>
+        <span class="badge" id="waveBadge">WAVE 1 / 4</span>
+      </div>
+      <div class="arena">
+        <canvas id="spreadCanvas"></canvas>
+      </div>
+      <div class="legend">
+        <span><i class="dot seed"></i> committed poison</span>
+        <span><i class="dot wave"></i> animated next wave</span>
+        <span><i class="dot hole"></i> empty board hole</span>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    // ── Production constants mirrored from src/constants.ts ──────────────
+    const COLS = 10;
+    const ROWS = 12;
+    const CELL = 40;
+    const TICK_RATE = 60;
+    const SPREAD_INTERVAL_TICKS = 60;
+    const POISON_GENERATIONS = 4; // lock seed + 3 spread waves
+    const SPREAD_INTERVAL_MS = (SPREAD_INTERVAL_TICKS / TICK_RATE) * 1000;
+    const WAVE_ANIMATION_MS = 720;
+    const POISON_COLOR = '#EF4444';
+    const POISON_GROWTH_COLOR = '#FDA4AF';
+    const PIECE_COLORS = ['#38bdf8', '#facc15', '#2dd4bf', '#a78bfa', '#f97316', '#a3e635'];
+
+    // Fixed occupied board with intentional holes. Spread can only enter occupied cells.
+    const HOLES = new Set([
+      '5,1', '5,8', '6,5', '7,2', '7,7',
+      '8,1', '8,8', '9,7', '10,2', '10,8', '11,5',
+    ]);
+    const BOARD = Array.from({ length: ROWS }, (_, r) =>
+      Array.from({ length: COLS }, (_, c) => {
+        if (r < 5 || HOLES.has(`${r},${c}`) || ((r + c) % 8 === 0)) return null;
+        return PIECE_COLORS[(r * 3 + c) % PIECE_COLORS.length];
+      })
+    );
+
+    const SEED = [{ r: 9, c: 4 }, { r: 9, c: 5 }];
+    const canvas = document.getElementById('spreadCanvas');
+    const ctx = canvas.getContext('2d');
+    const blobCanvas = document.createElement('canvas');
+    blobCanvas.width = COLS * CELL;
+    blobCanvas.height = ROWS * CELL;
+    const blobCtx = blobCanvas.getContext('2d');
+    const dpr = window.devicePixelRatio || 1;
+    canvas.width = COLS * CELL * dpr;
+    canvas.height = ROWS * CELL * dpr;
+
+    let poison;
+    let waveNumber;
+    let running = false;
+    let speed = 1;
+    let nextWaveAt = 0;
+    let pendingWave = null;
+    let lastFrame = performance.now();
+    let time = 0;
+
+    function createGrid(value = 0) {
+      return Array.from({ length: ROWS }, () => Array(COLS).fill(value));
+    }
+
+    function resetSimulation() {
+      poison = createGrid();
+      for (const { r, c } of SEED) poison[r][c] = 1;
+      waveNumber = 1;
+      running = false;
+      pendingWave = null;
+      nextWaveAt = 0;
+      updateStatus('Seeded');
+    }
+
+    // Exact two-pass helper from server/tetris/engine.ts:
+    // discover every target against the same pre-wave poison grid, then apply all.
+    function getSpreadTargets() {
+      const targets = [];
+      for (let y = 0; y < ROWS; y++) {
+        for (let x = 0; x < COLS; x++) {
+          if (poison[y][x] !== 0) continue;
+          if (BOARD[y][x] === null) continue;
+          const neighbourPoisoned =
+            (y > 0 && poison[y - 1][x] !== 0) ||
+            (y < ROWS - 1 && poison[y + 1][x] !== 0) ||
+            (x > 0 && poison[y][x - 1] !== 0) ||
+            (x < COLS - 1 && poison[y][x + 1] !== 0);
+          if (neighbourPoisoned) targets.push({ r: y, c: x });
+        }
+      }
+      return targets;
+    }
+
+    function applySpreadTargets(targets) {
+      for (const { r, c } of targets) poison[r][c] = 1;
+    }
+
+    function findSource({ r, c }) {
+      const neighbours = [
+        [r - 1, c], [r + 1, c], [r, c - 1], [r, c + 1],
+      ];
+      return neighbours
+        .filter(([y, x]) => y >= 0 && y < ROWS && x >= 0 && x < COLS)
+        .find(([y, x]) => poison[y][x] !== 0) || [r, c];
+    }
+
+    function queueNextWave(now) {
+      if (pendingWave || waveNumber >= POISON_GENERATIONS) return false;
+      const targets = getSpreadTargets();
+      if (targets.length === 0) {
+        running = false;
+        updateStatus('No occupied neighbours');
+        return false;
+      }
+      pendingWave = {
+        targets,
+        startedAt: now,
+        duration: WAVE_ANIMATION_MS / speed,
+        waveNumber: waveNumber + 1,
+      };
+      updateStatus(`Growing wave ${pendingWave.waveNumber}`);
+      return true;
+    }
+
+    function commitPendingWave(now) {
+      if (!pendingWave) return;
+      applySpreadTargets(pendingWave.targets);
+      waveNumber = pendingWave.waveNumber;
+      pendingWave = null;
+      nextWaveAt = now + SPREAD_INTERVAL_MS / speed;
+      updateStatus(waveNumber >= POISON_GENERATIONS ? 'Spread complete' : 'Wave committed');
+      if (waveNumber >= POISON_GENERATIONS) running = false;
+    }
+
+    function beginOrResume() {
+      if (waveNumber >= POISON_GENERATIONS && !pendingWave) return;
+      running = !running;
+      if (running && !pendingWave && nextWaveAt === 0) {
+        nextWaveAt = performance.now() + SPREAD_INTERVAL_MS / speed;
+      }
+      updateStatus(running ? 'Waiting for next tick' : 'Paused');
+    }
+
+    function stepWave() {
+      if (pendingWave) return;
+      const now = performance.now();
+      if (queueNextWave(now)) running = false;
+    }
+
+    function updateStatus(label) {
+      document.getElementById('stateLabel').textContent = label;
+      document.getElementById('wavesLeft').textContent = Math.max(0, POISON_GENERATIONS - waveNumber);
+      document.getElementById('cellCount').textContent = poison.flat().filter(Boolean).length;
+      document.getElementById('waveBadge').textContent = `WAVE ${waveNumber} / ${POISON_GENERATIONS}`;
+      document.getElementById('playButton').textContent = running ? '⏸ Pause Spread' : '▶ Play Spread';
+      document.getElementById('stepButton').disabled = Boolean(pendingWave) || waveNumber >= POISON_GENERATIONS;
+    }
+
+    function drawRegularPiece(r, c, color) {
+      const cx = c * CELL + CELL / 2;
+      const cy = r * CELL + CELL / 2;
+      const sides = 5 + ((r + c) % 3);
+      const radius = CELL * 0.38;
+      ctx.fillStyle = color;
+      ctx.strokeStyle = 'rgba(255,255,255,.28)';
+      ctx.lineWidth = 1.4;
+      ctx.beginPath();
+      for (let i = 0; i < sides; i++) {
+        const angle = (i * Math.PI * 2) / sides - Math.PI / 2;
+        const x = cx + Math.cos(angle) * radius;
+        const y = cy + Math.sin(angle) * radius;
+        if (i === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+      }
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+    }
+
+    function drawHole(r, c) {
+      const cx = c * CELL + CELL / 2;
+      const cy = r * CELL + CELL / 2;
+      ctx.strokeStyle = 'rgba(255,255,255,.72)';
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.arc(cx, cy, 8, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.fillStyle = '#fff';
+      ctx.beginPath();
+      ctx.arc(cx, cy, 2, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    function poisonCells() {
+      const cells = [];
+      for (let r = 0; r < ROWS; r++) {
+        for (let c = 0; c < COLS; c++) {
+          if (poison[r][c]) cells.push({ r, c });
+        }
+      }
+      return cells;
+    }
+
+    function easeOut(t) {
+      return 1 - Math.pow(1 - Math.min(1, Math.max(0, t)), 3);
+    }
+
+    function visualPoisonCells(now) {
+      const cells = poisonCells().map(({ r, c }) => ({
+        r, c, weight: 1,
+        x: c * CELL + CELL / 2,
+        y: r * CELL + CELL / 2,
+      }));
+      if (!pendingWave) return cells;
+
+      const progress = Math.min(1, (now - pendingWave.startedAt) / pendingWave.duration);
+      const growth = easeOut(progress);
+      for (const target of pendingWave.targets) {
+        const [sourceR, sourceC] = findSource(target);
+        const sourceX = sourceC * CELL + CELL / 2;
+        const sourceY = sourceR * CELL + CELL / 2;
+        const targetX = target.c * CELL + CELL / 2;
+        const targetY = target.r * CELL + CELL / 2;
+        cells.push({
+          r: target.r,
+          c: target.c,
+          weight: Math.max(0.12, growth),
+          x: sourceX + (targetX - sourceX) * growth,
+          y: sourceY + (targetY - sourceY) * growth,
+        });
+      }
+      document.getElementById('stateLabel').textContent =
+        `Growing wave ${pendingWave.waveNumber} · ${Math.round(progress * 100)}%`;
+      return cells;
+    }
+
+    function drawPoisonBlob(now) {
+      const cells = visualPoisonCells(now);
+      const cellKeys = new Set(cells.map(({ r, c }) => `${r},${c}`));
+      const influence = CELL * 0.82;
+      const influence2 = influence * influence;
+      const threshold = 1.7;
+      const edgeInset = 3;
+      const cornerRadius = 9;
+      const width = COLS * CELL;
+      const height = ROWS * CELL;
+      const image = blobCtx.createImageData(width, height);
+      const pixels = image.data;
+      const mask = new Uint8Array(width * height);
+
+      for (let py = 0; py < height; py++) {
+        for (let px = 0; px < width; px++) {
+          const x = px + 0.5;
+          const y = py + 0.5;
+          const c = Math.floor(x / CELL);
+          const r = Math.floor(y / CELL);
+          if (!cellKeys.has(`${r},${c}`)) continue;
+
+          const localX = x - c * CELL;
+          const localY = y - r * CELL;
+          const outerLeft = !cellKeys.has(`${r},${c - 1}`);
+          const outerRight = !cellKeys.has(`${r},${c + 1}`);
+          const outerTop = !cellKeys.has(`${r - 1},${c}`);
+          const outerBottom = !cellKeys.has(`${r + 1},${c}`);
+          if (
+            (outerLeft && localX < edgeInset) ||
+            (outerRight && localX > CELL - edgeInset) ||
+            (outerTop && localY < edgeInset) ||
+            (outerBottom && localY > CELL - edgeInset)
+          ) continue;
+          if (
+            (outerLeft && outerTop && Math.hypot(localX, localY) < cornerRadius) ||
+            (outerRight && outerTop && Math.hypot(localX - CELL, localY) < cornerRadius) ||
+            (outerLeft && outerBottom && Math.hypot(localX, localY - CELL) < cornerRadius) ||
+            (outerRight && outerBottom && Math.hypot(localX - CELL, localY - CELL) < cornerRadius)
+          ) continue;
+
+          let field = 0;
+          for (const cell of cells) {
+            const dx = x - cell.x;
+            const dy = y - cell.y;
+            field += influence2 * cell.weight / (dx * dx + dy * dy + 1);
+            if (field >= threshold) break;
+          }
+          if (field < threshold) continue;
+
+          const index = py * width + px;
+          mask[index] = 1;
+          const i = index * 4;
+          pixels[i] = 239;
+          pixels[i + 1] = 68;
+          pixels[i + 2] = 68;
+          pixels[i + 3] = 255;
+        }
+      }
+
+      // Two-pixel inward contour; all eight directions keep diagonal corners closed.
+      for (let py = 0; py < height; py++) {
+        for (let px = 0; px < width; px++) {
+          const index = py * width + px;
+          if (!mask[index]) continue;
+          let edge = false;
+          for (const [dx, dy] of [
+            [-1, -1], [0, -1], [1, -1],
+            [-1, 0],            [1, 0],
+            [-1, 1],  [0, 1],  [1, 1],
+          ]) {
+            for (let distance = 1; distance <= 2; distance++) {
+              const nx = px + dx * distance;
+              const ny = py + dy * distance;
+              if (nx < 0 || ny < 0 || nx >= width || ny >= height || !mask[ny * width + nx]) {
+                edge = true;
+                break;
+              }
+            }
+            if (edge) break;
+          }
+          if (edge) {
+            const i = index * 4;
+            pixels[i] = 255;
+            pixels[i + 1] = 255;
+            pixels[i + 2] = 255;
+            pixels[i + 3] = 225;
+          }
+        }
+      }
+
+      blobCtx.putImageData(image, 0, 0);
+      ctx.drawImage(blobCanvas, 0, 0);
+    }
+
+    function render(now) {
+      const delta = Math.min(50, now - lastFrame);
+      lastFrame = now;
+      time += delta / 1000;
+
+      if (running && !pendingWave && nextWaveAt && now >= nextWaveAt) {
+        queueNextWave(now);
+      }
+      if (pendingWave && now - pendingWave.startedAt >= pendingWave.duration) {
+        commitPendingWave(now);
+      }
+
+      ctx.save();
+      ctx.scale(dpr, dpr);
+      ctx.clearRect(0, 0, COLS * CELL, ROWS * CELL);
+
+      for (let r = 0; r < ROWS; r++) {
+        for (let c = 0; c < COLS; c++) {
+          if (BOARD[r][c] && !poison[r][c]) drawRegularPiece(r, c, BOARD[r][c]);
+        }
+      }
+      drawPoisonBlob(now);
+      // Holes stay on top of the blob, matching the established poison style.
+      for (const key of HOLES) {
+        const [r, c] = key.split(',').map(Number);
+        if (!poison[r][c] && !pendingWave?.targets.some((target) => target.r === r && target.c === c)) {
+          drawHole(r, c);
+        }
+      }
+      ctx.restore();
+      requestAnimationFrame(render);
+    }
+
+    document.getElementById('playButton').addEventListener('click', beginOrResume);
+    document.getElementById('stepButton').addEventListener('click', stepWave);
+    document.getElementById('resetButton').addEventListener('click', resetSimulation);
+    document.getElementById('speedSlider').addEventListener('input', (event) => {
+      speed = Number(event.target.value);
+      document.getElementById('speedValue').textContent = speed.toFixed(2);
+    });
+
+    resetSimulation();
+    requestAnimationFrame(render);
+  </script>
+</body>
+</html>

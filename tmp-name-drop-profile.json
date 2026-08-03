@@ -1,0 +1,294 @@
+{
+  "generatedAt": "2026-07-25T17:00:25.832Z",
+  "method": "Bun-native CDP against pre-launched Chromium; rAF frame deltas + Long Task observer + DOM counts",
+  "viewport": "1280x800 with resize scenario to 390 and 820",
+  "results": [
+    {
+      "label": "preopt",
+      "url": "http://localhost:3001/landing/?name=SHAPE%20SHOWDOWN",
+      "scenarios": [
+        {
+          "scenario": "mid-drop",
+          "domNodes": 2542,
+          "boardDescendants": 2493,
+          "canvasCount": 0,
+          "animatedElements": 140,
+          "longTasks": 0,
+          "longTaskTotalMs": 0,
+          "longTaskMaxMs": 0,
+          "frames": 139,
+          "avgFrameMs": 17.98,
+          "p95FrameMs": 16.8,
+          "droppedFrames": 3
+        },
+        {
+          "scenario": "completed-board",
+          "domNodes": 2542,
+          "boardDescendants": 2493,
+          "canvasCount": 0,
+          "animatedElements": 140,
+          "longTasks": 0,
+          "longTaskTotalMs": 0,
+          "longTaskMaxMs": 0,
+          "frames": 89,
+          "avgFrameMs": 16.85,
+          "p95FrameMs": 16.8,
+          "droppedFrames": 1
+        },
+        {
+          "scenario": "resize-during-cycle",
+          "domNodes": 2542,
+          "boardDescendants": 2493,
+          "canvasCount": 0,
+          "animatedElements": 140,
+          "longTasks": 13,
+          "longTaskTotalMs": 2500,
+          "longTaskMaxMs": 363,
+          "frames": 79,
+          "avgFrameMs": 59.28,
+          "p95FrameMs": 366.7,
+          "droppedFrames": 14
+        }
+      ]
+    },
+    {
+      "label": "optimized",
+      "url": "http://localhost:3002/landing/?name=SHAPE%20SHOWDOWN",
+      "scenarios": [
+        {
+          "scenario": "mid-drop",
+          "domNodes": 49,
+          "boardDescendants": 0,
+          "canvasCount": 1,
+          "animatedElements": 0,
+          "longTasks": 0,
+          "longTaskTotalMs": 0,
+          "longTaskMaxMs": 0,
+          "frames": 149,
+          "avgFrameMs": 16.67,
+          "p95FrameMs": 16.8,
+          "droppedFrames": 0
+        },
+        {
+          "scenario": "completed-board",
+          "domNodes": 49,
+          "boardDescendants": 0,
+          "canvasCount": 1,
+          "animatedElements": 0,
+          "longTasks": 0,
+          "longTaskTotalMs": 0,
+          "longTaskMaxMs": 0,
+          "frames": 90,
+          "avgFrameMs": 16.85,
+          "p95FrameMs": 16.7,
+          "droppedFrames": 1
+        },
+        {
+          "scenario": "resize-during-cycle",
+          "domNodes": 49,
+          "boardDescendants": 0,
+          "canvasCount": 1,
+          "animatedElements": 0,
+          "longTasks": 0,
+          "longTaskTotalMs": 0,
+          "longTaskMaxMs": 0,
+          "frames": 151,
+          "avgFrameMs": 17,
+          "p95FrameMs": 16.8,
+          "droppedFrames": 3
+        }
+      ]
+    }
+  ],
+  "comparison": [
+    {
+      "scenario": "mid-drop",
+      "domNodes": {
+        "before": 2542,
+        "after": 49,
+        "delta": -2493,
+        "pct": -98.1
+      },
+      "boardDescendants": {
+        "before": 2493,
+        "after": 0,
+        "delta": -2493,
+        "pct": -100
+      },
+      "animatedElements": {
+        "before": 140,
+        "after": 0,
+        "delta": -140,
+        "pct": -100
+      },
+      "avgFrameMs": {
+        "before": 17.98,
+        "after": 16.67,
+        "delta": -1.31,
+        "pct": -7.3
+      },
+      "p95FrameMs": {
+        "before": 16.8,
+        "after": 16.8,
+        "delta": 0,
+        "pct": 0
+      },
+      "droppedFrames": {
+        "before": 3,
+        "after": 0,
+        "delta": -3,
+        "pct": -100
+      },
+      "longTasks": {
+        "before": 0,
+        "after": 0,
+        "delta": 0,
+        "pct": 0
+      },
+      "longTaskTotalMs": {
+        "before": 0,
+        "after": 0,
+        "delta": 0,
+        "pct": 0
+      },
+      "longTaskMaxMs": {
+        "before": 0,
+        "after": 0,
+        "delta": 0,
+        "pct": 0
+      },
+      "canvasCount": {
+        "before": 0,
+        "after": 1,
+        "delta": 1,
+        "pct": null
+      }
+    },
+    {
+      "scenario": "completed-board",
+      "domNodes": {
+        "before": 2542,
+        "after": 49,
+        "delta": -2493,
+        "pct": -98.1
+      },
+      "boardDescendants": {
+        "before": 2493,
+        "after": 0,
+        "delta": -2493,
+        "pct": -100
+      },
+      "animatedElements": {
+        "before": 140,
+        "after": 0,
+        "delta": -140,
+        "pct": -100
+      },
+      "avgFrameMs": {
+        "before": 16.85,
+        "after": 16.85,
+        "delta": 0,
+        "pct": 0
+      },
+      "p95FrameMs": {
+        "before": 16.8,
+        "after": 16.7,
+        "delta": -0.1,
+        "pct": -0.6
+      },
+      "droppedFrames": {
+        "before": 1,
+        "after": 1,
+        "delta": 0,
+        "pct": 0
+      },
+      "longTasks": {
+        "before": 0,
+        "after": 0,
+        "delta": 0,
+        "pct": 0
+      },
+      "longTaskTotalMs": {
+        "before": 0,
+        "after": 0,
+        "delta": 0,
+        "pct": 0
+      },
+      "longTaskMaxMs": {
+        "before": 0,
+        "after": 0,
+        "delta": 0,
+        "pct": 0
+      },
+      "canvasCount": {
+        "before": 0,
+        "after": 1,
+        "delta": 1,
+        "pct": null
+      }
+    },
+    {
+      "scenario": "resize-during-cycle",
+      "domNodes": {
+        "before": 2542,
+        "after": 49,
+        "delta": -2493,
+        "pct": -98.1
+      },
+      "boardDescendants": {
+        "before": 2493,
+        "after": 0,
+        "delta": -2493,
+        "pct": -100
+      },
+      "animatedElements": {
+        "before": 140,
+        "after": 0,
+        "delta": -140,
+        "pct": -100
+      },
+      "avgFrameMs": {
+        "before": 59.28,
+        "after": 17,
+        "delta": -42.28,
+        "pct": -71.3
+      },
+      "p95FrameMs": {
+        "before": 366.7,
+        "after": 16.8,
+        "delta": -349.9,
+        "pct": -95.4
+      },
+      "droppedFrames": {
+        "before": 14,
+        "after": 3,
+        "delta": -11,
+        "pct": -78.6
+      },
+      "longTasks": {
+        "before": 13,
+        "after": 0,
+        "delta": -13,
+        "pct": -100
+      },
+      "longTaskTotalMs": {
+        "before": 2500,
+        "after": 0,
+        "delta": -2500,
+        "pct": -100
+      },
+      "longTaskMaxMs": {
+        "before": 363,
+        "after": 0,
+        "delta": -363,
+        "pct": -100
+      },
+      "canvasCount": {
+        "before": 0,
+        "after": 1,
+        "delta": 1,
+        "pct": null
+      }
+    }
+  ]
+}

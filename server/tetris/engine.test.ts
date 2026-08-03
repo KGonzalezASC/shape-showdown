@@ -22,6 +22,7 @@ import {
   STICKY_LOCK_RESET_CAP,
   BOARD_ROWS,
   BOARD_COLS,
+  BOARD_HIDDEN_ROWS,
   COUNTDOWN_SECONDS,
   GAME_DURATION,
 } from '../../src/constants.js';
@@ -49,6 +50,22 @@ describe('tetris engine', () => {
     assert.equal(player.nextQueue.length >= 5, true);
   });
 
+  it('advances one cell per simulation tick while soft drop is held', () => {
+    const rng = makeRng(43);
+    const player = makePlayer('a', rng);
+    const opponent = makePlayer('b', rng);
+    const game = makeGame([player, opponent]);
+    assert.ok(player.activePiece);
+
+    const startY = player.activePiece!.y;
+    player.inputState.softDrop = true;
+    stepPlayer(game, player, opponent, rng, []);
+    stepPlayer(game, player, opponent, rng, []);
+
+    assert.equal(player.activePiece?.y, startY + 2);
+    assert.equal(player.score, 2);
+  });
+
   it('supports hold swapping and maintains cooldown until lock', () => {
     const rng = makeRng(7);
     const player = makePlayer('a', rng);
@@ -70,7 +87,7 @@ describe('tetris engine', () => {
     assert.ok(player.activePiece);
     if (!player.activePiece) return;
 
-    player.activePiece.y = 20;
+    player.activePiece.y = BOARD_HIDDEN_ROWS;
     const beforeType = player.activePiece.type;
     player.actionQueue.push('hold');
     stepPlayer(game, player, opponent, rng, []);
@@ -88,7 +105,7 @@ describe('tetris engine', () => {
     assert.ok(player.activePiece);
     if (!player.activePiece) return;
 
-    player.activePiece.y = 30;
+    player.activePiece.y = BOARD_HIDDEN_ROWS + player.swapCutoffRow;
     const beforeType = player.activePiece.type;
     const beforeQueue = [...player.nextQueue];
     player.actionQueue.push('hold');
@@ -108,7 +125,7 @@ describe('tetris engine', () => {
 
     assert.ok(player.activePiece);
     player.holdFrozenUntilTick = 9999;
-    player.activePiece.y = 20;
+    player.activePiece.y = BOARD_HIDDEN_ROWS;
     const beforeType = player.activePiece.type;
 
     player.actionQueue.push('hold');
@@ -135,7 +152,7 @@ describe('tetris engine', () => {
     const game = makeGame([player, opponent]);
 
     assert.ok(player.activePiece);
-    player.activePiece.y = 20;
+    player.activePiece.y = BOARD_HIDDEN_ROWS;
     player.activePiece.poisoned = true;
     player.activePiece.poisonVariant = 2;
     const beforeType = player.activePiece.type;
@@ -156,7 +173,7 @@ describe('tetris engine', () => {
     const game = makeGame([player, opponent]);
 
     assert.ok(player.activePiece);
-    player.activePiece.y = 20;
+    player.activePiece.y = BOARD_HIDDEN_ROWS;
     player.activePiece.bomber = true;
     const bomberType = player.activePiece.type;
 
@@ -173,7 +190,7 @@ describe('tetris engine', () => {
     assert.equal(!!player.activePiece.bomber, false);
 
     player.canHold = true;
-    player.activePiece.y = 20;
+    player.activePiece.y = BOARD_HIDDEN_ROWS;
     player.actionQueue.push('hold');
     stepPlayer(game, player, opponent, rng, []);
 
@@ -291,6 +308,20 @@ describe('tetris engine', () => {
     player.actionQueue.push('hardDrop');
     stepPlayer(game, player, opponent, rng, []);
     assert.equal(player.pieceHasHardDropped, true);
+  });
+
+  it('treats hard drop as terminal before a queued hold', () => {
+    const rng = makeRng(30);
+    const player = makePlayer('a', rng);
+    const opponent = makePlayer('b', rng);
+    const game = makeGame([player, opponent]);
+
+    player.actionQueue.push('hardDrop', 'hold');
+    stepPlayer(game, player, opponent, rng, []);
+
+    assert.equal(player.holdPiece, null);
+    assert.equal(player.actionQueue.length, 0);
+    assert.equal(player.activePiece, null);
   });
 
   it('satellite arms and lingers until incoming garbage is queued', () => {

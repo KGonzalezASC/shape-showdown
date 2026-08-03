@@ -1,0 +1,719 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Shape Showdown — Soft Rounded Flowfield Studio</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;700;800&family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg-main: #07090E;
+      --bg-card: #121622;
+      --bg-card-hover: #1A2030;
+      --border-color: #222B3D;
+      --text-main: #F1F5F9;
+      --text-muted: #94A3B8;
+      --accent: #6366F1;
+      
+      --cols: 10;
+      --rows: 12;
+      --cell-size: 40px;
+    }
+
+    [data-theme="light"] {
+      --bg-main: #F8FAFC;
+      --bg-card: #FFFFFF;
+      --bg-card-hover: #F1F5F9;
+      --border-color: #E2E8F0;
+      --text-main: #0F172A;
+      --text-muted: #64748B;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: 'Outfit', -apple-system, BlinkMacSystemFont, sans-serif;
+      background-color: var(--bg-main);
+      color: var(--text-main);
+      min-height: 100vh;
+      padding: 2rem;
+    }
+
+    header {
+      max-width: 1280px;
+      margin: 0 auto 2rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+    }
+
+    .title-area h1 {
+      font-size: 2.2rem;
+      font-weight: 800;
+      letter-spacing: -0.02em;
+      background: linear-gradient(135deg, #F1F5F9 0%, #A5B4FC 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .title-area p {
+      color: var(--text-muted);
+      font-size: 1rem;
+      margin-top: 0.35rem;
+    }
+
+    .toolbar {
+      display: flex;
+      gap: 0.75rem;
+    }
+
+    .btn {
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      color: var(--text-main);
+      padding: 0.6rem 1.2rem;
+      border-radius: 8px;
+      font-family: inherit;
+      font-size: 0.875rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .btn:hover {
+      background: var(--bg-card-hover);
+      border-color: var(--accent);
+    }
+
+    .btn.active {
+      background: var(--accent);
+      border-color: var(--accent);
+      color: #fff;
+    }
+
+    .main-container {
+      max-width: 1280px;
+      margin: 0 auto;
+      display: grid;
+      grid-template-columns: 340px 1fr;
+      gap: 2rem;
+    }
+
+    .controls-panel {
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: 16px;
+      padding: 1.5rem;
+      display: flex;
+      flex-direction: column;
+      gap: 1.5rem;
+      height: fit-content;
+    }
+
+    .control-group {
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+    }
+
+    .control-group label {
+      font-size: 0.875rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--text-muted);
+    }
+
+    .legend-list {
+      display: flex;
+      flex-direction: column;
+      gap: 0.6rem;
+    }
+
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      background: var(--bg-main);
+      border: 1px solid var(--border-color);
+      padding: 0.6rem 0.85rem;
+      border-radius: 8px;
+      font-size: 0.85rem;
+      font-weight: 600;
+    }
+
+    .swatch {
+      width: 18px;
+      height: 18px;
+      border-radius: 4px;
+      box-shadow: 0 0 8px currentColor;
+    }
+
+    .slider-container input[type="range"] {
+      width: 100%;
+      accent-color: var(--accent);
+    }
+
+    .showcase-area {
+      display: flex;
+      flex-direction: column;
+      gap: 2rem;
+    }
+
+    .board-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: 16px;
+      padding: 2rem;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 1.5rem;
+      position: relative;
+    }
+
+    .board-header {
+      width: 100%;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 1px solid var(--border-color);
+      padding-bottom: 0.75rem;
+    }
+
+    .board-title {
+      font-size: 1.25rem;
+      font-weight: 700;
+    }
+
+    .arena-container {
+      position: relative;
+      width: calc(var(--cols) * var(--cell-size));
+      height: calc(var(--rows) * var(--cell-size));
+      background-color: #05070B;
+      background-image: 
+        linear-gradient(to right, rgba(255, 255, 255, 0.08) 1px, transparent 1px),
+        linear-gradient(to bottom, rgba(255, 255, 255, 0.08) 1px, transparent 1px);
+      background-size: var(--cell-size) var(--cell-size);
+      border: 2px solid #1E293B;
+      border-radius: 12px;
+      box-shadow: 0 12px 36px rgba(0, 0, 0, 0.6), inset 0 0 20px rgba(0, 0, 0, 0.8);
+      overflow: hidden;
+    }
+
+    canvas {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      filter: drop-shadow(0 0 6px rgba(0, 0, 0, 0.4));
+    }
+  </style>
+</head>
+<body data-theme="dark">
+
+  <header>
+    <div class="title-area">
+      <h1>Shape Showdown — Soft Rounded Flowfield Studio</h1>
+      <p>Soft Organic Rounded Voronoi Cells driven by real-time trigonometric flow fields</p>
+    </div>
+    <div class="toolbar">
+      <button class="btn active" id="toggleGrid">Toggle Board Grid</button>
+      <button class="btn" id="toggleTheme">Toggle Theme Mode</button>
+    </div>
+  </header>
+
+  <div class="main-container">
+    
+    <!-- Controls Sidebar -->
+    <aside class="controls-panel">
+      
+      <div class="control-group">
+        <label>Exact Game Speeds</label>
+        <div class="legend-list">
+          <div class="legend-item">
+            <span style="font-family: 'JetBrains Mono', monospace; font-weight: 700; color: #38bdf8;">0.3325x</span>
+            <span>Regular Piece Wobble Speed</span>
+          </div>
+          <div class="legend-item">
+            <span style="font-family: 'JetBrains Mono', monospace; font-weight: 700; color: #EF4444;">0.5500x</span>
+            <span>Poison Shape Wobble Speed</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="control-group">
+        <label>Poison Variants Palette</label>
+        <div class="legend-list">
+          <div class="legend-item">
+            <div class="swatch" style="background-color: #EF4444; color: #EF4444;"></div>
+            <span>V1 Bio-Toxin Crimson (#EF4444)</span>
+          </div>
+          <div class="legend-item">
+            <div class="swatch" style="background-color: #EC4899; color: #EC4899;"></div>
+            <span>V2 Cyber-Glitch Magenta (#EC4899)</span>
+          </div>
+          <div class="legend-item">
+            <div class="swatch" style="background-color: #6D28D9; color: #6D28D9;"></div>
+            <span>V3 EMP Dark Violet (#6D28D9)</span>
+          </div>
+          <div class="legend-item">
+            <div class="swatch" style="background-color: #059669; color: #059669;"></div>
+            <span>V4 Quantum Decay Slime (#059669)</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="control-group slider-container">
+        <label>Flowfield Intensity: <span id="flowVal">1.0</span>x</label>
+        <input type="range" id="flowSlider" min="0.2" max="2.5" step="0.1" value="1.0">
+      </div>
+
+      <div class="control-group slider-container">
+        <label>Global Speed Multiplier: <span id="speedVal">1.0</span>x</label>
+        <input type="range" id="speedSlider" min="0.2" max="2.5" step="0.1" value="1.0">
+      </div>
+
+      <div class="control-group">
+        <button class="btn active" id="togglePoison" style="width: 100%; justify-content: center;">
+          🧪 Toggle Bio-Poison Overlays
+        </button>
+      </div>
+
+    </aside>
+
+    <!-- Main Showcase Area -->
+    <main class="showcase-area">
+      <section class="board-card">
+        <div class="board-header">
+          <h2 class="board-title">Flowfield-Driven Soft Rounded Voronoi Cells</h2>
+          <span style="font-family: 'JetBrains Mono', monospace; font-size: 0.8rem; color: #94A3B8; background: #0F172A; padding: 0.25rem 0.6rem; border-radius: 6px; border: 1px solid #1E293B;">
+            10×12 Arena Grid
+          </span>
+        </div>
+
+        <div class="arena-container" id="arenaBox">
+          <canvas id="flowCanvas"></canvas>
+        </div>
+      </section>
+    </main>
+
+  </div>
+
+  <script>
+    const COLS = 10;
+    const ROWS = 12;
+    const CELL = 40;
+
+    const SHAPE_COLORS = {
+      I: '#fb7185', // Rose pink
+      J: '#facc15', // Yellow
+      L: '#2dd4bf', // Teal
+      O: '#a78bfa', // Purple
+      S: '#38bdf8', // Cyan
+      T: '#a3e635', // Lime Green
+      Z: '#f97316', // Orange
+    };
+
+    const POISON_COLORS = {
+      1: '#EF4444', // Bio-Toxin Crimson Red
+      2: '#EC4899', // Cyber-Glitch Neon Magenta
+      3: '#6D28D9', // EMP Dark Plasma Violet
+      4: '#059669', // Quantum Decay Slime Emerald
+    };
+
+    // Pre-computed polygon unit circle angles for N=5, N=6, N=7
+    const POLYGON_BASE_ANGLES = {};
+    for (let sides = 5; sides <= 7; sides++) {
+      POLYGON_BASE_ANGLES[sides] = Array.from({ length: sides }, (_, i) => {
+        const a = (i * 2 * Math.PI) / sides;
+        return { cos: Math.cos(a), sin: Math.sin(a) };
+      });
+    }
+
+    // Playfield Stack layout (Regular Voronoi pieces)
+    const STACK = [
+      [null, null, null, null, 'S', null, null, null, null, null],
+      [null, null, null, null, 'S', 'O', 'O', 'O', null, null],
+      [null, null, 'S', null, 'S', null, 'O', null, null, null],
+      [null, 'S', 'S', 'S', 'J', 'J', null, 'L', 'L', null],
+      [null, 'S', 'Z', 'Z', 'J', 'J', 'L', 'L', 'I', null],
+      ['Z', 'Z', null, 'Z', 'S', 'S', 'S', 'I', 'I', null],
+      ['O', 'O', 'O', 'J', 'J', null, 'S', 'S', 'S', 'I'],
+      ['O', 'L', 'L', 'J', 'J', 'S', null, 'Z', 'Z', 'Z'],
+      ['I', 'I', 'L', 'L', 'S', 'S', 'S', 'S', null, 'Z'],
+    ];
+
+    // Poison overlay matrix
+    const POISON_GRID = [
+      [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+      [0, 0, 0, 0, 0, 1, 1, 1, 0, 0], // Variant 1 Crimson on O piece
+      [0, 0, 0, 0, 0, 0, 1, 0, 0, 0],
+      [0, 0, 0, 0, 2, 2, 0, 0, 0, 0], // Variant 2 Magenta on J piece
+      [0, 0, 0, 0, 2, 2, 0, 0, 0, 0],
+      [0, 0, 0, 0, 0, 0, 0, 3, 3, 0], // Variant 3 Violet on I piece
+      [0, 0, 0, 0, 0, 0, 0, 0, 3, 3],
+      [4, 4, 4, 0, 0, 0, 0, 0, 0, 0], // Variant 4 Emerald Slime on bottom
+      [4, 4, 4, 0, 0, 0, 0, 0, 0, 0],
+    ];
+
+    let speedMult = 1.0;
+    let flowMult = 1.0;
+    let showPoison = true;
+
+    // Exact game delta-time clock accumulator
+    let time = 0;
+    let lastTimestamp = null;
+
+    const canvas = document.getElementById('flowCanvas');
+    const ctx = canvas.getContext('2d');
+
+    const dpr = window.devicePixelRatio || 1;
+    canvas.width = COLS * CELL * dpr;
+    canvas.height = ROWS * CELL * dpr;
+
+    // ── BASE GAME REGULAR VORONOI N-GON CELL (UNTOUCHED BASE GAME RENDERING) ──
+    function drawRegularVoronoiCell(r, c, cell) {
+      const cx = c * CELL + CELL / 2;
+      const cy = r * CELL + CELL / 2;
+      const sides = 5 + ((r + c) % 3);
+      const baseAngles = POLYGON_BASE_ANGLES[sides];
+
+      const wobbleSpeed = 0.3325; // Exact base speed
+
+      ctx.fillStyle = SHAPE_COLORS[cell] || '#38bdf8';
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.35)';
+      ctx.lineWidth = 1.5;
+
+      ctx.beginPath();
+      for (let i = 0; i < sides; i++) {
+        const base = baseAngles[i];
+        const angleOffset = Math.sin(time * wobbleSpeed + i) * 0.15;
+        const rad = CELL * 0.42 + Math.cos(time * wobbleSpeed * 2 + r + i) * 3;
+
+        const cosO = Math.cos(angleOffset);
+        const sinO = Math.sin(angleOffset);
+        const cosVal = base.cos * cosO - base.sin * sinO;
+        const sinVal = base.sin * cosO + base.cos * sinO;
+
+        const px = cx + rad * cosVal;
+        const py = cy + rad * sinVal;
+
+        if (i === 0) ctx.moveTo(px, py);
+        else ctx.lineTo(px, py);
+      }
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+    }
+
+    // Offscreen buffer for metaball blob compositing (CSS-pixel size; main canvas scales via DPR)
+    const blobCanvas = document.createElement('canvas');
+    blobCanvas.width = COLS * CELL;
+    blobCanvas.height = ROWS * CELL;
+    const blobCtx = blobCanvas.getContext('2d', { willReadFrequently: true });
+
+    function hexToRgb(hex) {
+      const n = parseInt(hex.slice(1), 16);
+      return { r: (n >> 16) & 255, g: (n >> 8) & 255, b: n & 255 };
+    }
+
+    // 4-connected flood so disconnected same-variant patches stay separate blobs
+    function connectedPoisonGroups(cells) {
+      const key = (r, c) => `${r},${c}`;
+      const set = new Set(cells.map(({ r, c }) => key(r, c)));
+      const visited = new Set();
+      const groups = [];
+
+      for (const { r, c } of cells) {
+        const start = key(r, c);
+        if (visited.has(start)) continue;
+
+        const group = [];
+        const stack = [{ r, c }];
+        visited.add(start);
+
+        while (stack.length) {
+          const cur = stack.pop();
+          group.push(cur);
+          for (const [dr, dc] of [[-1, 0], [1, 0], [0, -1], [0, 1]]) {
+            const nr = cur.r + dr;
+            const nc = cur.c + dc;
+            const nk = key(nr, nc);
+            if (set.has(nk) && !visited.has(nk)) {
+              visited.add(nk);
+              stack.push({ r: nr, c: nc });
+            }
+          }
+        }
+        groups.push(group);
+      }
+      return groups;
+    }
+
+    // True metaball field (no CSS blur) → one continuous blob per connected group.
+    // Paint only inside the poison-cell union so empty holes / neighbors stay clear.
+    function drawPoisonMetaball(cells, color) {
+      const wobbleSpeed = 0.55;
+      const rgb = hexToRgb(color);
+      // Broad influence keeps neighboring poison cells joined at their shared edge.
+      const influence = CELL * 0.82;
+      const influence2 = influence * influence;
+      const threshold = 1.8;
+      const edgeInset = 3;
+      const cornerRadius = 8;
+      const groupPhase = (cells[0].r * 1.7 + cells[0].c * 0.9) % (Math.PI * 2);
+      const sharedWobbleX = Math.sin(time * wobbleSpeed * 1.4 + groupPhase) * 1.5 * flowMult;
+      const sharedWobbleY = Math.cos(time * wobbleSpeed * 1.2 + groupPhase) * 1.5 * flowMult;
+      const sharedPulse = 1 + Math.sin(time * wobbleSpeed * 1.6 + groupPhase) * 0.045 * flowMult;
+
+      const centers = cells.map(({ r, c }) => ({
+        x: c * CELL + CELL / 2
+          + sharedWobbleX
+          + Math.sin(time * wobbleSpeed * 2.0 + r * 1.3 + c) * 2.2 * flowMult,
+        y: r * CELL + CELL / 2
+          + sharedWobbleY
+          + Math.cos(time * wobbleSpeed * 2.0 + c * 1.1 + r) * 2.2 * flowMult,
+        pulse: sharedPulse + Math.sin(time * wobbleSpeed * 2.3 + r + c) * 0.025 * flowMult,
+      }));
+
+      const cellKeys = new Set(cells.map(({ r, c }) => `${r},${c}`));
+
+      let minC = COLS, maxC = 0, minR = ROWS, maxR = 0;
+      for (const { r, c } of cells) {
+        if (c < minC) minC = c;
+        if (c > maxC) maxC = c;
+        if (r < minR) minR = r;
+        if (r > maxR) maxR = r;
+      }
+      // Small pad so outer silhouette can round inside poison cells near the border
+      const pad = 2;
+      const x0 = Math.max(0, minC * CELL - pad);
+      const y0 = Math.max(0, minR * CELL - pad);
+      const x1 = Math.min(COLS * CELL, (maxC + 1) * CELL + pad);
+      const y1 = Math.min(ROWS * CELL, (maxR + 1) * CELL + pad);
+      const w = x1 - x0;
+      const h = y1 - y0;
+
+      const img = blobCtx.createImageData(w, h);
+      const d = img.data;
+      const mask = new Uint8Array(w * h);
+
+      for (let py = 0; py < h; py++) {
+        for (let px = 0; px < w; px++) {
+          const wx = x0 + px + 0.5;
+          const wy = y0 + py + 0.5;
+
+          // Keep shared poison edges open for fusion, but round outer corners
+          // so the silhouette cannot become a sharp cell-shaped cutout.
+          const gc = Math.floor(wx / CELL);
+          const gr = Math.floor(wy / CELL);
+          if (!cellKeys.has(`${gr},${gc}`)) continue;
+          const localX = wx - gc * CELL;
+          const localY = wy - gr * CELL;
+          const outerLeft = !cellKeys.has(`${gr},${gc - 1}`);
+          const outerRight = !cellKeys.has(`${gr},${gc + 1}`);
+          const outerTop = !cellKeys.has(`${gr - 1},${gc}`);
+          const outerBottom = !cellKeys.has(`${gr + 1},${gc}`);
+          const surfaceWobble =
+            Math.sin(time * wobbleSpeed * 1.7 + wx * 0.075 + wy * 0.035) * 1.7 * flowMult +
+            Math.cos(time * wobbleSpeed * 1.25 + wx * 0.03 - wy * 0.06) * 0.9 * flowMult;
+          const leftInset = Math.max(1, edgeInset + surfaceWobble);
+          const rightInset = Math.max(1, edgeInset - surfaceWobble);
+          const topInset = Math.max(1, edgeInset - surfaceWobble * 0.8);
+          const bottomInset = Math.max(1, edgeInset + surfaceWobble * 0.8);
+          const liveCornerRadius = cornerRadius + surfaceWobble * 0.6;
+
+          if (
+            (outerLeft && localX < leftInset) ||
+            (outerRight && localX > CELL - rightInset) ||
+            (outerTop && localY < topInset) ||
+            (outerBottom && localY > CELL - bottomInset)
+          ) continue;
+
+          const roundedCorner =
+            (outerLeft && outerTop && Math.hypot(localX, localY) < liveCornerRadius) ||
+            (outerRight && outerTop && Math.hypot(localX - CELL, localY) < liveCornerRadius) ||
+            (outerLeft && outerBottom && Math.hypot(localX, localY - CELL) < liveCornerRadius) ||
+            (outerRight && outerBottom && Math.hypot(localX - CELL, localY - CELL) < liveCornerRadius);
+          if (roundedCorner) continue;
+
+          let field = 0;
+          for (const ctr of centers) {
+            const dx = wx - ctr.x;
+            const dy = wy - ctr.y;
+            field += influence2 * ctr.pulse / (dx * dx + dy * dy + 1);
+            if (field >= threshold) break;
+          }
+          const nearSharedEdge =
+            (cellKeys.has(`${gr},${gc - 1}`) && localX < 5) ||
+            (cellKeys.has(`${gr},${gc + 1}`) && localX > CELL - 5) ||
+            (cellKeys.has(`${gr - 1},${gc}`) && localY < 5) ||
+            (cellKeys.has(`${gr + 1},${gc}`) && localY > CELL - 5);
+          if (field < threshold && !(nearSharedEdge && field >= threshold * 0.5)) continue;
+
+          const idx = py * w + px;
+          mask[idx] = 1;
+          const i = idx * 4;
+          d[i] = rgb.r;
+          d[i + 1] = rgb.g;
+          d[i + 2] = rgb.b;
+          d[i + 3] = 255;
+        }
+      }
+
+      // Inward-facing 2px outline. The 8-neighbor test closes diagonal corners
+      // that the old 4-neighbor contour could leave incomplete.
+      for (let py = 0; py < h; py++) {
+        for (let px = 0; px < w; px++) {
+          const idx = py * w + px;
+          if (!mask[idx]) continue;
+          let edge = false;
+          for (const [dx, dy] of [
+            [-1, -1], [0, -1], [1, -1],
+            [-1, 0],           [1, 0],
+            [-1, 1],  [0, 1],  [1, 1],
+          ]) {
+            for (let distance = 1; distance <= 2; distance++) {
+              const nx = px + dx * distance;
+              const ny = py + dy * distance;
+              if (
+                nx < 0 || ny < 0 || nx >= w || ny >= h ||
+                !mask[ny * w + nx]
+              ) {
+                edge = true;
+                break;
+              }
+            }
+            if (edge) break;
+          }
+          if (edge) {
+            const i = idx * 4;
+            d[i] = 255;
+            d[i + 1] = 255;
+            d[i + 2] = 255;
+            d[i + 3] = 220;
+          }
+        }
+      }
+
+      blobCtx.putImageData(img, x0, y0);
+      ctx.drawImage(blobCanvas, x0, y0, w, h, x0, y0, w, h);
+    }
+
+    // ── CONTINUOUS METABALL POISON BLOBS (regular Voronoi cells untouched) ──
+    function renderContinuousPoisonShapes() {
+      if (!showPoison) return;
+
+      for (let variant = 1; variant <= 4; variant++) {
+        const pColor = POISON_COLORS[variant];
+        const poisonCells = [];
+
+        for (let r = 0; r < ROWS; r++) {
+          for (let c = 0; c < COLS; c++) {
+            if (POISON_GRID[r]?.[c] === variant) {
+              poisonCells.push({ r, c });
+            }
+          }
+        }
+
+        if (poisonCells.length === 0) continue;
+
+        for (const group of connectedPoisonGroups(poisonCells)) {
+          drawPoisonMetaball(group, pColor);
+
+          // Internal bio-organelles (do not segment the outer silhouette)
+          for (const { r, c } of group) {
+            const cx = c * CELL + CELL / 2;
+            const cy = r * CELL + CELL / 2;
+
+            const bX = cx + Math.sin(time * 3.6 + r + c) * 2.8;
+            const bY = cy + Math.cos(time * 3.6 + r) * 2.8;
+            const bRad = Math.max(3, CELL * 0.18 + Math.sin(time * 4.2 + r) * 2.0);
+
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.75)';
+            ctx.lineWidth = 1.2;
+            ctx.beginPath();
+            ctx.arc(bX, bY, bRad, 0, Math.PI * 2);
+            ctx.stroke();
+
+            ctx.fillStyle = '#FFFFFF';
+            ctx.beginPath();
+            ctx.arc(bX, bY, 2.0, 0, Math.PI * 2);
+            ctx.fill();
+          }
+        }
+      }
+    }
+
+    function render(timestamp) {
+      if (lastTimestamp === null) lastTimestamp = timestamp;
+      const deltaSec = Math.min((timestamp - lastTimestamp) / 1000, 0.05);
+      lastTimestamp = timestamp;
+
+      time += deltaSec * speedMult;
+
+      ctx.save();
+      ctx.scale(dpr, dpr);
+      ctx.clearRect(0, 0, COLS * CELL, ROWS * CELL);
+
+      // Render regular Voronoi pieces (Reverted to base game)
+      for (let r = 0; r < ROWS; r++) {
+        for (let c = 0; c < COLS; c++) {
+          const cell = STACK[r]?.[c];
+          const poison = showPoison ? (POISON_GRID[r]?.[c] ?? 0) : 0;
+
+          if (cell && poison === 0) {
+            drawRegularVoronoiCell(r, c, cell);
+          }
+        }
+      }
+
+      // Render continuous poison shapes
+      renderContinuousPoisonShapes();
+
+      ctx.restore();
+      requestAnimationFrame(render);
+    }
+
+    // Event listeners
+    document.getElementById('flowSlider').addEventListener('input', (e) => {
+      flowMult = parseFloat(e.target.value);
+      document.getElementById('flowVal').textContent = flowMult.toFixed(1);
+    });
+
+    document.getElementById('speedSlider').addEventListener('input', (e) => {
+      speedMult = parseFloat(e.target.value);
+      document.getElementById('speedVal').textContent = speedMult.toFixed(1);
+    });
+
+    document.getElementById('togglePoison').addEventListener('click', (e) => {
+      showPoison = !showPoison;
+      e.target.classList.toggle('active', showPoison);
+    });
+
+    document.getElementById('toggleGrid').addEventListener('click', (e) => {
+      const box = document.getElementById('arenaBox');
+      const active = box.style.backgroundImage !== 'none';
+      box.style.backgroundImage = active ? 'none' : 'linear-gradient(to right, rgba(255, 255, 255, 0.08) 1px, transparent 1px), linear-gradient(to bottom, rgba(255, 255, 255, 0.08) 1px, transparent 1px)';
+      e.target.classList.toggle('active', !active);
+    });
+
+    document.getElementById('toggleTheme').addEventListener('click', () => {
+      const current = document.body.getAttribute('data-theme');
+      document.body.setAttribute('data-theme', current === 'dark' ? 'light' : 'dark');
+    });
+
+    requestAnimationFrame(render);
+  </script>
+</body>
+</html>

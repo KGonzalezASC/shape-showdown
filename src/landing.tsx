@@ -6,6 +6,7 @@ import './nameDrop/nameDrop.css';
 
 // Keep this feature gate obvious so the public URL input can be disabled in one edit.
 const NAME_DROP_URL_PARAM_ENABLED = true;
+const LANDING_NAME = 'Keith Gonzalez';
 
 function landingNameFromUrl(): string | undefined {
   if (!NAME_DROP_URL_PARAM_ENABLED || typeof window === 'undefined') return undefined;
@@ -14,6 +15,6 @@ function landingNameFromUrl(): string | undefined {
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <NameDropShowcase name={landingNameFromUrl()} />
+    <NameDropShowcase name={landingNameFromUrl() ?? LANDING_NAME} />
   </StrictMode>,
 );

@@ -8,6 +8,7 @@ import { BOARD_COLS, BOARD_VISIBLE_ROWS } from '../types';
 import { resolveShopOffers, SHOP_ITEM_BY_ID } from '../shop/shopCatalog';
 import { useMatchChromeSnapshot, usePlayfieldSnapshot } from '../state/GameStateProvider';
 import { useShopConfirm } from '../hooks/useShopConfirm';
+import { BoardProfiler } from '../performance/BoardProfiler';
 
 function WaitingForOpponentBoard() {
   const cell = useContext(PlayfieldCellSizeContext);
@@ -33,6 +34,8 @@ interface PlayfieldShellProps {
   myMobileFieldRef: React.RefObject<GameFieldRef | null>;
   myDesktopFieldRef: React.RefObject<GameFieldRef | null>;
   oppDesktopFieldRef: React.RefObject<GameFieldRef | null>;
+  hatchingEnabled: boolean;
+  onToggleHatching: () => void;
 }
 
 export const PlayfieldShell: React.FC<PlayfieldShellProps> = ({
@@ -42,6 +45,8 @@ export const PlayfieldShell: React.FC<PlayfieldShellProps> = ({
   myMobileFieldRef,
   myDesktopFieldRef,
   oppDesktopFieldRef,
+  hatchingEnabled,
+  onToggleHatching,
 }) => {
   const playfield = usePlayfieldSnapshot();
   const chrome = useMatchChromeSnapshot();
@@ -66,23 +71,31 @@ export const PlayfieldShell: React.FC<PlayfieldShellProps> = ({
         >
           <div className="flex min-h-0 shrink-0 items-start justify-start">
             {myPlayer && (
-              <GameField
-                ref={myMobileFieldRef}
-                player={myPlayer}
-                isMe={true}
-                title="👤 YOUR FIELD"
-                borderColorClass="border-emerald-500/20"
-                shadowColorClass="shadow-[0_0_30px_rgba(16,185,129,0.1)]"
-                cellSize={mobileCellSize}
-                status={playfield.status}
-              />
+              <BoardProfiler id="mobile-player-field" renderer="board-canvas">
+                <GameField
+                  ref={myMobileFieldRef}
+                  player={myPlayer}
+                  isMe={true}
+                  title="👤 YOUR FIELD"
+                  borderColorClass="border-emerald-500/20"
+                  shadowColorClass="shadow-[0_0_30px_rgba(16,185,129,0.1)]"
+                  cellSize={mobileCellSize}
+                  status={playfield.status}
+                  hatchingEnabled={hatchingEnabled}
+                  performanceId="mobile-player-field"
+                />
+              </BoardProfiler>
             )}
           </div>
           <div
             ref={railRef}
             className="flex w-[5.75rem] shrink-0 flex-col gap-2 overflow-y-auto"
           >
-            <OpponentMiniField player={opponentPlayer} pendingGarbage={chrome.oppPendingGarbage} />
+            <OpponentMiniField
+              player={opponentPlayer}
+              pendingGarbage={chrome.oppPendingGarbage}
+              hatchingEnabled={hatchingEnabled}
+            />
             <ShopRail
               items={shopOffers}
               isPlaying={isPlaying}
@@ -93,6 +106,8 @@ export const PlayfieldShell: React.FC<PlayfieldShellProps> = ({
               onConfirm={handleShopConfirm}
               availableScore={chrome.availableShopScore}
               viewportMode="mobile"
+              hatchingEnabled={hatchingEnabled}
+              onToggleHatching={onToggleHatching}
             />
           </div>
         </div>
@@ -113,32 +128,42 @@ export const PlayfieldShell: React.FC<PlayfieldShellProps> = ({
                   onConfirm={handleShopConfirm}
                   availableScore={chrome.availableShopScore}
                   viewportMode="tabletDesktop"
+                  hatchingEnabled={hatchingEnabled}
+                  onToggleHatching={onToggleHatching}
                 />
               </div>
-              <GameField
-                ref={myDesktopFieldRef}
-                player={myPlayer}
-                isMe={true}
-                title="👤 YOUR FIELD"
-                borderColorClass="border-emerald-500/20"
-                shadowColorClass="shadow-[0_0_30px_rgba(16,185,129,0.1)]"
-                status={playfield.status}
-              />
+              <BoardProfiler id="desktop-player-field" renderer="board-canvas">
+                <GameField
+                  ref={myDesktopFieldRef}
+                  player={myPlayer}
+                  isMe={true}
+                  title="👤 YOUR FIELD"
+                  borderColorClass="border-emerald-500/20"
+                  shadowColorClass="shadow-[0_0_30px_rgba(16,185,129,0.1)]"
+                  status={playfield.status}
+                  hatchingEnabled={hatchingEnabled}
+                  performanceId="desktop-player-field"
+                />
+              </BoardProfiler>
             </div>
           )}
 
           <div className="relative shrink-0">
             {opponentPlayer ? (
-              <GameField
-                ref={oppDesktopFieldRef}
-                player={opponentPlayer}
-                isMe={false}
-                title="Opponent Field"
-                borderColorClass="border-rose-500/20"
-                shadowColorClass="shadow-[0_0_30px_rgba(244,63,94,0.1)]"
-                opacityClass="opacity-80"
-                status={playfield.status}
-              />
+              <BoardProfiler id="desktop-opponent-field" renderer="board-canvas">
+                <GameField
+                  ref={oppDesktopFieldRef}
+                  player={opponentPlayer}
+                  isMe={false}
+                  title="Opponent Field"
+                  borderColorClass="border-rose-500/20"
+                  shadowColorClass="shadow-[0_0_30px_rgba(244,63,94,0.1)]"
+                  opacityClass="opacity-80"
+                  status={playfield.status}
+                  hatchingEnabled={hatchingEnabled}
+                  performanceId="desktop-opponent-field"
+                />
+              </BoardProfiler>
             ) : (
               <WaitingForOpponentBoard />
             )}

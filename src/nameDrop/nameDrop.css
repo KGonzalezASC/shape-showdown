@@ -1,42 +1,5 @@
-/* Standalone landing-page Name Drop showcase. The board itself is sized in
- * measured cells so the 64:28 composition never stretches or crops. */
-.name-drop-grid-cell {
-  border-right: 1px solid rgba(255, 255, 255, 0.035);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.035);
-  background: linear-gradient(135deg, rgba(255, 255, 255, 0.018), transparent 58%);
-}
-
-@keyframes name-drop-fall {
-  0% {
-    opacity: 0;
-    transform: translateY(var(--name-drop-start)) scale(0.94);
-    filter: brightness(1.25) saturate(1.15);
-  }
-  12% {
-    opacity: 1;
-  }
-  82% {
-    opacity: 1;
-    transform: translateY(0) scale(1);
-    filter: brightness(1.08) saturate(1.08);
-  }
-  100% {
-    opacity: 1;
-    transform: translateY(0) scale(1);
-    filter: brightness(1);
-  }
-}
-
-.name-drop-falling-piece {
-  animation-name: name-drop-fall;
-  animation-duration: var(--name-drop-duration);
-  animation-timing-function: cubic-bezier(0.18, 0.82, 0.24, 1);
-  animation-fill-mode: both;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .name-drop-falling-piece {
-    animation-duration: var(--name-drop-duration) !important;
-    animation-iteration-count: 1 !important;
-  }
+/* Canvas owns the board paint; this file only keeps the showcase chrome hook. */
+.name-drop-board {
+  display: block;
+  background: #10131a;
 }
