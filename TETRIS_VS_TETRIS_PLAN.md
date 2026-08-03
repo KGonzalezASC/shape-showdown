@@ -1,5 +1,7 @@
 # Bubble Blitzers -> Tetris (1v1) Migration Plan
 
+> **Historical implementation record.** This plan documents the migration decisions and source material that led to the current game. It is not a list of remaining tasks; consult the code and active project docs for current behavior. The current field is 10×18 visually and 10×20 internally, with two hidden spawn rows.
+
 ## Sources (Top-Level)
 
 - Base project fork source: `https://github.com/AVLitskevich/BubbleBlitzersJS`
@@ -40,7 +42,7 @@
 ### 1) Shared Types and Constants
 
 - Replace breakout-specific types in `src/types.ts` with Tetris domain models:
-  - Board matrix (10x20 visible + hidden spawn rows).
+  - Board matrix (10x18 visible + two hidden spawn rows, 10x20 total).
   - Active piece, rotation state, spawn position.
   - Hold piece, next queue, bag state/seed.
   - Combo, B2B, pending garbage, outgoing attack events.

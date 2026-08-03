@@ -11,14 +11,14 @@ A task-oriented field guide to the **Shape Showdown** codebase (fork lineage: **
 
 ## What this is
 
-**Shape Showdown** is a **two-player, server-authoritative Tetris-vs-Tetris** browser game. Two players each get their own 10×20 board; the **server** runs the entire simulation at 60 Hz and streams authoritative state to both clients. Players attack each other by clearing lines (sending garbage) and by buying **shop powerups** that sabotage the opponent's field.
+**Shape Showdown** is a **two-player, server-authoritative falling-piece** browser game. Two players each get a 10×18 visible field backed by a 10×20 simulation board with two hidden spawn rows; the **server** runs the entire simulation at 60 Hz and streams authoritative state to both clients. Players attack each other by clearing lines (sending garbage) and by buying **shop powerups** that sabotage the opponent's field.
 
 - **Identity** is the raw `socket.id` — no accounts, no rooms.
 - **Max 2 players** per server instance; a 3rd connection is rejected with `"Game is full"`.
 - The client is a **dumb renderer**: it sends inputs, receives `GameState` JSON, and draws it.
 
 > [!IMPORTANT]
-> The product started life as a *breakout/bubble* game and parts of [AGENTS.md](../AGENTS.md) still use that vocabulary (paddle / ball / bubble). The **live game is Tetris** — pieces, SRS kicks, garbage lines, hold/swap, and a shop layer. This compendium documents the current Tetris reality.
+> The live game uses falling pieces, SRS kicks, garbage lines, hold/swap, and a shop layer. Its playfield is **10×18 visually**, backed by a **10×20 simulation board with two hidden spawn rows**. This compendium documents the current implementation.
 
 ---
 
@@ -93,4 +93,4 @@ docs/                     # SHOP_POWERUPS.md, legacy deploy plan
 
 - [AGENTS.md](../AGENTS.md) — canonical project overview & run commands.
 - [docs/SHOP_POWERUPS.md](../docs/SHOP_POWERUPS.md) — shop item specs (approved work + rejections).
-- [FORK.md](../FORK.md) — fork lineage from upstream BubbleBlitzersJS.
+- [TETRIS_VS_TETRIS_PLAN.md](../TETRIS_VS_TETRIS_PLAN.md) — historical migration decisions and sources.

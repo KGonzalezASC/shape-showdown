@@ -1,6 +1,6 @@
 # Shape Showdown — agent / contributor context
 
-**Repository:** fork of [BubbleBlitzersJS](https://github.com/AVLitskevich/BubbleBlitzersJS) (see [FORK.md](./FORK.md)). **Product name:** Shape Showdown.
+**Repository:** descendant of [BubbleBlitzersJS](https://github.com/AVLitskevich/BubbleBlitzersJS). **Product name:** Shape Showdown.
 
 Use this file as shared context when working in this repo on any machine or with any AI assistant. It is the **canonical project overview** for humans and agents.
 
@@ -8,7 +8,7 @@ Use this file as shared context when working in this repo on any machine or with
 
 ## What this is
 
-**Shape Showdown** (fork lineage: **Bubble Blitzers**) is a **two-player, server-authoritative** browser game: parallel **Tetris-attack** fields (each player has their own board, active piece, garbage queue, and shop). Real-time sync via **Socket.IO**. Max **2** players per server instance; identity is **socket.id** (no accounts).
+**Shape Showdown** is a **two-player, server-authoritative** browser game: parallel falling-piece fields (each player has their own 10×18 visible board, 10×20 simulation board with two hidden spawn rows, active piece, garbage queue, and shop). Real-time sync via **Socket.IO**. Max **2** players per server instance; identity is **socket.id** (no accounts).
 
 ## Stack
 
@@ -44,6 +44,9 @@ src/
   state/
     gameStateStore.ts          # Chrome + public playfield snapshots
     publicSnapshots.ts         # PublicPlayerState seam for React
+  board/
+    boardVisualModel.ts        # Visible 10×18 semantic board model
+    BoardCanvasOverlay.tsx     # Canvas effects layered over the board
   hooks/useGameSocket.ts       # Socket + game-config.json origin
   components/
     GameField.tsx              # Board render + effect pills

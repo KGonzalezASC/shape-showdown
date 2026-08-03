@@ -223,7 +223,7 @@ describe('tetris engine', () => {
 
     assert.ok(player.activePiece);
     player.pieceLockResetCap = STICKY_LOCK_RESET_CAP;
-    player.activePiece.y = 25;
+    player.activePiece.y = BOARD_ROWS - 5;
     assert.equal(lockResetCapFor(player), STICKY_LOCK_RESET_CAP);
 
     while (player.lockResetsUsed < STICKY_LOCK_RESET_CAP) {
@@ -256,9 +256,11 @@ describe('tetris engine', () => {
 
     assert.ok(player.activePiece);
     applyStickyToActivePiece(player);
-    for (let x = 0; x < 10; x++) player.board[26][x] = 'G';
-    player.activePiece = { type: 'O', rotation: 0, x: 4, y: 24 };
-    player.lowestY = 24;
+    const supportRow = BOARD_ROWS - 4;
+    for (let x = 0; x < 10; x++) player.board[supportRow][x] = 'G';
+    const activeRow = BOARD_ROWS - 6;
+    player.activePiece = { type: 'O', rotation: 0, x: 4, y: activeRow };
+    player.lowestY = activeRow;
     player.lockResetsUsed = STICKY_LOCK_RESET_CAP;
     player.lockDelayRemainingTicks = 5;
     player.gravityCounter = 999;
@@ -373,11 +375,12 @@ describe('tetris engine', () => {
     applyBomberToBuyer(player);
     assert.equal(player.activePiece?.bomber, true);
 
-    player.board[25][5] = 'G';
-    player.board[25][6] = 'G';
-    detonateBomberBlast(player, [{ x: 5, y: 25 }]);
-    assert.equal(player.board[25][5], null);
-    assert.equal(player.board[25][6], null);
+    const blastRow = BOARD_ROWS - 5;
+    player.board[blastRow][5] = 'G';
+    player.board[blastRow][6] = 'G';
+    detonateBomberBlast(player, [{ x: 5, y: blastRow }]);
+    assert.equal(player.board[blastRow][5], null);
+    assert.equal(player.board[blastRow][6], null);
     assert.equal(player.score, scoreBefore);
   });
 

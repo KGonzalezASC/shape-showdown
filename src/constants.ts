@@ -3,7 +3,7 @@
 // serialized snapshots smaller.
 export const BOARD_COLS = 10;
 export const BOARD_VISIBLE_ROWS = 18;
-export const BOARD_HIDDEN_ROWS = 12;
+export const BOARD_HIDDEN_ROWS = 2;
 export const BOARD_ROWS = BOARD_VISIBLE_ROWS + BOARD_HIDDEN_ROWS;
 
 export const CELL_SIZE = 28;
