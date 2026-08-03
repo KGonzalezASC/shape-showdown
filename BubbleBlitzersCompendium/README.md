@@ -2,23 +2,23 @@
 
 `[STATUS: ACTIVE]` `[CLIENT]` `[SERVER]` `[NETCODE]`
 
-A task-oriented field guide to the **Shape Showdown** codebase (fork lineage: **Bubble Blitzers**). It is intentionally lighter than a full architecture manual — each guide answers one practical question and links to the exact files and line numbers you need.
+A task-oriented field guide to the **Shape Showdown** codebase (fork lineage: **Bubble Blitzers**). It is intentionally lighter than a full architecture manual — each guide answers one practical question and links to the relevant files.
 
 > [!NOTE]
-> The canonical one-page overview lives in [AGENTS.md](../AGENTS.md). This compendium goes deeper on the topics people actually get stuck on. Where the two disagree, trust the code (and tell the team).
+> The canonical one-page overview lives in [AGENTS.md](../AGENTS.md). This compendium goes deeper on the topics people actually get stuck on. Runtime code and tests are authoritative; update this guide when it drifts.
 
 ---
 
 ## What this is
 
-**Shape Showdown** is a **two-player, server-authoritative falling-piece** browser game. Two players each get a 10×18 visible field backed by a 10×20 simulation board with two hidden spawn rows; the **server** runs the entire simulation at 60 Hz and streams authoritative state to both clients. Players attack each other by clearing lines (sending garbage) and by buying **shop powerups** that sabotage the opponent's field.
+**Shape Showdown** is a **two-player, server-authoritative falling-piece** browser game. Two players each get a 10×20 visible field backed by a 10×22 simulation board with two hidden spawn rows; the **server** runs the entire simulation at 60 Hz and streams authoritative state to both clients. Players attack each other by clearing lines (sending garbage) and by buying **shop powerups** that sabotage the opponent's field.
 
 - **Identity** is the raw `socket.id` — no accounts, no rooms.
 - **Max 2 players** per server instance; a 3rd connection is rejected with `"Game is full"`.
-- The client is a **dumb renderer**: it sends inputs, receives `GameState` JSON, and draws it.
+- The client sends input intent and receives full `GameState` JSON. `GameStateProvider` stores it, `gameStateStore` derives chrome and `PublicPlayerState` playfield snapshots, and React renders those snapshots.
 
 > [!IMPORTANT]
-> The live game uses falling pieces, SRS kicks, garbage lines, hold/swap, and a shop layer. Its playfield is **10×18 visually**, backed by a **10×20 simulation board with two hidden spawn rows**. This compendium documents the current implementation.
+> The live game uses falling pieces, SRS kicks, garbage lines, hold/swap, and a shop layer. Its playfield is **10×20 visually**, backed by a **10×22 simulation board with two hidden spawn rows**. This compendium documents the current implementation.
 
 ---
 
@@ -37,13 +37,13 @@ A task-oriented field guide to the **Shape Showdown** codebase (fork lineage: **
 
 | Command | Purpose |
 |---------|---------|
-| `npm install` (or `bun install`) | Install deps |
-| `npm run dev` | **Full stack local**: `bun server.ts` runs Express + Socket.IO on **http://localhost:3000** with Vite mounted as middleware. Open two tabs to play both sides. |
-| `npm run build` | `build:client` → `dist/`, `build:replay`, `build:server` → `dist-server/server.mjs` |
-| `npm run build:server:bin` | Compile the standalone Linux server binary used in production |
-| `npm start` | Production server only (`NODE_ENV=production`, serves `dist-server/server.mjs`) |
-| `npm run lint` | `tsc --noEmit` |
-| `npm run knip` | Dead-code scan (uses `knip.json`) |
+| `bun install` | Install deps |
+| `bun run dev` | **Full stack local**: `bun server.ts` runs Express + Socket.IO on **http://localhost:3000** with Vite mounted as middleware. Open two tabs to play both sides. |
+| `bun run build` | `build:client` → `dist/`, `build:replay`, `build:server` → `dist-server/server.mjs` |
+| `bun run build:server:bin` | Compile the standalone Linux server binary used in production |
+| `bun run start` | Production server only (`NODE_ENV=production`, serves `dist-server/server.mjs`) |
+| `bun run lint` | `tsc --noEmit` |
+| `bun run knip` | Dead-code scan (uses `knip.json`) |
 
 ---
 
@@ -52,7 +52,8 @@ A task-oriented field guide to the **Shape Showdown** codebase (fork lineage: **
 ```text
 server.ts                 # HTTP + Socket.IO entry; mounts Vite middleware in dev
 server/
-  GameManager.ts          # Connections, 60 Hz loop, match flow, shopPurchase handling
+  GameManager.ts          # Connections, 60 Hz loop, match flow, socket handlers
+  shop.ts                 # Authoritative purchase validation and effect handlers
   loadConfig.ts           # Reads config/server.json (+ PORT / SERVE_CLIENT env overrides)
   tetris/
     engine.ts             # stepPlayer(): the per-player simulation tick
@@ -60,9 +61,16 @@ server/
     engine.test.ts        # Engine unit tests
 src/
   main.tsx                # React mount
-  App.tsx                 # Shell: state, keyboard, shop reducer, both layouts
+  App.tsx                 # Shell: keyboard, overlays, responsive layout orchestration
   constants.ts            # Tuning numbers (board size, costs, durations, gravity)
   types.ts                # GameState, PlayerState, ShopItem, MatchEvent… (+ const re-exports)
+  shop/
+    shopCatalog.ts        # Canonical item catalog and purchasability
+    playerShop.ts         # Server-side shop phase machine and rolls
+  state/
+    GameStateProvider.tsx # Socket-to-store bridge and React contexts
+    gameStateStore.ts     # Chrome and PublicPlayerState snapshots
+    publicSnapshots.ts    # Local UI projection from full GameState
   hooks/useGameSocket.ts  # Socket.IO transport + server-URL resolution
   components/             # GameField (canvas), MobileControls, ShopRail, GameFieldsLayout, …
   ReplayApp.tsx, replay.tsx # Standalone replay viewer

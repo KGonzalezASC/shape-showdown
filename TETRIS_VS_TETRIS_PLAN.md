@@ -1,6 +1,6 @@
 # Bubble Blitzers -> Tetris (1v1) Migration Plan
 
-> **Historical implementation record.** This plan documents the migration decisions and source material that led to the current game. It is not a list of remaining tasks; consult the code and active project docs for current behavior. The current field is 10×18 visually and 10×20 internally, with two hidden spawn rows.
+> **Historical implementation record — not a current specification.** This plan documents migration decisions and source material that led to the current game. It is not a list of remaining tasks. Consult the code and [AGENTS.md](./AGENTS.md) for current behavior; the current field is 10×20 visually and 10×22 internally, with two hidden spawn rows.
 
 ## Sources (Top-Level)
 
@@ -10,11 +10,11 @@
 - Versus/garbage context: `https://tetris.wiki/Puyo_Puyo_Tetris#Garbage_mechanics`
 - Supplemental background (likely optional): `https://github.com/jherskow/nand2tetris/tree/master`
 
-## Decision Locked In
+## Historical decisions
 
 - Versus mode target for now: **Tetris vs Tetris garbage rules** (not mixed Puyo/Tetris timing).
 - Keep existing networking harness (Express + Socket.IO + 2-player lobby) and replace game simulation/protocol.
-- **Lock delay reset (MVP):** **Extended placement** — successful **horizontal moves and rotations** reset the lock timer, with a **cap of 15** combined move/rotation resets per piece, after which the piece locks even if delay time remains. Matches **Puyo Puyo Tetris** behavior (not pure infinity, not step-only reset). Reference: `https://harddrop.com/wiki/Puyo_Puyo_Tetris_movement_intricacies`
+- **Lock delay reset (historical MVP):** **Extended placement** — successful **horizontal moves and rotations** reset the lock timer, with a **cap of 15** combined move/rotation resets per piece. The current implementation uses `LOCK_RESET_CAP` from [`src/constants.ts`](./src/constants.ts), currently **10**; do not use this historical value as an implementation requirement. Reference: `https://harddrop.com/wiki/Puyo_Puyo_Tetris_movement_intricacies`
 
 ## Goals
 
@@ -42,13 +42,13 @@
 ### 1) Shared Types and Constants
 
 - Replace breakout-specific types in `src/types.ts` with Tetris domain models:
-  - Board matrix (10x18 visible + two hidden spawn rows, 10x20 total).
+  - Board matrix (10x20 visible + two hidden spawn rows, 10x22 total).
   - Active piece, rotation state, spawn position.
   - Hold piece, next queue, bag state/seed.
   - Combo, B2B, pending garbage, outgoing attack events.
   - Match outcome (top out, disconnect, draw policy if timer mode is added).
 - Replace breakout constants in `src/constants.ts` with Tetris constants:
-  - Gravity/level table, lock delay, **lock reset = move reset with cap 15** (per Decision Locked In), DAS/ARR defaults.
+  - Gravity/level table, lock delay, lock-reset behavior, DAS/ARR defaults. See `src/constants.ts` for current values.
   - Garbage table (line clears, T-Spin, B2B, combo, perfect clear).
   - Tick rate and timings used by server simulation.
 
@@ -57,7 +57,7 @@
 - Replace breakout `server/Physics.ts` with Tetris engine modules (new `server/tetris/` folder):
   - Piece definitions and SRS kick data.
   - Collision and movement/rotation validation.
-  - Gravity, lock-delay, and piece locking (extended placement lock: move/rotate resets timer, max 15 resets per piece).
+  - Gravity, lock-delay, and piece locking (the implementation's current move/rotate reset cap).
   - Line clear detection and board compaction.
   - Attack generation and garbage application.
   - Top-out detection and win resolution.

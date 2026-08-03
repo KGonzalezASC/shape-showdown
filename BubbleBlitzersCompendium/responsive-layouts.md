@@ -2,7 +2,7 @@
 
 `[STATUS: ACTIVE]` `[CLIENT]` `[MOBILE]`
 
-A tall 10×18 visible board has to fit everything from a 360px phone to a desktop showing **two** full boards side by side. The simulation adds two hidden spawn rows above the visible field. This guide covers the two-layout split, the scale-to-fit math, and the gotchas that caused every "not responsive" bug report.
+A tall 10×20 visible board has to fit everything from a 360px phone to a desktop showing **two** full boards side by side. The simulation adds two hidden spawn rows above the visible field. This guide covers the two-layout split, the scale-to-fit math, and the gotchas that caused every "not responsive" bug report.
 
 ---
 
@@ -23,7 +23,7 @@ The root container uses `h-dvh` (dynamic viewport height — survives mobile bro
 └───────────────┘
 ```
 
-In [App.tsx:1108](../src/App.tsx) the mobile view is `md:hidden` and the desktop view is `hidden … md:flex`. Only one is in the DOM at a time.
+In [App.tsx](../src/App.tsx) and [PlayfieldShell.tsx](../src/components/PlayfieldShell.tsx), the mobile view is `md:hidden` and the desktop view is `hidden … md:flex`. Only one is visible at a time.
 
 - **Mobile:** your board + a right **rail** (`OpponentMiniField` + `ShopRail`) + bottom `MobileControls`.
 - **Desktop:** `GameFieldsLayout` lays out shop rail + your full board + opponent's full board.
@@ -34,7 +34,7 @@ In [App.tsx:1108](../src/App.tsx) the mobile view is `md:hidden` and the desktop
 
 There is no fixed cell size — the board's `cellSize` is **computed from the available box** and shared down through `PlayfieldCellSizeContext`.
 
-**Desktop** — `fitCellSizeForDualBoard()` ([GameFieldsLayout.tsx:5](../src/components/GameFieldsLayout.tsx)):
+**Desktop** — `fitCellSizeForDualBoard()` ([GameFieldsLayout.tsx](../src/components/GameFieldsLayout.tsx)):
 
 ```text
 cell = min( (width - pad - gap - shopReserve) / (2 * BOARD_COLS),
@@ -42,7 +42,7 @@ cell = min( (width - pad - gap - shopReserve) / (2 * BOARD_COLS),
 clamped to [22, 48]
 ```
 
-**Mobile** — the measure effect at [App.tsx:579](../src/App.tsx):
+**Mobile** — the measurement effect in [App.tsx](../src/App.tsx):
 
 ```text
 cell = min( (availWidth - railWidth - safety) / BOARD_COLS,
@@ -50,7 +50,7 @@ cell = min( (availWidth - railWidth - safety) / BOARD_COLS,
 clamped to [8, 48]
 ```
 
-Both are driven by a **`ResizeObserver`** on the container (and, on mobile, on the live rail), recomputing on every size change. The mobile path measures the rail's **actual rendered width** rather than reserving fixed pixels — so a larger system font / display zoom can inflate the rail without pushing the board off-screen.
+Both are driven by a **`ResizeObserver`** on the layout container, recomputing on every size change. The mobile path reserves the rail's fixed CSS width (`5.75rem`, scaled for the root font size) plus a safety margin. The rail remains a normal flex sibling, so it cannot overlay the board.
 
 > [!TIP]
 > The cap was raised to **48** so the board grows to fill wide phones; on smaller devices width/height bounds dominate, so the cap is a no-op there.
@@ -60,7 +60,7 @@ Both are driven by a **`ResizeObserver`** on the container (and, on mobile, on t
 ## 3. The gotchas (each one was a real bug)
 
 > [!WARNING]
-> **THE responsiveness bug:** the mobile sizing `useLayoutEffect` **must** depend on `[gameState != null]` ([App.tsx:612](../src/App.tsx)), not `[]`. The playfield + rail only mount **after** the "Connecting…" screen, so on first mount the refs are `null`. With `[]` deps the `ResizeObserver` never attaches and the board stays stuck at its hardcoded default size. This was behind essentially every "the board isn't responsive" report.
+> **THE responsiveness bug:** the mobile sizing `useLayoutEffect` depends on `[connected]` in [App.tsx](../src/App.tsx), not `[]`. The playfield only mounts after the connection screen, so the effect must rerun when the connection state changes. With `[]` deps the `ResizeObserver` can attach while the ref is `null` and the board stays at its default size.
 
 > [!WARNING]
 > **The rail is a flex sibling, not an absolutely-positioned overlay.** The board is `shrink-0` and shrink-wraps to its computed size; the rail is a normal flex sibling. A real flex row lets the board take whatever width remains after the rail's actual size, so the rail **can never clip off-screen** regardless of device or display scaling. The old fixed-pixel-reserve approach broke on the Samsung layout.
@@ -83,8 +83,8 @@ In production the game runs inside an `<iframe>` in the skillcade.games hub wrap
 
 Don't guess from screenshots — measure live.
 
-1. Start the dev server (`bun server.ts` on :3000; the Claude Preview launch config does this).
-2. Use the Claude **Preview** tools: `preview_resize` to **360 / 387 / 412 / 522** (real device widths that exposed bugs), then `preview_eval` to read live `getBoundingClientRect()` of the board, rail, and controls.
+1. Start the dev server (`bun run dev` on :3000).
+2. Use browser DevTools or the IDE browser to resize to **360 / 387 / 412 / 522** and inspect live `getBoundingClientRect()` values for the board, rail, and controls.
 3. Confirm the board fills width without pushing the rail or controls out of view, in both portrait and the embedded-iframe height.
 
 This live-measurement loop is how the real bugs were finally found.

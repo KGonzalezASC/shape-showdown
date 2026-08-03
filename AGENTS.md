@@ -6,9 +6,11 @@ Use this file as shared context when working in this repo on any machine or with
 
 > **Deeper guides:** see [`BubbleBlitzersCompendium/`](./BubbleBlitzersCompendium/README.md) for task-oriented docs on codebase navigation, online/production networking, Socket.IO gameplay, responsive layouts, and swapping the UI framework.
 
+**Source-of-truth order:** runtime code and tests define behavior; this file defines the current architecture and invariants; active compendium guides explain workflows; historical plans and design docs provide background only. When documentation conflicts with code, update the documentation rather than inventing a second implementation.
+
 ## What this is
 
-**Shape Showdown** is a **two-player, server-authoritative** browser game: parallel falling-piece fields (each player has their own 10×18 visible board, 10×20 simulation board with two hidden spawn rows, active piece, garbage queue, and shop). Real-time sync via **Socket.IO**. Max **2** players per server instance; identity is **socket.id** (no accounts).
+**Shape Showdown** is a **two-player, server-authoritative** browser game: parallel falling-piece fields (each player has their own 10×20 visible board, 10×22 simulation board with two hidden spawn rows, active piece, garbage queue, and shop). Real-time sync via **Socket.IO**. Max **2** players per server instance; identity is **socket.id** (no accounts).
 
 ## Stack
 
@@ -45,7 +47,7 @@ src/
     gameStateStore.ts          # Chrome + public playfield snapshots
     publicSnapshots.ts         # PublicPlayerState seam for React
   board/
-    boardVisualModel.ts        # Visible 10×18 semantic board model
+    boardVisualModel.ts        # Visible 10×20 semantic board model
     BoardCanvasOverlay.tsx     # Canvas effects layered over the board
   hooks/useGameSocket.ts       # Socket + game-config.json origin
   components/
@@ -91,7 +93,7 @@ public/
 | `config/client.json` | Vite `base` |
 | `public/game-config.json` | Runtime `gameServerUrl` for Socket.IO |
 
-**Socket URL resolution** (client): `game-config.json` → `VITE_GAME_SERVER_URL` → `window.location.origin`.
+**Socket URL resolution** (client): in localhost Vite development, use the page origin; otherwise `game-config.json` (`gameServerUrl`, then port/host), then `VITE_GAME_SERVER_URL` (then port/host), then `window.location.origin`.
 
 ## Game design rules (server truth)
 
@@ -116,7 +118,3 @@ public/
 - No user authentication; no rooms beyond single 2-player lobby.
 - Wire protocol still carries full `GameState`; playfield UI already uses `PublicPlayerState` locally.
 - `PlayerState.isReady` is unused if present in older notes.
-
-## Explicit AI Instructions / Rules
-
-- **Strict Planning Rule:** Do not start writing code until the user explicitly says that planning is finished and you can write code. If the user announces a switch from code editing mode back to planning, you must strictly stay in planning mode and refrain from writing code.
