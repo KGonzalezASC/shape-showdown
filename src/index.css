@@ -265,6 +265,35 @@ html, body, #root {
   to { stroke-dashoffset: -16; }
 }
 
+@keyframes landing-forecast-dissolve {
+  0% {
+    opacity: 1;
+    stroke: rgba(103, 232, 249, 1);
+    fill: rgba(103, 232, 249, 0.25);
+    stroke-width: 2px;
+  }
+  25% {
+    opacity: 1;
+    stroke: #ffffff;
+    fill: rgba(255, 255, 255, 0.6);
+    stroke-width: 3px;
+    filter: drop-shadow(0 0 16px #ffffff);
+  }
+  60% {
+    opacity: 0.6;
+    stroke: #10b981;
+    fill: transparent;
+    stroke-width: 1px;
+    filter: drop-shadow(0 0 6px #10b981);
+  }
+  100% {
+    opacity: 0;
+    stroke: #10b981;
+    stroke-width: 0.5px;
+    filter: drop-shadow(0 0 0px transparent);
+  }
+}
+
 .landing-forecast-cell {
   fill: rgba(34, 211, 238, 0.06);
   stroke: rgba(103, 232, 249, 0.88);
@@ -272,6 +301,15 @@ html, body, #root {
   stroke-dasharray: 5 4;
   filter: drop-shadow(0 0 4px rgba(34, 211, 238, 0.8));
   animation: landing-forecast-dash 0.8s linear infinite;
+}
+
+.landing-forecast-cell-dissolving,
+.landing-forecast-dissolving {
+  animation: landing-forecast-dissolve 0.22s cubic-bezier(0.1, 0.9, 0.2, 1) forwards !important;
+}
+
+.landing-forecast-layer-dissolving {
+  filter: blur(0.35px);
 }
 
 .landing-forecast-label {
@@ -287,6 +325,10 @@ html, body, #root {
   line-height: 1;
   text-transform: uppercase;
   box-shadow: 0 0 12px rgba(34, 211, 238, 0.28);
+}
+
+.landing-forecast-label-dissolving {
+  animation: landing-forecast-dissolve 0.22s cubic-bezier(0.1, 0.9, 0.2, 1) forwards;
 }
 
 /* -------------------------------------------------------------------------- */

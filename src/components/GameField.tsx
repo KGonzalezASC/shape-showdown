@@ -39,6 +39,8 @@ export interface GameFieldRef {
 }
 
 const HOLD_PREVIEW_SIZE = 4;
+const LANDING_FORECAST_DISSOLVE_TICKS = 2;
+const LANDING_FORECAST_DISSOLVE_STAGGER_MS = 12;
 /** Curtain: rows just below the swap line that stay frosted/semi-visible; everything deeper is fully opaque. */
 const CURTAIN_FROST_ROWS = 3;
 
@@ -135,10 +137,48 @@ const GameField = forwardRef<GameFieldRef, GameFieldProps>(({
       ),
     [visualModel],
   );
-  const landingForecastCells = useMemo(() => {
-    if (status !== 'playing' || !isMe || (player.landingForecastTicksRemaining ?? 0) <= 0) return [];
+  const calculatedLandingForecastCells = useMemo(() => {
+    if (status !== 'playing' || !isMe) return [];
     return getLandingForecastCells(player);
   }, [status, isMe, player]);
+  const landingForecastTicksRemaining = player.landingForecastTicksRemaining ?? 0;
+  const [landingForecastRender, setLandingForecastRender] = useState<{
+    cells: Array<{ x: number; y: number }>;
+    phase: 'hidden' | 'visible' | 'dissolving';
+  }>({ cells: [], phase: 'hidden' });
+
+  useEffect(() => {
+    if (status !== 'playing' || !isMe) {
+      setLandingForecastRender({ cells: [], phase: 'hidden' });
+      return;
+    }
+
+    if (landingForecastTicksRemaining <= 0) return;
+
+    setLandingForecastRender({
+      cells: calculatedLandingForecastCells,
+      phase: landingForecastTicksRemaining <= LANDING_FORECAST_DISSOLVE_TICKS
+        ? 'dissolving'
+        : 'visible',
+    });
+  }, [
+    calculatedLandingForecastCells,
+    isMe,
+    landingForecastTicksRemaining,
+    status,
+  ]);
+
+  useEffect(() => {
+    if (
+      status !== 'playing' ||
+      !isMe ||
+      landingForecastTicksRemaining > 0
+    ) return;
+
+    setLandingForecastRender((previous) =>
+      previous.cells.length > 0 ? { ...previous, phase: 'dissolving' } : previous,
+    );
+  }, [isMe, landingForecastTicksRemaining, status]);
   const maxActiveVisibleRow = useMemo(() => {
     if (!player.activePiece) return null;
     const offsets = player.activePiece.customOffsets ?? SHAPES[player.activePiece.type][player.activePiece.rotation];
@@ -297,17 +337,27 @@ const GameField = forwardRef<GameFieldRef, GameFieldProps>(({
             performanceId={performanceId}
           />
         </div>
-        {landingForecastCells.length > 0 && (
+        {landingForecastRender.phase !== 'hidden' && landingForecastRender.cells.length > 0 && (
           <svg
-            className="pointer-events-none absolute inset-0 z-10 overflow-visible"
+            className={`pointer-events-none absolute inset-0 z-10 overflow-visible ${
+              landingForecastRender.phase === 'dissolving' ? 'landing-forecast-layer-dissolving' : ''
+            }`}
             width={BOARD_COLS * cellSize}
             height={BOARD_VISIBLE_ROWS * cellSize}
             aria-label="Landing forecast"
           >
-            {landingForecastCells.map(({ x, y }) => (
+            {landingForecastRender.cells.map(({ x, y }, index) => (
               <rect
                 key={`landing-forecast-${x}-${y}`}
-                className="landing-forecast-cell"
+                className={`landing-forecast-cell ${
+                  landingForecastRender.phase === 'dissolving' ? 'landing-forecast-dissolving' : ''
+                }`}
+                onAnimationEnd={landingForecastRender.phase === 'dissolving' && index === landingForecastRender.cells.length - 1
+                  ? () => setLandingForecastRender({ cells: [], phase: 'hidden' })
+                  : undefined}
+                style={landingForecastRender.phase === 'dissolving'
+                  ? { animationDelay: `${index * LANDING_FORECAST_DISSOLVE_STAGGER_MS}ms` }
+                  : undefined}
                 x={x * cellSize + 2}
                 y={y * cellSize + 2}
                 width={Math.max(1, cellSize - 4)}
@@ -317,9 +367,11 @@ const GameField = forwardRef<GameFieldRef, GameFieldProps>(({
             ))}
           </svg>
         )}
-        {status === 'playing' && isMe && (player.landingForecastTicksRemaining ?? 0) > 0 && (
+        {status === 'playing' && isMe && landingForecastRender.phase !== 'hidden' && (
           <div className="pointer-events-none absolute inset-x-0 top-2 z-20 flex justify-center">
-            <span className="landing-forecast-label">Landing forecast</span>
+            <span className={`landing-forecast-label ${
+              landingForecastRender.phase === 'dissolving' ? 'landing-forecast-dissolving' : ''
+            }`}>Landing forecast</span>
           </div>
         )}
         {rotationBlocked && (
