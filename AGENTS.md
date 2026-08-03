@@ -72,10 +72,33 @@ public/
 | `bun run start` | Production server (`dist-server/server.mjs`) |
 | `bun run start:serve-client` | Production + serve `./dist` |
 | `bun run lint` | `tsc --noEmit` |
-| `bun run test` | Interface harnesses (`engine`, `shop`, `GameManager`, poison) |
+| `bun run test:board` | Board model, canvas sizing, and painter tests |
+| `bun run test:engine` | Tetris engine movement, locking, hold, and timing tests |
+| `bun run test:poison` | Poison spread and poison-related special tests |
+| `bun run test:shop` | Shop catalog, rolls, phases, and purchase handlers |
+| `bun run test:manager` | GameManager lifecycle tests |
+| `bun run test:name-drop` | Name-drop planner and playback tests |
+| `bun run test` / `bun run test:all` | Full aggregate suite; use for broad/shared changes and pre-merge or release verification |
 | `bun run clean` | Remove build artifacts |
 
 **Two clients locally:** two browsers/tabs on the same origin.
+
+### Targeted verification policy
+
+Use the smallest relevant verification command for each change. `bun run test` is the full-suite command, not the default response to every edit.
+
+| Changed area | Verification |
+|---|---|
+| Markdown, docs, or comments | No tests; run `git diff --check` when useful |
+| Board model or canvas rendering | `bun run test:board` |
+| Tetris engine | `bun run test:engine`; add `bun run test:poison` or `bun run test:shop` when those seams are touched |
+| Shop catalog, handlers, or rolls | `bun run test:shop`; add `bun run test:poison` for poison effects |
+| GameManager or socket contract | `bun run test:manager`; use the full suite for broad protocol changes |
+| Name-drop planner or playback | `bun run test:name-drop` |
+| UI, layout, or socket-client changes without a matching harness | `bun run lint`, then browser/manual verification for visual or network behavior |
+| Shared constants, shared types, RNG, or broad simulation behavior | `bun run test` |
+
+For pre-merge or release verification, run `bun run lint` and the full `bun run test` suite regardless of the targeted command used during iteration.
 
 ## Module seams (design)
 
