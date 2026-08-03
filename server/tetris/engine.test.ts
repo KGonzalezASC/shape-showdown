@@ -52,7 +52,7 @@ describe('tetris engine', () => {
     assert.equal(player.landingForecastTicksRemaining, LANDING_FORECAST_TICKS);
   });
 
-  it('expires the Landing Forecast after exactly 60 simulation ticks', () => {
+  it('expires the Landing Forecast after exactly 40 simulation ticks', () => {
     const rng = makeRng(43);
     const player = makePlayer('a', rng);
     const opponent = makePlayer('b', rng);
