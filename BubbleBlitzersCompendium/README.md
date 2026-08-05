@@ -101,4 +101,4 @@ docs/                     # SHOP_POWERUPS.md, legacy deploy plan
 
 - [AGENTS.md](../AGENTS.md) — canonical project overview & run commands.
 - [docs/SHOP_POWERUPS.md](../docs/SHOP_POWERUPS.md) — shop item specs (approved work + rejections).
-- [TETRIS_VS_TETRIS_PLAN.md](../TETRIS_VS_TETRIS_PLAN.md) — historical migration decisions and sources.
+- [TETRIS_VS_TETRIS_PLAN.md](../TETRIS_VS_TETRIS_PLAN.md) — canonical core architecture & protocol specification.
