@@ -1,167 +1,93 @@
-# Bubble Blitzers -> Tetris (1v1) Migration Plan
+# Shape Showdown — Core Architecture & Protocol Specification
 
-> **Historical implementation record — not a current specification.** This plan documents migration decisions and source material that led to the current game. It is not a list of remaining tasks. Consult the code and [AGENTS.md](./AGENTS.md) for current behavior; the current field is 10×18 visually and 10×20 internally, with two hidden spawn rows.
+> **Canonical System Specification.** This document defines the active architecture, game rules, network contracts, and simulation invariants for **Shape Showdown** (1v1 server-authoritative Tetris). For local setup and contributor commands, consult [`AGENTS.md`](./AGENTS.md).
 
-## Sources (Top-Level)
+---
 
-- Base project fork source: `https://github.com/AVLitskevich/BubbleBlitzersJS`
-- Tetris Guideline reference: `https://tetris.wiki/Tetris_Guideline`
-- Additional Guideline notes: `https://harddrop.com/wiki/Tetris_Guideline`
-- Versus/garbage context: `https://tetris.wiki/Puyo_Puyo_Tetris#Garbage_mechanics`
-- Supplemental background (likely optional): `https://github.com/jherskow/nand2tetris/tree/master`
+## 1. System Overview
 
-## Historical decisions
+**Shape Showdown** is a **two-player, server-authoritative** real-time browser game featuring parallel falling-piece fields. Each player controls an independent playfield while competing in real-time over Socket.IO.
 
-- Versus mode target for now: **Tetris vs Tetris garbage rules** (not mixed Puyo/Tetris timing).
-- Keep existing networking harness (Express + Socket.IO + 2-player lobby) and replace game simulation/protocol.
-- **Lock delay reset (historical MVP):** **Extended placement** — successful **horizontal moves and rotations** reset the lock timer, with a **cap of 15** combined move/rotation resets per piece. The current implementation uses `LOCK_RESET_CAP` from [`src/constants.ts`](./src/constants.ts), currently **10**; do not use this historical value as an implementation requirement. Reference: `https://harddrop.com/wiki/Puyo_Puyo_Tetris_movement_intricacies`
+* **Simulation Rate:** 60 Hz fixed server tick loop (`server/GameManager.ts`).
+* **Identity:** Socket ID (`socket.id`), up to 2 players per server instance.
+* **Match States:** `waiting` → `countdown` → `playing` → `ended`. First top-out ends the match immediately.
 
-## Goals
+---
 
-1. Reuse the current connection and match lifecycle structure.
-2. Replace breakout gameplay with server-authoritative Tetris Guideline style systems.
-3. Implement 1v1 garbage with cancel/offset behavior.
-4. Upgrade replay system so Tetris matches can be replayed accurately.
+## 2. Playfield & Piece Invariants
 
-## Non-Goals (Initial Version)
+* **Board Dimensions:** 
+  * **Visible Field:** 10 columns × 18 rows (`src/constants.ts`).
+  * **Simulation Matrix:** 10 columns × 20 rows (includes 2 hidden spawn rows at the top).
+* **Piece Generation:** Standard SRS (Super Rotation System) 7-Bag generator driven by a shared, seeded [`MutableRng`](file:///c:/Users/Keithythefrog/source/BubbleBlitzers/src/rng.ts).
+* **Lock Delay:** Extended placement rule — successful movement or rotation resets the lock timer up to `LOCK_RESET_CAP` (default: 10 resets per piece).
+* **Hold Storage:** Single piece hold buffer with swap cooldown until piece lock. Storage toxin/freeze items can temporarily lock or poison hold operations.
 
-- PPT mixed-mode garbage timing (queued send on non-clear lock).
-- 3+ player rooms, ranked ladders, or accounts.
-- Netcode optimization beyond current full-state broadcast approach.
+---
 
-## Current Assets to Reuse
+## 3. Server-Authoritative Netcode & Protocol
 
-- Server boot + Socket.IO setup in `server.ts`.
-- 2-player lobby constraints and status flow in `server/GameManager.ts`.
-- Runtime config loading in `server/loadConfig.ts`.
-- Client socket bootstrap + server URL resolution in `src/hooks/useGameSocket.ts`.
-- Replay viewer shell and timeline controls in `src/ReplayApp.tsx`.
+### Network Loop
+Clients send discrete actions and continuous held inputs. The server applies movement, gravity, locks, line clears, garbage arrival, and shop effects inside [`server/tetris/engine.ts`](file:///c:/Users/Keithythefrog/source/BubbleBlitzers/server/tetris/engine.ts) via `stepPlayer()`.
 
-## High-Level Architecture Changes
+### Socket Events
 
-### 1) Shared Types and Constants
+#### Client → Server
+* **`inputState`**: Held continuous inputs (`left`, `right`, `softDrop`).
+* **`action`**: Discrete single-frame actions (`rotateCW`, `rotateCCW`, `hardDrop`, `hold`, `buyShopOffer`).
 
-- Replace breakout-specific types in `src/types.ts` with Tetris domain models:
-  - Board matrix (10x18 visible + two hidden spawn rows, 10x20 total).
-  - Active piece, rotation state, spawn position.
-  - Hold piece, next queue, bag state/seed.
-  - Combo, B2B, pending garbage, outgoing attack events.
-  - Match outcome (top out, disconnect, draw policy if timer mode is added).
-- Replace breakout constants in `src/constants.ts` with Tetris constants:
-  - Gravity/level table, lock delay, lock-reset behavior, DAS/ARR defaults. See `src/constants.ts` for current values.
-  - Garbage table (line clears, T-Spin, B2B, combo, perfect clear).
-  - Tick rate and timings used by server simulation.
+#### Server → Client
+* **`gameState`**: Full authoritative match snapshot (`GameState`).
+* **`matchEvent`**: Real-time event notifications (`lineClear`, `attackSent`, `garbageReceived`, `topOut`, `shopOpened`).
 
-### 2) Server Simulation Layer
+---
 
-- Replace breakout `server/Physics.ts` with Tetris engine modules (new `server/tetris/` folder):
-  - Piece definitions and SRS kick data.
-  - Collision and movement/rotation validation.
-  - Gravity, lock-delay, and piece locking (the implementation's current move/rotate reset cap).
-  - Line clear detection and board compaction.
-  - Attack generation and garbage application.
-  - Top-out detection and win resolution.
-- Keep game loop in `GameManager`, but delegate per-player updates to new Tetris engine.
+## 4. Versus & Garbage Mechanics
 
-### 3) Socket Event Contract (Tetris)
+### Attack Table Baseline
+Garbage is generated when a player locks a piece and clears lines:
 
-Client -> Server events:
+| Action | Lines Sent |
+| :--- | :--- |
+| **Single** | 0 |
+| **Double** | 1 |
+| **Triple** | 2 |
+| **Tetris** | 4 |
+| **T-Spin Single** | 2 |
+| **T-Spin Double** | 4 |
+| **T-Spin Triple** | 6 |
+| **Back-to-Back (B2B)** | +1 bonus to Tetris / T-Spins |
+| **Combos** | Scaled incoming attack bonus |
+| **Perfect Clear** | +10 bonus lines |
 
-- `inputState`: held directional/drop booleans (`left`, `right`, `softDrop`).
-- `action`: discrete actions (`rotateCW`, `rotateCCW`, `hardDrop`, `hold`).
+### Delivery & Cancellation
+1. **Garbage Cancellation:** Outgoing attacks first offset and cancel incoming pending garbage in the player's queue.
+2. **Garbage Arrival:** Uncancelled attacks are enqueued to the opponent with a short arrival delay before rising from the bottom.
+3. **Hole Distribution:** Garbage lines spawn with standardized hole positions to allow counter-play.
 
-Server -> Client events:
+---
 
-- `gameState`: authoritative match state snapshot.
-- `matchEvent` (optional feed): `lineClear`, `attackSent`, `garbageReceived`, `topOut`.
-- `error`: unchanged for invalid state/game-full messages.
+## 5. Shop & Powerup Integration
 
-## Garbage System (TvT Baseline)
+* **Shop Activation:** Clearing lines generates shop energy/offers.
+* **Phase Machine:** Player shops cycle through `waiting` → `ready` → `cycling` → `expired` phases.
+* **Authoritative Execution:** Purchases are validated server-side by `applyShopPurchase` in [`server/shop.ts`](file:///c:/Users/Keithythefrog/source/BubbleBlitzers/server/shop.ts) against phase, cost, and target constraints.
+* **Powerup Semantics:** Field effects (e.g., Elixir, Curtain, Bomber, Magnet, Satellite, Tectonic Shift, Wildcard +4) emit semantic `ActiveFieldEffect` kinds on the wire; the client maps them to visual styles via `effectStyles.ts`.
 
-### Attack Table (initial default)
+---
 
-- Single: 0
-- Double: 1
-- Triple: 2
-- Tetris: 4
-- T-Spin Single: 2
-- T-Spin Double: 4
-- T-Spin Triple: 6
-- B2B bonus: +1
-- Combo bonus: config-driven table
-- Perfect Clear bonus: config-driven (default candidate: +10)
+## 6. Replays & Determinism
 
-### Delivery Rules
+* **Seeded RNG:** The match seed drives piece generation, shop offer draws, and variant selections.
+* **Replay Recording:** Matches store initial seed, initial configuration, and timestamped input streams.
+* **Reconstruction:** The replay engine reconstructs matches deterministically by stepping `stepPlayer()` with the recorded input stream.
 
-1. Generate attack when a piece locks and clears lines.
-2. Apply cancel/offset against defender pending garbage first.
-3. Enqueue remaining garbage to opponent with short arrival delay.
-4. Apply garbage rows with one hole per row (hole randomization strategy configurable).
+---
 
-## Replay System Upgrade
+## Reference Map
 
-- Introduce replay format `version: 2`.
-- Store:
-  - Initial game state and RNG seed.
-  - Input/action stream per player with tick timestamps.
-  - Sparse keyframes every N ticks for efficient scrubbing.
-  - Match events (line clears, attacks, garbage applications, top out).
-- Update `src/ReplayApp.tsx` to reconstruct from nearest keyframe + subsequent events/inputs.
-
-## Delivery Phases
-
-### Phase 0 - Foundation
-
-- Add Tetris constants/types.
-- Create empty engine scaffolding and unit-friendly helper boundaries.
-
-### Phase 1 - Single-Player Engine Correctness
-
-- 7-bag generation, spawn, movement, SRS rotation, lock.
-- Line clears, hold, next queue, top-out.
-
-### Phase 2 - 1v1 Match Integration
-
-- Wire engine into `GameManager` for two concurrent boards.
-- Replace breakout socket handlers with Tetris handlers.
-
-### Phase 3 - Garbage and Versus Resolution
-
-- Implement attack table, combo/B2B, perfect clear bonus.
-- Implement cancel/offset and delayed garbage arrival.
-- End-match on top-out or disconnect.
-
-### Phase 4 - Client Playfield/UI Migration
-
-- Replace canvas breakout renderer with Tetris board renderer.
-- Add hold/next UI and garbage meter.
-- Replace controls/help text with Tetris bindings.
-
-### Phase 5 - Replay v2
-
-- Server writes v2 replay files.
-- Viewer reads and scrubs v2 accurately.
-
-### Phase 6 - Verification and Tuning
-
-- Validate server-authoritative behavior under packet jitter.
-- Tune garbage constants and timing for feel.
-- Validate two-browser local play and replay parity.
-
-## Acceptance Criteria (MVP)
-
-- Two players can join and play complete 1v1 Tetris matches.
-- Server is authoritative for all piece and board state.
-- Garbage sends/cancels correctly in TvT.
-- Match ends correctly on top-out and disconnect.
-- Replay file can be loaded and scrubbed with state consistency.
-
-## Reference Notes
-
-- Guideline behavior references:
-  - `https://tetris.wiki/Tetris_Guideline`
-  - `https://harddrop.com/wiki/Tetris_Guideline`
-- Garbage context reference:
-  - `https://tetris.wiki/Puyo_Puyo_Tetris#Garbage_mechanics`
-- PPT Tetris movement / lock reset cap (15):
-  - `https://harddrop.com/wiki/Puyo_Puyo_Tetris_movement_intricacies`
+* **Server Entry:** [`server.ts`](file:///c:/Users/Keithythefrog/source/BubbleBlitzers/server.ts)
+* **Match Lifecycle:** [`server/GameManager.ts`](file:///c:/Users/Keithythefrog/source/BubbleBlitzers/server/GameManager.ts)
+* **Simulation Core:** [`server/tetris/engine.ts`](file:///c:/Users/Keithythefrog/source/BubbleBlitzers/server/tetris/engine.ts)
+* **Shop Catalog & Handlers:** [`server/shop.ts`](file:///c:/Users/Keithythefrog/source/BubbleBlitzers/server/shop.ts) & [`src/shop/shopCatalog.ts`](file:///c:/Users/Keithythefrog/source/BubbleBlitzers/src/shop/shopCatalog.ts)
+* **Board Model Seam:** [`src/board/boardVisualModel.ts`](file:///c:/Users/Keithythefrog/source/BubbleBlitzers/src/board/boardVisualModel.ts)
