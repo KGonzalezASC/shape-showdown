@@ -353,6 +353,7 @@ export function applyShopPurchase(
   opponent: PlayerState | null,
   itemId: string,
   rng: RngChannels | MutableRng,
+  options?: { overrideCost?: number; bypassAffordabilityCheck?: boolean },
 ): boolean {
   const shop = buyer.shop;
   if (shop.phase !== 'cycling') return false;
@@ -362,7 +363,9 @@ export function applyShopPurchase(
 
   const catalogItem = SHOP_ITEM_BY_ID.get(itemId);
   if (!catalogItem || !catalogItem.purchasable) return false;
-  if (buyer.score < catalogItem.cost) return false;
+
+  const chargedCost = options?.overrideCost !== undefined ? Math.max(0, options.overrideCost) : catalogItem.cost;
+  if (!options?.bypassAffordabilityCheck && buyer.score < chargedCost) return false;
   if (catalogItem.target === 'opponent' && !opponent) return false;
 
   const handler = SHOP_HANDLERS[itemId];
@@ -372,7 +375,7 @@ export function applyShopPurchase(
   const ctx: PurchaseCtx = { gameState, buyer, opponent, tick: gameState.tick, rng: channels.effects };
   if (handler.canPurchase && !handler.canPurchase(ctx)) return false;
 
-  buyer.score -= catalogItem.cost;
+  buyer.score -= chargedCost;
   shop.phase = 'waiting';
   shop.cycleIndex = -1;
   shop.cycleStartTick = null;

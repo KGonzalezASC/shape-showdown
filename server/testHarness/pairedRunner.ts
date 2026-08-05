@@ -6,7 +6,9 @@ import { RulesBot, type ObservationMode } from './rulesBot.js';
 import { defaultObservationProjector } from './observationProjector.js';
 import { Scenario, type PlayerMetrics, type ScenarioReport } from './scenario.js';
 
-export type BotShopPolicy = (observation: DriverObservation) => { openShop?: boolean; purchaseItemId?: string } | null;
+export type BotShopPolicy = (
+  observation: DriverObservation,
+) => { openShop?: boolean; purchaseItemId?: string; overrideCost?: number } | null;
 
 export interface PairedRunnerConfig {
   seed: number;
@@ -40,8 +42,14 @@ export interface PairedRunnerReport {
   scenarioReport: ScenarioReport;
 }
 
-/** Pre-built shop policy: opens shop when score >= minScore and buys targetItem when ready/cycling. */
-export function createSimpleShopPolicy(targetItem: string, minScore = 50): BotShopPolicy {
+/** Pre-built shop policy: opens shop when score >= required score and buys targetItem when ready/cycling. */
+export function createSimpleShopPolicy(
+  targetItem: string,
+  requiredScore?: number,
+  overrideCost?: number,
+): BotShopPolicy {
+  const catalogCost = SHOP_ITEM_BY_ID.get(targetItem)?.cost ?? 50;
+  const minScore = requiredScore !== undefined ? requiredScore : (overrideCost !== undefined ? overrideCost : catalogCost);
   return (obs: DriverObservation) => {
     const player = obs.player.player;
     if (player.score < minScore) return null;
@@ -49,7 +57,7 @@ export function createSimpleShopPolicy(targetItem: string, minScore = 50): BotSh
       return { openShop: true };
     }
     if (player.shop.phase === 'cycling') {
-      return { purchaseItemId: targetItem };
+      return { purchaseItemId: targetItem, overrideCost };
     }
     return null;
   };
@@ -108,13 +116,16 @@ export class PairedRunner {
             this.scenario.openShop(id);
           }
           if (decision?.purchaseItemId) {
-            const accepted = this.scenario.purchase(id, decision.purchaseItemId);
+            const options = decision.overrideCost !== undefined ? { overrideCost: decision.overrideCost } : undefined;
+            const accepted = this.scenario.purchase(id, decision.purchaseItemId, options);
+            const catalogCost = SHOP_ITEM_BY_ID.get(decision.purchaseItemId)?.cost ?? 0;
+            const actualCost = decision.overrideCost !== undefined ? decision.overrideCost : catalogCost;
             this.purchases.push({
               tick: stateBefore.tick,
               playerId: id,
               itemId: decision.purchaseItemId,
               accepted,
-              cost: SHOP_ITEM_BY_ID.get(decision.purchaseItemId)?.cost,
+              cost: actualCost,
             });
           }
         }

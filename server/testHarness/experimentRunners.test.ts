@@ -8,8 +8,8 @@ import {
 
 describe('Separated Experiment Runners', () => {
   it('runBotQuality measures bot performance deterministically without shop noise', () => {
-    const report1 = runBotQuality({ runs: 3, seconds: 5, seedPolicyId: 'rulesBot-v1' } as any);
-    const report2 = runBotQuality({ runs: 3, seconds: 5, seedPolicyId: 'rulesBot-v1' } as any);
+    const report1 = runBotQuality({ runs: 3, seconds: 5, policyId: 'rulesBot-v1' });
+    const report2 = runBotQuality({ runs: 3, seconds: 5, policyId: 'rulesBot-v1' });
 
     assert.equal(report1.evidenceType, 'deterministic in-process simulation');
     assert.equal(report1.runCount, 3);
@@ -31,24 +31,32 @@ describe('Separated Experiment Runners', () => {
     assert.equal(report.costPolicy, 'mechanical-impact');
     assert.equal(report.avgEconomicCost, 0);
     assert.equal(report.roleDeltas.length, 3);
+
+    for (const trace of report.treatmentTraces) {
+      assert.equal(trace.players.p1.spending, 0);
+    }
   });
 
-  it('runItemImpact measures reference-price impact and computes role-aware deltas', () => {
-    const report = runItemImpact({
-      runs: 3,
+  it('runItemImpact resolves target recipient from catalog (self vs opponent)', () => {
+    const selfReport = runItemImpact({
+      runs: 2,
       seconds: 5,
-      targetItemId: 'frost-shift',
+      targetItemId: 'nova-charge', // self target
       costPolicy: 'reference-price',
     });
 
-    assert.equal(report.evidenceType, 'deterministic in-process simulation');
-    assert.equal(report.costPolicy, 'reference-price');
-    assert.equal(report.controlTraces.length, 3);
-    assert.equal(report.treatmentTraces.length, 3);
-    assert.ok(typeof report.avgDirectRecipientHolesDelta === 'number');
+    const oppReport = runItemImpact({
+      runs: 2,
+      seconds: 5,
+      targetItemId: 'frost-shift', // opponent target
+      costPolicy: 'reference-price',
+    });
+
+    assert.equal(selfReport.roleDeltas[0].recipientId, 'p1');
+    assert.equal(oppReport.roleDeltas[0].recipientId, 'p2');
   });
 
-  it('runPricingExperiment projects price matrix from item impact evidence without altering mechanics', () => {
+  it('runPricingExperiment performs closed-loop candidate price simulations', () => {
     const report = runPricingExperiment({
       runs: 3,
       seconds: 5,

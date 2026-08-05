@@ -141,19 +141,23 @@ export class Scenario {
     return accepted;
   }
 
-  public purchase(playerId: string, itemId: string): boolean {
+  public purchase(
+    playerId: string,
+    itemId: string,
+    options?: { overrideCost?: number; bypassAffordabilityCheck?: boolean },
+  ): boolean {
     const buyer = this.getPlayerState(playerId);
     const opponentId = this.playerIds.find((id) => id !== playerId);
     const opponent = opponentId ? this.gameState.players[opponentId] : null;
     const channels = this.rngChannelsByPlayer.get(playerId);
     if (!channels) throw new Error(`No RNG channels for player ${playerId}`);
 
-    const accepted = applyShopPurchase(this.gameState, buyer, opponent, itemId, channels.shop);
+    const accepted = applyShopPurchase(this.gameState, buyer, opponent, itemId, channels.shop, options);
     this.commandRecords.push({
       tick: this.gameState.tick,
       playerId,
       kind: 'purchase',
-      detail: { itemId },
+      detail: { itemId, overrideCost: options?.overrideCost },
       accepted,
     });
     return accepted;

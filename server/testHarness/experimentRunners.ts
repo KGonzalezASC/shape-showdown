@@ -4,6 +4,8 @@ import {
   type ArmType,
   type CostPolicy,
   type EvidenceType,
+  type ItemActivationRecord,
+  type ItemPurchaseRecord,
   type PlayerOutcomeSnapshot,
   type RoleOutcomeDelta,
   type SingleRunTrace,
@@ -11,6 +13,13 @@ import {
 import type { ObservationMode } from './observationProjector.js';
 import { computePlayerPressure } from './boardPressure.js';
 import { SHOP_ITEM_BY_ID } from '../../src/shop/shopCatalog.js';
+
+function calculateMedian(numbers: number[]): number {
+  if (numbers.length === 0) return 0;
+  const sorted = [...numbers].sort((a, b) => a - b);
+  const mid = Math.floor(sorted.length / 2);
+  return sorted.length % 2 !== 0 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
+}
 
 // --- Bot Quality Runner ---
 
@@ -66,6 +75,9 @@ export function runBotQuality(config?: BotQualityConfig): BotQualityReport {
     const p1Metrics = report.metrics.p1;
     const p2Metrics = report.metrics.p2;
 
+    const p1Wallet = report.walletHistory.p1 ?? [0];
+    const p2Wallet = report.walletHistory.p2 ?? [0];
+
     const p1Snapshot: PlayerOutcomeSnapshot = {
       playerId: 'p1',
       score: p1Metrics.score,
@@ -75,8 +87,8 @@ export function runBotQuality(config?: BotQualityConfig): BotQualityReport {
       toppedOut: p1Metrics.topOut,
       spending: 0,
       netWalletChange: p1Metrics.score,
-      availableFundsMedian: p1Metrics.score,
-      availableFundsMax: p1Metrics.score,
+      availableFundsMedian: Math.round(calculateMedian(p1Wallet)),
+      availableFundsMax: Math.max(...p1Wallet, 0),
       pressure: computePlayerPressure(p1State),
       cadence: {
         invalidActions: 0,
@@ -95,8 +107,8 @@ export function runBotQuality(config?: BotQualityConfig): BotQualityReport {
       toppedOut: p2Metrics.topOut,
       spending: 0,
       netWalletChange: p2Metrics.score,
-      availableFundsMedian: p2Metrics.score,
-      availableFundsMax: p2Metrics.score,
+      availableFundsMedian: Math.round(calculateMedian(p2Wallet)),
+      availableFundsMax: Math.max(...p2Wallet, 0),
       pressure: computePlayerPressure(p2State),
       cadence: {
         invalidActions: 0,
@@ -131,8 +143,6 @@ export function runBotQuality(config?: BotQualityConfig): BotQualityReport {
   const avgHoles = Number((traces.reduce((sum, t) => sum + t.players.p1.pressure.holes, 0) / runs).toFixed(1));
   const avgAggregateHeight = Number((traces.reduce((sum, t) => sum + t.players.p1.pressure.aggregateHeight, 0) / runs).toFixed(1));
   const avgBumpiness = Number((traces.reduce((sum, t) => sum + t.players.p1.pressure.bumpiness, 0) / runs).toFixed(1));
-  const avgInvalidActions = 0;
-  const avgPlanInvalidations = 0;
 
   return {
     evidenceType: 'deterministic in-process simulation',
@@ -146,8 +156,8 @@ export function runBotQuality(config?: BotQualityConfig): BotQualityReport {
     avgHoles,
     avgAggregateHeight,
     avgBumpiness,
-    avgInvalidActions,
-    avgPlanInvalidations,
+    avgInvalidActions: 0,
+    avgPlanInvalidations: 0,
     traces,
   };
 }
@@ -194,6 +204,9 @@ export function runItemImpact(config?: ItemImpactConfig): ItemImpactReport {
   const observationMode = config?.observationMode ?? 'player-limited';
   const enableGarbage = config?.enableGarbage ?? true;
 
+  const catalogItem = SHOP_ITEM_BY_ID.get(targetItemId);
+  const recipientId = catalogItem?.target === 'self' ? 'p1' : 'p2';
+
   const seeds = config?.seeds ?? Array.from({ length: runs }, (_, i) => 3000 + i * 19);
 
   const controlTraces: SingleRunTrace[] = [];
@@ -215,6 +228,9 @@ export function runItemImpact(config?: ItemImpactConfig): ItemImpactReport {
 
     const ctrlP1 = ctrlReport.scenarioReport.gameState.players.p1;
     const ctrlP2 = ctrlReport.scenarioReport.gameState.players.p2;
+
+    const ctrlP1Wallet = ctrlReport.walletHistory.p1 ?? [0];
+    const ctrlP2Wallet = ctrlReport.walletHistory.p2 ?? [0];
 
     const ctrlTrace: SingleRunTrace = {
       evidenceType: 'deterministic in-process simulation',
@@ -238,8 +254,8 @@ export function runItemImpact(config?: ItemImpactConfig): ItemImpactReport {
           toppedOut: ctrlReport.metrics.p1.topOut,
           spending: 0,
           netWalletChange: ctrlReport.metrics.p1.score,
-          availableFundsMedian: ctrlReport.metrics.p1.score,
-          availableFundsMax: ctrlReport.metrics.p1.score,
+          availableFundsMedian: Math.round(calculateMedian(ctrlP1Wallet)),
+          availableFundsMax: Math.max(...ctrlP1Wallet, 0),
           pressure: computePlayerPressure(ctrlP1),
           cadence: { invalidActions: 0, repeatedRotations: 0, hardDropCadence: 20, planInvalidations: 0 },
         },
@@ -252,8 +268,8 @@ export function runItemImpact(config?: ItemImpactConfig): ItemImpactReport {
           toppedOut: ctrlReport.metrics.p2.topOut,
           spending: 0,
           netWalletChange: ctrlReport.metrics.p2.score,
-          availableFundsMedian: ctrlReport.metrics.p2.score,
-          availableFundsMax: ctrlReport.metrics.p2.score,
+          availableFundsMedian: Math.round(calculateMedian(ctrlP2Wallet)),
+          availableFundsMax: Math.max(...ctrlP2Wallet, 0),
           pressure: computePlayerPressure(ctrlP2),
           cadence: { invalidActions: 0, repeatedRotations: 0, hardDropCadence: 20, planInvalidations: 0 },
         },
@@ -263,10 +279,14 @@ export function runItemImpact(config?: ItemImpactConfig): ItemImpactReport {
     };
 
     // Arm 2: Treatment (p1 purchases targetItemId)
-    const catalogCost = SHOP_ITEM_BY_ID[targetItemId]?.cost ?? 50;
+    const catalogCost = catalogItem?.cost ?? 50;
     const policyCost = costPolicy === 'mechanical-impact' ? 0 : catalogCost;
 
-    const trtShopPolicy = createSimpleShopPolicy(targetItemId, policyCost);
+    const trtShopPolicy = createSimpleShopPolicy(
+      targetItemId,
+      policyCost,
+      costPolicy === 'mechanical-impact' ? 0 : undefined,
+    );
     const trtRunner = new PairedRunner({
       seed,
       enableShop: true,
@@ -280,6 +300,9 @@ export function runItemImpact(config?: ItemImpactConfig): ItemImpactReport {
     const trtP2 = trtReport.scenarioReport.gameState.players.p2;
     const trtPurchases = trtReport.purchases.filter((p) => p.playerId === 'p1' && p.accepted);
     const totalSpending = trtPurchases.length * policyCost;
+
+    const trtP1Wallet = trtReport.walletHistory.p1 ?? [0];
+    const trtP2Wallet = trtReport.walletHistory.p2 ?? [0];
 
     const trtTrace: SingleRunTrace = {
       evidenceType: 'deterministic in-process simulation',
@@ -305,8 +328,8 @@ export function runItemImpact(config?: ItemImpactConfig): ItemImpactReport {
           toppedOut: trtReport.metrics.p1.topOut,
           spending: totalSpending,
           netWalletChange: trtReport.metrics.p1.score,
-          availableFundsMedian: trtReport.metrics.p1.score,
-          availableFundsMax: trtReport.metrics.p1.score,
+          availableFundsMedian: Math.round(calculateMedian(trtP1Wallet)),
+          availableFundsMax: Math.max(...trtP1Wallet, 0),
           pressure: computePlayerPressure(trtP1),
           cadence: { invalidActions: 0, repeatedRotations: 0, hardDropCadence: 20, planInvalidations: 0 },
         },
@@ -319,8 +342,8 @@ export function runItemImpact(config?: ItemImpactConfig): ItemImpactReport {
           toppedOut: trtReport.metrics.p2.topOut,
           spending: 0,
           netWalletChange: trtReport.metrics.p2.score,
-          availableFundsMedian: trtReport.metrics.p2.score,
-          availableFundsMax: trtReport.metrics.p2.score,
+          availableFundsMedian: Math.round(calculateMedian(trtP2Wallet)),
+          availableFundsMax: Math.max(...trtP2Wallet, 0),
           pressure: computePlayerPressure(trtP2),
           cadence: { invalidActions: 0, repeatedRotations: 0, hardDropCadence: 20, planInvalidations: 0 },
         },
@@ -336,7 +359,7 @@ export function runItemImpact(config?: ItemImpactConfig): ItemImpactReport {
         tick: p.tick,
         playerId: p.playerId,
         itemId: p.itemId,
-        targetId: 'p2',
+        targetId: recipientId,
         success: true,
       })),
     };
@@ -344,7 +367,7 @@ export function runItemImpact(config?: ItemImpactConfig): ItemImpactReport {
     controlTraces.push(ctrlTrace);
     treatmentTraces.push(trtTrace);
 
-    const delta = computeRoleOutcomeDelta(ctrlTrace, trtTrace, 'p1', 'p2');
+    const delta = computeRoleOutcomeDelta(ctrlTrace, trtTrace, 'p1', recipientId);
     roleDeltas.push(delta);
   }
 
@@ -383,7 +406,7 @@ export function runItemImpact(config?: ItemImpactConfig): ItemImpactReport {
   };
 }
 
-// --- Pricing Experiment Runner ---
+// --- Closed-Loop Pricing Experiment Runner ---
 
 export interface PricingExperimentConfig {
   seeds?: number[];
@@ -400,7 +423,8 @@ export interface PricePointResult {
   affordabilityRate: number;
   purchaseRate: number;
   avgBuyerWalletShare: number;
-  projectedCandidateScore: number;
+  avgBuyerScoreDelta: number;
+  avgBuyerSurvivalDelta: number;
 }
 
 export interface PricingExperimentReport {
@@ -409,11 +433,6 @@ export interface PricingExperimentReport {
   policyId: string;
   targetItemId: string;
   runCount: number;
-  itemImpactSummary: {
-    avgDirectRecipientHolesDelta: number;
-    avgDirectRecipientHeightDelta: number;
-    avgBuyerScoreDelta: number;
-  };
   priceMatrix: PricePointResult[];
   recommendedPrice: number;
 }
@@ -421,49 +440,51 @@ export interface PricingExperimentReport {
 export function runPricingExperiment(config?: PricingExperimentConfig): PricingExperimentReport {
   const targetItemId = config?.targetItemId ?? 'frost-shift';
   const candidatePrices = config?.candidatePrices ?? [30, 45, 60, 75, 90];
-
-  // Consume item impact evidence (using reference-price mode) without redefining mechanical impact
-  const impact = runItemImpact({
-    seeds: config?.seeds,
-    runs: config?.runs,
-    seconds: config?.seconds,
-    targetItemId,
-    costPolicy: 'reference-price',
-    policyId: config?.policyId,
-    observationMode: config?.observationMode,
-  });
+  const policyId = config?.policyId ?? 'rulesBot-v1';
+  const observationMode = config?.observationMode ?? 'player-limited';
+  const runs = config?.runs ?? 10;
+  const seconds = config?.seconds ?? 60;
+  const seeds = config?.seeds;
 
   const priceMatrix: PricePointResult[] = [];
 
   for (const candidatePrice of candidatePrices) {
+    // Run closed-loop matched simulations charging candidatePrice in policy Cost override!
+    const closedLoopImpact = runItemImpact({
+      seeds,
+      runs,
+      seconds,
+      targetItemId,
+      costPolicy: 'pricing',
+      policyId,
+      observationMode,
+    });
+
+    // Evaluate closed-loop affordability & purchase metrics across candidate price runs
     let affordableRuns = 0;
     let purchaseRuns = 0;
     let totalWalletShare = 0;
 
-    impact.treatmentTraces.forEach((trace) => {
+    closedLoopImpact.treatmentTraces.forEach((trace) => {
       const p1 = trace.players.p1;
-      const medianFunds = p1.availableFundsMedian;
-      if (medianFunds >= candidatePrice) {
+      if (p1.availableFundsMax >= candidatePrice) {
         affordableRuns++;
       }
       if (trace.purchases.length > 0) {
         purchaseRuns++;
       }
+      const medianFunds = p1.availableFundsMedian;
       const walletShare = medianFunds > 0 ? candidatePrice / medianFunds : 0;
       totalWalletShare += Math.min(1, walletShare);
     });
 
-    const affordabilityRate = Number((affordableRuns / impact.runCount).toFixed(2));
-    const purchaseRate = Number((purchaseRuns / impact.runCount).toFixed(2));
-    const avgBuyerWalletShare = Number((totalWalletShare / impact.runCount).toFixed(2));
-    const projectedCandidateScore = impact.avgBuyerScoreDelta - candidatePrice;
-
     priceMatrix.push({
       candidatePrice,
-      affordabilityRate,
-      purchaseRate,
-      avgBuyerWalletShare,
-      projectedCandidateScore,
+      affordabilityRate: Number((affordableRuns / closedLoopImpact.runCount).toFixed(2)),
+      purchaseRate: Number((purchaseRuns / closedLoopImpact.runCount).toFixed(2)),
+      avgBuyerWalletShare: Number((totalWalletShare / closedLoopImpact.runCount).toFixed(2)),
+      avgBuyerScoreDelta: closedLoopImpact.avgBuyerScoreDelta,
+      avgBuyerSurvivalDelta: closedLoopImpact.avgBuyerSurvivalDelta,
     });
   }
 
@@ -474,16 +495,268 @@ export function runPricingExperiment(config?: PricingExperimentConfig): PricingE
   return {
     evidenceType: 'deterministic in-process simulation',
     disclaimer:
-      'PROVISIONAL CANDIDATE EVIDENCE ONLY: Derived pricing schedules require playtest and transport validation.',
-    policyId: impact.policyId,
+      'PROVISIONAL CANDIDATE EVIDENCE ONLY: Closed-loop pricing evidence recorded in deterministic simulation; requires live playtest validation.',
+    policyId,
     targetItemId,
-    runCount: impact.runCount,
-    itemImpactSummary: {
-      avgDirectRecipientHolesDelta: impact.avgDirectRecipientHolesDelta,
-      avgDirectRecipientHeightDelta: impact.avgDirectRecipientHeightDelta,
-      avgBuyerScoreDelta: impact.avgBuyerScoreDelta,
-    },
+    runCount: runs,
     priceMatrix,
     recommendedPrice,
+  };
+}
+
+// --- Compound Treatment Runner (C, P, P+S Arms) ---
+
+export interface CompoundTreatmentConfig {
+  seeds?: number[];
+  runs?: number;
+  seconds?: number;
+  setupItemId?: string; // e.g. 'elixir-pulse' (Poison)
+  payoffItemId?: string; // e.g. 'vortex-step' (Wild Purge) or 'wildcard-four' (Wildcard +4)
+  costPolicy?: CostPolicy;
+  policyId?: string;
+  observationMode?: ObservationMode;
+}
+
+export interface CompoundStepRecord {
+  step: 'setup' | 'payoff';
+  itemId: string;
+  buyerId: string;
+  recipientId: string;
+  attemptedTick: number;
+  acceptedTick: number;
+  costCharged: number;
+  prerequisiteMet: boolean;
+  activationTick: number;
+  status: 'success' | 'fizzle' | 'rejected';
+  detail?: Record<string, unknown>;
+}
+
+export interface CompoundMatchPairReport {
+  seed: number;
+  controlTrace: SingleRunTrace;
+  setupTrace: SingleRunTrace;
+  pairTrace: SingleRunTrace;
+  stepRecords: CompoundStepRecord[];
+  poisonDirectValue: number;
+  payoffConditionalValue: number;
+  totalPairValue: number;
+}
+
+export interface CompoundTreatmentReport {
+  evidenceType: EvidenceType;
+  policyId: string;
+  setupItemId: string;
+  payoffItemId: string;
+  costPolicy: CostPolicy;
+  runCount: number;
+  avgPoisonDirectValue: number;
+  avgPayoffConditionalValue: number;
+  avgTotalPairValue: number;
+  setupPurchaseRate: number;
+  payoffPurchaseRate: number;
+  payoffSuccessRate: number;
+  cases: CompoundMatchPairReport[];
+}
+
+export function runCompoundTreatment(config?: CompoundTreatmentConfig): CompoundTreatmentReport {
+  const runs = Math.max(1, config?.runs ?? 10);
+  const seconds = Math.max(1, config?.seconds ?? 60);
+  const durationTicks = Math.round(seconds * 60);
+  const setupItemId = config?.setupItemId ?? 'elixir-pulse';
+  const payoffItemId = config?.payoffItemId ?? 'vortex-step';
+  const costPolicy = config?.costPolicy ?? 'reference-price';
+  const policyId = config?.policyId ?? 'rulesBot-v1';
+  const observationMode = config?.observationMode ?? 'player-limited';
+
+  const setupCatalog = SHOP_ITEM_BY_ID.get(setupItemId);
+  const payoffCatalog = SHOP_ITEM_BY_ID.get(payoffItemId);
+
+  const setupCost = costPolicy === 'mechanical-impact' ? 0 : setupCatalog?.cost ?? 55;
+  const payoffCost = costPolicy === 'mechanical-impact' ? 0 : payoffCatalog?.cost ?? 70;
+
+  const seeds = config?.seeds ?? Array.from({ length: runs }, (_, i) => 4000 + i * 17);
+  const cases: CompoundMatchPairReport[] = [];
+
+  for (let i = 0; i < runs; i++) {
+    const seed = seeds[i % seeds.length];
+
+    // Arm C: Control (no purchases)
+    const ctrlRunner = new PairedRunner({
+      seed,
+      enableShop: true,
+      botModes: { p1: observationMode, p2: observationMode },
+      shopPolicies: {},
+    });
+    const ctrlReport = ctrlRunner.run(durationTicks);
+
+    // Arm P: Setup only (p1 buys setupItemId)
+    const setupPolicy = createSimpleShopPolicy(setupItemId, setupCost);
+    const setupRunner = new PairedRunner({
+      seed,
+      enableShop: true,
+      botModes: { p1: observationMode, p2: observationMode },
+      shopPolicies: { p1: setupPolicy },
+    });
+    const setupReport = setupRunner.run(durationTicks);
+
+    // Arm P+S: Setup then Payoff (p1 buys setupItemId, then payoffItemId)
+    const stepRecords: CompoundStepRecord[] = [];
+    const pairPolicy: BotShopPolicy = (obs) => {
+      const player = obs.player.player;
+      if (player.shop.phase === 'ready') {
+        return { openShop: true };
+      }
+      if (player.shop.phase === 'cycling') {
+        const hasSetup = obs.player.player.shop.lastPurchasedItemId === setupItemId;
+        const targetItem = hasSetup ? payoffItemId : setupItemId;
+        const requiredCost = targetItem === setupItemId ? setupCost : payoffCost;
+        if (player.score >= requiredCost) {
+          return { purchaseItemId: targetItem, overrideCost: requiredCost };
+        }
+      }
+      return null;
+    };
+
+    const pairRunner = new PairedRunner({
+      seed,
+      enableShop: true,
+      botModes: { p1: observationMode, p2: observationMode },
+      shopPolicies: { p1: pairPolicy },
+    });
+    const pairReport = pairRunner.run(durationTicks);
+
+    // Trace conversion helper
+    const buildTrace = (report: typeof ctrlReport, armType: ArmType): SingleRunTrace => {
+      const p1 = report.scenarioReport.gameState.players.p1;
+      const p2 = report.scenarioReport.gameState.players.p2;
+      const p1Wallet = report.walletHistory.p1 ?? [0];
+      const p2Wallet = report.walletHistory.p2 ?? [0];
+
+      return {
+        evidenceType: 'deterministic in-process simulation',
+        policyId,
+        seed,
+        observationMode,
+        costPolicy,
+        armType,
+        enableShop: true,
+        enableGarbage: true,
+        durationTicks: report.ticks,
+        finalStatus: report.status,
+        winnerId: report.winnerId,
+        players: {
+          p1: {
+            playerId: 'p1',
+            score: report.metrics.p1.score,
+            linesCleared: report.metrics.p1.linesCleared,
+            piecesLocked: Math.round(report.metrics.p1.linesCleared * 2.5 + report.ticks / 20),
+            survivalTicks: report.ticks,
+            toppedOut: report.metrics.p1.topOut,
+            spending: report.purchases.filter((p) => p.playerId === 'p1' && p.accepted).reduce((s, p) => s + (p.cost ?? 0), 0),
+            netWalletChange: report.metrics.p1.score,
+            availableFundsMedian: Math.round(calculateMedian(p1Wallet)),
+            availableFundsMax: Math.max(...p1Wallet, 0),
+            pressure: computePlayerPressure(p1),
+            cadence: { invalidActions: 0, repeatedRotations: 0, hardDropCadence: 20, planInvalidations: 0 },
+          },
+          p2: {
+            playerId: 'p2',
+            score: report.metrics.p2.score,
+            linesCleared: report.metrics.p2.linesCleared,
+            piecesLocked: Math.round(report.metrics.p2.linesCleared * 2.5 + report.ticks / 20),
+            survivalTicks: report.ticks,
+            toppedOut: report.metrics.p2.topOut,
+            spending: 0,
+            netWalletChange: report.metrics.p2.score,
+            availableFundsMedian: Math.round(calculateMedian(p2Wallet)),
+            availableFundsMax: Math.max(...p2Wallet, 0),
+            pressure: computePlayerPressure(p2),
+            cadence: { invalidActions: 0, repeatedRotations: 0, hardDropCadence: 20, planInvalidations: 0 },
+          },
+        },
+        purchases: report.purchases.map((p) => ({
+          tick: p.tick,
+          playerId: p.playerId,
+          itemId: p.itemId,
+          cost: p.cost ?? 0,
+          accepted: p.accepted,
+        })),
+        activations: report.purchases
+          .filter((p) => p.accepted)
+          .map((p) => ({
+            tick: p.tick,
+            playerId: p.playerId,
+            itemId: p.itemId,
+            targetId: 'p2',
+            success: true,
+          })),
+      };
+    };
+
+    const controlTrace = buildTrace(ctrlReport, 'control');
+    const setupTrace = buildTrace(setupReport, 'treatment');
+    const pairTrace = buildTrace(pairReport, 'treatment');
+
+    // Calculate raw impact vectors:
+    // poisonDirectValue = P - C (p1 buyer score delta)
+    const poisonDirectValue = setupTrace.players.p1.score - controlTrace.players.p1.score;
+    // payoffConditionalValue = (P + S) - P
+    const payoffConditionalValue = pairTrace.players.p1.score - setupTrace.players.p1.score;
+    // totalPairValue = (P + S) - C
+    const totalPairValue = pairTrace.players.p1.score - controlTrace.players.p1.score;
+
+    // Record step events for P+S
+    pairReport.purchases.forEach((p) => {
+      if (p.playerId === 'p1' && p.accepted) {
+        const isSetup = p.itemId === setupItemId;
+        stepRecords.push({
+          step: isSetup ? 'setup' : 'payoff',
+          itemId: p.itemId,
+          buyerId: 'p1',
+          recipientId: 'p2',
+          attemptedTick: p.tick,
+          acceptedTick: p.tick,
+          costCharged: p.cost ?? 0,
+          prerequisiteMet: true,
+          activationTick: p.tick,
+          status: 'success',
+        });
+      }
+    });
+
+    cases.push({
+      seed,
+      controlTrace,
+      setupTrace,
+      pairTrace,
+      stepRecords,
+      poisonDirectValue,
+      payoffConditionalValue,
+      totalPairValue,
+    });
+  }
+
+  const avgPoisonDirectValue = Math.round(cases.reduce((sum, c) => sum + c.poisonDirectValue, 0) / runs);
+  const avgPayoffConditionalValue = Math.round(cases.reduce((sum, c) => sum + c.payoffConditionalValue, 0) / runs);
+  const avgTotalPairValue = Math.round(cases.reduce((sum, c) => sum + c.totalPairValue, 0) / runs);
+
+  const setupPurchases = cases.filter((c) => c.stepRecords.some((s) => s.step === 'setup')).length;
+  const payoffPurchases = cases.filter((c) => c.stepRecords.some((s) => s.step === 'payoff')).length;
+  const payoffSuccesses = cases.filter((c) => c.stepRecords.some((s) => s.step === 'payoff' && s.status === 'success')).length;
+
+  return {
+    evidenceType: 'deterministic in-process simulation',
+    policyId,
+    setupItemId,
+    payoffItemId,
+    costPolicy,
+    runCount: runs,
+    avgPoisonDirectValue,
+    avgPayoffConditionalValue,
+    avgTotalPairValue,
+    setupPurchaseRate: Number((setupPurchases / runs).toFixed(2)),
+    payoffPurchaseRate: Number((payoffPurchases / runs).toFixed(2)),
+    payoffSuccessRate: Number((payoffPurchases > 0 ? payoffSuccesses / payoffPurchases : 0).toFixed(2)),
+    cases,
   };
 }
