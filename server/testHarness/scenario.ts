@@ -4,6 +4,7 @@ import { makePlayer } from '../tetris/engine.js';
 import { matchStep } from '../tetris/matchStep.js';
 import { applyShopPurchase, openPlayerShop } from '../shop.js';
 import { clonePlayer, type InputDriver } from './inputDriver.js';
+import { defaultObservationProjector, type ObservationMode } from './observationProjector.js';
 import type { PlayerFixture } from './fixtures.js';
 
 export interface ScenarioConfig {
@@ -169,24 +170,23 @@ export class Scenario {
       for (const id of this.playerIds) {
         const driver = this.drivers[id];
         if (driver) {
-          const player = this.gameState.players[id];
+          const mode: ObservationMode = driver.observationMode ?? 'omniscient';
+          const playerObs = defaultObservationProjector.project(this.gameState, id, mode);
           const cmd = driver.next({
             tick: this.gameState.tick + 1,
-            player: {
-              tick: this.gameState.tick,
-              player: clonePlayer(player),
-            },
+            player: playerObs,
           });
 
+          const rawPlayer = this.gameState.players[id];
           if (cmd.inputState) {
-            player.inputState = {
+            rawPlayer.inputState = {
               left: !!cmd.inputState.left,
               right: !!cmd.inputState.right,
               softDrop: !!cmd.inputState.softDrop,
             };
           }
           if (cmd.actions && cmd.actions.length > 0) {
-            player.actionQueue.push(...cmd.actions);
+            rawPlayer.actionQueue.push(...cmd.actions);
           }
         }
       }

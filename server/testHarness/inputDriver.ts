@@ -1,4 +1,5 @@
-import type { ActionType, InputState, PlayerState } from '../../src/types.js';
+import type { ActionType, InputState } from '../../src/types.js';
+import type { ObservationMode, PlayerObservation as ObservationProjectorPlayerObservation } from './observationProjector.js';
 
 export type DeepReadonly<T> = T extends (...args: never[]) => unknown
   ? T
@@ -13,10 +14,7 @@ export interface PlayerCommand {
   actions?: readonly ActionType[];
 }
 
-export interface PlayerObservation {
-  tick: number;
-  player: DeepReadonly<PlayerState>;
-}
+export type PlayerObservation = ObservationProjectorPlayerObservation;
 
 export interface DriverObservation {
   tick: number;
@@ -24,6 +22,7 @@ export interface DriverObservation {
 }
 
 export interface InputDriver {
+  observationMode?: ObservationMode;
   next(observation: DriverObservation): PlayerCommand;
 }
 
@@ -32,6 +31,7 @@ export function clonePlayer<T extends object>(player: T): T {
 }
 
 export class ScriptedDriver implements InputDriver {
+  public readonly observationMode: ObservationMode = 'omniscient';
   private readonly script: Map<number, PlayerCommand>;
 
   constructor(
@@ -39,7 +39,9 @@ export class ScriptedDriver implements InputDriver {
       | Record<number, PlayerCommand>
       | Map<number, PlayerCommand>
       | Array<{ tick: number; command: PlayerCommand }>,
+    observationMode: ObservationMode = 'omniscient',
   ) {
+    this.observationMode = observationMode;
     if (Array.isArray(script)) {
       this.script = new Map(script.map((item) => [item.tick, item.command]));
     } else if (script instanceof Map) {

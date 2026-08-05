@@ -28,6 +28,7 @@ export const RETRIM_COST = 120;
 export const CURTAIN_COST = 140;
 export const CURTAIN_TELEGRAPH_TICKS = 60; // 1s warning pill before the curtain drops
 export const CURTAIN_DURATION_TICKS = 240; // 4s blackout once active
+export const CURTAIN_FROST_ROWS = 3;
 // Poison (Elixir): poisons the opponent's active piece. On lock it seeds wave 1
 // and spreads to orthogonally-adjacent stack/garbage cells once per interval,
 // up to POISON_GENERATIONS total waves. Poison is permanent — it only stops

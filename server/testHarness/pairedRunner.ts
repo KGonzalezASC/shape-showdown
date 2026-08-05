@@ -3,6 +3,7 @@ import { SHOP_ITEM_BY_ID } from '../../src/shop/shopCatalog.js';
 import type { DriverObservation, InputDriver } from './inputDriver.js';
 import type { PlayerFixture } from './fixtures.js';
 import { RulesBot, type ObservationMode } from './rulesBot.js';
+import { defaultObservationProjector } from './observationProjector.js';
 import { Scenario, type PlayerMetrics, type ScenarioReport } from './scenario.js';
 
 export type BotShopPolicy = (observation: DriverObservation) => { openShop?: boolean; purchaseItemId?: string } | null;
@@ -98,10 +99,9 @@ export class PairedRunner {
       for (const id of this.playerIds) {
         const policy = this.shopPolicies[id];
         if (policy) {
-          const player = this.scenario.getPlayerState(id);
-          const obs: DriverObservation = {
+          const obs = {
             tick: stateBefore.tick,
-            player: { tick: stateBefore.tick, player },
+            player: defaultObservationProjector.project(stateBefore, id, 'omniscient'),
           };
           const decision = policy(obs);
           if (decision?.openShop) {

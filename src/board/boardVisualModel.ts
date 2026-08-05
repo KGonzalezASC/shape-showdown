@@ -1,5 +1,6 @@
 import type { PublicPlayerState } from '../state/publicSnapshots';
 import { SHAPES } from '../tetris/shapes';
+import { CURTAIN_FROST_ROWS } from '../constants';
 import {
   BOARD_COLS,
   BOARD_HIDDEN_ROWS,
@@ -44,8 +45,6 @@ export interface BoardVisualModelOptions {
   hatchingEnabled: boolean;
   isMe: boolean;
 }
-
-const CURTAIN_FROST_ROWS = 3;
 
 function visibleCellIndex(x: number, y: number): number {
   return y * BOARD_COLS + x;

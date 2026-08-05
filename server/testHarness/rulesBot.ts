@@ -1,9 +1,11 @@
-import { BOARD_COLS, BOARD_HIDDEN_ROWS, BOARD_ROWS } from '../../src/constants.js';
-import type { CellValue, PlayerState, TetrominoType } from '../../src/types.js';
+import { BOMBER_BLAST_RADIUS, BOARD_COLS, BOARD_ROWS } from '../../src/constants.js';
+import type { CellValue, TetrominoType } from '../../src/types.js';
+import { PublicPlayerState } from '../../src/state/publicSnapshots.js';
 import { SHAPES } from '../tetris/pieces.js';
-import { clonePlayer, type DriverObservation, type InputDriver, type PlayerCommand } from './inputDriver.js';
+import type { DriverObservation, InputDriver, PlayerCommand } from './inputDriver.js';
+import type { ObservationMode } from './observationProjector.js';
 
-export type ObservationMode = 'omniscient' | 'player-limited';
+export type { ObservationMode };
 
 export interface RulesBotOptions {
   mode?: ObservationMode;
@@ -15,10 +17,14 @@ export interface PlacementPlan {
   score: number;
 }
 
-/** Evaluates board stack quality for bot heuristics. */
-export function evaluateBoard(board: CellValue[][]): { aggregateHeight: number; holes: number; bumpiness: number } {
+/** Evaluates board stack quality, poison cells, and holes for bot heuristics. */
+export function evaluateBoard(
+  board: CellValue[][],
+  poisonBoard?: number[][],
+): { aggregateHeight: number; holes: number; bumpiness: number; poisonCells: number } {
   const columnHeights = new Array<number>(BOARD_COLS).fill(0);
   let holes = 0;
+  let poisonCells = 0;
 
   for (let x = 0; x < BOARD_COLS; x++) {
     let filledFound = false;
@@ -27,6 +33,9 @@ export function evaluateBoard(board: CellValue[][]): { aggregateHeight: number; 
         if (!filledFound) {
           columnHeights[x] = BOARD_ROWS - y;
           filledFound = true;
+        }
+        if (poisonBoard?.[y]?.[x] && poisonBoard[y][x] > 0) {
+          poisonCells++;
         }
       } else if (filledFound) {
         holes++;
@@ -41,49 +50,64 @@ export function evaluateBoard(board: CellValue[][]): { aggregateHeight: number; 
 
   const aggregateHeight = columnHeights.reduce((sum, h) => sum + h, 0);
 
-  return { aggregateHeight, holes, bumpiness };
+  return { aggregateHeight, holes, bumpiness, poisonCells };
+}
+
+/**
+ * Pure simulation of Bomber blast matching engine.ts detonateBomberBlast:
+ * Detonates a circular blast radius around EVERY locked cell of the piece.
+ */
+export function applyBomberBlastSimulation(
+  board: CellValue[][],
+  placedCells: Array<[number, number]>,
+  radius = BOMBER_BLAST_RADIUS,
+): CellValue[][] {
+  const sim = board.map((r) => [...r]);
+  const rSq = radius * radius;
+  const toClear = new Set<string>();
+
+  for (const [cx, cy] of placedCells) {
+    for (let dy = -radius; dy <= radius; dy++) {
+      for (let dx = -radius; dx <= radius; dx++) {
+        if (dx * dx + dy * dy > rSq) continue;
+        const x = cx + dx;
+        const y = cy + dy;
+        if (x < 0 || x >= BOARD_COLS || y < 0 || y >= BOARD_ROWS) continue;
+        if (sim[y][x] !== null) toClear.add(`${x},${y}`);
+      }
+    }
+  }
+
+  for (const key of toClear) {
+    const [xs, ys] = key.split(',');
+    sim[Number(ys)][Number(xs)] = null;
+  }
+
+  return sim;
 }
 
 export class RulesBot implements InputDriver {
   public readonly mode: ObservationMode;
+  public readonly observationMode: ObservationMode;
   private currentPlan: PlacementPlan | null = null;
   private lastPieceKey = '';
+  private lastRevision = '';
 
   constructor(options?: RulesBotOptions) {
     this.mode = options?.mode ?? 'omniscient';
-  }
-
-  /** Project player observation based on mode (e.g. mask curtain for player-limited). */
-  public projectObservation(observation: DriverObservation): PlayerState {
-    const player = clonePlayer(observation.player.player) as PlayerState;
-    if (this.mode === 'omniscient') {
-      return player;
-    }
-
-    // Player-limited mode: mask Curtain rows if active
-    const hasCurtain = player.activeEffects?.some((e) => e.kind === 'curtain');
-    if (!hasCurtain) {
-      return player;
-    }
-
-    const maskedBoard = player.board.map((row, y) => {
-      // Curtain hides rows below the player's current visible swap line.
-      const firstMaskedRow = BOARD_HIDDEN_ROWS + player.swapCutoffRow;
-      if (y >= firstMaskedRow) {
-        return new Array<CellValue>(BOARD_COLS).fill(null);
-      }
-      return [...row];
-    });
-
-    return {
-      ...player,
-      board: maskedBoard,
-    };
+    this.observationMode = this.mode;
   }
 
   public next(observation: DriverObservation): PlayerCommand {
-    const player = this.projectObservation(observation);
+    const obs = observation.player;
+    const player = obs.player;
     const active = player.activePiece;
+
+    // Revision-based plan invalidation (e.g. Curtain boundary change)
+    if (obs.context?.revision && obs.context.revision !== this.lastRevision) {
+      this.currentPlan = null;
+      this.lastRevision = obs.context.revision;
+    }
 
     if (!active) {
       this.currentPlan = null;
@@ -91,9 +115,9 @@ export class RulesBot implements InputDriver {
       return { inputState: { left: false, right: false, softDrop: false }, actions: [] };
     }
 
-    const pieceKey = `${active.type}_${active.x}_${active.y}_${active.rotation}`;
+    const pieceKey = `${active.type}_${active.x}_${active.y}_${active.rotation}_${active.bomber ? 'b' : 'n'}`;
     if (!this.currentPlan || this.lastPieceKey !== pieceKey) {
-      this.currentPlan = this.findBestPlacement(player, active.type);
+      this.currentPlan = this.findBestPlacement(player, active.type, !!active.bomber);
       this.lastPieceKey = pieceKey;
     }
 
@@ -118,7 +142,11 @@ export class RulesBot implements InputDriver {
     return { actions: ['hardDrop'] };
   }
 
-  private findBestPlacement(player: PlayerState, type: TetrominoType): PlacementPlan | null {
+  private findBestPlacement(
+    player: PublicPlayerState,
+    type: TetrominoType,
+    isBomber: boolean,
+  ): PlacementPlan | null {
     const shapeRotations = SHAPES[type];
     if (!shapeRotations || shapeRotations.length === 0) return null;
 
@@ -147,24 +175,40 @@ export class RulesBot implements InputDriver {
         }
 
         // Simulate stack after drop
-        const simBoard = player.board.map((r) => [...r]);
-        let linesCleared = 0;
+        let simBoard = player.board.map((r) => [...r]);
+        const placedCells: Array<[number, number]> = [];
         for (const [px, py] of shape) {
           const bx = x + px;
           const by = dropY + py;
           if (by >= 0 && by < BOARD_ROWS && bx >= 0 && bx < BOARD_COLS) {
             simBoard[by][bx] = type;
+            placedCells.push([bx, by]);
           }
         }
 
+        if (isBomber) {
+          simBoard = applyBomberBlastSimulation(simBoard, placedCells);
+        }
+
+        let linesCleared = 0;
         for (let y = 0; y < BOARD_ROWS; y++) {
           if (simBoard[y].every((cell) => cell !== null)) {
             linesCleared++;
           }
         }
 
-        const { aggregateHeight, holes, bumpiness } = evaluateBoard(simBoard);
-        const score = linesCleared * 100 - aggregateHeight * 2 - holes * 50 - bumpiness * 5;
+        const { aggregateHeight, holes, bumpiness, poisonCells } = evaluateBoard(
+          simBoard,
+          player.poisonBoard,
+        );
+
+        // Heuristic scoring with poison penalty
+        const score =
+          linesCleared * 100 -
+          aggregateHeight * 2 -
+          holes * 50 -
+          bumpiness * 5 -
+          poisonCells * 15;
 
         if (score > bestScore) {
           bestScore = score;

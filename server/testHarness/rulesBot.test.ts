@@ -6,6 +6,8 @@ import { createEmptyBoard } from '../tetris/engine.js';
 import { BOARD_COLS, BOARD_ROWS } from '../../src/constants.js';
 import type { DriverObservation } from './inputDriver.js';
 
+import { defaultObservationProjector } from './observationProjector.js';
+
 describe('RulesBot Adapter', () => {
   it('evaluates board stack metrics accurately', () => {
     const board = createEmptyBoard();
@@ -23,24 +25,18 @@ describe('RulesBot Adapter', () => {
   });
 
   it('projects player-limited observation by masking Curtain rows', () => {
-    const omniscientBot = new RulesBot({ mode: 'omniscient' });
-    const limitedBot = new RulesBot({ mode: 'player-limited' });
-
     const scenario = new Scenario({ seed: 1234 });
     const p1 = scenario.getPlayerState('p1');
     p1.board[BOARD_ROWS - 1][0] = 'I';
     p1.activeEffects = [{ id: 'curtain-1', kind: 'curtain', label: 'Curtain' }];
 
-    const obs: DriverObservation = {
-      tick: 10,
-      player: { tick: 10, player: p1 },
-    };
+    const state = scenario.getReport().gameState;
 
-    const omniState = omniscientBot.projectObservation(obs);
-    const limitedState = limitedBot.projectObservation(obs);
+    const omniObs = defaultObservationProjector.project(state, 'p1', 'omniscient');
+    const limitedObs = defaultObservationProjector.project(state, 'p1', 'player-limited');
 
-    assert.equal(omniState.board[BOARD_ROWS - 1][0], 'I');
-    assert.equal(limitedState.board[BOARD_ROWS - 1][0], null); // masked by curtain
+    assert.equal(omniObs.player.board[BOARD_ROWS - 1][0], 'I');
+    assert.equal(limitedObs.player.board[BOARD_ROWS - 1][0], null); // masked by curtain
   });
 
   it('emits deterministic movement and action commands without mutating state directly', () => {
@@ -51,7 +47,7 @@ describe('RulesBot Adapter', () => {
 
     const obs: DriverObservation = {
       tick: 1,
-      player: { tick: 1, player: p1 },
+      player: defaultObservationProjector.project(scenario.getReport().gameState, 'p1', 'omniscient'),
     };
 
     const cmd = bot.next(obs);
