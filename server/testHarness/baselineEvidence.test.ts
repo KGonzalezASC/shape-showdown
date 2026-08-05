@@ -4,8 +4,8 @@ import { runBotQuality, runItemImpact } from './experimentRunners.js';
 
 describe('Baseline Evidence Generation (Section 3)', () => {
   it('records deterministic baseline bot quality evidence across matched seeds', () => {
-    const report1 = runBotQuality({ runs: 5, seconds: 10, policyId: 'rulesBot-v1' });
-    const report2 = runBotQuality({ runs: 5, seconds: 10, policyId: 'rulesBot-v1' });
+    const report1 = runBotQuality({ runs: 5, seconds: 10, policyId: 'rulesBot-v1', enableGarbage: false });
+    const report2 = runBotQuality({ runs: 5, seconds: 10, policyId: 'rulesBot-v1', enableGarbage: false });
 
     assert.equal(report1.evidenceType, 'deterministic in-process simulation');
     assert.equal(report1.policyId, 'rulesBot-v1');
@@ -21,6 +21,7 @@ describe('Baseline Evidence Generation (Section 3)', () => {
       targetItemId: 'frost-shift',
       costPolicy: 'reference-price',
       policyId: 'rulesBot-v1',
+      enableGarbage: false,
     });
 
     const poisonReport = runItemImpact({
@@ -29,6 +30,7 @@ describe('Baseline Evidence Generation (Section 3)', () => {
       targetItemId: 'elixir-pulse',
       costPolicy: 'reference-price',
       policyId: 'rulesBot-v1',
+      enableGarbage: false,
     });
 
     assert.equal(curtainReport.evidenceType, 'deterministic in-process simulation');

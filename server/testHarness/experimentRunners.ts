@@ -528,6 +528,7 @@ export interface CompoundTreatmentConfig {
   costPolicy?: CostPolicy;
   policyId?: string;
   observationMode?: ObservationMode;
+  enableGarbage?: boolean;
 }
 
 export interface CompoundStepRecord {
@@ -599,10 +600,13 @@ export function runCompoundTreatment(config?: CompoundTreatmentConfig): Compound
   for (let i = 0; i < runs; i++) {
     const seed = seeds[i % seeds.length];
 
+    const enableGarbage = config?.enableGarbage ?? true;
+
     // Arm C: Control (no purchases)
     const ctrlRunner = new PairedRunner({
       seed,
       enableShop: true,
+      enableGarbage,
       botModes: { p1: observationMode, p2: observationMode },
       shopPolicies: {},
     });
@@ -613,6 +617,7 @@ export function runCompoundTreatment(config?: CompoundTreatmentConfig): Compound
     const setupRunner = new PairedRunner({
       seed,
       enableShop: true,
+      enableGarbage,
       botModes: { p1: observationMode, p2: observationMode },
       shopPolicies: { p1: setupPolicy },
     });
@@ -640,6 +645,7 @@ export function runCompoundTreatment(config?: CompoundTreatmentConfig): Compound
     const pairRunner = new PairedRunner({
       seed,
       enableShop: true,
+      enableGarbage,
       botModes: { p1: observationMode, p2: observationMode },
       shopPolicies: { p1: pairPolicy },
     });

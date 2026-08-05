@@ -9,6 +9,7 @@ const botQualityReport = runBotQuality({
   seconds: 120,
   policyId: 'rulesBot-v1',
   observationMode: 'player-limited',
+  enableGarbage: false,
 });
 
 const curtainImpactReport = runItemImpact({
@@ -18,6 +19,7 @@ const curtainImpactReport = runItemImpact({
   costPolicy: 'reference-price',
   policyId: 'rulesBot-v1',
   observationMode: 'player-limited',
+  enableGarbage: false,
 });
 
 const poisonImpactReport = runItemImpact({
@@ -27,6 +29,7 @@ const poisonImpactReport = runItemImpact({
   costPolicy: 'reference-price',
   policyId: 'rulesBot-v1',
   observationMode: 'player-limited',
+  enableGarbage: false,
 });
 
 const summaryDoc = [
