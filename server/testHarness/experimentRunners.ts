@@ -170,6 +170,7 @@ export interface ItemImpactConfig {
   seconds?: number;
   targetItemId?: string;
   costPolicy?: CostPolicy;
+  candidatePrice?: number;
   policyId?: string;
   observationMode?: ObservationMode;
   enableGarbage?: boolean;
@@ -180,6 +181,7 @@ export interface ItemImpactReport {
   policyId: string;
   targetItemId: string;
   costPolicy: CostPolicy;
+  candidatePrice?: number;
   observationMode: ObservationMode;
   runCount: number;
   matchedCasesCount: number;
@@ -280,12 +282,21 @@ export function runItemImpact(config?: ItemImpactConfig): ItemImpactReport {
 
     // Arm 2: Treatment (p1 purchases targetItemId)
     const catalogCost = catalogItem?.cost ?? 50;
-    const policyCost = costPolicy === 'mechanical-impact' ? 0 : catalogCost;
+    const policyCost =
+      costPolicy === 'mechanical-impact'
+        ? 0
+        : config?.candidatePrice !== undefined
+          ? config.candidatePrice
+          : catalogCost;
 
     const trtShopPolicy = createSimpleShopPolicy(
       targetItemId,
       policyCost,
-      costPolicy === 'mechanical-impact' ? 0 : undefined,
+      costPolicy === 'mechanical-impact'
+        ? 0
+        : config?.candidatePrice !== undefined
+          ? config.candidatePrice
+          : undefined,
     );
     const trtRunner = new PairedRunner({
       seed,
@@ -299,7 +310,7 @@ export function runItemImpact(config?: ItemImpactConfig): ItemImpactReport {
     const trtP1 = trtReport.scenarioReport.gameState.players.p1;
     const trtP2 = trtReport.scenarioReport.gameState.players.p2;
     const trtPurchases = trtReport.purchases.filter((p) => p.playerId === 'p1' && p.accepted);
-    const totalSpending = trtPurchases.length * policyCost;
+    const totalSpending = trtPurchases.reduce((sum, p) => sum + (p.cost ?? 0), 0);
 
     const trtP1Wallet = trtReport.walletHistory.p1 ?? [0];
     const trtP2Wallet = trtReport.walletHistory.p2 ?? [0];
@@ -352,7 +363,7 @@ export function runItemImpact(config?: ItemImpactConfig): ItemImpactReport {
         tick: p.tick,
         playerId: p.playerId,
         itemId: p.itemId,
-        cost: policyCost,
+        cost: p.cost ?? 0,
         accepted: true,
       })),
       activations: trtPurchases.map((p) => ({
@@ -391,6 +402,7 @@ export function runItemImpact(config?: ItemImpactConfig): ItemImpactReport {
     policyId,
     targetItemId,
     costPolicy,
+    candidatePrice: config?.candidatePrice,
     observationMode,
     runCount: runs,
     matchedCasesCount: runs,
@@ -456,6 +468,7 @@ export function runPricingExperiment(config?: PricingExperimentConfig): PricingE
       seconds,
       targetItemId,
       costPolicy: 'pricing',
+      candidatePrice,
       policyId,
       observationMode,
     });
@@ -571,8 +584,14 @@ export function runCompoundTreatment(config?: CompoundTreatmentConfig): Compound
   const setupCatalog = SHOP_ITEM_BY_ID.get(setupItemId);
   const payoffCatalog = SHOP_ITEM_BY_ID.get(payoffItemId);
 
+  const setupRecipientId = setupCatalog?.target === 'self' ? 'p1' : 'p2';
+  const payoffRecipientId = payoffCatalog?.target === 'self' ? 'p1' : 'p2';
+
   const setupCost = costPolicy === 'mechanical-impact' ? 0 : setupCatalog?.cost ?? 55;
   const payoffCost = costPolicy === 'mechanical-impact' ? 0 : payoffCatalog?.cost ?? 70;
+
+  const setupOverrideCost = costPolicy === 'mechanical-impact' ? 0 : setupCost;
+  const payoffOverrideCost = costPolicy === 'mechanical-impact' ? 0 : payoffCost;
 
   const seeds = config?.seeds ?? Array.from({ length: runs }, (_, i) => 4000 + i * 17);
   const cases: CompoundMatchPairReport[] = [];
@@ -590,7 +609,7 @@ export function runCompoundTreatment(config?: CompoundTreatmentConfig): Compound
     const ctrlReport = ctrlRunner.run(durationTicks);
 
     // Arm P: Setup only (p1 buys setupItemId)
-    const setupPolicy = createSimpleShopPolicy(setupItemId, setupCost);
+    const setupPolicy = createSimpleShopPolicy(setupItemId, setupCost, setupOverrideCost);
     const setupRunner = new PairedRunner({
       seed,
       enableShop: true,
@@ -609,9 +628,10 @@ export function runCompoundTreatment(config?: CompoundTreatmentConfig): Compound
       if (player.shop.phase === 'cycling') {
         const hasSetup = obs.player.player.shop.lastPurchasedItemId === setupItemId;
         const targetItem = hasSetup ? payoffItemId : setupItemId;
-        const requiredCost = targetItem === setupItemId ? setupCost : payoffCost;
-        if (player.score >= requiredCost) {
-          return { purchaseItemId: targetItem, overrideCost: requiredCost };
+        const reqCost = targetItem === setupItemId ? setupCost : payoffCost;
+        const itemOverrideCost = targetItem === setupItemId ? setupOverrideCost : payoffOverrideCost;
+        if (player.score >= reqCost) {
+          return { purchaseItemId: targetItem, overrideCost: itemOverrideCost };
         }
       }
       return null;
@@ -687,7 +707,7 @@ export function runCompoundTreatment(config?: CompoundTreatmentConfig): Compound
             tick: p.tick,
             playerId: p.playerId,
             itemId: p.itemId,
-            targetId: 'p2',
+            targetId: p.itemId === setupItemId ? setupRecipientId : payoffRecipientId,
             success: true,
           })),
       };
@@ -705,21 +725,22 @@ export function runCompoundTreatment(config?: CompoundTreatmentConfig): Compound
     // totalPairValue = (P + S) - C
     const totalPairValue = pairTrace.players.p1.score - controlTrace.players.p1.score;
 
-    // Record step events for P+S
+    // Record step events for P+S (both accepted and rejected)
     pairReport.purchases.forEach((p) => {
-      if (p.playerId === 'p1' && p.accepted) {
+      if (p.playerId === 'p1') {
         const isSetup = p.itemId === setupItemId;
+        const recipientId = isSetup ? setupRecipientId : payoffRecipientId;
         stepRecords.push({
           step: isSetup ? 'setup' : 'payoff',
           itemId: p.itemId,
           buyerId: 'p1',
-          recipientId: 'p2',
+          recipientId,
           attemptedTick: p.tick,
           acceptedTick: p.tick,
-          costCharged: p.cost ?? 0,
-          prerequisiteMet: true,
+          costCharged: p.accepted ? (p.cost ?? 0) : 0,
+          prerequisiteMet: p.accepted,
           activationTick: p.tick,
-          status: 'success',
+          status: p.accepted ? 'success' : 'rejected',
         });
       }
     });
@@ -740,8 +761,8 @@ export function runCompoundTreatment(config?: CompoundTreatmentConfig): Compound
   const avgPayoffConditionalValue = Math.round(cases.reduce((sum, c) => sum + c.payoffConditionalValue, 0) / runs);
   const avgTotalPairValue = Math.round(cases.reduce((sum, c) => sum + c.totalPairValue, 0) / runs);
 
-  const setupPurchases = cases.filter((c) => c.stepRecords.some((s) => s.step === 'setup')).length;
-  const payoffPurchases = cases.filter((c) => c.stepRecords.some((s) => s.step === 'payoff')).length;
+  const setupPurchases = cases.filter((c) => c.stepRecords.some((s) => s.step === 'setup' && s.status === 'success')).length;
+  const payoffPurchases = cases.filter((c) => c.stepRecords.some((s) => s.step === 'payoff' && s.status === 'success')).length;
   const payoffSuccesses = cases.filter((c) => c.stepRecords.some((s) => s.step === 'payoff' && s.status === 'success')).length;
 
   return {

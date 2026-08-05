@@ -56,17 +56,23 @@ describe('Separated Experiment Runners', () => {
     assert.equal(oppReport.roleDeltas[0].recipientId, 'p2');
   });
 
-  it('runPricingExperiment performs closed-loop candidate price simulations', () => {
+  it('runPricingExperiment performs closed-loop candidate price simulations that change charged costs', () => {
     const report = runPricingExperiment({
       runs: 3,
       seconds: 5,
       targetItemId: 'frost-shift',
-      candidatePrices: [20, 40, 60, 80],
+      candidatePrices: [0, 1000],
     });
 
     assert.equal(report.evidenceType, 'deterministic in-process simulation');
     assert.ok(report.disclaimer.includes('PROVISIONAL CANDIDATE EVIDENCE ONLY'));
-    assert.equal(report.priceMatrix.length, 4);
-    assert.ok(typeof report.recommendedPrice === 'number');
+    assert.equal(report.priceMatrix.length, 2);
+
+    const price0 = report.priceMatrix[0];
+    const price1000 = report.priceMatrix[1];
+
+    assert.equal(price0.candidatePrice, 0);
+    assert.equal(price1000.candidatePrice, 1000);
+    assert.notEqual(price0.purchaseRate, price1000.purchaseRate);
   });
 });

@@ -29,6 +29,22 @@ describe('Compound Treatment Runner (C, P, P+S Arms)', () => {
     }
   });
 
+  it('charges 0 spending in mechanical-impact cost policy across setup and pair arms', () => {
+    const report = runCompoundTreatment({
+      runs: 3,
+      seconds: 5,
+      setupItemId: 'elixir-pulse',
+      payoffItemId: 'vortex-step',
+      costPolicy: 'mechanical-impact',
+    });
+
+    assert.equal(report.costPolicy, 'mechanical-impact');
+    for (const c of report.cases) {
+      assert.equal(c.setupTrace.players.p1.spending, 0);
+      assert.equal(c.pairTrace.players.p1.spending, 0);
+    }
+  });
+
   it('handles Wildcard +4 payoff sequence as a gated prerequisite treatment', () => {
     const report = runCompoundTreatment({
       runs: 3,
