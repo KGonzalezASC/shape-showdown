@@ -27,6 +27,7 @@
     "test:harness": "bun test server/testHarness/**/*.test.ts",
     "test:pricing": "bun scripts/pricing-lab.mts",
     "test:smoke": "bun scripts/live-smoke.mts",
+    "test:baseline": "bun scripts/generate-baseline-evidence.mts",
     "knip": "knip",
     "lint:dead-code": "knip",
     "start": "cross-env NODE_ENV=production bun dist-server/server.mjs",
