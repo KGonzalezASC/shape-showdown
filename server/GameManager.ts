@@ -7,21 +7,18 @@ import {
   GAME_DURATION,
   GameState,
   InputState,
-  MatchEvent,
   REPLAY_KEYFRAME_INTERVAL_TICKS,
   ReplayDataV2,
   ReplayInputFrame,
   RESTART_DELAY_SECONDS,
 } from '../src/types.js';
-import type { StepResult } from './tetris/stepTypes.js';
 import {
-  enqueueGarbage,
   initialSeed,
   makePlayer,
   replayDateLabel,
-  stepPlayer,
   tickSeconds,
 } from './tetris/engine.js';
+import { matchStep } from './tetris/matchStep.js';
 import { createPlayerRngChannels, type RngChannels } from '../src/rng.js';
 import { SHOP_ITEM_BY_ID } from '../src/shop/shopCatalog.js';
 import {
@@ -29,25 +26,6 @@ import {
   openPlayerShop,
   resetPlayerShop,
 } from './shop.js';
-
-const MATCH_EVENT_ORDER: Record<MatchEvent['type'], number> = {
-  lineClear: 10,
-  garbageApplied: 20,
-  attackSent: 30,
-  poisonSpread: 40,
-  shopRoll: 50,
-  tectonicStep: 60,
-  tectonicComplete: 70,
-  topOut: 80,
-};
-
-function canonicalMatchEvents(events: MatchEvent[]): MatchEvent[] {
-  return [...events].sort((left, right) => (
-    (left.tick - right.tick)
-    || (MATCH_EVENT_ORDER[left.type] - MATCH_EVENT_ORDER[right.type])
-    || left.playerId.localeCompare(right.playerId)
-  ));
-}
 
 export class GameManager {
   private io: Server;
@@ -260,7 +238,14 @@ export class GameManager {
   }
 
   private recordReplayInput(frame: ReplayInputFrame): void {
-    if (this.activeReplay) this.activeReplay.inputs.push(frame);
+    if (this.activeReplay) {
+      // Socket events received between simulation ticks take effect on the
+      // next integer tick. Keep replay frames aligned with matchStep().
+      this.activeReplay.inputs.push({
+        ...frame,
+        tick: this.gameState.tick + 1,
+      });
+    }
   }
 
   private clearInputs() {
@@ -318,69 +303,26 @@ export class GameManager {
         };
       }
     } else if (this.gameState.status === 'playing') {
-      this.gameState.tick += 1;
-      this.gameState.remainingTime = Math.max(0, this.gameState.remainingTime - tickSeconds());
+      const stepResult = matchStep(this.gameState, (id) => this.playerRng(id));
 
-      const matchEvents: MatchEvent[] = [];
-      const pids = Object.keys(this.gameState.players);
-      const stepResults: Record<string, StepResult> = {};
-      let matchEndedThisTick = false;
-
-      // Pass 1: step both players independently (no opponent mutation during step)
-      for (const id of pids) {
-        if (this.gameState.status !== 'playing') break;
-        const player = this.gameState.players[id];
-        const stepRes = stepPlayer(this.gameState.tick, player, this.playerRng(id), matchEvents);
-        stepResults[id] = stepRes;
-        if (player.topOut) {
-          this.gameState.status = 'ended';
-          const opponentId = pids.find((pid) => pid !== id);
-          this.gameState.winnerId = opponentId ?? null;
-          this.gameState.restartTimer = RESTART_DELAY_SECONDS;
-          matchEndedThisTick = true;
-          break;
-        }
+      if (this.activeReplay && stepResult.events.length > 0) {
+        this.activeReplay.events.push(...stepResult.events);
       }
-
-      // Pass 2: commit outgoing attacks to opponents
-      if (this.gameState.status === 'playing') {
-        for (const id of pids) {
-          const attack = stepResults[id]?.attackLinesQueued ?? 0;
-          if (attack > 0) {
-            const opponentId = pids.find((pid) => pid !== id);
-            const opponent = opponentId ? this.gameState.players[opponentId] : null;
-            if (opponent) {
-              enqueueGarbage(opponent, attack, this.gameState.tick);
-              matchEvents.push({
-                tick: this.gameState.tick,
-                type: 'attackSent',
-                playerId: id,
-                lines: attack,
-              });
-            }
-          }
-        }
-      }
-
-      const orderedEvents = canonicalMatchEvents(matchEvents);
-      if (this.activeReplay && orderedEvents.length > 0) {
-        this.activeReplay.events.push(...orderedEvents);
-      }
-      if (orderedEvents.length > 0) {
-        for (const ev of orderedEvents) {
+      if (stepResult.events.length > 0) {
+        for (const ev of stepResult.events) {
           this.io.emit('matchEvent', ev);
         }
       }
 
       if (this.activeReplay && (
-        this.gameState.tick % this.replayKeyframeIntervalTicks === 0 || matchEndedThisTick
+        this.gameState.tick % this.replayKeyframeIntervalTicks === 0 || stepResult.matchEnded
       )) {
         this.activeReplay.keyframes.push({
           tick: this.gameState.tick,
           players: JSON.parse(JSON.stringify(this.gameState.players)),
         });
       }
-      if (matchEndedThisTick) this.saveReplay();
+      if (stepResult.matchEnded) this.saveReplay();
     } else if (this.gameState.status === 'ended') {
       this.clearInputs();
       if (this.gameState.restartTimer !== undefined) {

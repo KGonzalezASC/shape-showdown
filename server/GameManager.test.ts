@@ -153,6 +153,7 @@ describe('GameManager lifecycle harness', () => {
     p1Socket.emit('shopPurchase', 'not-the-highlighted-offer');
 
     assert.deepEqual(replay.inputs.map((frame) => frame.kind), ['shopOpen', 'shopPurchase']);
+    assert.deepEqual(replay.inputs.map((frame) => frame.tick), [1, 1]);
     assert.equal(replay.inputs[0].kind, 'shopOpen');
     assert.equal(replay.inputs[1].kind, 'shopPurchase');
   });
@@ -212,5 +213,70 @@ describe('GameManager lifecycle harness', () => {
       else process.env.REPLAYS_DIR = previousReplayDir;
       fs.rmSync(replayDir, { recursive: true, force: true });
     }
+  });
+
+  it('derives player RNG channels from match seed and player slot, not socket id', () => {
+    const gm1 = new GameManager(createFakeIo(), 60);
+    managers.push(gm1);
+    const gm2 = new GameManager(createFakeIo(), 60);
+    managers.push(gm2);
+
+    (gm1 as unknown as { gameState: { seed: number } }).gameState.seed = 12345;
+    (gm2 as unknown as { gameState: { seed: number } }).gameState.seed = 12345;
+
+    gm1.handleConnection(new FakeSocket('alpha') as unknown as Socket);
+    gm1.handleConnection(new FakeSocket('beta') as unknown as Socket);
+
+    gm2.handleConnection(new FakeSocket('foo') as unknown as Socket);
+    gm2.handleConnection(new FakeSocket('bar') as unknown as Socket);
+
+    const state1 = (gm1 as unknown as { gameState: { players: Record<string, PlayerState> } }).gameState;
+    const state2 = (gm2 as unknown as { gameState: { players: Record<string, PlayerState> } }).gameState;
+
+    assert.equal(state1.players.alpha.activePiece?.type, state2.players.foo.activePiece?.type);
+    assert.deepEqual(state1.players.alpha.nextQueue, state2.players.foo.nextQueue);
+    assert.deepEqual(state1.players.alpha.shop.offerIds, state2.players.foo.shop.offerIds);
+
+    assert.equal(state1.players.beta.activePiece?.type, state2.players.bar.activePiece?.type);
+    assert.deepEqual(state1.players.beta.nextQueue, state2.players.bar.nextQueue);
+    assert.deepEqual(state1.players.beta.shop.offerIds, state2.players.bar.shop.offerIds);
+  });
+
+  it('fixed seed and identical actions produce deterministic player states and canonical event sequences', () => {
+    const emitted1: unknown[][] = [];
+    const gm1 = new GameManager(createFakeIo(emitted1), 60);
+    managers.push(gm1);
+    (gm1 as unknown as { gameState: { seed: number } }).gameState.seed = 9999;
+    const s1a = new FakeSocket('p1');
+    const s1b = new FakeSocket('p2');
+    gm1.handleConnection(s1a as unknown as Socket);
+    gm1.handleConnection(s1b as unknown as Socket);
+
+    const emitted2: unknown[][] = [];
+    const gm2 = new GameManager(createFakeIo(emitted2), 60);
+    managers.push(gm2);
+    (gm2 as unknown as { gameState: { seed: number } }).gameState.seed = 9999;
+    const s2a = new FakeSocket('p1');
+    const s2b = new FakeSocket('p2');
+    gm2.handleConnection(s2a as unknown as Socket);
+    gm2.handleConnection(s2b as unknown as Socket);
+
+    for (let i = 0; i < 200; i += 1) {
+      gm1.tickOnceForTests();
+      gm2.tickOnceForTests();
+    }
+
+    const state1 = (gm1 as unknown as { gameState: { tick: number; players: Record<string, PlayerState> } }).gameState;
+    const state2 = (gm2 as unknown as { gameState: { tick: number; players: Record<string, PlayerState> } }).gameState;
+
+    assert.equal(state1.tick, state2.tick);
+    assert.deepEqual(state1.players.p1.board, state2.players.p1.board);
+    assert.deepEqual(state1.players.p1.activePiece, state2.players.p1.activePiece);
+    assert.deepEqual(state1.players.p2.board, state2.players.p2.board);
+    assert.deepEqual(state1.players.p2.activePiece, state2.players.p2.activePiece);
+
+    const events1 = emitted1.filter((args) => args[0] === 'matchEvent').map((args) => args[1]);
+    const events2 = emitted2.filter((args) => args[0] === 'matchEvent').map((args) => args[1]);
+    assert.deepEqual(events1, events2);
   });
 });

@@ -19,3 +19,9 @@ export interface StepOptions {
   /** Disable shop behavior for training dummies or non-player simulations. */
   enableShop?: boolean;
 }
+
+/** Options for one authoritative two-player match tick. */
+export interface MatchStepOptions extends StepOptions {
+  /** Suppress outgoing attack-to-garbage commits while retaining line clears. */
+  enableGarbage?: boolean;
+}

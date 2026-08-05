@@ -1,0 +1,144 @@
+import { describe, it } from 'node:test';
+import assert from 'node:assert/strict';
+import { matchStep, canonicalMatchEvents } from './matchStep.js';
+import { makePlayer } from './engine.js';
+import { createPlayerRngChannels } from '../../src/rng.js';
+import { BOARD_COLS, BOARD_ROWS } from '../../src/constants.js';
+import type { GameState, MatchEvent } from '../../src/types.js';
+
+describe('matchStep authoritative match seam', () => {
+  it('advances tick and steps both players independently', () => {
+    const seed = 12345;
+    const p1Rng = createPlayerRngChannels(seed, 0);
+    const p2Rng = createPlayerRngChannels(seed, 1);
+    const p1 = makePlayer('p1', p1Rng);
+    const p2 = makePlayer('p2', p2Rng);
+
+    const gameState: GameState = {
+      players: { p1, p2 },
+      status: 'playing',
+      countdown: 0,
+      remainingTime: 180,
+      winnerId: null,
+      tick: 0,
+      seed,
+    };
+
+    const rngLookup = { p1: p1Rng, p2: p2Rng };
+    const result = matchStep(gameState, rngLookup);
+
+    assert.equal(gameState.tick, 1);
+    assert.equal(result.tick, 1);
+    assert.equal(result.matchEnded, false);
+    assert.ok(result.stepResults.p1);
+    assert.ok(result.stepResults.p2);
+  });
+
+  it('commits attacks to opponent in pass 2 after independent simulation pass', () => {
+    const seed = 54321;
+    const p1Rng = createPlayerRngChannels(seed, 0);
+    const p2Rng = createPlayerRngChannels(seed, 1);
+    const p1 = makePlayer('p1', p1Rng);
+    const p2 = makePlayer('p2', p2Rng);
+
+    const bottom = BOARD_ROWS - 1;
+    for (let x = 1; x < BOARD_COLS; x += 1) p1.board[bottom][x] = 'I';
+    p1.activePiece = { type: 'I', rotation: 0, x: -1, y: bottom - 1 };
+    p1.lockDelayRemainingTicks = 0;
+
+    const gameState: GameState = {
+      players: { p1, p2 },
+      status: 'playing',
+      countdown: 0,
+      remainingTime: 180,
+      winnerId: null,
+      tick: 0,
+      seed,
+    };
+
+    const result = matchStep(gameState, (id) => (id === 'p1' ? p1Rng : p2Rng));
+
+    assert.equal(result.stepResults.p1.linesClearedThisStep, 1);
+    assert.equal(result.stepResults.p1.attackLinesQueued, 11);
+    assert.ok(p2.pendingGarbage.length > 0);
+    assert.ok(result.events.some((ev) => ev.type === 'attackSent' && ev.playerId === 'p1' && ev.lines === 11));
+  });
+
+  it('stops processing remaining players immediately on top-out', () => {
+    const seed = 999;
+    const p1Rng = createPlayerRngChannels(seed, 0);
+    const p2Rng = createPlayerRngChannels(seed, 1);
+    const p1 = makePlayer('p1', p1Rng);
+    const p2 = makePlayer('p2', p2Rng);
+
+    p1.topOut = false;
+    p1.activePiece = null;
+    for (let y = 0; y < 2; y += 1) {
+      for (let x = 0; x < BOARD_COLS; x += 1) p1.board[y][x] = 'I';
+    }
+
+    const p2GravityBefore = p2.gravityCounter;
+
+    const gameState: GameState = {
+      players: { p1, p2 },
+      status: 'playing',
+      countdown: 0,
+      remainingTime: 180,
+      winnerId: null,
+      tick: 10,
+      seed,
+    };
+
+    const result = matchStep(gameState, { p1: p1Rng, p2: p2Rng });
+
+    assert.equal(gameState.status, 'ended');
+    assert.equal(result.matchEnded, true);
+    assert.equal(result.winnerId, 'p2');
+    assert.equal(p2.gravityCounter, p2GravityBefore);
+  });
+
+  it('canonicalizes events by tick, type priority, and playerId', () => {
+    const events: MatchEvent[] = [
+      { tick: 5, type: 'topOut', playerId: 'p2' },
+      { tick: 5, type: 'lineClear', playerId: 'p1', lines: 4, tSpin: false },
+      { tick: 5, type: 'attackSent', playerId: 'p1', lines: 4 },
+      { tick: 5, type: 'lineClear', playerId: 'p0', lines: 1, tSpin: false },
+    ];
+
+    const sorted = canonicalMatchEvents(events);
+    assert.equal(sorted[0].type, 'lineClear');
+    assert.equal(sorted[0].playerId, 'p0');
+    assert.equal(sorted[1].type, 'lineClear');
+    assert.equal(sorted[1].playerId, 'p1');
+    assert.equal(sorted[2].type, 'attackSent');
+    assert.equal(sorted[3].type, 'topOut');
+  });
+
+  it('can suppress outgoing garbage without suppressing the line clear result', () => {
+    const seed = 2468;
+    const p1Rng = createPlayerRngChannels(seed, 0);
+    const p2Rng = createPlayerRngChannels(seed, 1);
+    const p1 = makePlayer('p1', p1Rng);
+    const p2 = makePlayer('p2', p2Rng);
+    const bottom = BOARD_ROWS - 1;
+    for (let x = 1; x < BOARD_COLS; x += 1) p1.board[bottom][x] = 'I';
+    p1.activePiece = { type: 'I', rotation: 0, x: -1, y: bottom - 1 };
+    p1.lockDelayRemainingTicks = 0;
+
+    const gameState: GameState = {
+      players: { p1, p2 },
+      status: 'playing',
+      countdown: 0,
+      remainingTime: 180,
+      winnerId: null,
+      tick: 0,
+      seed,
+    };
+
+    const result = matchStep(gameState, { p1: p1Rng, p2: p2Rng }, { enableGarbage: false });
+
+    assert.equal(result.stepResults.p1.linesClearedThisStep, 1);
+    assert.equal(p2.pendingGarbage.length, 0);
+    assert.equal(result.events.some((event) => event.type === 'attackSent'), false);
+  });
+});
