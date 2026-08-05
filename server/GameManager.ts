@@ -9,36 +9,57 @@ import {
   InputState,
   MatchEvent,
   REPLAY_KEYFRAME_INTERVAL_TICKS,
-  ReplayData,
   ReplayDataV2,
+  ReplayInputFrame,
   RESTART_DELAY_SECONDS,
 } from '../src/types.js';
+import type { StepResult } from './tetris/stepTypes.js';
 import {
+  enqueueGarbage,
   initialSeed,
   makePlayer,
-  makeRng,
   replayDateLabel,
   stepPlayer,
   tickSeconds,
 } from './tetris/engine.js';
+import { createPlayerRngChannels, type RngChannels } from '../src/rng.js';
+import { SHOP_ITEM_BY_ID } from '../src/shop/shopCatalog.js';
 import {
   applyShopPurchase,
   openPlayerShop,
   resetPlayerShop,
-  rollShopOnLineClear,
-  tickPlayerShop,
 } from './shop.js';
+
+const MATCH_EVENT_ORDER: Record<MatchEvent['type'], number> = {
+  lineClear: 10,
+  garbageApplied: 20,
+  attackSent: 30,
+  poisonSpread: 40,
+  shopRoll: 50,
+  tectonicStep: 60,
+  tectonicComplete: 70,
+  topOut: 80,
+};
+
+function canonicalMatchEvents(events: MatchEvent[]): MatchEvent[] {
+  return [...events].sort((left, right) => (
+    (left.tick - right.tick)
+    || (MATCH_EVENT_ORDER[left.type] - MATCH_EVENT_ORDER[right.type])
+    || left.playerId.localeCompare(right.playerId)
+  ));
+}
 
 export class GameManager {
   private io: Server;
   private gameState: GameState;
   private activeReplay: ReplayDataV2 | null = null;
-  private rng = makeRng(initialSeed());
+  private readonly matchSeed = initialSeed();
+  private readonly playerSlots = new Map<string, number>();
+  private rngChannelsByPlayer = new Map<string, RngChannels>();
   private readonly replayKeyframeIntervalTicks: number;
   private readonly netcastEveryNTicks: number;
   private readonly lobbyNetcastEveryNTicks: number;
   private lastHandledStatus: GameState['status'] = 'waiting';
-  private prevLinesCleared: Record<string, number> = {};
 
   constructor(io: Server, replayKeyframeIntervalTicks = REPLAY_KEYFRAME_INTERVAL_TICKS) {
     this.io = io;
@@ -58,7 +79,7 @@ export class GameManager {
       remainingTime: GAME_DURATION,
       winnerId: null,
       tick: 0,
-      seed: this.rng.seed,
+      seed: this.matchSeed,
     };
 
     this.loopHandle = this.startLoop();
@@ -76,7 +97,10 @@ export class GameManager {
 
   public handleConnection(socket: Socket) {
     if (Object.keys(this.gameState.players).length < 2) {
-      this.gameState.players[socket.id] = makePlayer(socket.id, this.rng);
+      const slot = this.assignPlayerSlot(socket.id);
+      const channels = createPlayerRngChannels(this.gameState.seed, slot);
+      this.rngChannelsByPlayer.set(socket.id, channels);
+      this.gameState.players[socket.id] = makePlayer(socket.id, channels);
       this.io.emit("gameState", this.gameState);
     } else {
       socket.emit("error", "Game is full");
@@ -93,7 +117,7 @@ export class GameManager {
         softDrop: !!input?.softDrop,
       };
       if (this.activeReplay && this.gameState.status === 'playing') {
-        this.activeReplay.inputs.push({
+        this.recordReplayInput({
           tick: this.gameState.tick,
           playerId: socket.id,
           kind: 'inputState',
@@ -108,7 +132,7 @@ export class GameManager {
       if (!['rotateCW', 'rotateCCW', 'hardDrop', 'hold'].includes(action)) return;
       player.actionQueue.push(action);
       if (this.activeReplay) {
-        this.activeReplay.inputs.push({
+        this.recordReplayInput({
           tick: this.gameState.tick,
           playerId: socket.id,
           kind: 'action',
@@ -121,7 +145,13 @@ export class GameManager {
       if (this.gameState.status !== 'playing') return;
       const buyer = this.gameState.players[socket.id];
       if (!buyer) return;
-      openPlayerShop(buyer, this.gameState.tick);
+      const accepted = openPlayerShop(buyer, this.gameState.tick);
+      this.recordReplayInput({
+        tick: this.gameState.tick,
+        playerId: socket.id,
+        kind: 'shopOpen',
+        accepted,
+      });
     });
 
     socket.on('shopPurchase', (itemId: string) => {
@@ -133,7 +163,16 @@ export class GameManager {
       const pids = Object.keys(this.gameState.players);
       const opponentId = pids.find((id) => id !== socket.id);
       const opponent = opponentId ? this.gameState.players[opponentId] : null;
-      applyShopPurchase(this.gameState, buyer, opponent, itemId, this.rng);
+      const accepted = applyShopPurchase(this.gameState, buyer, opponent, itemId, this.playerRng(socket.id));
+      const cost = SHOP_ITEM_BY_ID.get(itemId)?.cost;
+      this.recordReplayInput({
+        tick: this.gameState.tick,
+        playerId: socket.id,
+        kind: 'shopPurchase',
+        itemId,
+        accepted,
+        ...(cost === undefined ? {} : { cost }),
+      });
       // Flush immediately so cascade / pills aren't held back by the 30Hz netcast.
       this.io.emit('gameState', this.gameState);
     });
@@ -157,6 +196,8 @@ export class GameManager {
         this.gameState.restartTimer = undefined;
       }
       delete this.gameState.players[socket.id];
+      this.playerSlots.delete(socket.id);
+      this.rngChannelsByPlayer.delete(socket.id);
       this.io.emit("gameState", this.gameState);
     });
   }
@@ -191,6 +232,37 @@ export class GameManager {
     this.update();
   }
 
+  private assignPlayerSlot(playerId: string): number {
+    const used = new Set(this.playerSlots.values());
+    for (let slot = 0; slot < 2; slot += 1) {
+      if (!used.has(slot)) {
+        this.playerSlots.set(playerId, slot);
+        return slot;
+      }
+    }
+    throw new Error('No player slot available');
+  }
+
+  private playerRng(playerId: string): RngChannels {
+    const channels = this.rngChannelsByPlayer.get(playerId);
+    if (!channels) throw new Error(`No RNG channels for player ${playerId}`);
+    return channels;
+  }
+
+  private resetMatchRngChannels(): void {
+    const next = new Map<string, RngChannels>();
+    for (const playerId of Object.keys(this.gameState.players)) {
+      const slot = this.playerSlots.get(playerId);
+      if (slot === undefined) throw new Error(`No slot for player ${playerId}`);
+      next.set(playerId, createPlayerRngChannels(this.gameState.seed, slot));
+    }
+    this.rngChannelsByPlayer = next;
+  }
+
+  private recordReplayInput(frame: ReplayInputFrame): void {
+    if (this.activeReplay) this.activeReplay.inputs.push(frame);
+  }
+
   private clearInputs() {
     for (const id in this.gameState.players) {
       this.gameState.players[id].inputState = { left: false, right: false, softDrop: false };
@@ -202,21 +274,14 @@ export class GameManager {
     const status = this.gameState.status;
     if (status === this.lastHandledStatus) return;
 
-    const prev = this.lastHandledStatus;
     this.lastHandledStatus = status;
 
     if (status === 'waiting' || status === 'countdown') {
       for (const id in this.gameState.players) {
-        resetPlayerShop(this.gameState.players[id], this.rng);
+        resetPlayerShop(this.gameState.players[id], this.playerRng(id).shop);
       }
-      this.prevLinesCleared = {};
     }
 
-    if (status === 'playing' && prev !== 'playing') {
-      for (const id in this.gameState.players) {
-        this.prevLinesCleared[id] = 0;
-      }
-    }
   }
 
   private update() {
@@ -234,11 +299,12 @@ export class GameManager {
         this.gameState.status = 'playing';
         this.gameState.remainingTime = GAME_DURATION;
         this.gameState.tick = 0;
-        this.rng = makeRng(this.gameState.seed);
+        this.resetMatchRngChannels();
         this.activeReplay = {
           version: 2,
           date: replayDateLabel(),
           seed: this.gameState.seed,
+          playerSlots: Object.fromEntries(this.playerSlots.entries()),
           keyframeIntervalTicks: this.replayKeyframeIntervalTicks,
           initialState: JSON.parse(JSON.stringify(this.gameState)),
           inputs: [],
@@ -255,45 +321,66 @@ export class GameManager {
       this.gameState.tick += 1;
       this.gameState.remainingTime = Math.max(0, this.gameState.remainingTime - tickSeconds());
 
-
       const matchEvents: MatchEvent[] = [];
       const pids = Object.keys(this.gameState.players);
-      for (const id in this.gameState.players) {
+      const stepResults: Record<string, StepResult> = {};
+      let matchEndedThisTick = false;
+
+      // Pass 1: step both players independently (no opponent mutation during step)
+      for (const id of pids) {
         if (this.gameState.status !== 'playing') break;
         const player = this.gameState.players[id];
-        const opponentId = pids.find((pid) => pid !== id);
-        const opponent = opponentId ? this.gameState.players[opponentId] : null;
-        const prevLines = this.prevLinesCleared[id] ?? player.linesCleared;
-        stepPlayer(this.gameState, player, opponent, this.rng, matchEvents);
-        if (player.linesCleared > prevLines) {
-          rollShopOnLineClear(player, this.rng);
-        }
-        this.prevLinesCleared[id] = player.linesCleared;
-        tickPlayerShop(player, this.gameState.tick);
+        const stepRes = stepPlayer(this.gameState.tick, player, this.playerRng(id), matchEvents);
+        stepResults[id] = stepRes;
         if (player.topOut) {
           this.gameState.status = 'ended';
-          this.gameState.winnerId = opponent?.id ?? null;
+          const opponentId = pids.find((pid) => pid !== id);
+          this.gameState.winnerId = opponentId ?? null;
           this.gameState.restartTimer = RESTART_DELAY_SECONDS;
-          this.saveReplay();
+          matchEndedThisTick = true;
           break;
         }
       }
 
-      if (this.activeReplay && matchEvents.length > 0) {
-        this.activeReplay.events.push(...matchEvents);
+      // Pass 2: commit outgoing attacks to opponents
+      if (this.gameState.status === 'playing') {
+        for (const id of pids) {
+          const attack = stepResults[id]?.attackLinesQueued ?? 0;
+          if (attack > 0) {
+            const opponentId = pids.find((pid) => pid !== id);
+            const opponent = opponentId ? this.gameState.players[opponentId] : null;
+            if (opponent) {
+              enqueueGarbage(opponent, attack, this.gameState.tick);
+              matchEvents.push({
+                tick: this.gameState.tick,
+                type: 'attackSent',
+                playerId: id,
+                lines: attack,
+              });
+            }
+          }
+        }
       }
-      if (matchEvents.length > 0) {
-        for (const ev of matchEvents) {
+
+      const orderedEvents = canonicalMatchEvents(matchEvents);
+      if (this.activeReplay && orderedEvents.length > 0) {
+        this.activeReplay.events.push(...orderedEvents);
+      }
+      if (orderedEvents.length > 0) {
+        for (const ev of orderedEvents) {
           this.io.emit('matchEvent', ev);
         }
       }
 
-      if (this.activeReplay && this.gameState.tick % this.replayKeyframeIntervalTicks === 0) {
+      if (this.activeReplay && (
+        this.gameState.tick % this.replayKeyframeIntervalTicks === 0 || matchEndedThisTick
+      )) {
         this.activeReplay.keyframes.push({
           tick: this.gameState.tick,
           players: JSON.parse(JSON.stringify(this.gameState.players)),
         });
       }
+      if (matchEndedThisTick) this.saveReplay();
     } else if (this.gameState.status === 'ended') {
       this.clearInputs();
       if (this.gameState.restartTimer !== undefined) {
@@ -302,9 +389,9 @@ export class GameManager {
           this.gameState.restartTimer = undefined;
           this.gameState.technicalVictory = false;
           this.gameState.seed = initialSeed();
-          this.rng = makeRng(this.gameState.seed);
+          this.resetMatchRngChannels();
           for (const id in this.gameState.players) {
-            this.gameState.players[id] = makePlayer(id, this.rng);
+            this.gameState.players[id] = makePlayer(id, this.playerRng(id));
           }
           this.gameState.status = 'countdown';
           this.gameState.countdown = COUNTDOWN_SECONDS;

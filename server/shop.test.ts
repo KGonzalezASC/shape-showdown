@@ -120,7 +120,7 @@ describe('shop purchase / phase harness', () => {
 
     const activation = opponent.pendingShopEffects[0].activationTick;
     game.tick = activation;
-    stepPlayer(game, opponent, buyer, rng, []);
+    stepPlayer(game.tick, opponent, rng, []);
     assert.ok(opponent.activeEffects?.some((e) => e.kind === 'curtain'));
     assert.equal(opponent.pendingShopEffects.length, 0);
   });
@@ -190,7 +190,7 @@ describe('shop purchase / phase harness', () => {
     opponent.canHold = true;
     opponent.activePiece!.y = BOARD_HIDDEN_ROWS;
     opponent.actionQueue.push('hold');
-    stepPlayer(game, opponent, buyer, rng, []);
+    stepPlayer(game.tick, opponent, rng, []);
 
     assert.equal(opponent.activePiece?.type, 'S');
     assert.equal(opponent.activePiece?.poisoned, true);

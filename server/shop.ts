@@ -10,7 +10,7 @@ import {
   POISON_PURGE_TELEGRAPH_TICKS,
   RETRIM_ACTIVATION_TICKS,
 } from '../src/types.js';
-import { MutableRng, rngInt } from '../src/rng.js';
+import { MutableRng, RngChannels, ensureRngChannels, rngInt } from '../src/rng.js';
 import { SHOP_ITEM_BY_ID } from '../src/shop/shopCatalog.js';
 import { pushFieldEffect } from '../src/shop/fieldEffects.js';
 import {
@@ -352,7 +352,7 @@ export function applyShopPurchase(
   buyer: PlayerState,
   opponent: PlayerState | null,
   itemId: string,
-  rng: MutableRng,
+  rng: RngChannels | MutableRng,
 ): boolean {
   const shop = buyer.shop;
   if (shop.phase !== 'cycling') return false;
@@ -368,7 +368,8 @@ export function applyShopPurchase(
   const handler = SHOP_HANDLERS[itemId];
   if (!handler) return false;
 
-  const ctx: PurchaseCtx = { gameState, buyer, opponent, tick: gameState.tick, rng };
+  const channels = ensureRngChannels(rng);
+  const ctx: PurchaseCtx = { gameState, buyer, opponent, tick: gameState.tick, rng: channels.effects };
   if (handler.canPurchase && !handler.canPurchase(ctx)) return false;
 
   buyer.score -= catalogItem.cost;

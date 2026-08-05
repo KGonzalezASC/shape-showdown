@@ -17,6 +17,9 @@ import {
   stepPlayer,
 } from './engine.js';
 import {
+  createPlayerRngChannels,
+} from '../../src/rng.js';
+import {
   GRAVITY_TICKS_PER_CELL,
   SATELLITE_PACKET_DELAY_TICKS,
   STICKY_LOCK_RESET_CAP,
@@ -74,7 +77,7 @@ describe('tetris engine', () => {
 
     for (let tick = 1; tick <= LANDING_FORECAST_TICKS; tick += 1) {
       game.tick = tick;
-      stepPlayer(game, player, opponent, rng, []);
+      stepPlayer(game.tick, player, rng, []);
     }
 
     assert.equal(player.landingForecastTicksRemaining, 0);
@@ -90,8 +93,8 @@ describe('tetris engine', () => {
 
     const startY = player.activePiece!.y;
     player.inputState.softDrop = true;
-    stepPlayer(game, player, opponent, rng, []);
-    stepPlayer(game, player, opponent, rng, []);
+    stepPlayer(game.tick, player, rng, []);
+    stepPlayer(game.tick, player, rng, []);
 
     assert.equal(player.activePiece?.y, startY + 2);
     assert.equal(player.score, 2);
@@ -104,7 +107,7 @@ describe('tetris engine', () => {
     const game = makeGame([player, opponent]);
 
     player.actionQueue.push('hold');
-    stepPlayer(game, player, opponent, rng, []);
+    stepPlayer(game.tick, player, rng, []);
     assert.equal(player.canHold, false);
     assert.ok(player.holdPiece);
   });
@@ -121,7 +124,7 @@ describe('tetris engine', () => {
     player.activePiece.y = BOARD_HIDDEN_ROWS;
     const beforeType = player.activePiece.type;
     player.actionQueue.push('hold');
-    stepPlayer(game, player, opponent, rng, []);
+    stepPlayer(game.tick, player, rng, []);
 
     assert.equal(player.holdPiece?.type, beforeType);
     assert.equal(player.canHold, false);
@@ -140,7 +143,7 @@ describe('tetris engine', () => {
     const beforeType = player.activePiece.type;
     const beforeQueue = [...player.nextQueue];
     player.actionQueue.push('hold');
-    stepPlayer(game, player, opponent, rng, []);
+    stepPlayer(game.tick, player, rng, []);
 
     assert.equal(player.holdPiece, null);
     assert.equal(player.canHold, true);
@@ -160,7 +163,7 @@ describe('tetris engine', () => {
     const beforeType = player.activePiece.type;
 
     player.actionQueue.push('hold');
-    stepPlayer(game, player, opponent, rng, []);
+    stepPlayer(game.tick, player, rng, []);
 
     assert.equal(player.holdPiece, null);
     assert.equal(player.canHold, true);
@@ -170,7 +173,7 @@ describe('tetris engine', () => {
     player.holdPiece = { type: 'T' };
     player.canHold = true;
     player.actionQueue.push('hold');
-    stepPlayer(game, player, opponent, rng, []);
+    stepPlayer(game.tick, player, rng, []);
 
     assert.equal(player.holdPiece?.type, 'T');
     assert.equal(player.activePiece?.type, beforeType);
@@ -189,7 +192,7 @@ describe('tetris engine', () => {
     const beforeType = player.activePiece.type;
 
     player.actionQueue.push('hold');
-    stepPlayer(game, player, opponent, rng, []);
+    stepPlayer(game.tick, player, rng, []);
 
     assert.equal(player.holdPiece, null);
     assert.equal(player.canHold, true);
@@ -209,21 +212,21 @@ describe('tetris engine', () => {
     const bomberType = player.activePiece.type;
 
     player.actionQueue.push('hold');
-    stepPlayer(game, player, opponent, rng, []);
+    stepPlayer(game.tick, player, rng, []);
 
     assert.equal(player.holdPiece?.type, bomberType);
     assert.equal(player.holdPiece?.bomber, true);
     // Hold-into-empty clears active until the next tick's spawn.
     assert.equal(player.activePiece, null);
 
-    stepPlayer(game, player, opponent, rng, []);
+    stepPlayer(game.tick, player, rng, []);
     assert.ok(player.activePiece);
     assert.equal(!!player.activePiece.bomber, false);
 
     player.canHold = true;
     player.activePiece.y = BOARD_HIDDEN_ROWS;
     player.actionQueue.push('hold');
-    stepPlayer(game, player, opponent, rng, []);
+    stepPlayer(game.tick, player, rng, []);
 
     assert.equal(player.activePiece?.type, bomberType);
     assert.equal(!!player.activePiece?.bomber, true);
@@ -242,13 +245,13 @@ describe('tetris engine', () => {
 
     while (player.lockResetsUsed < STICKY_LOCK_RESET_CAP) {
       player.actionQueue.push('rotateCW');
-      stepPlayer(game, player, opponent, rng, []);
+      stepPlayer(game.tick, player, rng, []);
     }
     assert.equal(player.lockResetsUsed, STICKY_LOCK_RESET_CAP);
 
     const delayAfterCap = player.lockDelayRemainingTicks;
     player.actionQueue.push('rotateCW');
-    stepPlayer(game, player, opponent, rng, []);
+    stepPlayer(game.tick, player, rng, []);
     assert.equal(player.lockResetsUsed, STICKY_LOCK_RESET_CAP);
     assert.equal(player.lockDelayRemainingTicks, delayAfterCap);
   });
@@ -279,12 +282,12 @@ describe('tetris engine', () => {
     player.lockDelayRemainingTicks = 5;
     player.gravityCounter = 999;
 
-    stepPlayer(game, player, opponent, rng, []);
+    stepPlayer(game.tick, player, rng, []);
     assert.equal(player.lockResetsUsed, STICKY_LOCK_RESET_CAP);
 
     const delayAfterGravity = player.lockDelayRemainingTicks;
     player.actionQueue.push('rotateCW');
-    stepPlayer(game, player, opponent, rng, []);
+    stepPlayer(game.tick, player, rng, []);
     assert.equal(player.lockResetsUsed, STICKY_LOCK_RESET_CAP);
     assert.ok(
       player.lockDelayRemainingTicks <= delayAfterGravity,
@@ -329,7 +332,7 @@ describe('tetris engine', () => {
 
     const yBefore = player.activePiece!.y;
     player.actionQueue.push('hardDrop');
-    stepPlayer(game, player, opponent, rng, []);
+    stepPlayer(game.tick, player, rng, []);
     assert.equal(player.activePiece?.y, yBefore);
     assert.equal(player.pieceHasHardDropped, false);
 
@@ -339,7 +342,7 @@ describe('tetris engine', () => {
     assert.equal(player.snagNextPiece, true);
 
     player.actionQueue.push('hardDrop');
-    stepPlayer(game, player, opponent, rng, []);
+    stepPlayer(game.tick, player, rng, []);
     assert.equal(player.pieceHasHardDropped, true);
   });
 
@@ -350,7 +353,7 @@ describe('tetris engine', () => {
     const game = makeGame([player, opponent]);
 
     player.actionQueue.push('hardDrop', 'hold');
-    stepPlayer(game, player, opponent, rng, []);
+    stepPlayer(game.tick, player, rng, []);
 
     assert.equal(player.holdPiece, null);
     assert.equal(player.actionQueue.length, 0);
@@ -365,12 +368,12 @@ describe('tetris engine', () => {
     game.tick = 17;
 
     player.actionQueue.push('hardDrop');
-    stepPlayer(game, player, opponent, rng, []);
+    stepPlayer(game.tick, player, rng, []);
 
     assert.equal(player.lastHardDropTick, 17);
 
     game.tick = 18;
-    stepPlayer(game, player, opponent, rng, []);
+    stepPlayer(game.tick, player, rng, []);
     assert.equal(player.lastHardDropTick, 17);
   });
 
@@ -432,7 +435,7 @@ describe('tetris engine', () => {
     // Position it at the floor so it is grounded and locks.
     player.activePiece.y = BOARD_ROWS - 2;
     player.lockDelayRemainingTicks = 0;
-    stepPlayer(game, player, opponent, rng, []);
+    stepPlayer(game.tick, player, rng, []);
     
     // The first piece should have locked, and a new one spawned.
     assert.notEqual(player.activePiece?.type, firstType);
@@ -451,9 +454,116 @@ describe('tetris engine', () => {
       y: bottom - 1,
     };
     player.lockDelayRemainingTicks = 0;
-    stepPlayer(game, player, opponent, rng, []);
+    stepPlayer(game.tick, player, rng, []);
 
     // Line clear has occurred! The sticky cap must be cleared (undefined).
     assert.equal(player.pieceLockResetCap, undefined);
+  });
+
+  it('provides order-independent attack queuing in two-pass match stepping', () => {
+    const seed = 777;
+    const p1ChannelsA = createPlayerRngChannels(seed, 0);
+    const p2ChannelsA = createPlayerRngChannels(seed, 1);
+    // Scenario A: P1 stepped then P2 stepped in Pass 1
+    const p1A = makePlayer('p1', p1ChannelsA);
+    const p2A = makePlayer('p2', p2ChannelsA);
+    const bottomA = BOARD_ROWS - 1;
+    for (let x = 0; x < BOARD_COLS - 1; x++) p1A.board[bottomA][x] = 'I';
+    p1A.activePiece = { type: 'I', rotation: 0, x: -1, y: bottomA - 1 };
+    p1A.lockDelayRemainingTicks = 0;
+
+    const eventsA: any[] = [];
+    const resP1A = stepPlayer(10, p1A, p1ChannelsA, eventsA);
+    const resP2A = stepPlayer(10, p2A, p2ChannelsA, eventsA);
+
+    const p2ChannelsB = createPlayerRngChannels(seed, 1);
+    const p1ChannelsB = createPlayerRngChannels(seed, 0);
+    // Scenario B: P2 stepped then P1 stepped in Pass 1
+    const p2B = makePlayer('p2', p2ChannelsB);
+    const p1B = makePlayer('p1', p1ChannelsB);
+    const bottomB = BOARD_ROWS - 1;
+    for (let x = 0; x < BOARD_COLS - 1; x++) p1B.board[bottomB][x] = 'I';
+    p1B.activePiece = { type: 'I', rotation: 0, x: -1, y: bottomB - 1 };
+    p1B.lockDelayRemainingTicks = 0;
+
+    const eventsB: any[] = [];
+    const resP2B = stepPlayer(10, p2B, p2ChannelsB, eventsB);
+    const resP1B = stepPlayer(10, p1B, p1ChannelsB, eventsB);
+
+    assert.equal(resP1A.attackLinesQueued, resP1B.attackLinesQueued);
+    assert.equal(resP2A.attackLinesQueued, resP2B.attackLinesQueued);
+    assert.equal(p1A.linesCleared, p1B.linesCleared);
+    assert.equal(p2A.linesCleared, p2B.linesCleared);
+    assert.deepEqual(p1A.activePiece, p1B.activePiece);
+    assert.deepEqual(p1A.nextQueue, p1B.nextQueue);
+    assert.deepEqual(p1A.shop.offerIds, p1B.shop.offerIds);
+    assert.deepEqual(p2A.activePiece, p2B.activePiece);
+    assert.deepEqual(p2A.nextQueue, p2B.nextQueue);
+    assert.deepEqual(p2A.shop.offerIds, p2B.shop.offerIds);
+  });
+
+  it('skips shop rolling and shop timer tick when enableShop is false (dummy simulation)', () => {
+    const rng = makeRng(101);
+    const player = makePlayer('dummy', rng);
+    const initialOffers = [...player.shop.offerIds];
+
+    const bottom = BOARD_ROWS - 1;
+    for (let x = 4; x < BOARD_COLS; x++) player.board[bottom][x] = 'I';
+    player.activePiece = { type: 'I', rotation: 0, x: 0, y: bottom - 1 };
+    player.lockDelayRemainingTicks = 0;
+
+    const events: any[] = [];
+    const res = stepPlayer(1, player, rng, events, { enableShop: false });
+
+    assert.equal(res.linesClearedThisStep, 1);
+    assert.equal(res.shopRolled, false);
+    assert.deepEqual(player.shop.offerIds, initialOffers);
+    assert.equal(events.some((e) => e.type === 'shopRoll'), false);
+  });
+
+  it('emits detailed shopRoll match event with offerIds when shop is enabled', () => {
+    const rng = makeRng(202);
+    const player = makePlayer('p1', rng);
+    const bottom = BOARD_ROWS - 1;
+    for (let x = 4; x < BOARD_COLS; x++) player.board[bottom][x] = 'I';
+    player.activePiece = { type: 'I', rotation: 0, x: 0, y: bottom - 1 };
+    player.lockDelayRemainingTicks = 0;
+
+    const events: any[] = [];
+    const res = stepPlayer(5, player, rng, events, { enableShop: true });
+
+    assert.equal(res.shopRolled, true);
+    const rollEvent = events.find((e) => e.type === 'shopRoll');
+    assert.ok(rollEvent);
+    assert.ok(Array.isArray(rollEvent.offerIds));
+    assert.equal(rollEvent.offerIds.length, player.shop.offerIds.length);
+  });
+
+  it('reports structured tectonic progress and completion on silent line clears', () => {
+    const rng = makeRng(303);
+    const player = makePlayer('p1', rng);
+
+    // Fill the bottom row completely to trigger a silent clear on tectonic settle
+    const bottom = BOARD_ROWS - 1;
+    for (let x = 0; x < BOARD_COLS; x++) player.board[bottom][x] = 'G';
+
+    player.tectonicShiftNextStepTick = 10;
+    player.tectonicShiftStartTick = 10;
+    player.tectonicShiftStepTicks = 1;
+
+    const events: any[] = [];
+    // Tick 10: Tectonic fall phase active
+    const resStart = stepPlayer(10, player, rng, events);
+    assert.equal(resStart.tectonic.active, true);
+    assert.equal(resStart.tectonic.completed, false);
+
+    // Tick 30: Tectonic duration elapses (10 + 18 = 28 ticks) and silent clear settles
+    const resEnd = stepPlayer(30, player, rng, events);
+    assert.equal(resEnd.tectonic.active, false);
+    assert.equal(resEnd.tectonic.completed, true);
+    assert.equal(resEnd.tectonic.rowsCleared, 1);
+    assert.equal(events.some((e) => e.type === 'tectonicComplete' && e.rowsCleared === 1), true);
+    // Silent clear must NOT increment score or linesCleared
+    assert.equal(player.score, 0);
   });
 });

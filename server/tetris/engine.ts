@@ -8,7 +8,6 @@ import {
   ActionType,
   GAME_TICK_RATE,
   GARBAGE_ARRIVAL_DELAY_TICKS,
-  GameState,
   HOLD_SWAP_CUTOFF_VISIBLE_ROW,
   InputState,
   LOCK_DELAY_TICKS,
@@ -26,6 +25,7 @@ import {
   TetrominoType,
   POISON_LINE_CLEAR_PENALTY_MAX_RATIO,
 } from '../../src/types.js';
+import type { StepOptions, StepResult } from './stepTypes.js';
 import {
   COMBO_BONUS_TABLE,
   CURTAIN_DURATION_TICKS,
@@ -48,11 +48,11 @@ import {
   TECTONIC_SHIFT_MIN_DURATION_TICKS,
 } from '../../src/constants.js';
 import { getKickTests, PIECE_SEQUENCE, SHAPES } from './pieces.js';
-import { createInitialPlayerShop } from '../../src/shop/playerShop.js';
+import { createInitialPlayerShop, rollShopOnLineClear, tickPlayerShop } from '../../src/shop/playerShop.js';
 import { pushFieldEffect } from '../../src/shop/fieldEffects.js';
-import { MutableRng, makeRng as makeSharedRng, rngNext } from '../../src/rng.js';
+import { MutableRng, RngChannels, ensureRngChannels, makeRng as makeSharedRng, rngNext } from '../../src/rng.js';
 
-export type { MutableRng };
+export type { MutableRng, RngChannels };
 
 export function createEmptyBoard(): CellValue[][] {
   return Array.from({ length: BOARD_ROWS }, () => Array.from({ length: BOARD_COLS }, () => null));
@@ -87,8 +87,9 @@ function normalizeInput(input: InputState): InputState {
   };
 }
 
-export function makePlayer(id: string, rng: MutableRng): PlayerState {
-  const bag = shuffledBag(rng);
+export function makePlayer(id: string, rng: RngChannels | MutableRng): PlayerState {
+  const channels = ensureRngChannels(rng);
+  const bag = shuffledBag(channels.pieces);
   const nextQueue = [...bag];
   const player: PlayerState = {
     id,
@@ -139,10 +140,10 @@ export function makePlayer(id: string, rng: MutableRng): PlayerState {
     tectonicShiftNextStepTick: null,
     tectonicShiftStartTick: null,
     tectonicShiftStepTicks: null,
-    shop: createInitialPlayerShop(rng),
+    shop: createInitialPlayerShop(channels.shop),
   };
-  ensureQueue(player, rng);
-  player.activePiece = spawnNextPiece(player, rng);
+  ensureQueue(player, channels.pieces);
+  player.activePiece = spawnNextPiece(player, channels.pieces);
   player.landingForecastTicksRemaining = player.activePiece ? LANDING_FORECAST_TICKS : 0;
   if (player.activePiece) player.lowestY = player.activePiece.y;
   return player;
@@ -652,7 +653,7 @@ function cancelOwnGarbage(player: PlayerState, lines: number): number {
   return remaining;
 }
 
-function enqueueGarbage(target: PlayerState, lines: number, tick: number): void {
+export function enqueueGarbage(target: PlayerState, lines: number, tick: number): void {
   if (lines <= 0) return;
   const packet: PendingGarbagePacket = {
     lines,
@@ -685,13 +686,12 @@ function applyGarbageIfReady(player: PlayerState, tick: number, rng: MutableRng)
 }
 
 function applyLockResult(
-  gameState: GameState,
+  tick: number,
   player: PlayerState,
-  opponent: PlayerState | null,
-  rng: MutableRng,
+  garbageRng: MutableRng,
   matchEvents: MatchEvent[],
   clearResult: { lines: number; tSpin: 'full' | 'mini' | false; perfectClear: boolean; poisonedRatio: number },
-): void {
+): number {
   const attackLines = attackFromClear(
     clearResult.lines,
     clearResult.tSpin,
@@ -701,7 +701,7 @@ function applyLockResult(
   );
   if (clearResult.lines > 0) {
     matchEvents.push({
-      tick: gameState.tick,
+      tick,
       type: 'lineClear',
       playerId: player.id,
       lines: clearResult.lines,
@@ -710,25 +710,16 @@ function applyLockResult(
   }
 
   const remainingAttack = cancelOwnGarbage(player, attackLines);
-  if (remainingAttack > 0 && opponent) {
-    enqueueGarbage(opponent, remainingAttack, gameState.tick);
-    matchEvents.push({
-      tick: gameState.tick,
-      type: 'attackSent',
-      playerId: player.id,
-      lines: remainingAttack,
-    });
-  }
-
-  const applied = applyGarbageIfReady(player, gameState.tick, rng);
+  const applied = applyGarbageIfReady(player, tick, garbageRng);
   if (applied > 0) {
     matchEvents.push({
-      tick: gameState.tick,
+      tick,
       type: 'garbageApplied',
       playerId: player.id,
       lines: applied,
     });
   }
+  return remainingAttack > 0 ? remainingAttack : 0;
 }
 
 function pieceWouldTopOut(player: PlayerState): boolean {
@@ -915,9 +906,9 @@ export function spreadPoisonWaveOnce(
  * POISON_GENERATIONS waves the scheduler stops, but poisoned cells stay poisoned
  * permanently (the poisonBoard marks are never cleared).
  */
-function processPoisonSpread(player: PlayerState, tick: number): void {
+function processPoisonSpread(player: PlayerState, tick: number): number {
   const spread = player.poisonSpread;
-  if (!spread || tick < spread.nextSpreadTick) return;
+  if (!spread || tick < spread.nextSpreadTick) return 0;
 
   const poison = ensurePoisonBoard(player);
   const newly = spreadPoisonWaveOnce(player.board, poison, spread.variant);
@@ -928,15 +919,35 @@ function processPoisonSpread(player: PlayerState, tick: number): void {
   } else {
     spread.nextSpreadTick = tick + POISON_SPREAD_INTERVAL_TICKS;
   }
+  return newly;
 }
 
 export function stepPlayer(
-  gameState: GameState,
+  tick: number,
   player: PlayerState,
-  opponent: PlayerState | null,
-  rng: MutableRng,
+  rng: RngChannels | MutableRng,
   matchEvents: MatchEvent[],
-): void {
+  options?: StepOptions,
+): StepResult {
+  const channels = ensureRngChannels(rng);
+  const enableShop = options?.enableShop ?? true;
+
+  const result: StepResult = {
+    linesClearedThisStep: 0,
+    attackLinesQueued: 0,
+    topOut: false,
+    locked: false,
+    shopRolled: false,
+    tectonic: {
+      active: false,
+      advanced: false,
+      completed: false,
+      rowsCleared: 0,
+    },
+    poisonSpreadCells: 0,
+  };
+  const prevLines = player.linesCleared;
+
   if (player.activePiece) {
     player.landingForecastTicksRemaining = Math.max(
       0,
@@ -949,35 +960,45 @@ export function stepPlayer(
   // ── Clean up expired visual effect pills ──
   if (player.activeEffects && player.activeEffects.length > 0) {
     player.activeEffects = player.activeEffects.filter(
-      (effect) => effect.expiresAtTick === undefined || gameState.tick < effect.expiresAtTick
+      (effect) => effect.expiresAtTick === undefined || tick < effect.expiresAtTick
     );
   }
 
   // ── Tectonic Shift cascade: pause piece / inputs until gravity + silent clears finish ──
   if (player.tectonicShiftNextStepTick != null) {
-    advanceTectonicShift(player, gameState.tick);
-    return;
+    const tec = advanceTectonicShift(player, tick);
+    result.tectonic = tec;
+    if (tec.advanced) {
+      matchEvents.push({ tick, type: 'tectonicStep', playerId: player.id, advanced: true });
+    }
+    if (tec.completed) {
+      matchEvents.push({ tick, type: 'tectonicComplete', playerId: player.id, rowsCleared: tec.rowsCleared });
+    }
+    if (enableShop) {
+      tickPlayerShop(player, tick);
+    }
+    return result;
   }
 
   // ── Process any pending shop effects that have reached their activation tick ──
   if (player.pendingShopEffects.length > 0) {
     const remaining: PendingShopEffect[] = [];
     for (const effect of player.pendingShopEffects) {
-      if (effect.activationTick <= gameState.tick) {
+      if (effect.activationTick <= tick) {
         if (effect.itemId === 'retrim') {
           player.swapCutoffRow = Math.max(0, player.swapCutoffRow - 1);
         } else if (effect.itemId === 'curtain') {
           pushFieldEffect(
             player,
             'curtain',
-            gameState.tick,
+            tick,
             'Curtain',
             '🎭',
-            gameState.tick + CURTAIN_DURATION_TICKS,
+            tick + CURTAIN_DURATION_TICKS,
           );
         } else if (effect.itemId === 'vortex-step' && effect.poisonVariant) {
           purgePoisonVariant(player, effect.poisonVariant);
-          pushFieldEffect(player, 'purge', gameState.tick, 'Purged', '🃏', gameState.tick + 120);
+          pushFieldEffect(player, 'purge', tick, 'Purged', '🃏', tick + 120);
         }
       } else {
         remaining.push(effect);
@@ -987,11 +1008,15 @@ export function stepPlayer(
   }
 
   // ── Advance any in-progress poison spread ──
-  processPoisonSpread(player, gameState.tick);
+  const poisonCells = processPoisonSpread(player, tick);
+  if (poisonCells > 0) {
+    result.poisonSpreadCells = poisonCells;
+    matchEvents.push({ tick, type: 'poisonSpread', playerId: player.id, newCells: poisonCells });
+  }
 
   if (!player.activePiece) {
     player.lastSrsKick = null;
-    player.activePiece = spawnNextPiece(player, rng);
+    player.activePiece = spawnNextPiece(player, channels.pieces);
     if (player.activePiece) {
       player.landingForecastTicksRemaining = LANDING_FORECAST_TICKS;
       player.pieceHasHardDropped = false;
@@ -1008,8 +1033,9 @@ export function stepPlayer(
     }
     if (pieceWouldTopOut(player)) {
       player.topOut = true;
-      matchEvents.push({ tick: gameState.tick, type: 'topOut', playerId: player.id });
-      return;
+      result.topOut = true;
+      matchEvents.push({ tick, type: 'topOut', playerId: player.id });
+      return result;
     }
   }
 
@@ -1017,46 +1043,69 @@ export function stepPlayer(
     player.inputState.softDrop = false;
   }
 
-  const hardDropped = processActions(player, gameState.tick);
+  const hardDropped = processActions(player, tick);
   if (hardDropped) {
-    const clearResult = lockPiece(player, gameState.tick);
-    applyLockResult(gameState, player, opponent, rng, matchEvents, clearResult);
-    return;
-  }
-  applyHorizontalInput(player);
-
-  const isSoftDrop = !!player.inputState.softDrop;
-  
-  let movedDown = false;
-  let cellsToDrop = 0;
-
-  if (isSoftDrop) {
-    cellsToDrop = Math.max(1, Math.floor(SOFT_DROP_CELLS_PER_TICK));
-    player.gravityCounter = 0;
+    const clearResult = lockPiece(player, tick);
+    const attackSent = applyLockResult(tick, player, channels.garbage, matchEvents, clearResult);
+    result.locked = true;
+    result.linesClearedThisStep = clearResult.lines;
+    result.attackLinesQueued = attackSent;
   } else {
-    player.gravityCounter += 1;
-    if (player.gravityCounter >= gravityTicksPerCellFor(player)) {
-      cellsToDrop = 1;
+    applyHorizontalInput(player);
+
+    const isSoftDrop = !!player.inputState.softDrop;
+
+    let movedDown = false;
+    let cellsToDrop = 0;
+
+    if (isSoftDrop) {
+      cellsToDrop = Math.max(1, Math.floor(SOFT_DROP_CELLS_PER_TICK));
       player.gravityCounter = 0;
-    }
-  }
-
-  for (let i = 0; i < cellsToDrop; i++) {
-    if (tryMove(player, 0, 1)) {
-      movedDown = true;
-      if (isSoftDrop) player.score += 1;
     } else {
-      break;
+      player.gravityCounter += 1;
+      if (player.gravityCounter >= gravityTicksPerCellFor(player)) {
+        cellsToDrop = 1;
+        player.gravityCounter = 0;
+      }
+    }
+
+    for (let i = 0; i < cellsToDrop; i++) {
+      if (tryMove(player, 0, 1)) {
+        movedDown = true;
+        if (isSoftDrop) player.score += 1;
+      } else {
+        break;
+      }
+    }
+
+    if (player.activePiece && !movedDown && isGrounded(player)) {
+      player.lockDelayRemainingTicks -= 1;
+      if (player.lockDelayRemainingTicks <= 0) {
+        const clearResult = lockPiece(player, tick);
+        const attackSent = applyLockResult(tick, player, channels.garbage, matchEvents, clearResult);
+        result.locked = true;
+        result.linesClearedThisStep = clearResult.lines;
+        result.attackLinesQueued = attackSent;
+      }
     }
   }
 
-  if (player.activePiece && !movedDown && isGrounded(player)) {
-    player.lockDelayRemainingTicks -= 1;
-    if (player.lockDelayRemainingTicks <= 0) {
-      const clearResult = lockPiece(player, gameState.tick);
-      applyLockResult(gameState, player, opponent, rng, matchEvents, clearResult);
+  // ── Shop orchestration: roll on line clear, advance cycle timer ──
+  if (enableShop) {
+    if (player.linesCleared > prevLines) {
+      rollShopOnLineClear(player, channels.shop);
+      result.shopRolled = true;
+      matchEvents.push({
+        tick,
+        type: 'shopRoll',
+        playerId: player.id,
+        offerIds: [...player.shop.offerIds],
+      });
     }
+    tickPlayerShop(player, tick);
   }
+
+  return result;
 }
 
 export function initialSeed(): number {
@@ -1178,29 +1227,41 @@ export function startTectonicShift(player: PlayerState, tick: number): void {
   player.tectonicShiftNextStepTick = tick;
 }
 
+export interface TectonicAdvanceResult {
+  active: boolean;
+  advanced: boolean;
+  completed: boolean;
+  rowsCleared: number;
+}
+
 /**
  * Advance cascade when due. While `tectonicShiftNextStepTick` is set, the caller should
  * pause piece input/gravity. On settle, clears all full rows silently in one pass.
  */
-export function advanceTectonicShift(player: PlayerState, tick: number): void {
-  if (player.tectonicShiftNextStepTick == null) return;
-  if (tick < player.tectonicShiftNextStepTick) return;
+export function advanceTectonicShift(player: PlayerState, tick: number): TectonicAdvanceResult {
+  if (player.tectonicShiftNextStepTick == null) {
+    return { active: false, advanced: false, completed: false, rowsCleared: 0 };
+  }
+  if (tick < player.tectonicShiftNextStepTick) {
+    return { active: true, advanced: false, completed: false, rowsCleared: 0 };
+  }
 
   const moved = tectonicGravityStep(player);
   if (moved) {
     player.tectonicShiftNextStepTick = tick + tectonicStepTicksFor(player);
-    return;
+    return { active: true, advanced: true, completed: false, rowsCleared: 0 };
   }
 
   const start = player.tectonicShiftStartTick ?? tick;
   const minEnd = start + TECTONIC_SHIFT_MIN_DURATION_TICKS;
   if (tick < minEnd) {
     player.tectonicShiftNextStepTick = minEnd;
-    return;
+    return { active: true, advanced: false, completed: false, rowsCleared: 0 };
   }
 
-  silentClearFullRows(player);
+  const rowsCleared = silentClearFullRows(player);
   clearTectonicShiftState(player);
+  return { active: false, advanced: false, completed: true, rowsCleared };
 }
 
 /** Instant settle (tests / tools): run gravity to completion then silent clear. */

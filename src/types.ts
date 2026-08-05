@@ -332,15 +332,39 @@ export type MatchEvent =
   | { tick: number; type: 'lineClear'; playerId: string; lines: number; tSpin: TSpinType }
   | { tick: number; type: 'attackSent'; playerId: string; lines: number }
   | { tick: number; type: 'garbageApplied'; playerId: string; lines: number }
-  | { tick: number; type: 'topOut'; playerId: string };
+  | { tick: number; type: 'topOut'; playerId: string }
+  | { tick: number; type: 'poisonSpread'; playerId: string; newCells: number }
+  | { tick: number; type: 'shopRoll'; playerId: string; offerIds: string[] }
+  | { tick: number; type: 'tectonicStep'; playerId: string; advanced: boolean }
+  | { tick: number; type: 'tectonicComplete'; playerId: string; rowsCleared: number };
 
-export interface ReplayInputFrame {
-  tick: number;
-  playerId: string;
-  kind: 'inputState' | 'action';
-  inputState?: InputState;
-  action?: ActionType;
-}
+export type ReplayInputFrame =
+  | {
+      tick: number;
+      playerId: string;
+      kind: 'inputState';
+      inputState: InputState;
+    }
+  | {
+      tick: number;
+      playerId: string;
+      kind: 'action';
+      action: ActionType;
+    }
+  | {
+      tick: number;
+      playerId: string;
+      kind: 'shopOpen';
+      accepted: boolean;
+    }
+  | {
+      tick: number;
+      playerId: string;
+      kind: 'shopPurchase';
+      itemId: string;
+      accepted: boolean;
+      cost?: number;
+    };
 
 export interface ReplayKeyframe {
   tick: number;
@@ -351,6 +375,8 @@ export interface ReplayDataV2 {
   version: 2;
   date: string;
   seed: number;
+  /** Stable player-slot mapping used to derive independent RNG channels. */
+  playerSlots?: Record<string, number>;
   /** Optional snapshot cadence in ticks for frame-by-frame or sparse replays. */
   keyframeIntervalTicks?: number;
   initialState: GameState;

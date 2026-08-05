@@ -185,7 +185,7 @@ describe('poison spread variations', () => {
 
     // Step the player to lock it. This should clear the bottom row.
     // Base score = 1 * 100 + 1 * 10 (Single clear = 1 attack) + 10 * 10 (Perfect Clear = 10 attack) = 210.
-    stepPlayer(game, p1, opponent, rng, []);
+    stepPlayer(game.tick, p1, rng, []);
     const cleanScore = p1.score;
     assert.equal(cleanScore, 210, 'Clean single line clear with perfect clear should award 210 points');
 
@@ -220,7 +220,7 @@ describe('poison spread variations', () => {
     // base score = 210.
     // penalty = Math.round(210 * 0.20) = 42.
     // expected score = 210 - 42 = 168.
-    stepPlayer(game, p2, opponent, rng, []);
+    stepPlayer(game.tick, p2, rng, []);
     assert.equal(p2.score, 168, 'Four poisoned cells on a 10-cell clear should award 168 points');
   });
 
@@ -269,7 +269,7 @@ describe('poison spread variations', () => {
     opponent.activePiece = null;
     opponent.nextQueue = ['I'];
     
-    stepPlayer(game, opponent, buyer, rng, []);
+    stepPlayer(game.tick, opponent, rng, []);
     
     const active = opponent.activePiece;
     assert.ok(active, 'Should spawn a piece');
@@ -284,14 +284,14 @@ describe('poison spread variations', () => {
     assert.equal(active.poisonVariant, 2, 'Piece poison variant should match variant 2');
 
     opponent.actionQueue = ['rotateCW'];
-    stepPlayer(game, opponent, buyer, rng, []);
+    stepPlayer(game.tick, opponent, rng, []);
     assert.equal(opponent.activePiece.rotation, 1, 'Rotation should succeed and be 1');
     assert.deepEqual(opponent.activePiece.customOffsets, [[0, 0], [0, 1]], 'Offsets should rotate to vertical');
 
     opponent.canHold = true;
     opponent.holdPiece = null;
     opponent.actionQueue = ['hold'];
-    stepPlayer(game, opponent, buyer, rng, []);
+    stepPlayer(game.tick, opponent, rng, []);
     assert.ok(opponent.activePiece, 'Hold action should be ignored for custom piece');
     assert.equal(opponent.holdPiece, null, 'Hold piece should remain empty');
 
@@ -299,7 +299,7 @@ describe('poison spread variations', () => {
     opponent.activePiece.x = 0;
     opponent.lockDelayRemainingTicks = 1;
     
-    stepPlayer(game, opponent, buyer, rng, []);
+    stepPlayer(game.tick, opponent, rng, []);
     
     assert.equal(opponent.activePiece, null, 'Piece should lock and activePiece become null');
     assert.equal(opponent.board[BOARD_ROWS - 2][0], 'W', 'Landed piece cell 1 should lock as W');
@@ -405,7 +405,7 @@ describe('poison spread variations', () => {
     };
     opponent.lockDelayRemainingTicks = 1;
 
-    stepPlayer(game, opponent, buyer, rng, []);
+    stepPlayer(game.tick, opponent, rng, []);
 
     // Bottom row (row 39) was cleared; row 38 slid down to row 39.
     // The poisoned cell at (39, 4) was cleared.
@@ -462,7 +462,7 @@ describe('poison spread variations', () => {
     };
     opponent.lockDelayRemainingTicks = 1;
 
-    stepPlayer(game, opponent, buyer, rng, []);
+    stepPlayer(game.tick, opponent, rng, []);
 
     // The only poisoned cell is now cleared. Purchase should fizzle.
     const purchaseResult = applyShopPurchase(game, buyer, opponent, 'wildcard-four', makeRng(1));
@@ -746,11 +746,11 @@ describe('poison spread variations', () => {
 
     opponent.activePiece = null;
     opponent.nextQueue = ['I'];
-    stepPlayer(game, opponent, buyer, rng, []);
+    stepPlayer(game.tick, opponent, rng, []);
     assert.ok(opponent.activePiece?.customOffsets);
 
     opponent.actionQueue = ['rotateCW'];
-    stepPlayer(game, opponent, buyer, rng, []);
+    stepPlayer(game.tick, opponent, rng, []);
     // Bounding-box CW of L: [[0,0],[1,0],[0,1]] -> [[0,0],[1,0],[1,1]]
     assert.deepEqual(opponent.activePiece!.customOffsets, [[0, 0], [1, 0], [1, 1]]);
   });
