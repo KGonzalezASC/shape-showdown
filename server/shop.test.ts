@@ -196,4 +196,36 @@ describe('shop purchase / phase harness', () => {
     assert.equal(opponent.activePiece?.poisoned, true);
     assert.equal(opponent.activePiece?.poisonVariant, variant);
   });
+
+  it('vortex-step and wildcard-four require opponent poison as authoritative prerequisite', () => {
+    const { game, rng } = blankGame();
+    const buyer = game.players.buyer;
+    const opponent = game.players.opponent;
+    buyer.score = 9999;
+
+    // 1. Without poison on opponent, both vortex-step and wildcard-four purchases are rejected
+    buyer.shop.offerIds = ['vortex-step'];
+    buyer.shop.phase = 'cycling';
+    buyer.shop.cycleIndex = 0;
+    assert.equal(applyShopPurchase(game, buyer, opponent, 'vortex-step', rng), false);
+
+    buyer.shop.offerIds = ['wildcard-four'];
+    buyer.shop.phase = 'cycling';
+    buyer.shop.cycleIndex = 0;
+    assert.equal(applyShopPurchase(game, buyer, opponent, 'wildcard-four', rng), false);
+
+    // 2. Add poison to opponent stack
+    opponent.poisonBoard = Array.from({ length: 20 }, () => Array.from({ length: 10 }, () => 0));
+    opponent.poisonBoard[19][0] = 1;
+
+    buyer.shop.offerIds = ['vortex-step'];
+    buyer.shop.phase = 'cycling';
+    buyer.shop.cycleIndex = 0;
+    assert.equal(applyShopPurchase(game, buyer, opponent, 'vortex-step', rng), true);
+
+    buyer.shop.offerIds = ['wildcard-four'];
+    buyer.shop.phase = 'cycling';
+    buyer.shop.cycleIndex = 0;
+    assert.equal(applyShopPurchase(game, buyer, opponent, 'wildcard-four', rng), true);
+  });
 });
