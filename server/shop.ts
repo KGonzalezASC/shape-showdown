@@ -239,7 +239,6 @@ const SHOP_HANDLERS: Record<string, ShopHandler> = {
     },
   },
   'vortex-step': {
-    canPurchase: ({ opponent }) => !!opponent && opponentHasPoison(opponent),
     onPurchase: ({ opponent, tick, rng }) => {
       if (!opponent) return;
       const variant = rngInt(rng, POISON_GENERATIONS) + 1;
