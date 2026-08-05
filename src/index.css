@@ -63,10 +63,12 @@ html, body, #root {
 }
 
 .animate-shake-soft {
+  will-change: transform;
   animation: shake-soft 0.15s ease-in-out;
 }
 
 .animate-shake-medium {
+  will-change: transform;
   animation: shake-medium 0.25s ease-in-out;
 }
 
@@ -81,11 +83,13 @@ html, body, #root {
 }
 
 @keyframes shop-cycle-pulse {
-  0%, 100% { box-shadow: 0 0 6px rgba(56, 189, 248, 0.25); }
-  50% { box-shadow: 0 0 14px rgba(56, 189, 248, 0.55); }
+  0%, 100% { opacity: 0.65; }
+  50% { opacity: 1; }
 }
 
 .animate-shop-cycle-pulse {
+  box-shadow: 0 0 10px rgba(56, 189, 248, 0.45);
+  will-change: opacity;
   animation: shop-cycle-pulse 0.7s ease-in-out infinite;
 }
 
@@ -97,6 +101,7 @@ html, body, #root {
 }
 
 .animate-bomb-wiggle {
+  will-change: transform;
   animation: bomb-wiggle 0.5s ease-in-out infinite;
 }
 
@@ -108,12 +113,11 @@ html, body, #root {
 .animate-rainbow {
   background: linear-gradient(270deg, #ff0000, #ff7f00, #ffff00, #00ff00, #0000ff, #4b0082, #9400d3);
   background-size: 1400% 1400%;
+  will-change: background-position;
   animation: rainbow-bg 3s ease infinite;
 }
 
-/* Tetromino hatching — a compact CSS version of the reference's diagonal
- * hand-drawn shader. The fill remains underneath so piece identity is still
- * clear, while the repeated ink lines add texture without extra assets. */
+/* Tetromino hatching */
 .tetromino-hatch {
   background-image:
     repeating-linear-gradient(
@@ -134,6 +138,7 @@ html, body, #root {
     );
   mix-blend-mode: screen;
   opacity: 0.72;
+  will-change: background-position;
   animation: tetromino-hatch-drift 0.8s steps(8) infinite;
 }
 
@@ -157,51 +162,39 @@ html, body, #root {
   }
 }
 
-/* Magnet pull — rainbow/wind ring on the falling piece while magnet debuff is active */
+/* Magnet pull ring */
 @keyframes magnet-pull-glow {
   0%, 100% {
-    box-shadow:
-      0 0 4px #e879f9,
-      0 0 8px #38bdf8,
-      inset 0 0 2px rgba(255, 255, 255, 0.45);
     border-color: #f0abfc;
+    opacity: 0.82;
   }
   33% {
-    box-shadow:
-      0 0 5px #fbbf24,
-      0 0 10px #a3e635,
-      inset 0 0 2px rgba(255, 255, 255, 0.55);
     border-color: #bef264;
+    opacity: 1;
   }
   66% {
-    box-shadow:
-      0 0 5px #38bdf8,
-      0 0 10px #c084fc,
-      inset 0 0 2px rgba(255, 255, 255, 0.5);
     border-color: #7dd3fc;
+    opacity: 0.88;
   }
 }
 
 .magnet-pull-ring {
   border: 2px solid #e879f9;
   border-radius: 1px;
-  animation: magnet-pull-glow 1.1s ease-in-out infinite;
+  box-shadow: 0 0 6px rgba(232, 121, 249, 0.6), inset 0 0 2px rgba(255, 255, 255, 0.45);
+  will-change: border-color, opacity;
+  animation: magnet-pull-glow 1.1s steps(6) infinite;
 }
 
-/*
- * Poison cells — stepped sprite animation (Gen III battle poison-screen feel;
- * see public/poison/poison-sheet.svg, built via scripts/generate-poison-sprites.mjs).
- * 8 frames scroll upward in lockstep across the poisoned region; each variant is
- * a row in the sheet. steps(8) matches GBA-style discrete frames, not smooth scroll.
- */
+/* Poison cells */
 @keyframes poison-sprite {
   from { background-position: 0% var(--poison-row, 0%); }
   to   { background-position: 100% var(--poison-row, 0%); }
 }
 
 @keyframes poison-glow {
-  0%, 100% { filter: brightness(1); }
-  50%      { filter: brightness(1.18); }
+  0%, 100% { opacity: 0.88; }
+  50%      { opacity: 1; }
 }
 
 .poison-cell {
@@ -209,14 +202,14 @@ html, body, #root {
   overflow: hidden;
   background-image: url('/poison/poison-sheet.svg');
   background-repeat: no-repeat;
-  /* 8 columns × 4 variant rows — one frame fills the cell at any cellSize */
   background-size: 800% 400%;
   background-position: 0% var(--poison-row, 0%);
   image-rendering: pixelated;
   image-rendering: crisp-edges;
+  will-change: background-position, opacity;
   animation:
     poison-sprite 0.64s steps(8) infinite,
-    poison-glow 1.1s ease-in-out infinite;
+    poison-glow 1.1s steps(4) infinite;
   border: 1px solid rgba(0, 0, 0, 0.35) !important;
 }
 
@@ -241,11 +234,6 @@ html, body, #root {
   to { stroke-dashoffset: -12; }
 }
 
-@keyframes wildcard-rotation-blocked {
-  0%, 100% { opacity: 0; transform: translateY(-4px) scale(0.94); }
-  18%, 82% { opacity: 1; transform: translateY(0) scale(1); }
-}
-
 .wildcard-source-outline {
   fill: none;
   stroke: rgb(250 232 255);
@@ -253,6 +241,7 @@ html, body, #root {
   stroke-linecap: round;
   stroke-dasharray: 2 4;
   filter: drop-shadow(0 0 3px rgba(217, 70, 239, 0.95));
+  will-change: stroke-dashoffset;
   animation: wildcard-source-dash 0.7s linear infinite;
 }
 
@@ -551,4 +540,42 @@ html, body, #root {
   .wildcard-rotation-blocked {
     animation: none !important;
   }
+}
+
+/* -------------------------------------------------------------------------- */
+/* Performance Diagnostic Classes (window.__shapeShowdownPerf)                */
+/* -------------------------------------------------------------------------- */
+
+html.perf-no-animations *,
+html.perf-no-animations *::before,
+html.perf-no-animations *::after {
+  animation: none !important;
+}
+
+html.perf-no-transitions *,
+html.perf-no-transitions *::before,
+html.perf-no-transitions *::after {
+  transition: none !important;
+}
+
+html.perf-no-blurs *,
+html.perf-no-blurs *::before,
+html.perf-no-blurs *::after {
+  backdrop-filter: none !important;
+  filter: none !important;
+}
+
+html.perf-no-glows *,
+html.perf-no-glows *::before,
+html.perf-no-glows *::after {
+  box-shadow: none !important;
+  text-shadow: none !important;
+}
+
+html.perf-reduced-motion *,
+html.perf-reduced-motion *::before,
+html.perf-reduced-motion *::after {
+  animation-duration: 0.01ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.01ms !important;
 }

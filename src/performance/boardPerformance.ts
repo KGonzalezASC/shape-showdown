@@ -62,7 +62,7 @@ function summarize(values: number[]): BoardPerformanceSummary {
   };
 }
 
-function snapshot(): BoardPerformanceSnapshot {
+export function snapshot(): BoardPerformanceSnapshot {
   const grouped = new Map<string, number[]>();
   for (const sample of samples) {
     const key =

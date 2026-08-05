@@ -1,0 +1,780 @@
+[00:00] I'm not going to lie, I'm pretty excited
+[00:01] to film this video because we're
+[00:02] actually talking about one of my old
+[00:04] favorite topics again, performance in
+[00:06] the web. Yes, really no clickbait. We're
+[00:09] actually going to dive into some
+[00:10] performance stuff. But the reason we're
+[00:11] doing it is probably why you guys are
+[00:13] here. Because the fixes that I'm working
+[00:15] on here are things that I could not get
+[00:17] any of the models to do. But more
+[00:18] importantly, the things that were broken
+[00:20] here were broken because of those very
+[00:22] same models. As great as AI developer
+[00:25] tools have gotten and as powerful as
+[00:26] models like GPT56 and Fable are, there
+[00:29] are still things they don't understand.
+[00:31] Some of that is because these things are
+[00:33] just really hard to get right. But some
+[00:35] of it's because the tooling just isn't
+[00:37] there for the agents to figure stuff out
+[00:40] properly. And while the agents couldn't
+[00:42] solve this problem themselves, I
+[00:44] actually found really useful ways to
+[00:45] wield agentic coding while I solve
+[00:47] problems that the agents just could not
+[00:49] understand. What are those problems,
+[00:52] though? Well, here I'll show you. You've
+[00:54] probably seen the app before. It's right
+[00:55] here. T3 code. So, what am I talking
+[00:58] about with that? It looks like it's
+[00:59] running fine. Everything when you click
+[01:00] it loads immediately. It's pretty good.
+[01:03] Well, here's the problem. My GPU process
+[01:07] is currently using as much as 13 to 15%
+[01:10] of my CPU, and I'm running at 720p right
+[01:13] now. When I blew this up to my full
+[01:15] resolution on my laptop or even pulled
+[01:17] it up on my 5K Studio Display XDR, this
+[01:21] would take up to 50% CPU utilization on
+[01:24] the graphics process. That's not good. I
+[01:27] don't know about you guys, but this
+[01:29] doesn't look like a complex 3D game to
+[01:31] me. This looks like a very simple web
+[01:34] app. It should not be performing that
+[01:36] poorly. Did I screw up the React code?
+[01:38] Am I hitting the network too
+[01:40] aggressively? What could I possibly be
+[01:42] doing that is causing my laptop to heat
+[01:44] up and is causing my GPU process to use
+[01:47] such an absurd amount of resources?
+[01:49] Well, these are all very good questions
+[01:51] and if you were to ask your agent about
+[01:52] it, the answers you get would be frankly
+[01:55] garbage. And the actual answer ended up
+[01:57] being way more interesting than I
+[01:58] expected. I put a lot of time into these
+[02:00] fixes, roughly a day and a half, and I
+[02:02] talked to a bunch of my favorite
+[02:03] performance people in the space, and
+[02:06] most of them were also surprised at how
+[02:08] absurd this problem was and how common
+[02:10] it is. Spoiler, it was a single built-in
+[02:13] Tailwind class, kind of. You're going to
+[02:16] want to watch this one if you're a nerd
+[02:18] about the web. And at the very least,
+[02:20] you're going to want to watch this if
+[02:21] you want to see how to utilize agents in
+[02:23] solving problems that they are not smart
+[02:24] enough to solve. Before we can do that,
+[02:26] we're going to have to take a quick
+[02:27] break for today's sponsor. My team is
+[02:29] shipping so fast right now, it's kind of
+[02:30] insane. Today alone, I merged 11 PRs
+[02:33] into T3 Code and about to merge many
+[02:35] more. But in order to do all of this, we
+[02:37] have to run a lot of CI. And if I'm
+[02:38] being honest, CI is just not very good
+[02:41] on GitHub. GitHub actions feels like a
+[02:43] forgotten product of a past era. And
+[02:45] that's why I'm so thankful for today's
+[02:46] sponsor, Blacksmith. If I'm being
+[02:48] totally honest, GitHub should just buy
+[02:49] these guys because they made using their
+[02:51] platform so much better. For running
+[02:53] your actions, Blacksmith is two times
+[02:54] faster. For downloading from cache,
+[02:56] Blacksmith is four times faster. And for
+[02:58] building Docker, it's up to 40 times
+[03:00] faster. If you think these numbers are
+[03:01] [ __ ] I promise you they aren't.
+[03:03] I've seen it in my own projects. I've
+[03:04] seen build times go from 20 plus minutes
+[03:06] to sub 10 trivially. Making the switch
+[03:08] is easy. You change one line of code in
+[03:11] your action and you're good to go. On
+[03:12] top of that, there's so many little
+[03:13] things they get right. If you or your
+[03:15] agents want SSH access to figure out
+[03:17] what went wrong, they have that. If you
+[03:18] want to cach your git checkout so you
+[03:20] don't have to fetch the whole thing
+[03:21] every time with a sticky disc, they have
+[03:23] that. If you want to dig through logs to
+[03:25] see which builds are succeeding and
+[03:26] failing and why, they absolutely have
+[03:28] that with one of the best observability
+[03:29] platforms I've ever seen for CI. If your
+[03:31] CI runs are longer than this ad, fix it
+[03:33] today at soyv.link/blacksmith.
+[03:35] I want to go full storytime mode so you
+[03:37] guys can understand how I ended up in
+[03:39] this position because it was quite an
+[03:43] experience. I was doing a lot more work
+[03:46] in T3 code over the last few days both
+[03:48] to like maximize my fable usage before
+[03:50] we lose it and also because I just had a
+[03:52] lot of stuff I wanted to get done and
+[03:53] finally was done with conferences for a
+[03:55] brief like 5day window which ends
+[03:58] tomorrow. I'm back at conferences again.
+[03:59] This video is probably coming out when
+[04:00] I'm at open source. Yeah. So I finally
+[04:02] had time to just sit down and work for a
+[04:04] very brief moment and I wanted to get as
+[04:06] much done as possible in that time and I
+[04:09] did. This is a screenshot of me using T3
+[04:12] code a couple days ago where I was
+[04:14] pulling up and landing dozens of PRs
+[04:17] across different projects. I still have
+[04:18] like 10 or so trying to get merged into
+[04:20] the T3 code project as well as a bunch
+[04:23] of work on LakeBed which is so close to
+[04:25] launch. I'm really excited about it. But
+[04:26] as you can see here, just the sheer
+[04:28] volume of threads like these ones, this
+[04:30] is like eight threads that are all in
+[04:31] the last 10 minutes. I have a couple
+[04:33] here that are in the last 12 hours or
+[04:34] so. I got a shitload of work done. But
+[04:37] the more I was doing, the more I started
+[04:39] noticing some issues with the
+[04:41] performance. Thankfully, for most of
+[04:43] this, I was just at home at my desk with
+[04:45] my monitor plugged in. So, it didn't
+[04:47] seem too too bad. But then I started
+[04:49] doing something silly. I started using
+[04:51] Moonlight to play games on my desktop
+[04:53] remotely while doing Agentic Code on my
+[04:56] laptop. And while I did have pretty
+[04:58] absurd settings, I was streaming at 120
+[05:00] fps over my 10 gig network. and the
+[05:03] games looked and ran great. It was
+[05:05] insane that it wasn't native because the
+[05:07] latency was really low. Huge shout out
+[05:08] to Moonlight. It's an unbelievable
+[05:10] client. It's so much better than Steam
+[05:11] Link. It's way more annoying to set up,
+[05:13] but once it's set up, it runs comically
+[05:16] better. But I noticed that when I was
+[05:17] running the game that my keyboard
+[05:20] started getting pretty damn hot. So, I
+[05:22] put a bunch of time trying to optimize
+[05:24] Moonlight and Sunshine to get a better
+[05:26] experience there and not have my
+[05:27] computer overheating as much. But, I
+[05:29] couldn't get it quite where I wanted.
+[05:30] So, I closed it and went to bed. The
+[05:32] next day, I woke up and came to my
+[05:33] computer and it was still quite hot. Not
+[05:37] quite as bad, but pretty damn close. So,
+[05:39] I started using Fable and 56 on my
+[05:41] machine to trace things to figure out
+[05:44] what's going on in a way that's causing
+[05:46] my laptop to overheat this much. And the
+[05:48] more I dug in, the more I realized it
+[05:50] was my browser processes. Because, as
+[05:52] I've mentioned before, I usually run T3
+[05:54] Code through the browser because I'm
+[05:56] using it to control other machines.
+[05:58] Generally speaking, the biggest issue
+[06:00] with T3 code performance has never been
+[06:02] T3 code itself and certainly not the
+[06:04] JavaScript backend that we use for the
+[06:06] websocket server is almost always the
+[06:08] actual harnesses that it's running
+[06:10] because things like cloud code and
+[06:12] codecs aren't the most efficient on
+[06:14] memory or on RAM. But all of these were
+[06:16] running on other machines on my network.
+[06:18] It shouldn't affect my computer anywhere
+[06:21] near as much as it was. So I was
+[06:23] confused and concerned. So, I started to
+[06:26] dig in a bit more and I couldn't figure
+[06:28] out what was going on and I also
+[06:30] couldn't figure out confidently enough
+[06:32] whether or not it was my tab in Helium
+[06:35] or other tabs because, and this is
+[06:37] probably the most important hint to get
+[06:38] from here, the builtin browser
+[06:41] performance tools were not helpful at
+[06:44] all. These tools are more focused on
+[06:46] things like JavaScript running when it
+[06:48] shouldn't or really slow load times or
+[06:51] resources that aren't coming in
+[06:52] properly. Slight spoiler for what's
+[06:54] coming. Once things are offloaded to a
+[06:56] layer like CSS, these tools become much
+[06:59] much less useful. And when I went into
+[07:01] the browser tools for T3 code, I just
+[07:04] didn't see anything that suggested that
+[07:05] this performance should be as bad as it
+[07:07] was. And it also was still snappy. Like
+[07:09] navigating and doing things was great,
+[07:11] but it was hammering this GPU process.
+[07:14] But also again, this task manager is not
+[07:17] tab specific. This is for the whole
+[07:20] browser. So, if any tab had problems, it
+[07:23] would come up here and there was no way
+[07:25] to figure out which tab it was other
+[07:27] than debugging one tab at a time, which
+[07:29] is why I'm currently in a browser you
+[07:30] don't see me using much. I'm in Chrome
+[07:34] because I use Helium for my day-to-day
+[07:35] work and I use Zen as my like casual
+[07:37] browsing. So, I need a browser that only
+[07:39] had one tab in it, T3 Code, so I could
+[07:42] be certain that the problem was T3 Code.
+[07:46] And sure as hell, you can see here it
+[07:47] has to be because if I go to another
+[07:49] place like google.com,
+[07:52] the GPU process drops a bunch down to
+[07:55] like 3% instead of the 18 plus I was
+[07:58] hitting and 40 plus I was hitting when I
+[08:00] was on a bigger monitor. So all of this
+[08:02] made it clear something was up and it
+[08:05] was up with T3 code directly. So I
+[08:09] started how I start a lot of tasks
+[08:10] nowadays. I gave a very vague
+[08:12] description of my problem to codeex to
+[08:14] see what it would do and it wrote this
+[08:16] up. T3 codes web UI can plausibly drive
+[08:19] sustained CPU load and laptop heat. Live
+[08:22] Chrome profiling found a websocket
+[08:24] driven main thread stall while source
+[08:26] analysis found several multiplicative
+[08:27] paths that could turn active agent
+[08:29] streams into continuous decoding history
+[08:30] scan state rewrites persistence time
+[08:32] derivation and highlighting. And this
+[08:34] all sounded pretty viable. So I did what
+[08:37] I usually do. I told the agent to build
+[08:39] the thing and test the thing and see if
+[08:41] it could fix the problems. They very
+[08:42] confidently came back and told me it
+[08:44] did. This was a huge PR where it rewrote
+[08:46] a ton of stuff. So, I started using it
+[08:49] and it didn't meaningfully improve the
+[08:51] experience on my machine. This is when I
+[08:54] realized I was in for a rough ride
+[08:57] because it had just done like a 10,000
+[08:59] plus line of code change in order to
+[09:02] optimize performance mostly focused
+[09:05] around the network layer and how it
+[09:06] triggered updates in the React layer for
+[09:08] the app itself. And none of it mattered.
+[09:12] None of it mattered at all. And that's
+[09:14] when I started to go deep. That's when I
+[09:16] gave up and opened up Chrome and
+[09:18] isolated things to hear. That's why I
+[09:19] started using the task manager to figure
+[09:21] out what might be the problem like what
+[09:24] layer is this issue happening in. And
+[09:27] that's when I noticed in the browser
+[09:29] section that GPU process was using way
+[09:31] more resource than it should be. Even
+[09:34] here when I go to the tab, the tab's
+[09:36] only showing like 1 to 4% utilization,
+[09:39] but the browser is pulling GPU as high
+[09:42] as 20% even on this low res. Thankfully,
+[09:45] I have been doing this since way before
+[09:47] AI was a thing. And I had a rough idea
+[09:49] of a handful of things that could be
+[09:52] causing problems. In particular,
+[09:54] anything that triggers at a high frame
+[09:56] rate because I was on a 120 fps 5K
+[09:59] display. So, I asked for my agent to go
+[10:01] through the codebase and find every
+[10:03] single thing that triggers rendering or
+[10:05] updates on the page that could possibly
+[10:08] have any GPU demand whatsoever. This is
+[10:11] the thread where I did most of this work
+[10:12] for reference. I'm noticing some brutal
+[10:15] performance issues in this app, both
+[10:16] Electron and Browser. If you fix in
+[10:18] Chrome, they should be fixed globally. I
+[10:19] have a separate PR for CPU related
+[10:21] issues, but they aren't the ones I care
+[10:22] about right now. The GPU is getting
+[10:24] pegged, and I have no idea why. I traced
+[10:27] a bit in Chrome on the production app
+[10:28] code site, and I got an AI summary. You
+[10:30] should start with this. This ended up
+[10:32] being absolute garbage. I was just
+[10:33] curious and still loosely debugging
+[10:35] while trying to play Pow World. So, I
+[10:37] threw the Gemini summary from Chrome in
+[10:39] here, and it was pretty garbage. again
+[10:41] was saying that scripting, style,
+[10:43] layout, and framework were all like
+[10:45] happening, but very, very small amounts
+[10:47] of time. So, none of this seemed like it
+[10:50] was the problem. And initially, it
+[10:51] called out the ultrathink composer
+[10:54] treatment. This is a pretty weird thing
+[10:56] for it to call out because the ultraink
+[10:58] UI only appears when you type ultrathink
+[11:01] and you have claude code set because
+[11:03] it's triggering ultraink in claude. And
+[11:06] it does this fancy little gradient
+[11:08] around the input box. But that only
+[11:10] happens when you're using cloud code and
+[11:12] Ultraink. And I had this problem when I
+[11:14] was exclusively using codecs and had
+[11:16] forgotten we had this Ultraink feature
+[11:17] in. And as cool as the little text box
+[11:20] is, I would remove it immediately if it
+[11:22] was a source of problems. And it's very
+[11:23] obviously not. So, the fact that it's
+[11:26] calling out the sustained GPU bug being
+[11:28] the Ultraink composer treatment made me
+[11:31] realize in this exact moment just how
+[11:34] [ __ ] I was because it was so far from
+[11:37] the reality I was experiencing that
+[11:39] there was no world in which I was going
+[11:40] to get Soul to figure this out for me.
+[11:42] It failed just as bad with roughly the
+[11:44] same prompt. By the way, it also fixated
+[11:46] on this Ultraink rapper. So, at this
+[11:48] point, I realized the model was not
+[11:49] going to solve this problem for me or
+[11:51] even find the problem for me. So, I had
+[11:52] to flip my mindset a bit. Instead, I try
+[11:55] to think about how can I use the model
+[11:56] to debug as many different theories as
+[11:59] efficiently as possible. So, I asked it
+[12:01] to make a way for me to test changes
+[12:02] that are easy to experiment with in prod
+[12:04] ideally with just console commands so I
+[12:06] can see an immediate difference. So, it
+[12:07] wrote up this fun window binding
+[12:09] function for me that would create
+[12:10] underscore_t3gpu
+[12:12] and in this let me define custom CSS
+[12:16] that would be applied to the page to
+[12:18] turn on and off various features. This
+[12:20] included things that I was suspicious of
+[12:22] like animations, filters, shadows, the
+[12:25] composer, blur, any media layers, and
+[12:28] this noise layer. This is one I was
+[12:29] particularly suspicious of. So, now that
+[12:31] I have this all defined, I can yink it.
+[12:34] I can go back to this broken slow build,
+[12:38] go into the console, paste it, and now I
+[12:41] have the ability to experiment. So, as I
+[12:42] was saying before, performance here is
+[12:44] bad. It could occasionally get as low as
+[12:46] like a bit under 10%, but it's usually
+[12:48] way over. Watch what happens when I do
+[12:50] underscore_t3GPU.apply
+[12:54] all. It has broken the UI a decent bit.
+[12:57] Like the text is appearing behind the
+[12:59] text box. But if we look at the
+[13:01] performance here, we are now down to 3%
+[13:04] or less GPU process. So it's clear
+[13:08] something in that set fixed the problem.
+[13:11] I don't know what yet, but something
+[13:14] did. But now we have a custom tool that
+[13:16] we built to go back and forth with these
+[13:18] options and figure out what it was. And
+[13:21] just to confirm, I have the D3GPU.reset
+[13:24] function. And as soon as I run that GPU
+[13:27] process spikes back up. Okay, let's
+[13:30] start applying things. I said noise was
+[13:32] suspicious, so let's just do the noise
+[13:34] change. Huh. Numbers are still pretty
+[13:37] high. It's idling a bit lower with the
+[13:39] noise change, but not enough. Okay, how
+[13:42] about blur? Now the blur is off. And the
+[13:45] process is somehow going up. It just
+[13:47] almost hit 20%. Okay, let's try the next
+[13:50] one. Animations. I hope it's not this
+[13:53] one because if it is, that means to turn
+[13:54] off animations.
+[13:56] Oh, looks like it was. All of a sudden,
+[13:59] the GPU process is down to basically
+[14:01] nothing again. And now I have some
+[14:04] actual information. I also forgot to
+[14:06] mention at the start, it spent 30
+[14:08] minutes trying to get debug info out of
+[14:10] Chrome and just failed outright. And
+[14:13] eventually I just told it to use
+[14:14] computer use and look at the browser
+[14:16] tabs instead instead of trying to go
+[14:18] through the Chrome extension that it
+[14:19] insisted on trying to use. Helped a bit,
+[14:21] but still this this is a rough one if
+[14:23] I'm being frank. This message was a cued
+[14:25] one where I gave it the context of a
+[14:27] basic empty like idle T3 code instance
+[14:30] and the massive GPU utilization I was
+[14:33] seeing said that this changes the
+[14:34] diagnosis materially. The 31.3% is GPU
+[14:37] process CPU with 1 gig of GPU process
+[14:40] memory specifically while the thread is
+[14:42] working. Likely frame pump is now
+[14:43] visible in code. Here's where it starts
+[14:46] fixating on the animations. I also had
+[14:47] told it that the animations seem to turn
+[14:49] off and cancel this problem out here. It
+[14:52] gave me another script I could run to
+[14:53] find all the animations and manually
+[14:55] pause them and see what happens. It is
+[14:59] also worth noting that DevTools changes
+[15:01] the performance characteristics of a
+[15:02] site. just having it open starts to
+[15:04] insert a bunch of things into the site
+[15:06] and put it in a debug mode that
+[15:08] inherently makes it slower. So, it's not
+[15:09] the most accurate readout compared to
+[15:11] something like the task manager that I
+[15:13] was using. So, it told me to do that,
+[15:15] close dev tools and then watch the task
+[15:16] manager and see what the difference was.
+[15:18] Then, it told me what order to apply
+[15:20] different things in to see how it
+[15:22] affects the performance. I then
+[15:23] described what I had seen, which is that
+[15:25] all had an immediate cut to under 4%,
+[15:27] reset jump back to 25 plus, and
+[15:29] animations appear to be the biggest
+[15:30] improvement. One correction helpers
+[15:32] animations rule disables both animations
+[15:34] and transition. Let's separate them in
+[15:36] order to diagnose further. Now you can
+[15:37] turn off transitions and animations
+[15:39] separately in order to get a more direct
+[15:41] answer to what was up. It had its
+[15:43] theories and I will again tell you guys
+[15:45] most of these are wrong. The pulse had a
+[15:48] little bit of the impact. This stroke
+[15:51] for the blue context window ring did not
+[15:53] at all. It did not matter in the
+[15:54] slightest. The pulse was the biggest
+[15:57] issue for sure in different places
+[16:00] though, specifically in the sidebar. And
+[16:02] here's where we identified one of the
+[16:03] major offenders. It was the pulsing
+[16:06] terminal icon that appears when you open
+[16:08] a terminal in a thread. This little icon
+[16:11] right there was what was causing all of
+[16:13] my hell. I could never have guessed when
+[16:15] I first started running into the problem
+[16:16] here that of all the things on the
+[16:18] screen, these two little green icons in
+[16:21] the bottom were pegging my GPU on my now
+[16:25] $8,000 computer. And then it gave its
+[16:27] theory for why an opacity pulse is
+[16:29] expensive. Normally, it's a cheap
+[16:30] compositor only animation, but an
+[16:32] infinite compositor animation still
+[16:34] requires frames at the display refresh
+[16:35] rate, which for me was 120 fps. And on a
+[16:37] high DPI display, it was pretty brutal.
+[16:40] And its suggestion was to make it
+[16:41] static, which I did not love. And it
+[16:43] said, "If motion is desirable, use a
+[16:45] finite pulse only when it first becomes
+[16:47] active." This is like the worst guidance
+[16:49] I've ever heard. Like, if you like the
+[16:52] pulse, do it for two and a half seconds
+[16:54] instead. No, [ __ ] you. This is why
+[16:56] everybody thinks that Codex is so bad at
+[16:58] design. I hated this suggestion so much.
+[17:01] It gave suggestions for bad
+[17:02] optimizations to not do. So stupid. And
+[17:06] it also suggested a lower frequency
+[17:08] blink to see how it would affect
+[17:10] performance. I tried that and it was not
+[17:12] much better. It was a little better, but
+[17:15] I also hated how it looked. So, I was
+[17:17] just not happy with a lot of this. And
+[17:20] it made a PR that just removed pulsing
+[17:23] from that one icon, even though other
+[17:25] icons like the working completed and the
+[17:27] uh work in progress in threads were also
+[17:30] affecting this in a meaningful way. So
+[17:32] again, Soul just was terrible at this.
+[17:35] Here I start talking about other agents
+[17:37] because this is the point where I was
+[17:39] accepting of the fact that Soul was not
+[17:41] going to help and was hoping, praying
+[17:43] even that Fable would do a better job.
+[17:45] So I gave it some of the work Fable had
+[17:47] done. And this is probably the point
+[17:48] where I should switch over to the Fable
+[17:50] thread because I'd given up on Soul
+[17:51] being helpful. Also, fun fact, I did
+[17:53] most of this work on my other MacBook
+[17:56] over T3 Code remotely, but since I was
+[17:58] moving to Fable and it wouldn't benefit
+[18:00] from Codeex's control options, and I
+[18:03] also wanted a bit more resource
+[18:04] available, I moved this over to my
+[18:05] framework desktop running Linux because
+[18:07] it wouldn't have quite as much computer
+[18:09] use capability, but at this point, I
+[18:10] didn't need it. I just needed to test
+[18:11] theories and write code. So, I had this
+[18:13] going at the same time also so that like
+[18:15] these two could run at the same time and
+[18:16] not interfere with each other and get
+[18:18] confused by each other's solutions. This
+[18:20] separation was really convenient and
+[18:21] just throwing old machines on my network
+[18:23] and being able to hop between them just
+[18:25] by clicking different things in T3 code
+[18:27] in the browser. It's such a nice UX. I I
+[18:29] have never been doing more work across
+[18:31] more machines in my life. Huge shout out
+[18:33] to Julius for making all of this as
+[18:35] stable as he has. The best thing I ever
+[18:36] did was buy a Mac Mini for Julius
+[18:39] because now he's making all of this
+[18:40] workflow stuff work great. So, here is
+[18:43] what I did with Fable. I discovered some
+[18:45] awful perf issues due to CSS animations.
+[18:47] They're pinging the GPU really hard,
+[18:48] especially on 120 Hz monitors. I know
+[18:50] the terminal icon in the sidebar is
+[18:51] guilty of causing problems. What other
+[18:53] animations may cause PF issues? What can
+[18:55] we do to make them less GPU intensive?
+[18:57] Found the full animation inventory. Here
+[18:59] is where it started and like built up
+[19:01] the list of all of the different
+[19:03] animations and again started with three
+[19:06] that didn't [ __ ] matter. It started
+[19:08] with the loading skeleton when you first
+[19:10] open T3 code, which is not the problem.
+[19:13] I don't care. And then it suggested the
+[19:15] Ultrathink Rainbow and the Ultraink
+[19:18] Chroma Shift. As I discussed before,
+[19:20] Ultraink has nothing to do with this.
+[19:24] Thankfully, as we keep scrolling and we
+[19:25] leave behind the expensive ones, we end
+[19:27] up in the moderate ones where problems
+[19:29] actually live. There's the animate
+[19:31] pulse, which is the terminal icon that I
+[19:32] mentioned before, as well as a few
+[19:34] others, like the typing dots for message
+[19:36] timeline, thread status indicators,
+[19:38] things like that. Opacity animation on
+[19:40] the compositor. So each isn't expensive
+[19:42] alone, but every infinite animation
+[19:45] promotes its element to its own GPU
+[19:46] layer and keeps the compositor
+[19:48] committing at 120 fps even when nothing
+[19:50] else changes. With several sidebar rows
+[19:52] pushing at once, that's a lot of tiny
+[19:54] layers being recomposited forever. The
+[19:56] reason terminal icon feels guilty is
+[19:57] probably that it prevents the page from
+[19:58] ever going idle. Oh boy. Now we get into
+[20:01] animate ping connection status.preview
+[20:04] local server card. These did not end up
+[20:06] being a big deal. Animate spin didn't
+[20:09] matter. It's only loading states. And
+[20:10] the provider update pill countdown also
+[20:13] didn't really matter. But here is where
+[20:16] I got some actual useful insights from
+[20:18] Fable. It fixated on the backdrop blur.
+[20:22] It's a thing that was funny enough added
+[20:23] by Opus way back when we started T3 Code
+[20:26] in order to try and make it look better.
+[20:28] For the most part, our use of backdrop
+[20:29] blur is not too bad. As you see, I am
+[20:31] blurring the background behind the text
+[20:33] box and my performance isn't bad right
+[20:35] now. But there are other places where
+[20:37] we're doing this type of thing. And in
+[20:39] particular, I don't think it's mentioned
+[20:40] here. Uh, okay. The the root tsx is
+[20:43] mentioned, we had a noise layer that was
+[20:47] applied to the front of the page with a
+[20:50] very low opacity in order to make it a
+[20:53] little grainier, to make the gray not
+[20:55] feel so monolithic.
+[20:58] It's very common and looks so much
+[21:02] better. We've used this on most of the
+[21:04] things we have built. But when combined
+[21:07] with a handful of other things,
+[21:08] specifically the backdrop blur and the
+[21:11] consistent animation, that's when the
+[21:13] performance started to get bad. Mind
+[21:16] you, it took me this entire thread and a
+[21:19] dozen and a half back and forths to get
+[21:22] this figured out. And even when it did
+[21:25] get mostly figured out, it did a really
+[21:28] bad job fixing it. This might not come
+[21:32] through in the encoded version of this
+[21:34] video on YouTube because compression is
+[21:37] a [ __ ] but there were very clearly
+[21:40] distinctly different gray colors in
+[21:43] multiple places. You had the gray for
+[21:44] the sidebar and you had a now darker
+[21:47] gray for the main body because my
+[21:48] filters were actually brightening the
+[21:50] color a little before and a different
+[21:52] gray on the bottom here for this special
+[21:54] area where like the local checkout
+[21:56] button and things go. It was not super
+[21:58] visible on most SDR displays, but on my
+[22:00] HDR MacBook and on my HDR Studio
+[22:03] display, it was really bad. So, yeah, I
+[22:08] was going mad with this. I ended up
+[22:09] removing the noise entirely and tuning
+[22:12] the color to make it look good enough,
+[22:15] but it kept screwing up the color here.
+[22:17] This one should be even more visible. I
+[22:18] don't know again if this will come
+[22:19] through in the compression or not, but
+[22:20] it was very clearly lighter gray on the
+[22:22] bottom, and it was very jarring and bad.
+[22:25] Found it. And this one isn't my change
+[22:27] at all. The bar is the composer's lower
+[22:29] chrome strip, the full width row that
+[22:31] holds the branch and checkout
+[22:32] information. In the dark mode, it's
+[22:34] defined as this specific mix. Let's
+[22:36] lighten it to try and make it match. It
+[22:38] screwed it up again.
+[22:41] Ended up fighting it more in another
+[22:42] thread and eventually got it to the
+[22:44] point where you cannot see it at all.
+[22:47] But this also resulted in the darkening
+[22:48] of the body here, which with a little
+[22:50] tuning, I got to a point that I was okay
+[22:52] with. Most importantly, I got the
+[22:54] performance down right.
+[22:58] Why is that still at 18%.
+[23:02] 20%. God, did our merge not go through?
+[23:06] I'm on the site app T3 codes. So, when
+[23:08] we finally shipped it and I finally
+[23:10] moved back over to Helium, I noticed the
+[23:12] GPU process cooking still and I was so
+[23:17] stressed thinking I just did all of this
+[23:18] work and it didn't fix it. I don't even
+[23:21] have very many tabs open here. I have my
+[23:23] YouTube stream, which thankfully, as bad
+[23:26] as the YouTube client is optimized, is
+[23:27] not the problem. Here I have the chat,
+[23:29] which I'll close as well. I have my
+[23:31] codeex dashboard with my usage there.
+[23:33] We've lost a tiny bit here, but not much
+[23:35] so far. So, let's just close that. Okay,
+[23:38] that helped a bit. That took 2% or so
+[23:40] off it, maybe, but it's still way too
+[23:42] high. Well, I had forgotten something. I
+[23:46] had two other Helium windows open. I had
+[23:50] one for Claude and I had another for my
+[23:53] other Claude because I have three Claude
+[23:54] accounts. Once I closed those, the
+[23:56] performance was exactly where I expected
+[23:58] it. Do you know what that means, though?
+[24:01] What that means is an empty idle
+[24:04] Cloud.AI page uses 10% of my $8,000
+[24:09] laptop's GPU for each open tab. I had to
+[24:13] sneak a Claude duck dunk in here
+[24:14] somewhere, but I understand why. Because
+[24:17] when I asked Claude to fix it, it gave
+[24:18] the most stupid [ __ ] suggestions I've
+[24:20] ever seen in my life. So, as most of my
+[24:24] real engineering videos tend to
+[24:25] conclude, I think Anthropic needs to
+[24:28] hire some real godamn engineers because
+[24:31] they made me think that my fixes didn't
+[24:33] work because their code on an idle page
+[24:35] was that [ __ ] bad. To their credit,
+[24:38] the same thing happens in Codeex a lot.
+[24:40] In fact, this thing happened in Codeex
+[24:42] so much when I was first testing the
+[24:44] Codex desktop app that I was concerned
+[24:47] that the performance would continue
+[24:48] going to [ __ ] randomly. They would fix
+[24:50] it and then the next update would break
+[24:52] it again. And that kept on happening to
+[24:54] the point where I decided to build my
+[24:56] own open- source alternative to the
+[24:57] Codeex app to make sure this would never
+[24:59] happen again. And despite that, and
+[25:01] despite having 120,000 people, thank
+[25:03] each and every one of you, by the way,
+[25:05] having 120,000 of you guys using T3
+[25:07] code, I had to stay up until 5:00 a.m.
+[25:10] two nights in a row fixing this myself.
+[25:12] These things aren't easy. It does not
+[25:14] matter that models have gotten so smart.
+[25:15] They were very helpful. This diagnosis
+[25:17] would have taken me way more than like a
+[25:19] day and a half of partially working on
+[25:21] it if I had to do it all by hand.
+[25:24] Getting agents to build tools to help me
+[25:26] diagnose different theories was great,
+[25:29] even though their suggestions were
+[25:30] absolute [ __ ] trash. And this is why
+[25:33] being an engineer is so useful. And
+[25:35] having experience in these things is
+[25:37] great. My experience didn't make the
+[25:39] agent solve the problem, and the agent
+[25:41] didn't understand it better than me. The
+[25:43] agent could find things in the codebase
+[25:45] faster than me. It could build custom
+[25:46] tools to test my theories better than
+[25:48] me, but I was still the one who brought
+[25:50] the real information. And that felt
+[25:52] weird, but it also felt good in a way to
+[25:55] know that this experience I have
+[25:57] fighting weird CSS behaviors in the
+[25:59] browser without tools that are actually
+[26:01] helpful for it is still valuable. And
+[26:03] it's valuable enough that both major
+[26:05] labs that are trying to replace all of
+[26:06] us engineers with their fancy GPU
+[26:08] runners can certainly waste my GPU in
+[26:11] ways that make no sense. Yeah, this was
+[26:14] a fun deep dive. I am happy I did it and
+[26:16] I am very happy with the resulting
+[26:18] performance improvements that we now
+[26:20] have in T3 code. If your reason for not
+[26:22] using it before is because the
+[26:23] performance wasn't great, it's more than
+[26:25] fixed now. I highly recommend giving it
+[26:27] another go. The desktop app is great. I
+[26:29] personally mostly use it through the
+[26:30] website connecting over the CLIs on
+[26:32] other computers. And T3 Connect is
+[26:34] coming soon too, which will make it so
+[26:35] you can connect without even needing
+[26:36] something like Tailscale. But if you do
+[26:38] already have tail scale set up, I can
+[26:40] say with 100% certainty, T3 code is the
+[26:43] best way to work with it. If you're
+[26:45] curious about the final version of the
+[26:47] PR that landed and fixed all these
+[26:48] problems, you can go check it out on
+[26:50] GitHub right here. Both Fable and Soul
+[26:52] pissed me off a ton during this
+[26:54] debugging journey, but they also ended
+[26:55] up building useful tools to help me find
+[26:57] the answer. But what was really cool
+[26:58] here is that I still had to find it
+[27:00] myself. As great as these tools are,
+[27:02] they are just that, tools. They don't
+[27:04] know everything. They can find things
+[27:06] fast, but they have to be steered. And
+[27:08] when you learn how to steer them and
+[27:09] wield them for different types of work,
+[27:11] whether that is they find and solve the
+[27:13] problem themselves, or they build the
+[27:14] tools to help you solve it, agents can
+[27:16] always be valuable in almost any dev
+[27:18] work, even if not as valuable as people
+[27:20] on Twitter like to make them out to be.
+[27:22] Just cuz your agents don't know the
+[27:23] solution to the problem doesn't mean
+[27:25] they can't be helpful when you solve it
+[27:26] yourself. This is a fun deep dive for
+[27:28] me, and I hope it was for you guys, too.
+[27:29] Until next time, peace and ns.

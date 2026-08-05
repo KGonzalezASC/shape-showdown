@@ -45,6 +45,7 @@
     "knip": "^6.16.1",
     "lucide-react": "^0.546.0",
     "motion": "^12.23.24",
+    "puppeteer": "^25.5.0",
     "react": "^19.0.0",
     "react-doctor": "^0.0.39",
     "react-dom": "^19.0.0",

@@ -1,5 +1,6 @@
 import React, { useEffect, useLayoutEffect, useRef } from 'react';
 import { recordBoardCanvasPaint } from '../performance/boardPerformance';
+import { areCanvasOverlaysDisabled } from '../performance/perfDiagnostic';
 import type { BoardVisualCell, BoardVisualModel } from './boardVisualModel';
 import {
   isCanvasLayoutVisible,
@@ -66,6 +67,8 @@ export function paintBoardCanvasOverlay(
   elapsedMs: number,
 ): void {
   ctx.clearRect(0, 0, model.columns * cellSize, model.rows * cellSize);
+  if (areCanvasOverlaysDisabled()) return;
+
   const hatchPhase = Math.floor(elapsedMs / 100) * 2;
 
   for (const cell of model.cells) {
