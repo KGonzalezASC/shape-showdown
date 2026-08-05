@@ -7,12 +7,17 @@ export interface BoardPressureMetrics {
   holes: number;
   bumpiness: number;
   fillRatio: number;
+  poisonCells: number;
 }
 
-export function computeBoardPressure(board: CellValue[][]): BoardPressureMetrics {
+export function computeBoardPressure(
+  board: CellValue[][],
+  poisonBoard?: number[][],
+): BoardPressureMetrics {
   const columnHeights = new Array<number>(BOARD_COLS).fill(0);
   let holes = 0;
   let filledCells = 0;
+  let poisonCells = 0;
 
   for (let x = 0; x < BOARD_COLS; x++) {
     let filledFound = false;
@@ -22,6 +27,9 @@ export function computeBoardPressure(board: CellValue[][]): BoardPressureMetrics
         if (!filledFound) {
           columnHeights[x] = BOARD_ROWS - y;
           filledFound = true;
+        }
+        if (poisonBoard?.[y]?.[x] && poisonBoard[y][x] > 0) {
+          poisonCells++;
         }
       } else if (filledFound) {
         holes++;
@@ -45,9 +53,10 @@ export function computeBoardPressure(board: CellValue[][]): BoardPressureMetrics
     holes,
     bumpiness,
     fillRatio,
+    poisonCells,
   };
 }
 
 export function computePlayerPressure(player: PlayerState): BoardPressureMetrics {
-  return computeBoardPressure(player.board);
+  return computeBoardPressure(player.board, player.poisonBoard);
 }
