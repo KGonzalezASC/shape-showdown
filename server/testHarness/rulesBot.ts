@@ -71,6 +71,70 @@ export const DEEPEST_CAVITY_REDUCTION_WEIGHT = 25;
 export const CAVITY_DEPTH_INCREASE_PENALTY = 70;
 export const DEEPEST_CAVITY_INCREASE_PENALTY = 20;
 
+export interface PlacementVisibilityRisk {
+  unknownCellCount: number;
+  deepestUnknownRowOffset: number;
+  crossesUnknownFrontier: boolean;
+  uncertainLineClearCount: number;
+}
+
+// Curtain masking makes bottom-row occupancy uncertain, but entering that
+// region is still normal play. Keep these penalties below the initial
+// frontier-risk calibration so the bot does not stack above the mask and top out.
+export const UNKNOWN_PLACED_CELL_PENALTY = 40;
+export const UNKNOWN_ROW_DEPTH_PENALTY = 20;
+export const UNCERTAIN_LINE_CLEAR_PENALTY = 150;
+
+export function evaluatePlacementVisibilityRisk(
+  placedCells: Array<[number, number]>,
+  clearedRowIndices: number[],
+  visibility: BoardMetricVisibility,
+): PlacementVisibilityRisk {
+  const { knownRowStart, knownRowEndExclusive } = visibility;
+  let unknownCellCount = 0;
+  let deepestUnknownRowOffset = 0;
+
+  for (const [, y] of placedCells) {
+    if (y < knownRowStart) {
+      unknownCellCount++;
+      const offset = knownRowStart - y;
+      if (offset > deepestUnknownRowOffset) {
+        deepestUnknownRowOffset = offset;
+      }
+    } else if (y >= knownRowEndExclusive) {
+      unknownCellCount++;
+      const offset = y - knownRowEndExclusive + 1;
+      if (offset > deepestUnknownRowOffset) {
+        deepestUnknownRowOffset = offset;
+      }
+    }
+  }
+
+  let uncertainLineClearCount = 0;
+  for (const rowIndex of clearedRowIndices) {
+    if (rowIndex < knownRowStart || rowIndex >= knownRowEndExclusive) {
+      uncertainLineClearCount++;
+    }
+  }
+
+  return {
+    unknownCellCount,
+    deepestUnknownRowOffset,
+    crossesUnknownFrontier: unknownCellCount > 0,
+    uncertainLineClearCount,
+  };
+}
+
+export function calculatePlacementVisibilityRiskScore(
+  risk: PlacementVisibilityRisk,
+): number {
+  return (
+    risk.unknownCellCount * UNKNOWN_PLACED_CELL_PENALTY +
+    risk.deepestUnknownRowOffset * UNKNOWN_ROW_DEPTH_PENALTY +
+    risk.uncertainLineClearCount * UNCERTAIN_LINE_CLEAR_PENALTY
+  );
+}
+
 export function deriveVisibilityFromObservation(
   obs: PlayerObservation,
 ): BoardMetricVisibility {
@@ -415,20 +479,20 @@ export class RulesBot implements InputDriver {
         }
 
         let linesCleared = 0;
+        const clearedRowIndices: number[] = [];
         for (let y = 0; y < BOARD_ROWS; y++) {
           if (simBoard[y].every((cell) => cell !== null)) {
             linesCleared++;
+            clearedRowIndices.push(y);
           }
         }
 
+        const visibilityRisk = evaluatePlacementVisibilityRisk(placedCells, clearedRowIndices, visibility ?? { knownRowStart: 0, knownRowEndExclusive: BOARD_ROWS });
+        const visibilityRiskPenalty = calculatePlacementVisibilityRiskScore(visibilityRisk);
+
         // Apply line clear removal to simBoard to evaluate post-clear stack state
         if (linesCleared > 0) {
-          const clearedRows = new Set<number>();
-          for (let y = 0; y < BOARD_ROWS; y++) {
-            if (simBoard[y].every((cell) => cell !== null)) {
-              clearedRows.add(y);
-            }
-          }
+          const clearedRows = new Set<number>(clearedRowIndices);
           const remainingRows = simBoard.filter((_, y) => !clearedRows.has(y));
           while (remainingRows.length < BOARD_ROWS) {
             remainingRows.unshift(new Array<CellValue>(BOARD_COLS).fill(null));
@@ -514,7 +578,12 @@ export class RulesBot implements InputDriver {
           spiresScore +
           wellsScore +
           poisonScore +
-          dropDepthBonus;
+          dropDepthBonus -
+          visibilityRiskPenalty;
+
+        if (visibilityRisk.uncertainLineClearCount > 0 && perfectClear) {
+          score -= 500;
+        }
 
         if (causesTopOut) {
           score -= 100000;

@@ -9,7 +9,7 @@ const botQualityReport = runBotQuality({
   seconds: 120,
   policyId: 'rulesBot-v1',
   observationMode: 'player-limited',
-  enableGarbage: false,
+  enableGarbage: true,
 });
 
 const curtainImpactReport = runItemImpact({

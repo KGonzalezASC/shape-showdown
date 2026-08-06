@@ -10,14 +10,14 @@
 | Policy ID | rulesBot-v1 |
 | Observation Mode | player-limited |
 | Simulation Runs | 15 (120s each) |
-| Survival Rate | 93.3% |
-| Avg Score | 41269 |
-| Avg Lines Cleared | 213.3 |
-| Avg Holes | 0.1 |
-| Avg Cavity Depth | 0.3 |
-| Avg Deepest Cavity | 0.1 |
-| Avg Aggregate Height | 24.8 |
-| Avg Bumpiness | 8.2 |
+| Survival Rate | 100.0% |
+| Avg Score | 41833 |
+| Avg Lines Cleared | 216.7 |
+| Avg Holes | 0 |
+| Avg Cavity Depth | 0 |
+| Avg Deepest Cavity | 0 |
+| Avg Aggregate Height | 17.1 |
+| Avg Bumpiness | 6.5 |
 
 ## 2. Baseline Item Impact (Curtain / Frost-Shift)
 
@@ -25,10 +25,10 @@
 | --- | --- |
 | Matched Seed Cases | 15 |
 | Cost Policy | reference-price |
-| Avg Direct Recipient Holes Delta | 18.2 |
-| Avg Direct Recipient Height Delta | 109 |
-| Avg Buyer Score Delta | -13797 |
-| Avg Buyer Survival Delta (ticks) | -2195 |
+| Avg Direct Recipient Holes Delta | 16.33 |
+| Avg Direct Recipient Height Delta | 103.27 |
+| Avg Buyer Score Delta | -14000 |
+| Avg Buyer Survival Delta (ticks) | -2229 |
 | Avg Economic Cost (spent) | 513 |
 
 ## 3. Baseline Item Impact (Poison / Elixir-Pulse)
@@ -39,6 +39,6 @@
 | Cost Policy | reference-price |
 | Avg Direct Recipient Poison Cells Delta | 0.27 |
 | Avg Direct Recipient Holes Delta | 0 |
-| Avg Direct Recipient Height Delta | -0.67 |
+| Avg Direct Recipient Height Delta | -1.2 |
 | Avg Buyer Score Delta | -580 |
 | Avg Economic Cost (spent) | 532 |

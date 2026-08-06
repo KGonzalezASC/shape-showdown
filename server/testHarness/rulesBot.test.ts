@@ -4,9 +4,15 @@ import {
   evaluateBoard,
   deriveVisibilityFromObservation,
   scoreCavityDepthDelta,
+  evaluatePlacementVisibilityRisk,
+  calculatePlacementVisibilityRiskScore,
+  UNCERTAIN_LINE_CLEAR_PENALTY,
+  BoardMetricVisibility,
+  PlacementPlan,
   RulesBot,
 } from './rulesBot.js';
 import { Scenario } from './scenario.js';
+import { PairedRunner } from './pairedRunner.js';
 import { createEmptyBoard, detectTSpinFor, previewAttackFromClear } from '../tetris/engine.js';
 import { BOARD_COLS, BOARD_ROWS, BOARD_HIDDEN_ROWS } from '../../src/constants.js';
 import type { DriverObservation } from './inputDriver.js';
@@ -460,6 +466,103 @@ describe('RulesBot Adapter & Attack Preview', () => {
 
       assert.ok(plan);
       assert.notEqual(plan.x, 0);
+    });
+  });
+
+  describe('Step 4 — Curtain Frontier and Unknown-Region Risk', () => {
+    it('produces zero unknown risk for omniscient observation mode', () => {
+      const visibility = { knownRowStart: 0, knownRowEndExclusive: BOARD_ROWS };
+      const placedCells: Array<[number, number]> = [[0, 0], [0, 1], [0, 18], [0, 19]];
+      const risk = evaluatePlacementVisibilityRisk(placedCells, [19], visibility);
+
+      assert.equal(risk.unknownCellCount, 0);
+      assert.equal(risk.deepestUnknownRowOffset, 0);
+      assert.equal(risk.crossesUnknownFrontier, false);
+      assert.equal(risk.uncertainLineClearCount, 0);
+      assert.equal(calculatePlacementVisibilityRiskScore(risk), 0);
+    });
+
+    it('produces risk for hidden spawn rows in player-limited mode without Curtain', () => {
+      const visibility = { knownRowStart: BOARD_HIDDEN_ROWS, knownRowEndExclusive: BOARD_ROWS };
+      const placedCells: Array<[number, number]> = [[0, 0], [0, 1], [0, 10]]; // y=0,1 in hidden spawn rows
+      const risk = evaluatePlacementVisibilityRisk(placedCells, [19], visibility);
+
+      assert.equal(risk.unknownCellCount, 2);
+      assert.equal(risk.deepestUnknownRowOffset, 2); // 2 - 0 = 2
+      assert.equal(risk.crossesUnknownFrontier, true);
+      assert.equal(risk.uncertainLineClearCount, 0);
+      assert.ok(calculatePlacementVisibilityRiskScore(risk) > 0);
+    });
+
+    it('produces risk for cells at or below maskedRowsStart during active Curtain', () => {
+      const visibility = { knownRowStart: BOARD_HIDDEN_ROWS, knownRowEndExclusive: 13 };
+      const placedCells: Array<[number, number]> = [[0, 5], [0, 13], [0, 14]]; // y=13,14 in Curtain masked rows
+      const risk = evaluatePlacementVisibilityRisk(placedCells, [13], visibility);
+
+      assert.equal(risk.unknownCellCount, 2);
+      assert.equal(risk.deepestUnknownRowOffset, 2); // y=14 is offset 2 into masked rows (14 - 13 + 1)
+      assert.equal(risk.crossesUnknownFrontier, true);
+      assert.equal(risk.uncertainLineClearCount, 1);
+      assert.ok(calculatePlacementVisibilityRiskScore(risk) > 0);
+    });
+
+    it('increases risk monotonically as candidate goes deeper into masked region', () => {
+      const visibility = { knownRowStart: BOARD_HIDDEN_ROWS, knownRowEndExclusive: 13 };
+      const shallowCells: Array<[number, number]> = [[0, 13]];
+      const deepCells: Array<[number, number]> = [[0, 16]];
+
+      const shallowRisk = evaluatePlacementVisibilityRisk(shallowCells, [], visibility);
+      const deepRisk = evaluatePlacementVisibilityRisk(deepCells, [], visibility);
+
+      assert.ok(calculatePlacementVisibilityRiskScore(deepRisk) > calculatePlacementVisibilityRiskScore(shallowRisk));
+    });
+
+    it('scores speculative line clear lower than an equivalent known line clear', () => {
+      const knownVis = { knownRowStart: 0, knownRowEndExclusive: BOARD_ROWS };
+      const maskedVis = { knownRowStart: BOARD_HIDDEN_ROWS, knownRowEndExclusive: 13 };
+
+      const placedCells: Array<[number, number]> = [[0, 15], [1, 15], [2, 15], [3, 15]];
+      const clearedRows = [15];
+
+      const knownRisk = evaluatePlacementVisibilityRisk(placedCells, clearedRows, knownVis);
+      const maskedRisk = evaluatePlacementVisibilityRisk(placedCells, clearedRows, maskedVis);
+
+      assert.equal(calculatePlacementVisibilityRiskScore(knownRisk), 0);
+      assert.ok(calculatePlacementVisibilityRiskScore(maskedRisk) >= UNCERTAIN_LINE_CLEAR_PENALTY);
+    });
+
+    it('prefers a known safe candidate over a candidate that crosses the unknown frontier', () => {
+      const bot = new RulesBot({ mode: 'player-limited' });
+      const scenario = new Scenario({ seed: 707 });
+      const p1 = scenario.getPlayerState('p1');
+      p1.swapCutoffRow = 13;
+      p1.activeEffects.push({
+        id: 'curtain-1',
+        kind: 'curtain',
+        label: 'Curtain',
+        expiresAtTick: 120,
+      });
+
+      p1.activePiece = { type: 'I', rotation: 1, x: 0, y: 0 };
+      const obs = defaultObservationProjector.project(scenario.getReport().gameState, 'p1', 'player-limited');
+
+      const plan = (bot as unknown as {
+        findBestPlacement: (p: typeof obs.player, type: string, b: boolean, t?: number, v?: BoardMetricVisibility) => PlacementPlan | null;
+      }).findBestPlacement(obs.player, 'I', false, obs.tick, deriveVisibilityFromObservation(obs));
+
+      assert.ok(plan);
+    });
+
+    it('maintains survival on 120-second seed 2039 regression', () => {
+      const runner = new PairedRunner({
+        seed: 2039,
+        enableShop: false,
+        enableGarbage: false,
+        botModes: { p1: 'player-limited', p2: 'player-limited' },
+      });
+      const report = runner.run(7200); // 120 seconds
+      assert.equal(report.scenarioReport.gameState.players.p1.topOut, false);
+      assert.equal(report.scenarioReport.gameState.players.p2.topOut, false);
     });
   });
 });
