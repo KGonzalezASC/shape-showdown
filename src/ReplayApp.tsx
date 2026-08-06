@@ -108,6 +108,28 @@ export default function ReplayApp() {
     };
   }, [replay, tick]);
 
+  const loadReplayFromUrl = (url: string) => {
+    fetch(url)
+      .then((res) => res.json())
+      .then((raw: ReplayData) => {
+        const normalized = normalizeReplay(raw);
+        if (normalized) {
+          dispatch({ type: 'LOAD_SUCCESS', payload: normalized });
+        } else {
+          dispatch({ type: 'LOAD_ERROR', payload: 'Replay viewer currently supports v2 replay files only.' });
+        }
+      })
+      .catch(() => {
+        // Silent fallback if default demo replay file is not found
+      });
+  };
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const targetFile = params.get('file') || params.get('replay') || '/replays/improved_rulesbot_demo.json';
+    loadReplayFromUrl(targetFile);
+  }, []);
+
   const pids = viewState ? Object.keys(viewState.players) : [];
   const p1 = viewState && pids[0] ? viewState.players[pids[0]] : null;
   const p2 = viewState && pids[1] ? viewState.players[pids[1]] : null;
@@ -146,10 +168,17 @@ export default function ReplayApp() {
         <div className="flex gap-3 items-center">
           <button
             type="button"
+            onClick={() => loadReplayFromUrl('/replays/improved_rulesbot_demo.json')}
+            className="p-2 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 rounded-full transition-colors flex items-center gap-2 px-3 text-xs font-bold"
+          >
+            DEMO BOT GAME
+          </button>
+          <button
+            type="button"
             onClick={() => fileInputRef.current?.click()}
             className="p-2 bg-white/5 hover:bg-white/10 rounded-full text-zinc-400 hover:text-white transition-colors flex items-center gap-2 px-3 text-xs font-bold"
           >
-            <FileUp size={14} /> LOAD
+            <FileUp size={14} /> LOAD FILE
           </button>
           <button
             type="button"

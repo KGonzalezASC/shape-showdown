@@ -22,6 +22,7 @@ export const LOCK_DELAY_TICKS = 24; // 0.4s @ 60hz
 export const LOCK_RESET_CAP = 10;
 export const HOLD_SWAP_CUTOFF_VISIBLE_ROW = 8;
 export const GARBAGE_ARRIVAL_DELAY_TICKS = 18; // 300ms @ 60hz
+export const SINGLE_CLEAR_EXTRA_DELAY_TICKS = 30; // ~500ms additional arrival delay for single-clear packets (800ms total)
 export const RETRIM_ACTIVATION_TICKS = 60; // 2 rows of gravity (1s @ 60Hz)
 export const RETRIM_COST = 120;
 // Curtain: a timed frost overlay dropped on the opponent's field below their swap line.
@@ -113,7 +114,7 @@ export const ATTACK_TABLE = {
   tSpinSingle: 2,
   tSpinDouble: 4,
   tSpinTriple: 6,
-  perfectClear: 10,
+  perfectClear: 7,
   backToBackBonus: 1,
 } as const;
 

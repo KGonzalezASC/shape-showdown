@@ -184,10 +184,10 @@ describe('poison spread variations', () => {
     p1.score = 0;
 
     // Step the player to lock it. This should clear the bottom row.
-    // Base score = 1 * 100 + 1 * 10 (Single clear = 1 attack) + 10 * 10 (Perfect Clear = 10 attack) = 210.
+    // Base score = 1 * 100 + 1 * 10 (Single clear = 1 attack) + 7 * 10 (Perfect Clear = 7 attack) = 180.
     stepPlayer(game.tick, p1, rng, []);
     const cleanScore = p1.score;
-    assert.equal(cleanScore, 210, 'Clean single line clear with perfect clear should award 210 points');
+    assert.equal(cleanScore, 180, 'Clean single line clear with perfect clear should award 180 points');
 
     // 2. Now try a line clear with poisoned cells.
     const p2 = makePlayer('a', rng);
@@ -217,11 +217,11 @@ describe('poison spread variations', () => {
     // poisonedRatio = 4 / 10 = 0.4.
     // POISON_LINE_CLEAR_PENALTY_MAX_RATIO = 0.50.
     // penalty multiplier = 0.4 * 0.50 = 0.20.
-    // base score = 210.
-    // penalty = Math.round(210 * 0.20) = 42.
-    // expected score = 210 - 42 = 168.
+    // base score = 180.
+    // penalty = Math.round(180 * 0.20) = 36.
+    // expected score = 180 - 36 = 144.
     stepPlayer(game.tick, p2, rng, []);
-    assert.equal(p2.score, 168, 'Four poisoned cells on a 10-cell clear should award 168 points');
+    assert.equal(p2.score, 144, 'Four poisoned cells on a 10-cell clear should award 144 points');
   });
 
   it('Wildcard +4 item purchase, shape copying, centering, blocked rotation/hold, and locking/poison spreading', () => {

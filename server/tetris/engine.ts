@@ -561,7 +561,7 @@ function resolveBoardAfterLock(
   return { lines, tSpin, perfectClear, poisonedRatio };
 }
 
-function detectTSpinFor(
+export function detectTSpinFor(
   board: CellValue[][],
   piece: TetrisPiece,
   lastActionWasRotate: boolean,
@@ -593,17 +593,15 @@ function detectTSpinFor(
   return bothFrontOccupied ? 'full' : 'mini';
 }
 
-function attackFromClear(
-  lines: number,
-  tSpin: 'full' | 'mini' | false,
-  perfectClear: boolean,
-  player: PlayerState,
-  poisonedRatio: number,
-): number {
-  if (lines === 0) {
-    player.combo = -1;
-    return 0;
-  }
+export function previewAttackFromClear(params: {
+  lines: number;
+  tSpin?: 'full' | 'mini' | false;
+  perfectClear?: boolean;
+  combo?: number;
+  backToBack?: boolean;
+}): number {
+  const { lines, tSpin = false, perfectClear = false, combo = -1, backToBack = false } = params;
+  if (lines === 0) return 0;
 
   let attack = 0;
   if (tSpin === 'full') {
@@ -621,18 +619,43 @@ function attackFromClear(
   }
 
   const b2bAction = !!tSpin || lines >= 4;
-  if (b2bAction && player.backToBack && attack > 0) {
+  if (b2bAction && backToBack && attack > 0) {
     attack += ATTACK_TABLE.backToBackBonus;
   }
-  player.backToBack = b2bAction;
 
-  player.combo += 1;
-  if (player.combo >= 0) {
-    const idx = Math.min(player.combo, COMBO_BONUS_TABLE.length - 1);
+  const nextCombo = combo + 1;
+  if (nextCombo >= 0) {
+    const idx = Math.min(nextCombo, COMBO_BONUS_TABLE.length - 1);
     attack += COMBO_BONUS_TABLE[idx];
   }
   if (perfectClear) attack += ATTACK_TABLE.perfectClear;
-  
+
+  return attack;
+}
+
+function attackFromClear(
+  lines: number,
+  tSpin: 'full' | 'mini' | false,
+  perfectClear: boolean,
+  player: PlayerState,
+  poisonedRatio: number,
+): number {
+  if (lines === 0) {
+    player.combo = -1;
+    return 0;
+  }
+
+  const attack = previewAttackFromClear({
+    lines,
+    tSpin,
+    perfectClear,
+    combo: player.combo,
+    backToBack: player.backToBack,
+  });
+
+  player.backToBack = !!tSpin || lines >= 4;
+  player.combo += 1;
+
   const baseScore = lines * 100 + attack * 10;
   const penalty = Math.round(baseScore * poisonedRatio * POISON_LINE_CLEAR_PENALTY_MAX_RATIO);
   player.score += baseScore - penalty;
@@ -653,11 +676,20 @@ function cancelOwnGarbage(player: PlayerState, lines: number): number {
   return remaining;
 }
 
-export function enqueueGarbage(target: PlayerState, lines: number, tick: number): void {
+export function enqueueGarbage(
+  target: PlayerState,
+  lines: number,
+  tick: number,
+  extraDelayTicks = 0,
+): void {
   if (lines <= 0) return;
   const packet: PendingGarbagePacket = {
     lines,
-    arrivalTick: tick + GARBAGE_ARRIVAL_DELAY_TICKS + satelliteExtraGarbageDelay(target, tick),
+    arrivalTick:
+      tick +
+      GARBAGE_ARRIVAL_DELAY_TICKS +
+      extraDelayTicks +
+      satelliteExtraGarbageDelay(target, tick),
   };
   target.pendingGarbage.push(packet);
   tryActivateSatellite(target, tick);

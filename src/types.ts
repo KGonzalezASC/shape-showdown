@@ -201,7 +201,10 @@ export interface PoisonSpreadState {
 
 export interface PendingGarbagePacket {
   lines: number;
-  arrivalTick: number;
+  /** Absolute server tick when this packet arrives (omniscient / server truth). */
+  arrivalTick?: number;
+  /** Relative ticks remaining until arrival (player observation projection). */
+  ticksUntilArrival?: number;
 }
 
 /**

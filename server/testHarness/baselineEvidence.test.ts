@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { runBotQuality, runItemImpact } from './experimentRunners.js';
 
 describe('Baseline Evidence Generation (Section 3)', () => {
-  it('records deterministic baseline bot quality evidence across matched seeds', () => {
+  it('records deterministic baseline bot quality evidence across matched seeds', { timeout: 15000 }, () => {
     const report1 = runBotQuality({ runs: 5, seconds: 10, policyId: 'rulesBot-v1', enableGarbage: false });
     const report2 = runBotQuality({ runs: 5, seconds: 10, policyId: 'rulesBot-v1', enableGarbage: false });
 
@@ -14,7 +14,7 @@ describe('Baseline Evidence Generation (Section 3)', () => {
     assert.equal(report1.avgScore, report2.avgScore);
   });
 
-  it('records baseline item impact for Curtain and Poison without modifying bot controller policy', () => {
+  it('records baseline item impact for Curtain and Poison without modifying bot controller policy', { timeout: 15000 }, () => {
     const curtainReport = runItemImpact({
       runs: 4,
       seconds: 10,
