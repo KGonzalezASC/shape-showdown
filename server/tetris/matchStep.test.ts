@@ -59,9 +59,9 @@ describe('matchStep authoritative match seam', () => {
     const result = matchStep(gameState, (id) => (id === 'p1' ? p1Rng : p2Rng));
 
     assert.equal(result.stepResults.p1.linesClearedThisStep, 1);
-    assert.equal(result.stepResults.p1.attackLinesQueued, 11);
+    assert.equal(result.stepResults.p1.attackLinesQueued, 8);
     assert.ok(p2.pendingGarbage.length > 0);
-    assert.ok(result.events.some((ev) => ev.type === 'attackSent' && ev.playerId === 'p1' && ev.lines === 11));
+    assert.ok(result.events.some((ev) => ev.type === 'attackSent' && ev.playerId === 'p1' && ev.lines === 8));
   });
 
   it('stops processing remaining players immediately on top-out', () => {
@@ -140,5 +140,50 @@ describe('matchStep authoritative match seam', () => {
     assert.equal(result.stepResults.p1.linesClearedThisStep, 1);
     assert.equal(p2.pendingGarbage.length, 0);
     assert.equal(result.events.some((event) => event.type === 'attackSent'), false);
+  });
+
+  it('enqueues garbage with 48 ticks arrival delay for single-clear and 18 ticks for multi-clear', () => {
+    const seed = 54321;
+    const p1Rng = createPlayerRngChannels(seed, 0);
+    const p2Rng = createPlayerRngChannels(seed, 1);
+    const p1 = makePlayer('p1', p1Rng);
+    const p2 = makePlayer('p2', p2Rng);
+
+    // Setup 1 line clear on p1
+    const bottom = BOARD_ROWS - 1;
+    for (let x = 1; x < BOARD_COLS; x += 1) p1.board[bottom][x] = 'I';
+    p1.activePiece = { type: 'I', rotation: 0, x: -1, y: bottom - 1 };
+    p1.lockDelayRemainingTicks = 0;
+
+    const gameState: GameState = {
+      players: { p1, p2 },
+      status: 'playing',
+      countdown: 0,
+      remainingTime: 180,
+      winnerId: null,
+      tick: 10,
+      seed,
+    };
+
+    matchStep(gameState, { p1: p1Rng, p2: p2Rng });
+    assert.equal(p2.pendingGarbage.length, 1);
+    // Single clear at start tick 10 (step tick 11): arrivalTick = 11 + 18 + 30 = 59 (48 ticks delay after step tick)
+    assert.equal(p2.pendingGarbage[0].arrivalTick, 59);
+
+    // Multi-clear on p2: clear pending garbage so p2 attack is committed to p1, setup 2 completed rows except col 0
+    p2.pendingGarbage = [];
+    const p2Bottom = BOARD_ROWS - 1;
+    for (let x = 1; x < BOARD_COLS; x += 1) {
+      p2.board[p2Bottom][x] = 'I';
+      p2.board[p2Bottom - 1][x] = 'I';
+    }
+    // Place an 'I' piece vertically (rotation 3 has x=1 offset) at x=-1 so blocks fall at col 0
+    p2.activePiece = { type: 'I', rotation: 3, x: -1, y: p2Bottom - 3 };
+    p2.lockDelayRemainingTicks = 0;
+
+    matchStep(gameState, { p1: p1Rng, p2: p2Rng });
+    assert.ok(p1.pendingGarbage.length > 0);
+    // Double clear (multi-clear) at step tick 12: arrivalTick = 12 + 18 = 30 (18 ticks delay after step tick)
+    assert.equal(p1.pendingGarbage[0].arrivalTick, 30);
   });
 });

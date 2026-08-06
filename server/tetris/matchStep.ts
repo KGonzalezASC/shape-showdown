@@ -3,6 +3,7 @@ import {
   MatchEvent,
   RESTART_DELAY_SECONDS,
 } from '../../src/types.js';
+import { SINGLE_CLEAR_EXTRA_DELAY_TICKS } from '../../src/constants.js';
 import type { RngChannels } from '../../src/rng.js';
 import type { MatchStepOptions, StepResult } from './stepTypes.js';
 import {
@@ -99,11 +100,13 @@ export function matchStep(
   if (gameState.status === 'playing' && options?.enableGarbage !== false) {
     for (const id of pids) {
       const attack = stepResults[id]?.attackLinesQueued ?? 0;
+      const linesCleared = stepResults[id]?.linesClearedThisStep ?? 0;
       if (attack > 0) {
         const opponentId = pids.find((pid) => pid !== id);
         const opponent = opponentId ? gameState.players[opponentId] : null;
         if (opponent) {
-          enqueueGarbage(opponent, attack, gameState.tick);
+          const extraDelay = linesCleared === 1 ? SINGLE_CLEAR_EXTRA_DELAY_TICKS : 0;
+          enqueueGarbage(opponent, attack, gameState.tick, extraDelay);
           matchEvents.push({
             tick: gameState.tick,
             type: 'attackSent',
