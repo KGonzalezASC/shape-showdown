@@ -49,6 +49,8 @@ const summaryDoc = [
   `| Avg Score | ${botQualityReport.avgScore} |`,
   `| Avg Lines Cleared | ${botQualityReport.avgLinesCleared} |`,
   `| Avg Holes | ${botQualityReport.avgHoles} |`,
+  `| Avg Cavity Depth | ${botQualityReport.avgCavityDepth} |`,
+  `| Avg Deepest Cavity | ${botQualityReport.avgDeepestCavity} |`,
   `| Avg Aggregate Height | ${botQualityReport.avgAggregateHeight} |`,
   `| Avg Bumpiness | ${botQualityReport.avgBumpiness} |`,
   '',

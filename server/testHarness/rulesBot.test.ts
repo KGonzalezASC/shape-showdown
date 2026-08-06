@@ -1,9 +1,14 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { evaluateBoard, RulesBot } from './rulesBot.js';
+import {
+  evaluateBoard,
+  deriveVisibilityFromObservation,
+  scoreCavityDepthDelta,
+  RulesBot,
+} from './rulesBot.js';
 import { Scenario } from './scenario.js';
 import { createEmptyBoard, detectTSpinFor, previewAttackFromClear } from '../tetris/engine.js';
-import { BOARD_COLS, BOARD_ROWS } from '../../src/constants.js';
+import { BOARD_COLS, BOARD_ROWS, BOARD_HIDDEN_ROWS } from '../../src/constants.js';
 import type { DriverObservation } from './inputDriver.js';
 import { defaultObservationProjector } from './observationProjector.js';
 
@@ -278,5 +283,183 @@ describe('RulesBot Adapter & Attack Preview', () => {
     bot.next(obs2);
     // Imminent state flipped to true and plan was re-evaluated for imminent defense
     assert.equal(bot['lastImminentState'], true);
+  });
+
+  describe('Step 3 — Refined Hole-Uncovering Metrics', () => {
+    it('evaluates per-column cavity depth and distinguishes deep vs shallow overburden', () => {
+      const boardA = createEmptyBoard();
+      // Hole at (0, BOARD_ROWS-1) under 5 blocks
+      for (let y = BOARD_ROWS - 6; y < BOARD_ROWS - 1; y++) {
+        boardA[y][0] = 'I';
+      }
+
+      const boardB = createEmptyBoard();
+      // Hole at (0, BOARD_ROWS-1) under 1 block
+      boardB[BOARD_ROWS - 2][0] = 'I';
+
+      const evalA = evaluateBoard(boardA);
+      const evalB = evaluateBoard(boardB);
+
+      assert.equal(evalA.holes, 1);
+      assert.equal(evalB.holes, 1);
+      assert.equal(evalA.columnCavities[0].cavityDepth, 5);
+      assert.equal(evalB.columnCavities[0].cavityDepth, 1);
+      assert.equal(evalA.columnCavities[0].deepestCavity, 5);
+      assert.equal(evalB.columnCavities[0].deepestCavity, 1);
+      assert.ok(evalA.totalCavityDepth > evalB.totalCavityDepth);
+    });
+
+    it('handles multi-column cavity depth metrics independently', () => {
+      const board = createEmptyBoard();
+      // Col 2: 3 blocks above hole
+      board[BOARD_ROWS - 4][2] = 'I';
+      board[BOARD_ROWS - 3][2] = 'I';
+      board[BOARD_ROWS - 2][2] = 'I';
+      // Col 5: 1 block above hole
+      board[BOARD_ROWS - 2][5] = 'I';
+
+      const evalResult = evaluateBoard(board);
+      assert.equal(evalResult.holes, 2);
+      assert.equal(evalResult.columnCavities[2].cavityDepth, 3);
+      assert.equal(evalResult.columnCavities[5].cavityDepth, 1);
+      assert.equal(evalResult.totalCavityDepth, 4);
+      assert.equal(evalResult.deepestCavity, 3);
+    });
+
+    it('penalizes placements that increase cavity depth and overburden', () => {
+      const origBoard = createEmptyBoard();
+      origBoard[BOARD_ROWS - 2][0] = 'I'; // 1 block over hole at bottom
+
+      const simBoardBury = createEmptyBoard();
+      simBoardBury[BOARD_ROWS - 4][0] = 'I';
+      simBoardBury[BOARD_ROWS - 3][0] = 'I';
+      simBoardBury[BOARD_ROWS - 2][0] = 'I'; // 3 blocks over hole
+
+      const origEval = evaluateBoard(origBoard);
+      const simEval = evaluateBoard(simBoardBury);
+
+      const deltaScore = scoreCavityDepthDelta(origEval, simEval);
+      assert.ok(deltaScore < 0);
+    });
+
+    it('respects visibility bounds for omniscient vs player-limited observation mode', () => {
+      const scenario = new Scenario({ seed: 505 });
+      const obsOmni = defaultObservationProjector.project(scenario.getReport().gameState, 'p1', 'omniscient');
+      const obsLimited = defaultObservationProjector.project(scenario.getReport().gameState, 'p1', 'player-limited');
+
+      const visOmni = deriveVisibilityFromObservation(obsOmni);
+      const visLimited = deriveVisibilityFromObservation(obsLimited);
+
+      assert.equal(visOmni.knownRowStart, 0);
+      assert.equal(visOmni.knownRowEndExclusive, BOARD_ROWS);
+
+      assert.equal(visLimited.knownRowStart, BOARD_HIDDEN_ROWS);
+      assert.equal(visLimited.knownRowEndExclusive, BOARD_ROWS);
+    });
+
+    it('evaluates player-limited Curtain masking without creating false holes or false depth reduction', () => {
+      const scenario = new Scenario({ seed: 606 });
+      const p1 = scenario.getPlayerState('p1');
+      p1.swapCutoffRow = 8;
+      p1.activeEffects.push({
+        id: 'curtain-effect-1',
+        kind: 'curtain',
+        label: 'Curtain',
+        expiresAtTick: 120,
+      });
+
+      const obs = defaultObservationProjector.project(scenario.getReport().gameState, 'p1', 'player-limited');
+      const vis = deriveVisibilityFromObservation(obs);
+
+      assert.ok(obs.context.boardVisibility);
+      assert.equal(obs.context.boardVisibility.maskedRowsStart, 13);
+      assert.equal(vis.knownRowEndExclusive, 13);
+
+      const evalVis = evaluateBoard(p1.board, p1.poisonBoard, { visibility: vis });
+      assert.equal(evalVis.totalCavityDepth, 0);
+    });
+
+    it('scores cavity depth reduction dynamically without a flat static +400 bonus', () => {
+      const origBoard = createEmptyBoard();
+      // Hole covered by 4 blocks
+      for (let y = BOARD_ROWS - 5; y < BOARD_ROWS - 1; y++) {
+        origBoard[y][0] = 'I';
+      }
+
+      const simBoardDeepClear = createEmptyBoard();
+      // Uncovers 3 of the 4 overburden blocks
+      simBoardDeepClear[BOARD_ROWS - 2][0] = 'I';
+
+      const simBoardShallowClear = createEmptyBoard();
+      // Uncovers 1 overburden block
+      for (let y = BOARD_ROWS - 4; y < BOARD_ROWS - 1; y++) {
+        simBoardShallowClear[y][0] = 'I';
+      }
+
+      const origEval = evaluateBoard(origBoard);
+      const deepSimEval = evaluateBoard(simBoardDeepClear);
+      const shallowSimEval = evaluateBoard(simBoardShallowClear);
+
+      const deepDeltaScore = scoreCavityDepthDelta(origEval, deepSimEval);
+      const shallowDeltaScore = scoreCavityDepthDelta(origEval, shallowSimEval);
+
+      assert.ok(deepDeltaScore > shallowDeltaScore);
+      assert.ok(deepDeltaScore > 0);
+    });
+
+    it('selects placement that reduces deeper cavity depth over shallow hole removal', () => {
+      const origBoard = createEmptyBoard();
+      // Col 0: Hole at y=19 under 4 overburden cells
+      for (let y = BOARD_ROWS - 5; y < BOARD_ROWS - 1; y++) {
+        origBoard[y][0] = 'I';
+      }
+      // Col 5: Hole at y=19 under 1 overburden cell
+      origBoard[BOARD_ROWS - 2][5] = 'I';
+
+      const simBoardDeep = createEmptyBoard();
+      // Uncovers 3 of the 4 overburden cells in Col 0
+      simBoardDeep[BOARD_ROWS - 2][0] = 'I';
+      simBoardDeep[BOARD_ROWS - 2][5] = 'I';
+
+      const simBoardShallow = createEmptyBoard();
+      // Uncovers the 1 overburden cell in Col 5
+      for (let y = BOARD_ROWS - 5; y < BOARD_ROWS - 1; y++) {
+        simBoardShallow[y][0] = 'I';
+      }
+
+      const origEval = evaluateBoard(origBoard);
+      const simEvalDeep = evaluateBoard(simBoardDeep);
+      const simEvalShallow = evaluateBoard(simBoardShallow);
+
+      const scoreDeep = scoreCavityDepthDelta(origEval, simEvalDeep);
+      const scoreShallow = scoreCavityDepthDelta(origEval, simEvalShallow);
+
+      assert.ok(scoreDeep > scoreShallow);
+      assert.ok(scoreDeep > 0);
+    });
+
+    it('rejects lower-height placement when it buries/increases cavity depth', () => {
+      const bot = new RulesBot();
+      const scenario = new Scenario({ seed: 909 });
+      const p1 = scenario.getPlayerState('p1');
+
+      // Col 0: Hole at bottom covered by 1 cell. Placing a piece here drops deep (low height) but adds overburden cells above hole.
+      p1.board[BOARD_ROWS - 2][0] = 'I';
+
+      // Col 5: Solid stack up to BOARD_ROWS - 3 (no holes). Placing piece here lands higher but creates no cavity depth increase.
+      for (let y = BOARD_ROWS - 3; y < BOARD_ROWS; y++) {
+        p1.board[y][5] = 'O';
+      }
+
+      p1.activePiece = { type: 'O', rotation: 0, x: 0, y: 0 };
+      const obs = defaultObservationProjector.project(scenario.getReport().gameState, 'p1', 'omniscient');
+
+      const plan = (bot as unknown as {
+        findBestPlacement: (p: typeof obs.player, type: string, b: boolean) => { rotation: number; x: number; score: number };
+      }).findBestPlacement(obs.player, 'O', false);
+
+      assert.ok(plan);
+      assert.notEqual(plan.x, 0);
+    });
   });
 });

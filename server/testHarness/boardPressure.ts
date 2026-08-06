@@ -8,6 +8,8 @@ export interface BoardPressureMetrics {
   bumpiness: number;
   fillRatio: number;
   poisonCells: number;
+  totalCavityDepth?: number;
+  deepestCavity?: number;
 }
 
 export function computeBoardPressure(
@@ -18,9 +20,15 @@ export function computeBoardPressure(
   let holes = 0;
   let filledCells = 0;
   let poisonCells = 0;
+  let totalCavityDepth = 0;
+  let deepestCavity = 0;
 
   for (let x = 0; x < BOARD_COLS; x++) {
     let filledFound = false;
+    let filledAboveInCol = 0;
+    let colCavityDepth = 0;
+    let colDeepestCavity = 0;
+
     for (let y = 0; y < BOARD_ROWS; y++) {
       if (board[y][x] !== null) {
         filledCells++;
@@ -28,13 +36,18 @@ export function computeBoardPressure(
           columnHeights[x] = BOARD_ROWS - y;
           filledFound = true;
         }
+        filledAboveInCol++;
         if (poisonBoard?.[y]?.[x] && poisonBoard[y][x] > 0) {
           poisonCells++;
         }
       } else if (filledFound) {
         holes++;
+        colCavityDepth += filledAboveInCol;
+        colDeepestCavity = Math.max(colDeepestCavity, filledAboveInCol);
       }
     }
+    totalCavityDepth += colCavityDepth;
+    deepestCavity = Math.max(deepestCavity, colDeepestCavity);
   }
 
   let bumpiness = 0;
@@ -54,6 +67,8 @@ export function computeBoardPressure(
     bumpiness,
     fillRatio,
     poisonCells,
+    totalCavityDepth,
+    deepestCavity,
   };
 }
 

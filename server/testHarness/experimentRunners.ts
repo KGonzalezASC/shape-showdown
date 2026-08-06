@@ -42,6 +42,8 @@ export interface BotQualityReport {
   avgScore: number;
   avgLinesCleared: number;
   avgHoles: number;
+  avgCavityDepth: number;
+  avgDeepestCavity: number;
   avgAggregateHeight: number;
   avgBumpiness: number;
   avgInvalidActions: number;
@@ -141,6 +143,8 @@ export function runBotQuality(config?: BotQualityConfig): BotQualityReport {
   const avgScore = Math.round(traces.reduce((sum, t) => sum + t.players.p1.score, 0) / runs);
   const avgLinesCleared = Number((traces.reduce((sum, t) => sum + t.players.p1.linesCleared, 0) / runs).toFixed(1));
   const avgHoles = Number((traces.reduce((sum, t) => sum + t.players.p1.pressure.holes, 0) / runs).toFixed(1));
+  const avgCavityDepth = Number((traces.reduce((sum, t) => sum + t.players.p1.pressure.totalCavityDepth, 0) / runs).toFixed(1));
+  const avgDeepestCavity = Number((traces.reduce((sum, t) => sum + t.players.p1.pressure.deepestCavity, 0) / runs).toFixed(1));
   const avgAggregateHeight = Number((traces.reduce((sum, t) => sum + t.players.p1.pressure.aggregateHeight, 0) / runs).toFixed(1));
   const avgBumpiness = Number((traces.reduce((sum, t) => sum + t.players.p1.pressure.bumpiness, 0) / runs).toFixed(1));
 
@@ -154,6 +158,8 @@ export function runBotQuality(config?: BotQualityConfig): BotQualityReport {
     avgScore,
     avgLinesCleared,
     avgHoles,
+    avgCavityDepth,
+    avgDeepestCavity,
     avgAggregateHeight,
     avgBumpiness,
     avgInvalidActions: 0,

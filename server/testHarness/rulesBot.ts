@@ -1,10 +1,10 @@
-import { BOMBER_BLAST_RADIUS, BOARD_COLS, BOARD_ROWS } from '../../src/constants.js';
+import { BOMBER_BLAST_RADIUS, BOARD_COLS, BOARD_ROWS, BOARD_HIDDEN_ROWS } from '../../src/constants.js';
 import type { CellValue, PendingGarbagePacket, RotationState, TetrominoType } from '../../src/types.js';
 import { PublicPlayerState } from '../../src/state/publicSnapshots.js';
 import { SHAPES } from '../tetris/pieces.js';
 import { detectTSpinFor, previewAttackFromClear } from '../tetris/engine.js';
 import type { DriverObservation, InputDriver, PlayerCommand } from './inputDriver.js';
-import type { ObservationMode } from './observationProjector.js';
+import type { ObservationMode, PlayerObservation } from './observationProjector.js';
 
 export type { ObservationMode };
 
@@ -16,6 +16,23 @@ export interface PlacementPlan {
   rotation: number;
   x: number;
   score: number;
+}
+
+/** Visibility bounds for board metrics to avoid scanning hidden or masked rows. */
+export interface BoardMetricVisibility {
+  knownRowStart: number;
+  knownRowEndExclusive: number;
+}
+
+export interface BoardEvaluationOptions {
+  visibility?: BoardMetricVisibility;
+}
+
+/** Per-column cavity metrics measuring hole count and overburden depth. */
+export interface ColumnCavityMetrics {
+  holeCount: number;
+  cavityDepth: number;
+  deepestCavity: number;
 }
 
 /** Mode-safe extraction of relative ticks until arrival for a pending garbage packet. */
@@ -32,7 +49,7 @@ export function getPacketTicksUntilArrival(
   return Infinity;
 }
 
-/** Evaluates board stack quality, poison cells, and holes for bot heuristics. */
+/** Evaluates board stack quality, poison cells, holes, and cavity depth for bot heuristics. */
 export interface BoardEvaluation {
   aggregateHeight: number;
   maxHeight: number;
@@ -42,22 +59,84 @@ export interface BoardEvaluation {
   poisonCells: number;
   wells: number;
   spires: number;
+  columnCavities: readonly ColumnCavityMetrics[];
+  totalCavityDepth: number;
+  deepestCavity: number;
 }
 
-/** Evaluates board stack quality, poison cells, holes, and covered holes for bot heuristics. */
+export const CAVITY_DEPTH_REDUCTION_WEIGHT = 60;
+export const DEEPEST_CAVITY_REDUCTION_WEIGHT = 25;
+// Stronger increase penalties made the bot build around cavities until top-out;
+// keep them below that avoidance threshold while still preferring shallower cover.
+export const CAVITY_DEPTH_INCREASE_PENALTY = 70;
+export const DEEPEST_CAVITY_INCREASE_PENALTY = 20;
+
+export function deriveVisibilityFromObservation(
+  obs: PlayerObservation,
+): BoardMetricVisibility {
+  const mode = obs.context?.mode ?? 'omniscient';
+  if (mode === 'omniscient') {
+    return { knownRowStart: 0, knownRowEndExclusive: BOARD_ROWS };
+  }
+  const knownRowStart = BOARD_HIDDEN_ROWS;
+  let knownRowEndExclusive = BOARD_ROWS;
+
+  const boardVis = obs.context?.boardVisibility;
+  if (boardVis && boardVis.maskedRowsStart !== undefined) {
+    knownRowEndExclusive = Math.min(BOARD_ROWS, boardVis.maskedRowsStart);
+  }
+
+  return { knownRowStart, knownRowEndExclusive };
+}
+
+export function scoreCavityDepthDelta(
+  origEval: BoardEvaluation,
+  simEval: BoardEvaluation,
+): number {
+  let score = 0;
+  for (let x = 0; x < BOARD_COLS; x++) {
+    const origCol = origEval.columnCavities[x];
+    const simCol = simEval.columnCavities[x];
+
+    const depthReduction = Math.max(0, origCol.cavityDepth - simCol.cavityDepth);
+    const depthIncrease = Math.max(0, simCol.cavityDepth - origCol.cavityDepth);
+    const deepestReduction = Math.max(0, origCol.deepestCavity - simCol.deepestCavity);
+    const deepestIncrease = Math.max(0, simCol.deepestCavity - origCol.deepestCavity);
+
+    score += depthReduction * CAVITY_DEPTH_REDUCTION_WEIGHT;
+    score += deepestReduction * DEEPEST_CAVITY_REDUCTION_WEIGHT;
+    score -= depthIncrease * CAVITY_DEPTH_INCREASE_PENALTY;
+    score -= deepestIncrease * DEEPEST_CAVITY_INCREASE_PENALTY;
+  }
+  return score;
+}
+
+/** Evaluates board stack quality, poison cells, holes, and per-column cavity depth for bot heuristics. */
 export function evaluateBoard(
   board: CellValue[][],
   poisonBoard?: number[][],
+  options?: BoardEvaluationOptions,
 ): BoardEvaluation {
+  const knownStart = options?.visibility?.knownRowStart ?? 0;
+  const knownEnd = options?.visibility?.knownRowEndExclusive ?? BOARD_ROWS;
+
   const columnHeights = new Array<number>(BOARD_COLS).fill(0);
   let holes = 0;
   let coveredHoles = 0;
   let poisonCells = 0;
+  let totalCavityDepth = 0;
+  let deepestCavity = 0;
+
+  const columnCavities: ColumnCavityMetrics[] = [];
 
   for (let x = 0; x < BOARD_COLS; x++) {
     let filledFound = false;
     let filledAboveHoleInCol = 0;
-    for (let y = 0; y < BOARD_ROWS; y++) {
+    let colHoleCount = 0;
+    let colCavityDepth = 0;
+    let colDeepestCavity = 0;
+
+    for (let y = knownStart; y < knownEnd; y++) {
       if (board[y][x] !== null) {
         if (!filledFound) {
           columnHeights[x] = BOARD_ROWS - y;
@@ -68,10 +147,22 @@ export function evaluateBoard(
           poisonCells++;
         }
       } else if (filledFound) {
+        colHoleCount++;
         holes++;
         coveredHoles += filledAboveHoleInCol;
+        colCavityDepth += filledAboveHoleInCol;
+        colDeepestCavity = Math.max(colDeepestCavity, filledAboveHoleInCol);
       }
     }
+
+    columnCavities.push({
+      holeCount: colHoleCount,
+      cavityDepth: colCavityDepth,
+      deepestCavity: colDeepestCavity,
+    });
+
+    totalCavityDepth += colCavityDepth;
+    deepestCavity = Math.max(deepestCavity, colDeepestCavity);
   }
 
   let bumpiness = 0;
@@ -106,6 +197,9 @@ export function evaluateBoard(
     poisonCells,
     wells,
     spires,
+    columnCavities,
+    totalCavityDepth,
+    deepestCavity,
   };
 }
 
@@ -180,15 +274,17 @@ export class RulesBot implements InputDriver {
       return { inputState: { left: false, right: false, softDrop: false }, actions: [] };
     }
 
+    const visibility = deriveVisibilityFromObservation(obs);
+
     const pieceKey = `${active.type}_${active.x}_${active.y}_${active.rotation}_${active.bomber ? 'b' : 'n'}`;
     if (!this.currentPlan || this.lastPieceKey !== pieceKey) {
-      const activePlan = this.findBestPlacement(player, active.type, !!active.bomber, currentTick);
+      const activePlan = this.findBestPlacement(player, active.type, !!active.bomber, currentTick, visibility);
 
       let holdPlan: PlacementPlan | null = null;
       if (player.canHold) {
         const holdType = player.holdPiece ? player.holdPiece.type : player.nextQueue?.[0] ?? null;
         if (holdType && holdType !== active.type) {
-          holdPlan = this.findBestPlacement(player, holdType, false, currentTick);
+          holdPlan = this.findBestPlacement(player, holdType, false, currentTick, visibility);
         }
       }
 
@@ -260,11 +356,12 @@ export class RulesBot implements InputDriver {
     type: TetrominoType,
     isBomber: boolean,
     currentTick?: number,
+    visibility?: BoardMetricVisibility,
   ): PlacementPlan | null {
     const shapeRotations = SHAPES[type];
     if (!shapeRotations || shapeRotations.length === 0) return null;
 
-    const origEval = evaluateBoard(player.board, player.poisonBoard);
+    const origEval = evaluateBoard(player.board, player.poisonBoard, { visibility });
     const pendingGarbagePackets = player.pendingGarbage || [];
     const totalPendingGarbage = pendingGarbagePackets.reduce((sum, p) => sum + p.lines, 0);
     const imminentGarbageLines = pendingGarbagePackets
@@ -339,12 +436,11 @@ export class RulesBot implements InputDriver {
           simBoard = remainingRows;
         }
 
-        const simEval = evaluateBoard(simBoard, player.poisonBoard);
+        const simEval = evaluateBoard(simBoard, player.poisonBoard, { visibility });
 
         const causesTopOut = simBoard[0].some((c) => c !== null) || simBoard[1].some((c) => c !== null);
 
         const holesDelta = simEval.holes - origEval.holes;
-        const coveredHolesDelta = simEval.coveredHoles - origEval.coveredHoles;
 
         const candidatePiece = { type, rotation: rotation as RotationState, x, y: dropY, bomber: isBomber };
         const activeType = player.activePiece?.type;
@@ -391,19 +487,10 @@ export class RulesBot implements InputDriver {
           lineClearScore += linesCleared * 350;
         }
 
-        let holesScore = -simEval.holes * 180;
-        if (holesDelta > 0) {
-          holesScore -= holesDelta * 350;
-        } else if (holesDelta < 0) {
-          holesScore += (-holesDelta) * 400;
-        }
-
-        let coveredHolesScore = 0;
-        if (coveredHolesDelta > 0) {
-          coveredHolesScore -= coveredHolesDelta * 70;
-        } else if (coveredHolesDelta < 0) {
-          coveredHolesScore += (-coveredHolesDelta) * 100;
-        }
+        const holeCountScore = -simEval.holes * 180;
+        const holeCountDeltaScore = holesDelta > 0 ? -holesDelta * 350 : 0;
+        const cavityScore = scoreCavityDepthDelta(origEval, simEval);
+        const holesScore = holeCountScore + holeCountDeltaScore + cavityScore;
 
         let heightScore = -simEval.aggregateHeight * 2;
         if (simEval.maxHeight >= 8) {
@@ -422,7 +509,6 @@ export class RulesBot implements InputDriver {
         let score =
           lineClearScore +
           holesScore +
-          coveredHolesScore +
           heightScore +
           bumpinessScore +
           spiresScore +

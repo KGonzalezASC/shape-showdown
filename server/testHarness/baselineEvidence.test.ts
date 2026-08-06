@@ -14,6 +14,20 @@ describe('Baseline Evidence Generation (Section 3)', () => {
     assert.equal(report1.avgScore, report2.avgScore);
   });
 
+  it('does not over-avoid temporary cavity cover on the Step 3 regression seed', { timeout: 15000 }, () => {
+    const report = runBotQuality({
+      seeds: [2039],
+      runs: 1,
+      seconds: 120,
+      policyId: 'rulesBot-v1',
+      observationMode: 'player-limited',
+      enableGarbage: false,
+    });
+
+    assert.equal(report.survivalRate, 1);
+    assert.equal(report.avgHoles, 0);
+  });
+
   it('records baseline item impact for Curtain and Poison without modifying bot controller policy', { timeout: 15000 }, () => {
     const curtainReport = runItemImpact({
       runs: 4,
