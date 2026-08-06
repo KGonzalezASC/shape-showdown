@@ -176,8 +176,9 @@ export class Scenario {
         if (driver) {
           const mode: ObservationMode = driver.observationMode ?? 'omniscient';
           const playerObs = defaultObservationProjector.project(this.gameState, id, mode);
+          const driverTick = mode === 'player-limited' ? 0 : this.gameState.tick;
           const cmd = driver.next({
-            tick: this.gameState.tick + 1,
+            tick: driverTick,
             player: playerObs,
           });
 

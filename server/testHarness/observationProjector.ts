@@ -42,9 +42,23 @@ export interface ObservationProjector {
   ): PlayerObservation;
 }
 
-export function computeEffectsHash(effects?: readonly ObservedEffect[]): string {
+export function sanitizeEffectId(id: string): string {
+  let hash = 0;
+  for (let i = 0; i < id.length; i++) {
+    hash = (hash << 5) - hash + id.charCodeAt(i);
+    hash |= 0;
+  }
+  const hex = (hash >>> 0).toString(16);
+  const prefix = id.replace(/-\d+$/, '');
+  return `${prefix}_${hex}`;
+}
+
+export function computeEffectsHash(effects?: readonly ObservedEffect[], limited = false): string {
   if (!effects || effects.length === 0) return 'none';
-  return effects.map((e) => `${e.kind}:${e.expiresAtTick ?? 0}`).join(';');
+  if (limited) {
+    return effects.map((e) => `${e.kind}:${e.id}`).join(';');
+  }
+  return effects.map((e) => `${e.kind}:${e.id}:${e.expiresAtTick ?? 0}`).join(';');
 }
 
 export class StandardObservationProjector implements ObservationProjector {
@@ -59,22 +73,21 @@ export class StandardObservationProjector implements ObservationProjector {
     }
 
     const publicPlayer = toPublicPlayerState(rawPlayer);
-    const effects: ObservedEffect[] = (publicPlayer.activeEffects ?? []).map((e) => ({
+    const rawEffects: ObservedEffect[] = (publicPlayer.activeEffects ?? []).map((e) => ({
       id: e.id,
       kind: e.kind,
       label: e.label,
       expiresAtTick: e.expiresAtTick,
     }));
 
-    const effectsHash = computeEffectsHash(effects);
-
     if (mode === 'omniscient') {
+      const omniEffectsHash = computeEffectsHash(rawEffects, false);
       const context: BotObservationContext = {
-        revision: `omni:${playerId}:${effectsHash}`,
+        revision: `omni:${playerId}:${omniEffectsHash}`,
         mode: 'omniscient',
         boardVisibility: null,
         poisonVisibility: null,
-        effects,
+        effects: rawEffects,
       };
 
       return {
@@ -87,7 +100,11 @@ export class StandardObservationProjector implements ObservationProjector {
     // Player-limited mode:
     // 1. Hidden spawn rows (0..BOARD_HIDDEN_ROWS-1) are ALWAYS masked for human-facing observation.
     // 2. If Curtain is active, mask blackout rows starting at (BOARD_HIDDEN_ROWS + cutoffRow + CURTAIN_FROST_ROWS).
+    // 3. Absolute server timestamps are converted to relative delta ticks (ticksUntilArrival / ticksRemaining) and arrivalTick is removed.
+    // 4. Observation tick is normalized to 0 to prevent raw server loop tick leakage.
+    // 5. Effect IDs are sanitized to remove creation tick numbers while retaining unique instance hash for revision invalidation.
     const projectedPlayer: PublicPlayerState = JSON.parse(JSON.stringify(publicPlayer));
+    const currentTick = gameState.tick;
 
     // Mask hidden spawn rows 0..BOARD_HIDDEN_ROWS - 1
     for (let y = 0; y < BOARD_HIDDEN_ROWS; y++) {
@@ -99,7 +116,42 @@ export class StandardObservationProjector implements ObservationProjector {
       }
     }
 
-    const curtainActive = effects.some((e) => e.kind === 'curtain');
+    // Convert absolute garbage arrival ticks to relative ticksUntilArrival (removing arrivalTick)
+    projectedPlayer.pendingGarbage = (publicPlayer.pendingGarbage ?? []).map((p) => ({
+      lines: p.lines,
+      ticksUntilArrival: p.arrivalTick !== undefined ? Math.max(0, p.arrivalTick - currentTick) : p.ticksUntilArrival,
+      arrivalTick: undefined,
+    }));
+
+    if (projectedPlayer.holdFrozenUntilTick !== undefined) {
+      projectedPlayer.holdFrozenUntilTick = Math.max(0, projectedPlayer.holdFrozenUntilTick - currentTick);
+    }
+    if (projectedPlayer.satelliteDelayUntilTick !== undefined) {
+      projectedPlayer.satelliteDelayUntilTick = Math.max(0, projectedPlayer.satelliteDelayUntilTick - currentTick);
+    }
+    if (projectedPlayer.tectonicShiftNextStepTick !== undefined && projectedPlayer.tectonicShiftNextStepTick !== null) {
+      projectedPlayer.tectonicShiftNextStepTick = Math.max(0, projectedPlayer.tectonicShiftNextStepTick - currentTick);
+    }
+    if (projectedPlayer.lastHardDropTick !== undefined) {
+      projectedPlayer.lastHardDropTick = Math.max(0, currentTick - projectedPlayer.lastHardDropTick);
+    }
+
+    if (projectedPlayer.poisonSpread) {
+      projectedPlayer.poisonSpread = {
+        ...projectedPlayer.poisonSpread,
+        nextSpreadTick: Math.max(0, projectedPlayer.poisonSpread.nextSpreadTick - currentTick),
+      };
+    }
+
+    if (projectedPlayer.activeEffects) {
+      projectedPlayer.activeEffects = projectedPlayer.activeEffects.map((e) => ({
+        ...e,
+        id: sanitizeEffectId(e.id),
+        expiresAtTick: e.expiresAtTick !== undefined ? Math.max(0, e.expiresAtTick - currentTick) : undefined,
+      }));
+    }
+
+    const curtainActive = rawEffects.some((e) => e.kind === 'curtain');
     let boardVisibility: BoardVisibility | null = null;
     let poisonVisibility: BoardVisibility | null = null;
 
@@ -122,17 +174,25 @@ export class StandardObservationProjector implements ObservationProjector {
       }
     }
 
+    // Normalize effect expiration ticks and sanitize IDs in context
+    const normalizedEffects: ObservedEffect[] = rawEffects.map((e) => ({
+      ...e,
+      id: sanitizeEffectId(e.id),
+      expiresAtTick: e.expiresAtTick !== undefined ? Math.max(0, e.expiresAtTick - currentTick) : undefined,
+    }));
+
+    const limitedEffectsHash = computeEffectsHash(normalizedEffects, true);
     const visTag = curtainActive ? `curtain-active@${boardVisibility?.maskedRowsStart}` : 'clear';
     const context: BotObservationContext = {
-      revision: `limited:${playerId}:${visTag}:${effectsHash}`,
+      revision: `limited:${playerId}:${visTag}:${limitedEffectsHash}`,
       mode: 'player-limited',
       boardVisibility,
       poisonVisibility,
-      effects,
+      effects: normalizedEffects,
     };
 
     return {
-      tick: gameState.tick,
+      tick: 0,
       player: Object.freeze(projectedPlayer),
       context,
     };

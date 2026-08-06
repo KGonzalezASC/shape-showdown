@@ -212,4 +212,63 @@ describe('Observation Projector Seam', () => {
     assert.equal(report.finalTick, 1);
     assert.equal(customDriver.observationMode, 'player-limited');
   });
+
+  it('normalizes absolute timestamps to relative ticks in player-limited mode while preserving omniscient absolute ticks', () => {
+    const seed = 12345;
+    const p1Rng = createPlayerRngChannels(seed, 0);
+    const p1 = makePlayer('p1', p1Rng);
+    p1.pendingGarbage = [{ lines: 3, arrivalTick: 120 }];
+    p1.holdFrozenUntilTick = 150;
+    p1.satelliteDelayUntilTick = 140;
+    p1.tectonicShiftNextStepTick = 110;
+    p1.lastHardDropTick = 90;
+    p1.poisonSpread = { generationsRemaining: 3, nextSpreadTick: 160, variant: 1 };
+    p1.activeEffects = [{ id: 'curtain-1450', kind: 'curtain', label: 'Curtain', expiresAtTick: 340 }];
+
+    const gameState: GameState = {
+      players: { p1 },
+      status: 'playing',
+      countdown: 0,
+      remainingTime: 120,
+      winnerId: null,
+      tick: 100,
+      seed,
+    };
+
+    // Omniscient mode: exposes raw server tick and absolute timestamps
+    const omniObs = defaultObservationProjector.project(gameState, 'p1', 'omniscient');
+    assert.equal(omniObs.tick, 100);
+    assert.equal(omniObs.player.pendingGarbage[0].arrivalTick, 120);
+    assert.equal(omniObs.player.activeEffects?.[0].expiresAtTick, 340);
+    assert.equal(omniObs.player.activeEffects?.[0].id, 'curtain-1450');
+    assert.equal(omniObs.player.poisonSpread?.nextSpreadTick, 160);
+    assert.ok(omniObs.context.revision.includes('340'));
+
+    // Player-limited mode: tick is 0, arrivalTick is undefined, ticksUntilArrival is relative (20), activeEffects expiresAtTick is relative (240)
+    const limitedObs = defaultObservationProjector.project(gameState, 'p1', 'player-limited');
+    assert.equal(limitedObs.tick, 0);
+    assert.equal(limitedObs.player.pendingGarbage[0].arrivalTick, undefined);
+    assert.equal(limitedObs.player.pendingGarbage[0].ticksUntilArrival, 20); // 120 - 100
+    assert.equal(limitedObs.player.holdFrozenUntilTick, 50); // 150 - 100
+    assert.equal(limitedObs.player.satelliteDelayUntilTick, 40); // 140 - 100
+    assert.equal(limitedObs.player.tectonicShiftNextStepTick, 10); // 110 - 100
+    assert.equal(limitedObs.player.lastHardDropTick, 10); // 100 - 90
+    assert.equal(limitedObs.player.activeEffects?.[0].expiresAtTick, 240); // 340 - 100
+    assert.equal(limitedObs.player.poisonSpread?.nextSpreadTick, 60); // 160 - 100
+    assert.ok(!limitedObs.player.activeEffects?.[0].id.includes('1450')); // ID is sanitized
+    assert.equal(limitedObs.context.effects[0].expiresAtTick, 240);
+    assert.ok(!limitedObs.context.revision.includes('340')); // Revision does NOT leak absolute tick
+
+    // Revision stability check across ticks while effect remains active
+    const gameStateTick101: GameState = { ...gameState, tick: 101 };
+    const limitedObs101 = defaultObservationProjector.project(gameStateTick101, 'p1', 'player-limited');
+    assert.equal(limitedObs.context.revision, limitedObs101.context.revision);
+
+    // Revision invalidation check on same-kind effect replacement
+    const p1NewCurtain = makePlayer('p1', p1Rng);
+    p1NewCurtain.activeEffects = [{ id: 'curtain-1690', kind: 'curtain', label: 'Curtain', expiresAtTick: 400 }];
+    const gameStateNewCurtain: GameState = { ...gameState, players: { p1: p1NewCurtain } };
+    const limitedObsNewCurtain = defaultObservationProjector.project(gameStateNewCurtain, 'p1', 'player-limited');
+    assert.notEqual(limitedObs.context.revision, limitedObsNewCurtain.context.revision);
+  });
 });
