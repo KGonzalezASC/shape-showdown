@@ -1,5 +1,5 @@
 import { BOMBER_BLAST_RADIUS, BOARD_COLS, BOARD_ROWS, BOARD_HIDDEN_ROWS } from '../../src/constants.js';
-import type { CellValue, PendingGarbagePacket, RotationState, TetrominoType } from '../../src/types.js';
+import type { CellValue, PendingGarbagePacket, RotationState, TetrominoType, CandidateSubScores, CandidateEvaluationTrace, BotDecisionTrace } from '../../src/types.js';
 import { PublicPlayerState } from '../../src/state/publicSnapshots.js';
 import { SHAPES } from '../tetris/pieces.js';
 import { detectTSpinFor, previewAttackFromClear } from '../tetris/engine.js';
@@ -16,6 +16,8 @@ export interface PlacementPlan {
   rotation: number;
   x: number;
   score: number;
+  subScores?: CandidateSubScores;
+  trace?: BotDecisionTrace;
 }
 
 /** Visibility bounds for board metrics to avoid scanning hidden or masked rows. */
@@ -301,6 +303,7 @@ export function applyBomberBlastSimulation(
 export class RulesBot implements InputDriver {
   public readonly mode: ObservationMode;
   public readonly observationMode: ObservationMode;
+  public lastDecisionTrace: BotDecisionTrace | null = null;
 
   private currentPlan: PlacementPlan | null = null;
   private lastPieceKey = '';
@@ -439,6 +442,7 @@ export class RulesBot implements InputDriver {
     const isDownstack = origEval.holes > 0;
     const isCleanStack = !isCriticalPanic && !isGarbageDefense && !isDownstack;
 
+    const allCandidates: CandidateEvaluationTrace[] = [];
     let bestPlan: PlacementPlan | null = null;
     let bestScore = -Infinity;
 
@@ -589,11 +593,59 @@ export class RulesBot implements InputDriver {
           score -= 100000;
         }
 
+        const subScores = {
+          lineClearScore,
+          holeCountScore,
+          holeCountDeltaScore,
+          cavityScore,
+          heightScore,
+          bumpinessScore,
+          spiresScore,
+          wellsScore,
+          poisonScore,
+          dropDepthBonus,
+          visibilityRiskPenalty,
+          totalScore: score,
+        };
+
+        allCandidates.push({
+          rotation,
+          x,
+          score,
+          subScores,
+          selected: false,
+        });
+
         if (score > bestScore) {
           bestScore = score;
-          bestPlan = { rotation, x, score };
+          bestPlan = { rotation, x, score, subScores };
         }
       }
+    }
+
+    if (bestPlan && allCandidates.length > 0) {
+      allCandidates.sort((a, b) => b.score - a.score);
+      const topCandidate = allCandidates.find(
+        (c) => c.rotation === bestPlan!.rotation && c.x === bestPlan!.x,
+      ) || allCandidates[0];
+      topCandidate.selected = true;
+
+      const runnerUps = allCandidates.filter((c) => !c.selected).slice(0, 4);
+
+      this.lastDecisionTrace = {
+        tick: currentTick ?? 0,
+        playerId: player.id,
+        pieceType: type,
+        isBomber,
+        selectedCandidate: topCandidate,
+        runnerUpCandidates: runnerUps,
+        activeEffects: player.activeEffects || [],
+        pendingGarbageLines: totalPendingGarbage,
+        imminentGarbageLines,
+        maxHeight: origEval.maxHeight,
+        totalCavityDepth: origEval.totalCavityDepth,
+      };
+      bestPlan.trace = this.lastDecisionTrace;
     }
 
     return bestPlan;

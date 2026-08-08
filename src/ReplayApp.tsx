@@ -1,8 +1,12 @@
-import React, { useEffect, useMemo, useReducer, useRef } from 'react';
-import { FileUp, Trophy } from 'lucide-react';
+import React, { useEffect, useMemo, useReducer, useRef, useState } from 'react';
+import { Activity, BarChart3, FileUp, Target, Trophy } from 'lucide-react';
 import { GameState, PlayerState, ReplayData, ReplayDataV2 } from './types';
 import GameField from './components/GameField';
 import { GameFieldsLayout } from './components/GameFieldsLayout';
+import { CandidateInspector } from './components/CandidateInspector';
+import { HabitReportDashboard } from './components/HabitReportDashboard';
+import { TimelinePowerupBands } from './components/TimelinePowerupBands';
+import { analyzeReplayDiagnostics, type ReplayDiagnosticReport } from './replayDiagnostics';
 
 function winnerText(p1: PlayerState | null, p2: PlayerState | null): string {
   if (!p1 || !p2) return 'Unknown winner';
@@ -12,7 +16,6 @@ function winnerText(p1: PlayerState | null, p2: PlayerState | null): string {
   if (p2.score > p1.score) return `Player 2 wins (${p2.score}-${p1.score})`;
   return 'Draw';
 }
-
 function normalizeReplay(json: ReplayData): ReplayDataV2 | null {
   if (json.version === 2) return json;
   return null;
@@ -69,12 +72,18 @@ const initialReplayState: ReplayState = {
 export default function ReplayApp() {
   const [state, dispatch] = useReducer(replayReducer, initialReplayState);
   const { replay, error, playing, speed, tick } = state;
+  const [activeTab, setActiveTab] = useState<'inspector' | 'habits'>('inspector');
   const fileInputRef = useRef<HTMLInputElement>(null);
   const rafRef = useRef<number>(0);
   const lastTimeRef = useRef<number>(0);
 
   const totalTicks = useMemo(() => replay?.keyframes[replay.keyframes.length - 1]?.tick ?? 1, [replay]);
   const keyframeIntervalTicks = replay?.keyframeIntervalTicks ?? null;
+
+  const diagnosticReport: ReplayDiagnosticReport | null = useMemo(() => {
+    if (!replay) return null;
+    return analyzeReplayDiagnostics(replay);
+  }, [replay]);
 
   useEffect(() => {
     if (!playing || !replay) return;
@@ -92,7 +101,7 @@ export default function ReplayApp() {
     };
   }, [playing, replay, speed, totalTicks]);
 
-  const viewState = useMemo((): GameState | null => {
+  const viewFrame = useMemo(() => {
     if (!replay) return null;
     const frames = replay.keyframes;
     let nearest = frames[0];
@@ -100,13 +109,23 @@ export default function ReplayApp() {
       if (frame.tick <= tick) nearest = frame;
       else break;
     }
+    return nearest;
+  }, [replay, tick]);
+
+  const viewState = useMemo((): GameState | null => {
+    if (!replay || !viewFrame) return null;
     return {
       ...replay.initialState,
-      tick: nearest.tick,
-      players: nearest.players,
+      tick: viewFrame.tick,
+      players: viewFrame.players,
       status: 'playing',
     };
-  }, [replay, tick]);
+  }, [replay, viewFrame]);
+
+  const currentDecisionTrace = useMemo(() => {
+    if (!viewFrame) return null;
+    return viewFrame.decisionTraces?.p1 || viewFrame.decisionTraces?.p2 || null;
+  }, [viewFrame]);
 
   const loadReplayFromUrl = (url: string) => {
     fetch(url)
@@ -155,15 +174,18 @@ export default function ReplayApp() {
   };
 
   return (
-    <div className="flex flex-col h-dvh bg-[#0a0a0a] text-white">
+    <div className="flex flex-col h-dvh bg-[#0a0a0f] text-white overflow-hidden">
       <input ref={fileInputRef} type="file" className="hidden" onChange={onFile} accept=".replay,.json" />
-      <div className="p-4 bg-[#1a1a1a] border-b border-white/10 flex justify-between items-center">
+
+      {/* Top Header Bar */}
+      <div className="p-3 bg-[#121218] border-b border-white/10 flex justify-between items-center flex-none">
         <div>
-          <h1 className="text-xl font-black text-emerald-400 tracking-wider">REPLAY VIEWER</h1>
-          <p className="text-xs text-zinc-500">{replay ? replay.date : 'No file loaded'}</p>
-          {keyframeIntervalTicks !== null && (
-            <p className="text-[10px] text-zinc-600">Snapshot interval: {keyframeIntervalTicks} tick(s)</p>
-          )}
+          <h1 className="text-lg font-black text-emerald-400 tracking-wider flex items-center gap-2">
+            <Activity size={18} /> REPLAY DIAGNOSTICS VIEWER
+          </h1>
+          <p className="text-[11px] text-zinc-400">
+            {replay ? `Seed ${replay.seed} • ${replay.date}` : 'No replay loaded'}
+          </p>
         </div>
         <div className="flex gap-3 items-center">
           <button
@@ -184,14 +206,14 @@ export default function ReplayApp() {
             type="button"
             onClick={() => dispatch({ type: 'TOGGLE_PLAY' })}
             disabled={!replay}
-            className="px-4 py-2 bg-emerald-500/20 text-emerald-400 font-bold rounded-lg hover:bg-emerald-500/30 disabled:opacity-50"
+            className="px-4 py-1.5 bg-emerald-500/20 text-emerald-400 font-bold rounded-lg hover:bg-emerald-500/30 disabled:opacity-50 text-xs"
           >
             {playing ? 'PAUSE' : 'PLAY'}
           </button>
           <select
             value={speed}
             onChange={(e) => dispatch({ type: 'SET_SPEED', payload: Number(e.target.value) })}
-            className="bg-[#0a0a0f] border border-white/20 rounded p-1"
+            className="bg-[#0a0a0f] border border-white/20 rounded p-1 text-xs"
           >
             <option value={0.5}>0.5x</option>
             <option value={1}>1x</option>
@@ -200,34 +222,94 @@ export default function ReplayApp() {
         </div>
       </div>
 
-      <div className="flex-1 min-h-0 relative">
-        {error && <div className="absolute z-30 left-3 top-3 text-xs text-rose-300 bg-rose-950/50 px-2 py-1 rounded">{error}</div>}
-        <GameFieldsLayout>
-          {p1 && <GameField player={p1} isMe={false} title="Player 1" borderColorClass="border-emerald-500/20" shadowColorClass="" />}
-          {p2 && <GameField player={p2} isMe={false} title="Player 2" borderColorClass="border-rose-500/20" shadowColorClass="" />}
-        </GameFieldsLayout>
-        {replay && tick >= totalTicks - 1 && (
-          <div className="absolute inset-0 z-40 bg-[#0a0a0f]/40 flex items-center justify-center">
-            <div className="bg-[#121212]/90 border border-emerald-500/30 p-6 rounded-xl text-center shadow-[0_0_30px_rgba(16,185,129,0.2)] backdrop-blur px-12">
-              <Trophy className="mx-auto mb-3 text-emerald-400" size={32} />
-              <div className="text-zinc-400 text-xs tracking-widest mb-1 uppercase">Match Finished</div>
-              <div className="text-2xl font-black text-white">{winnerText(p1, p2)}</div>
+      {/* Main Dual-Pane Shell */}
+      <div className="flex-1 min-h-0 flex overflow-hidden">
+        {/* Left Playfield & Canvas Area (60% Width) */}
+        <div className="flex-1 min-w-0 flex flex-col relative border-r border-white/10 p-3 bg-[#0c0c10]">
+          {error && <div className="absolute z-30 left-3 top-3 text-xs text-rose-300 bg-rose-950/50 px-2 py-1 rounded">{error}</div>}
+          <div className="flex-1 min-h-0 relative">
+            <GameFieldsLayout>
+              {p1 && <GameField player={p1} isMe={false} title="Player 1 (Bot)" borderColorClass="border-emerald-500/20" shadowColorClass="" />}
+              {p2 && <GameField player={p2} isMe={false} title="Player 2 (Opponent)" borderColorClass="border-rose-500/20" shadowColorClass="" />}
+            </GameFieldsLayout>
+            {replay && tick >= totalTicks - 1 && (
+              <div className="absolute inset-0 z-40 bg-[#0a0a0f]/40 flex items-center justify-center">
+                <div className="bg-[#121212]/90 border border-emerald-500/30 p-6 rounded-xl text-center shadow-[0_0_30px_rgba(16,185,129,0.2)] backdrop-blur px-12">
+                  <Trophy className="mx-auto mb-3 text-emerald-400" size={32} />
+                  <div className="text-zinc-400 text-xs tracking-widest mb-1 uppercase">Match Finished</div>
+                  <div className="text-2xl font-black text-white">{winnerText(p1, p2)}</div>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Timeline Scrubber + Powerup Bands */}
+          <div className="flex-none pt-3 border-t border-white/10 flex flex-col gap-1.5">
+            <div className="flex justify-between text-[11px] font-mono text-zinc-400">
+              <span>Active Powerup Timeline Bands</span>
+              <span>{(tick / 60).toFixed(1)}s / {(totalTicks / 60).toFixed(1)}s</span>
+            </div>
+            {replay && <TimelinePowerupBands replay={replay} totalTicks={totalTicks} />}
+            <div className="flex items-center gap-3">
+              <span className="text-xs font-mono w-10 text-zinc-400">{(tick / 60).toFixed(1)}s</span>
+              <input
+                type="range"
+                min={0}
+                max={totalTicks}
+                value={tick}
+                onChange={(e) => dispatch({ type: 'SET_TICK', payload: Number(e.target.value) })}
+                className="flex-1 accent-emerald-500 cursor-pointer h-2 bg-zinc-800 rounded-lg"
+              />
+              <span className="text-xs font-mono w-10 text-zinc-500 text-right">{(totalTicks / 60).toFixed(1)}s</span>
             </div>
           </div>
-        )}
-      </div>
+        </div>
 
-      <div className="h-16 bg-[#141414] border-t border-white/10 px-8 flex items-center gap-4">
-        <span className="text-xs font-mono w-12">{(tick / 60).toFixed(1)}s</span>
-        <input
-          type="range"
-          min={0}
-          max={totalTicks}
-          value={tick}
-          onChange={(e) => dispatch({ type: 'SET_TICK', payload: Number(e.target.value) })}
-          className="flex-1 accent-emerald-500"
-        />
-        <span className="text-xs font-mono w-12 text-zinc-500">{(totalTicks / 60).toFixed(1)}s</span>
+        {/* Right Scrollable Diagnostic Inspector (40% Width) */}
+        <div className="w-[480px] flex-none flex flex-col bg-[#0f0f14] overflow-hidden">
+          {/* Tab Header Selector */}
+          <div className="flex border-b border-white/10 p-2 gap-2 bg-[#14141a]">
+            <button
+              type="button"
+              onClick={() => setActiveTab('inspector')}
+              className={`flex-1 py-2 px-3 rounded-lg text-xs font-bold flex items-center justify-center gap-2 transition-all ${
+                activeTab === 'inspector'
+                  ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+                  : 'text-zinc-400 hover:text-white hover:bg-white/5'
+              }`}
+            >
+              <Target size={14} /> Candidate Inspector
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveTab('habits')}
+              className={`flex-1 py-2 px-3 rounded-lg text-xs font-bold flex items-center justify-center gap-2 transition-all ${
+                activeTab === 'habits'
+                  ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+                  : 'text-zinc-400 hover:text-white hover:bg-white/5'
+              }`}
+            >
+              <BarChart3 size={14} /> Habit Trend Report
+            </button>
+          </div>
+
+          {/* Dedicated Sub-Scrollable Body Pane */}
+          <div className="flex-1 min-h-0 overflow-y-auto p-4 custom-scrollbar">
+            {activeTab === 'inspector' ? (
+              <CandidateInspector trace={currentDecisionTrace} />
+            ) : diagnosticReport ? (
+              <HabitReportDashboard
+                report={diagnosticReport}
+                selectedTick={tick}
+                onJumpToTick={(targetTick) => dispatch({ type: 'SET_TICK', payload: targetTick })}
+              />
+            ) : (
+              <div className="p-6 text-center text-zinc-500 text-xs">
+                No diagnostic report available for this replay file.
+              </div>
+            )}
+          </div>
+        </div>
       </div>
     </div>
   );

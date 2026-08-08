@@ -369,9 +369,54 @@ export type ReplayInputFrame =
       cost?: number;
     };
 
+export type MisstepTag =
+  | 'BuriedCavity'
+  | 'MisjudgedGarbageUrgency'
+  | 'HighFrontierRisk'
+  | 'MissedGarbageCancel';
+
+export interface CandidateSubScores {
+  lineClearScore: number;
+  holeCountScore: number;
+  holeCountDeltaScore: number;
+  cavityScore: number;
+  heightScore: number;
+  bumpinessScore: number;
+  spiresScore: number;
+  wellsScore: number;
+  poisonScore: number;
+  dropDepthBonus: number;
+  visibilityRiskPenalty: number;
+  totalScore: number;
+}
+
+export interface CandidateEvaluationTrace {
+  rotation: number;
+  x: number;
+  score: number;
+  subScores: CandidateSubScores;
+  selected: boolean;
+}
+
+export interface BotDecisionTrace {
+  tick: number;
+  playerId: string;
+  pieceType: TetrominoType;
+  isBomber?: boolean;
+  selectedCandidate: CandidateEvaluationTrace;
+  runnerUpCandidates: CandidateEvaluationTrace[];
+  activeEffects: ActiveFieldEffect[];
+  pendingGarbageLines: number;
+  imminentGarbageLines: number;
+  maxHeight: number;
+  totalCavityDepth: number;
+  misstepTags?: MisstepTag[];
+}
+
 export interface ReplayKeyframe {
   tick: number;
   players: Record<string, PlayerState>;
+  decisionTraces?: Record<string, BotDecisionTrace>;
 }
 
 export interface ReplayDataV2 {
@@ -386,6 +431,12 @@ export interface ReplayDataV2 {
   inputs: ReplayInputFrame[];
   keyframes: ReplayKeyframe[];
   events: MatchEvent[];
+  /** Optional multi-run diagnostic suite aggregate. */
+  diagnosticSummary?: {
+    totalMissteps: number;
+    misstepCounts: Record<MisstepTag, number>;
+    hotspotTicks: Record<MisstepTag, number[]>;
+  };
 }
 
 // Legacy support for historical replay files.

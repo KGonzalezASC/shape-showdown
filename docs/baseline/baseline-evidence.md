@@ -10,14 +10,14 @@
 | Policy ID | rulesBot-v1 |
 | Observation Mode | player-limited |
 | Simulation Runs | 15 (120s each) |
-| Survival Rate | 100.0% |
-| Avg Score | 41833 |
-| Avg Lines Cleared | 216.7 |
-| Avg Holes | 0 |
-| Avg Cavity Depth | 0 |
-| Avg Deepest Cavity | 0 |
-| Avg Aggregate Height | 17.1 |
-| Avg Bumpiness | 6.5 |
+| Survival Rate | 80.0% |
+| Avg Score | 30113 |
+| Avg Lines Cleared | 167.5 |
+| Avg Holes | 4.5 |
+| Avg Cavity Depth | 27.2 |
+| Avg Deepest Cavity | 4.4 |
+| Avg Aggregate Height | 53.1 |
+| Avg Bumpiness | 10.9 |
 
 ## 2. Baseline Item Impact (Curtain / Frost-Shift)
 
