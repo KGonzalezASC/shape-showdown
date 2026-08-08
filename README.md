@@ -6,6 +6,13 @@
 
 Contributor and agent context: [AGENTS.md](./AGENTS.md).
 
+> [!NOTE]
+> **Project status:** Shape Showdown is no longer live. The startup that operated and hosted the game has closed, so the former production deployment is offline. This repository remains available for development, reference, and future distribution work.
+
+## Project goal
+
+The goal for Shape Showdown is to evolve it from a single-host VPS game into a cross-platform competitive game distributed through **Discord Activities**, **Itch.io**, and dedicated web portals. The authoritative multiplayer server remains a separate backend concern, while each platform provides a client entry point for players.
+
 ---
 
 ## Run locally
