@@ -1,12 +1,13 @@
 import React, { useEffect, useMemo, useReducer, useRef, useState } from 'react';
 import { Activity, BarChart3, FileUp, Target, Trophy } from 'lucide-react';
-import { BotDecisionTrace, GameState, PlayerState, ReplayData, ReplayDataV2 } from './types';
+import { BotDecisionTrace, CandidateEvaluationTrace, GameState, PlayerState, ReplayData, ReplayDataV2 } from './types';
 import GameField from './components/GameField';
 import { GameFieldsLayout } from './components/GameFieldsLayout';
 import { CandidateInspector } from './components/CandidateInspector';
 import { HabitReportDashboard } from './components/HabitReportDashboard';
 import { TimelinePowerupBands } from './components/TimelinePowerupBands';
 import { analyzeReplayDiagnostics, type ReplayDiagnosticReport } from './replayDiagnostics';
+import { projectCandidatePlacement, type ReplayCandidateOverlay } from './replayCandidateOverlay';
 
 function winnerText(p1: PlayerState | null, p2: PlayerState | null): string {
   if (!p1 || !p2) return 'Unknown winner';
@@ -82,6 +83,7 @@ export default function ReplayApp() {
   const { replay, error, playing, speed, tick } = state;
   const [activeTab, setActiveTab] = useState<'inspector' | 'habits'>('inspector');
   const [inspectedPlayerId, setInspectedPlayerId] = useState<string | null>(null);
+  const [previewCandidate, setPreviewCandidate] = useState<CandidateEvaluationTrace | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const rafRef = useRef<number>(0);
   const lastTimeRef = useRef<number>(0);
@@ -166,6 +168,42 @@ export default function ReplayApp() {
   const inspectedPlayer = activeInspectedPlayerId && viewState
     ? viewState.players[activeInspectedPlayerId] ?? null
     : null;
+
+  const decisionPlayer = useMemo(() => {
+    if (!replay || !activeInspectedPlayerId || !currentDecisionTrace) return inspectedPlayer;
+    const decisionFrame = replay.keyframes.find((frame) => {
+      const direct = frame.decisionTraces?.[activeInspectedPlayerId];
+      const trace = direct || (Object.values(frame.decisionTraces ?? {}) as BotDecisionTrace[]).find(
+        (candidateTrace) => candidateTrace.playerId === activeInspectedPlayerId,
+      );
+      return trace?.tick === currentDecisionTrace.tick;
+    });
+    return decisionFrame?.players[activeInspectedPlayerId] ?? inspectedPlayer;
+  }, [activeInspectedPlayerId, currentDecisionTrace, inspectedPlayer, replay]);
+
+  useEffect(() => {
+    setPreviewCandidate(null);
+  }, [activeInspectedPlayerId, viewFrame?.tick]);
+
+  const replayCandidateOverlay = useMemo<ReplayCandidateOverlay | null>(() => {
+    if (!currentDecisionTrace || !decisionPlayer) return null;
+    return {
+      botChoice: projectCandidatePlacement(
+        decisionPlayer.board,
+        currentDecisionTrace.pieceType,
+        currentDecisionTrace.selectedCandidate,
+        currentDecisionTrace.isBomber,
+      ),
+      alternative: previewCandidate && !previewCandidate.selected
+        ? projectCandidatePlacement(
+            decisionPlayer.board,
+            currentDecisionTrace.pieceType,
+            previewCandidate,
+            currentDecisionTrace.isBomber,
+          )
+        : null,
+    };
+  }, [currentDecisionTrace, decisionPlayer, previewCandidate]);
 
   const loadReplayFromUrl = (url: string) => {
     fetch(url)
@@ -268,8 +306,8 @@ export default function ReplayApp() {
           {error && <div className="absolute z-30 left-3 top-3 text-xs text-rose-300 bg-rose-950/50 px-2 py-1 rounded">{error}</div>}
           <div className="flex-1 min-h-0 relative">
             <GameFieldsLayout>
-              {p1 && <GameField player={p1} isMe={false} title={playerLabel(playerIds[0])} borderColorClass="border-emerald-500/20" shadowColorClass="" hatchingEnabled={false} showEffectPills effectTick={viewFrame?.tick} />}
-              {p2 && <GameField player={p2} isMe={false} title={playerLabel(playerIds[1])} borderColorClass="border-rose-500/20" shadowColorClass="" hatchingEnabled={false} showEffectPills effectTick={viewFrame?.tick} />}
+              {p1 && <GameField player={p1} isMe={false} title={playerLabel(playerIds[0])} borderColorClass="border-emerald-500/20" shadowColorClass="" hatchingEnabled={false} showEffectPills effectTick={viewFrame?.tick} replayCandidateOverlay={activeInspectedPlayerId === playerIds[0] ? replayCandidateOverlay : null} />}
+              {p2 && <GameField player={p2} isMe={false} title={playerLabel(playerIds[1])} borderColorClass="border-rose-500/20" shadowColorClass="" hatchingEnabled={false} showEffectPills effectTick={viewFrame?.tick} replayCandidateOverlay={activeInspectedPlayerId === playerIds[1] ? replayCandidateOverlay : null} />}
             </GameFieldsLayout>
             {replay && tick >= totalTicks - 1 && (
               <div className="absolute inset-0 z-40 bg-[#0a0a0f]/40 flex items-center justify-center">
@@ -369,6 +407,8 @@ export default function ReplayApp() {
                 player={inspectedPlayer}
                 playerLabel={activeInspectedPlayerId ? playerLabel(activeInspectedPlayerId) : 'No player selected'}
                 frameTick={viewFrame?.tick}
+                previewCandidate={previewCandidate}
+                onPreviewCandidate={setPreviewCandidate}
               />
             ) : diagnosticReport ? (
               <HabitReportDashboard

@@ -9,6 +9,8 @@ interface CandidateInspectorProps {
   player: PublicPlayerState | null;
   playerLabel: string;
   frameTick?: number;
+  previewCandidate?: CandidateEvaluationTrace | null;
+  onPreviewCandidate?: (candidate: CandidateEvaluationTrace | null) => void;
 }
 
 const MISSTEP_BADGE_STYLES: Record<MisstepTag, { label: string; bg: string; text: string; border: string }> = {
@@ -143,6 +145,8 @@ export const CandidateInspector: React.FC<CandidateInspectorProps> = ({
   player,
   playerLabel,
   frameTick,
+  previewCandidate = null,
+  onPreviewCandidate,
 }) => {
   const [expanded, setExpanded] = useState(true);
 
@@ -320,14 +324,29 @@ export const CandidateInspector: React.FC<CandidateInspectorProps> = ({
 
         {candidates.slice(0, expanded ? 8 : 3).map((candidate, idx) => {
           const isSelected = candidate.selected;
+          const isPreviewed = candidate === previewCandidate;
           const scoreDifference = candidate.score - selected.score;
           return (
             <div
               key={`${candidate.rotation}_${candidate.x}_${idx}`}
+              role={!isSelected && onPreviewCandidate ? 'button' : undefined}
+              tabIndex={!isSelected && onPreviewCandidate ? 0 : undefined}
+              aria-pressed={!isSelected && onPreviewCandidate ? isPreviewed : undefined}
+              aria-label={!isSelected && onPreviewCandidate ? `Preview alternative ${idx + 1}` : undefined}
+              title={!isSelected && onPreviewCandidate ? 'Click to preview this counterfactual placement on the board' : undefined}
+              onClick={!isSelected && onPreviewCandidate ? () => onPreviewCandidate(isPreviewed ? null : candidate) : undefined}
+              onKeyDown={!isSelected && onPreviewCandidate ? (event) => {
+                if (event.key === 'Enter' || event.key === ' ') {
+                  event.preventDefault();
+                  onPreviewCandidate(isPreviewed ? null : candidate);
+                }
+              } : undefined}
               className={`rounded-lg border p-2.5 transition-all ${
                 isSelected
                   ? 'border-emerald-500/40 bg-emerald-950/20 shadow-[0_0_15px_rgba(16,185,129,0.1)]'
-                  : 'border-white/5 bg-black/20 opacity-85 hover:opacity-100'
+                  : isPreviewed
+                    ? 'cursor-pointer border-cyan-400/60 bg-cyan-950/20 opacity-100 shadow-[0_0_15px_rgba(34,211,238,0.12)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-cyan-300'
+                    : 'cursor-pointer border-white/5 bg-black/20 opacity-85 hover:opacity-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-cyan-300'
               }`}
             >
               <div className="flex items-center justify-between gap-2">
@@ -349,7 +368,11 @@ export const CandidateInspector: React.FC<CandidateInspectorProps> = ({
                   </div>
                   {!isSelected && (
                     <div className="text-[9px] text-zinc-600">
-                      {Math.abs(scoreDifference) < 0.05 ? 'ties bot choice' : `Δ ${formatScore(scoreDifference)} vs bot choice`}
+                      {isPreviewed
+                        ? 'board preview shown'
+                        : Math.abs(scoreDifference) < 0.05
+                          ? 'ties bot choice'
+                          : `Δ ${formatScore(scoreDifference)} vs bot choice`}
                     </div>
                   )}
                   {isSelected && scoreMargin !== null && <div className="text-[9px] text-emerald-500/70">lead over best alternative {formatScore(scoreMargin)}</div>}

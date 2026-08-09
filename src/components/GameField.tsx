@@ -11,6 +11,7 @@ import { SHAPES } from '../tetris/shapes';
 import { SHAPE_COLORS } from '../presentation/shapePalette';
 import { BoardCanvasOverlay } from '../board/BoardCanvasOverlay';
 import { buildBoardVisualModel } from '../board/boardVisualModel';
+import type { ReplayCandidateOverlay } from '../replayCandidateOverlay';
 import { styleForFieldEffect } from '../shop/effectStyles';
 import {
   normalizeHeldPiece,
@@ -36,6 +37,8 @@ interface GameFieldProps {
   showEffectPills?: boolean;
   /** Current replay tick used to show remaining effect duration. */
   effectTick?: number;
+  /** Replay-only counterfactual placement overlay for the inspected player. */
+  replayCandidateOverlay?: ReplayCandidateOverlay | null;
 }
 
 export interface GameFieldRef {
@@ -94,6 +97,7 @@ const GameField = forwardRef<GameFieldRef, GameFieldProps>(({
   performanceId = title,
   showEffectPills = false,
   effectTick,
+  replayCandidateOverlay = null,
 }, ref) => {
   const activeEffects = player.activeEffects || [];
   const effectPills = useMemo(() => {
@@ -469,6 +473,39 @@ const GameField = forwardRef<GameFieldRef, GameFieldProps>(({
             ))}
           </svg>
         )}
+        {replayCandidateOverlay && (
+          <svg
+            className="pointer-events-none absolute inset-0 z-[15] overflow-visible"
+            width={BOARD_COLS * cellSize}
+            height={BOARD_VISIBLE_ROWS * cellSize}
+            aria-label="Solver candidate placement preview"
+          >
+            {replayCandidateOverlay.alternative?.cells.map(({ x, y }) => (
+              <rect
+                key={`candidate-alternative-${x}-${y}`}
+                className="landing-forecast-cell replay-candidate-alternative"
+                x={x * cellSize + 2}
+                y={y * cellSize + 2}
+                width={Math.max(1, cellSize - 4)}
+                height={Math.max(1, cellSize - 4)}
+                rx={Math.max(2, Math.round(cellSize * 0.12))}
+              />
+            ))}
+            {replayCandidateOverlay.botChoice.cells.map(({ x, y }) => (
+              <rect
+                key={`candidate-bot-choice-${x}-${y}`}
+                className={replayCandidateOverlay.botChoice.lineClearCount === 0
+                  ? 'replay-bot-choice-cell'
+                  : 'replay-bot-choice-line-clear-cell'}
+                x={x * cellSize + 2}
+                y={y * cellSize + 2}
+                width={Math.max(1, cellSize - 4)}
+                height={Math.max(1, cellSize - 4)}
+                rx={Math.max(2, Math.round(cellSize * 0.12))}
+              />
+            ))}
+          </svg>
+        )}
         {status === 'playing' && isMe && landingForecastRender.phase !== 'hidden' && (
           <div className="pointer-events-none absolute inset-x-0 top-2 z-20 flex justify-center">
             <span className={`landing-forecast-label ${
@@ -572,6 +609,8 @@ export default React.memo(GameField, (prev, next) => {
   ) {
     return false;
   }
+
+  if (prev.replayCandidateOverlay !== next.replayCandidateOverlay) return false;
 
   return publicPlayersEqual(prev.player, next.player);
 });

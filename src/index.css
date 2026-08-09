@@ -292,6 +292,27 @@ html, body, #root {
   animation: landing-forecast-dash 0.8s linear infinite;
 }
 
+.replay-candidate-alternative {
+  opacity: 0.8;
+  animation: landing-forecast-dash 0.8s steps(8) infinite;
+}
+
+.replay-bot-choice-cell {
+  fill: rgba(16, 185, 129, 0.04);
+  stroke: rgba(167, 243, 208, 0.98);
+  stroke-width: 2;
+  stroke-dasharray: 4 3;
+  filter: drop-shadow(0 0 4px rgba(16, 185, 129, 0.9));
+}
+
+.replay-bot-choice-line-clear-cell {
+  fill: rgba(16, 185, 129, 0.1);
+  stroke: rgba(167, 243, 208, 0.62);
+  stroke-width: 1.5;
+  opacity: 0.72;
+  filter: drop-shadow(0 0 3px rgba(16, 185, 129, 0.55));
+}
+
 @keyframes landing-forecast-timeout-fade {
   0% {
     opacity: 1;
