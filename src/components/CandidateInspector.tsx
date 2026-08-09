@@ -167,6 +167,7 @@ export const CandidateInspector: React.FC<CandidateInspectorProps> = ({
   const scoreMax = Math.max(0, ...scores);
   const runnerUp = candidates.find((candidate) => !candidate.selected);
   const scoreMargin = runnerUp ? selected.score - runnerUp.score : null;
+  const alternativeCount = Math.max(0, candidates.length - 1);
   const decisionTick = trace.tick;
 
   const effects = trace.activeEffects ?? [];
@@ -295,10 +296,20 @@ export const CandidateInspector: React.FC<CandidateInspectorProps> = ({
         <div>
           <div className="flex items-end justify-between gap-3">
             <div>
-              <div className="font-mono text-[10px] font-bold uppercase tracking-wider text-zinc-300">Candidate placements</div>
-              <div className="mt-0.5 text-[9px] text-zinc-500">Net heuristic score, not player score. Candidates are ranked for this piece at this tick.</div>
+              <div className="font-mono text-[10px] font-bold uppercase tracking-wider text-zinc-300">Placements considered by the bot</div>
+              <div className="mt-0.5 text-[9px] text-zinc-500">
+                1 executed choice + {alternativeCount} retained alternative{alternativeCount === 1 ? '' : 's'} · net heuristic score, not player score.
+              </div>
             </div>
             <span className="shrink-0 text-[9px] text-zinc-600">higher is better</span>
+          </div>
+          <div className="mt-2 rounded-lg border border-sky-500/20 bg-sky-950/15 p-2.5 text-[10px] leading-relaxed text-zinc-400">
+            <span className="font-bold text-sky-300">What are these rows?</span>
+            <span className="block mt-0.5">
+              Each row is a legal rotation/column placement for this same <span className="font-mono text-zinc-300">{trace.pieceType}</span> piece.
+              <span className="text-emerald-300"> BOT CHOICE</span> is the only placement the bot actually played.
+              <span className="text-zinc-300"> ALTERNATIVE</span> rows are counterfactual options it considered but did not play — not extra pieces or future moves.
+            </span>
           </div>
           <div className="mt-2 flex justify-between font-mono text-[9px] text-zinc-600">
             <span>worst {formatScore(scoreMin)}</span>
@@ -328,7 +339,7 @@ export const CandidateInspector: React.FC<CandidateInspectorProps> = ({
                         : 'bg-zinc-800 text-zinc-400'
                     }`}
                   >
-                    {isSelected ? 'SELECTED · #1' : `#${idx + 1}`}
+                    {isSelected ? 'BOT CHOICE · #1' : `ALTERNATIVE · #${idx + 1}`}
                   </span>
                   <span className="truncate font-mono text-xs text-zinc-300">rotation {candidate.rotation} · column {candidate.x}</span>
                 </div>
@@ -336,8 +347,12 @@ export const CandidateInspector: React.FC<CandidateInspectorProps> = ({
                   <div className={`text-sm font-bold ${isSelected ? 'text-emerald-300' : 'text-zinc-300'}`}>
                     {formatScore(candidate.score)}
                   </div>
-                  {!isSelected && <div className="text-[9px] text-zinc-600">{formatScore(scoreDifference)} vs selected</div>}
-                  {isSelected && scoreMargin !== null && <div className="text-[9px] text-emerald-500/70">margin {formatScore(scoreMargin)}</div>}
+                  {!isSelected && (
+                    <div className="text-[9px] text-zinc-600">
+                      {Math.abs(scoreDifference) < 0.05 ? 'ties bot choice' : `Δ ${formatScore(scoreDifference)} vs bot choice`}
+                    </div>
+                  )}
+                  {isSelected && scoreMargin !== null && <div className="text-[9px] text-emerald-500/70">lead over best alternative {formatScore(scoreMargin)}</div>}
                 </div>
               </div>
               <div className="mt-2">
