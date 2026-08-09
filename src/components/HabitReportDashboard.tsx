@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import type { MisstepTag, ReplayDataV2 } from '../types';
-import { createEmptyMisstepCounts, MISSTEP_CATEGORIES, type ReplayDiagnosticReport } from '../replayDiagnostics';
+import { createEmptyMisstepCounts, MISSTEP_CATEGORIES, type AnnotatedDecision, type ReplayDiagnosticReport } from '../replayDiagnostics';
 import { Activity, AlertTriangle, BarChart3, ChevronRight, Gauge, Users } from 'lucide-react';
 
 interface HabitReportDashboardProps {
@@ -47,6 +47,20 @@ interface TimelineBin {
   garbageLines: number;
 }
 
+interface DecisionTimingContext {
+  pendingLines: number;
+  imminentLines: number;
+  onBoardGarbageCells: number | null;
+  nextIncomingTick: number | null;
+  appliedTick: number | null;
+  appliedLines: number;
+}
+
+interface DecisionScrubTarget {
+  tick: number;
+  label: string;
+}
+
 function formatTime(tick: number): string {
   return `${(tick / 60).toFixed(1)}s`;
 }
@@ -58,6 +72,63 @@ function formatScore(score: number | undefined): string {
 function positionForTick(tick: number, totalTicks: number): number {
   if (totalTicks <= 0) return 0;
   return Math.min(100, Math.max(0, (tick / totalTicks) * 100));
+}
+
+function decisionKey(decision: AnnotatedDecision): string {
+  return `${decision.playerId}-${decision.tick}-${decision.trace.decisionId ?? 'legacy'}-${decision.trace.selectedCandidate.rotation}-${decision.trace.selectedCandidate.x}`;
+}
+
+function timingForDecision(replay: ReplayDataV2, decision: AnnotatedDecision): DecisionTimingContext | null {
+  const garbageRelated = decision.misstepTags.includes('MisjudgedGarbageUrgency')
+    || decision.misstepTags.includes('MissedGarbageCancel');
+  if (!garbageRelated) return null;
+
+  const frame = replay.keyframes.find((candidate) => Object.values(candidate.decisionTraces ?? {}).some((trace) => (
+    trace.playerId === decision.playerId
+      && (decision.trace.decisionId === undefined
+        ? trace.tick === decision.tick
+        : trace.decisionId === decision.trace.decisionId)
+  ))) ?? replay.keyframes.find((candidate) => candidate.tick >= decision.tick) ?? replay.keyframes.at(-1);
+  const player = frame?.players[decision.playerId];
+  const pendingPackets = player?.pendingGarbage ?? [];
+  const incomingPackets = pendingPackets.filter((packet) => packet.arrivalTick !== undefined && packet.arrivalTick >= decision.tick);
+  const arrivalTicks = incomingPackets.map((packet) => packet.arrivalTick as number);
+  const applied = replay.events.find((event) => {
+    if (event.playerId !== decision.playerId || event.type !== 'garbageApplied' || event.tick < decision.tick) return false;
+    const frameBeforeApply = replay.keyframes.filter((candidate) => candidate.tick < event.tick).at(-1);
+    const pendingBeforeApply = frameBeforeApply?.players[decision.playerId]?.pendingGarbage ?? [];
+    return pendingPackets.some((packet) => packet.arrivalTick !== undefined && pendingBeforeApply.some((candidate) => (
+      candidate.arrivalTick === packet.arrivalTick && candidate.lines > 0
+    )));
+  });
+  const decisionBoard = decision.trace.decisionBoard;
+
+  return {
+    pendingLines: decision.trace.pendingGarbageLines ?? pendingPackets.reduce((sum, packet) => sum + packet.lines, 0),
+    imminentLines: decision.trace.imminentGarbageLines ?? 0,
+    onBoardGarbageCells: decisionBoard ? decisionBoard.flat().filter((cell) => cell === 'G').length : null,
+    nextIncomingTick: arrivalTicks.length > 0 ? Math.min(...arrivalTicks) : null,
+    appliedTick: applied?.tick ?? null,
+    appliedLines: applied?.type === 'garbageApplied' ? applied.lines : 0,
+  };
+}
+
+function timingSummary(context: DecisionTimingContext | null): string | null {
+  if (!context) return null;
+  const parts: string[] = [];
+  if (context.nextIncomingTick !== null) parts.push(`incoming ${formatTime(context.nextIncomingTick)}`);
+  if (context.appliedTick !== null) parts.push(`applied ${formatTime(context.appliedTick)}`);
+  parts.push(`queued ${context.pendingLines}`, `imminent ${context.imminentLines}`);
+  parts.push(context.onBoardGarbageCells === null ? 'board unavailable' : `on board ${context.onBoardGarbageCells}`);
+  return parts.join(' · ');
+}
+
+function scrubTargets(context: DecisionTimingContext | null): DecisionScrubTarget[] {
+  if (!context) return [];
+  const targets: DecisionScrubTarget[] = [];
+  if (context.nextIncomingTick !== null) targets.push({ tick: context.nextIncomingTick, label: `incoming · ${formatTime(context.nextIncomingTick)}` });
+  if (context.appliedTick !== null) targets.push({ tick: context.appliedTick, label: `apply ${context.appliedLines} · ${formatTime(context.appliedTick)}` });
+  return targets;
 }
 
 export const HabitReportDashboard: React.FC<HabitReportDashboardProps> = ({
@@ -134,6 +205,11 @@ export const HabitReportDashboard: React.FC<HabitReportDashboardProps> = ({
     }),
     [activeCategory, playerScopedDecisions],
   );
+  const decisionTiming = useMemo(() => {
+    const timing = new Map<string, DecisionTimingContext | null>();
+    for (const decision of report.annotatedDecisions) timing.set(decisionKey(decision), timingForDecision(replay, decision));
+    return timing;
+  }, [replay, report.annotatedDecisions]);
   const maxBinCount = Math.max(
     1,
     ...displayedTimeBins.map((bin) => Math.max(...(Object.values(bin.counts) as number[]))),
@@ -396,15 +472,21 @@ export const HabitReportDashboard: React.FC<HabitReportDashboardProps> = ({
                       );
                     })}
                     {markers.map(({ decision, tag, decisionIndex }) => (
-                      <button
-                        type="button"
-                        key={`${category}-${decision.playerId}-${decision.tick}-${decision.trace.decisionId ?? decisionIndex}`}
-                        onClick={() => onJumpToDecision(decision.playerId, decision.tick)}
-                        title={`${MISSTEP_LABELS[tag]} · ${playerLabel(decision.playerId)} · tick ${decision.tick} (${formatTime(decision.tick)})`}
-                        aria-label={`${MISSTEP_LABELS[tag]} for ${playerLabel(decision.playerId)} at ${formatTime(decision.tick)}`}
-                        className={`absolute top-1/2 z-20 h-4 w-4 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-[#111116] ${MISSTEP_COLORS[tag]} shadow-[0_0_7px_rgba(255,255,255,0.2)] transition-transform hover:scale-125`}
-                        style={{ left: `${positionForTick(decision.tick, report.totalTicks)}%` }}
-                      />
+                      (() => {
+                        const context = decisionTiming.get(decisionKey(decision)) ?? null;
+                        const summary = timingSummary(context);
+                        return (
+                          <button
+                            type="button"
+                            key={`${category}-${decision.playerId}-${decision.tick}-${decision.trace.decisionId ?? decisionIndex}`}
+                            onClick={() => onJumpToDecision(decision.playerId, decision.tick)}
+                            title={`${MISSTEP_LABELS[tag]} · ${playerLabel(decision.playerId)} · decision ${formatTime(decision.tick)}${summary ? ` · ${summary}` : ''}`}
+                            aria-label={`${MISSTEP_LABELS[tag]} for ${playerLabel(decision.playerId)} at ${formatTime(decision.tick)}${summary ? `; ${summary}` : ''}`}
+                            className={`absolute top-1/2 z-20 h-4 w-4 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-[#111116] ${MISSTEP_COLORS[tag]} shadow-[0_0_7px_rgba(255,255,255,0.2)] transition-transform hover:scale-125`}
+                            style={{ left: `${positionForTick(decision.tick, report.totalTicks)}%` }}
+                          />
+                        );
+                      })()
                     ))}
                     {selectedTick !== undefined && <span className="pointer-events-none absolute inset-y-[-3px] z-30 w-px bg-white shadow-[0_0_5px_rgba(255,255,255,0.9)]" style={{ left: `${selectedPosition}%` }} />}
                   </div>
@@ -420,21 +502,45 @@ export const HabitReportDashboard: React.FC<HabitReportDashboardProps> = ({
           <div className="font-mono text-[10px] font-bold uppercase tracking-wider text-zinc-300">Flagged decisions to inspect</div>
           <span className="font-mono text-[9px] text-zinc-600">{filteredDecisions.length} matches</span>
         </div>
+        <p className="text-[9px] leading-relaxed text-zinc-600">Click the row to inspect the decision. Garbage rows show queued, incoming, and applied timing; use the event buttons to scrub to each point.</p>
         <div className="max-h-64 overflow-y-auto rounded-lg border border-white/5 bg-black/40 p-2 [scrollbar-color:#3f3f46_transparent]">
           <div className="flex flex-col gap-1.5">
-            {filteredDecisions.map((decision) => (
-              <button
-                type="button"
+            {filteredDecisions.map((decision) => {
+              const context = decisionTiming.get(decisionKey(decision)) ?? null;
+              const summary = timingSummary(context);
+              const targets = scrubTargets(context);
+              return (
+              <div
                 key={`${decision.playerId}-${decision.tick}-${decision.trace.decisionId ?? 'legacy'}`}
-                onClick={() => onJumpToDecision(decision.playerId, decision.tick)}
-                className={`flex items-center gap-2 rounded border px-2 py-1.5 text-left transition-colors ${selectedTick === decision.tick ? 'border-emerald-500/40 bg-emerald-950/30' : 'border-white/5 bg-white/[0.02] hover:bg-white/10'}`}
+                className={`flex items-center gap-1 rounded border px-1.5 py-1.5 transition-colors ${selectedTick === decision.tick ? 'border-emerald-500/40 bg-emerald-950/30' : 'border-white/5 bg-white/[0.02]'}`}
               >
-                <AlertTriangle size={11} className="shrink-0 text-amber-400" />
-                <span className="w-12 shrink-0 font-mono text-[10px] text-zinc-300">t={formatTime(decision.tick)}</span>
-                <span className="min-w-0 flex-1 truncate text-[9px] text-zinc-500">{playerLabel(decision.playerId)} · {decision.misstepTags.map((tag) => MISSTEP_LABELS[tag]).join(', ')}</span>
-                <ChevronRight size={10} className="shrink-0 text-zinc-600" />
-              </button>
-            ))}
+                <button
+                  type="button"
+                  onClick={() => onJumpToDecision(decision.playerId, decision.tick)}
+                  className="min-w-0 flex-1 rounded px-1 py-0.5 text-left hover:bg-white/5"
+                >
+                  <div className="flex items-center gap-2">
+                    <AlertTriangle size={11} className="shrink-0 text-amber-400" />
+                    <span className="w-12 shrink-0 font-mono text-[10px] text-zinc-300">t={formatTime(decision.tick)}</span>
+                    <span className="min-w-0 flex-1 truncate text-[9px] text-zinc-500">{playerLabel(decision.playerId)} · {decision.misstepTags.map((tag) => MISSTEP_LABELS[tag]).join(', ')}</span>
+                    <ChevronRight size={10} className="shrink-0 text-zinc-600" />
+                  </div>
+                  {summary && <div className="mt-1 whitespace-normal break-words pl-6 text-[9px] leading-snug font-mono text-amber-300/70">{summary}</div>}
+                </button>
+                {targets.map((target) => (
+                  <button
+                    type="button"
+                    key={target.label}
+                    onClick={() => onJumpToTick(target.tick)}
+                    title={`Scrub to ${target.label}`}
+                    className="shrink-0 rounded border border-amber-500/20 bg-amber-500/10 px-1.5 py-1 text-[8px] font-mono text-amber-300 hover:bg-amber-500/20"
+                  >
+                    {target.label}
+                  </button>
+                ))}
+              </div>
+              );
+            })}
             {filteredDecisions.length === 0 && (
               <div className="p-3 text-center text-[10px] italic text-zinc-600">
                 {displayedTotalFlags === 0 ? 'No retrospective flags detected for the current player scope.' : 'No flags match the current filters.'}
