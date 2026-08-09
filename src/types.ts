@@ -387,6 +387,8 @@ export interface CandidateSubScores {
   spiresScore: number;
   wellsScore: number;
   poisonScore: number;
+  /** Optional for legacy replay traces; enabled by the topology experiment policy. */
+  surfaceTopologyScore?: number;
   dropDepthBonus: number;
   visibilityRiskPenalty: number;
   /** Extra penalties applied after the named board terms (for example, uncertain clears or top-out). */

@@ -11,6 +11,7 @@ import {
   type SingleRunTrace,
 } from './measurementContract.js';
 import type { ObservationMode } from './observationProjector.js';
+import type { RulesBotTopologyMode } from './rulesBot.js';
 import { computePlayerPressure } from './boardPressure.js';
 import { SHOP_ITEM_BY_ID } from '../../src/shop/shopCatalog.js';
 
@@ -30,6 +31,7 @@ export interface BotQualityConfig {
   policyId?: string;
   observationMode?: ObservationMode;
   enableGarbage?: boolean;
+  topology?: RulesBotTopologyMode;
 }
 
 export interface BotQualityReport {
@@ -69,6 +71,7 @@ export function runBotQuality(config?: BotQualityConfig): BotQualityReport {
       enableShop: false,
       enableGarbage,
       botModes: { p1: observationMode, p2: observationMode },
+      botTopology: { p1: config?.topology ?? 'none', p2: config?.topology ?? 'none' },
     });
 
     const report = runner.run(durationTicks);
@@ -180,6 +183,7 @@ export interface ItemImpactConfig {
   policyId?: string;
   observationMode?: ObservationMode;
   enableGarbage?: boolean;
+  topology?: RulesBotTopologyMode;
 }
 
 export interface ItemImpactReport {
@@ -230,6 +234,7 @@ export function runItemImpact(config?: ItemImpactConfig): ItemImpactReport {
       enableShop: true,
       enableGarbage,
       botModes: { p1: observationMode, p2: observationMode },
+      botTopology: { p1: config?.topology ?? 'none', p2: config?.topology ?? 'none' },
       shopPolicies: {},
     });
     const ctrlReport = ctrlRunner.run(durationTicks);
@@ -309,6 +314,7 @@ export function runItemImpact(config?: ItemImpactConfig): ItemImpactReport {
       enableShop: true,
       enableGarbage,
       botModes: { p1: observationMode, p2: observationMode },
+      botTopology: { p1: config?.topology ?? 'none', p2: config?.topology ?? 'none' },
       shopPolicies: { p1: trtShopPolicy },
     });
     const trtReport = trtRunner.run(durationTicks);
@@ -434,6 +440,7 @@ export interface PricingExperimentConfig {
   candidatePrices?: number[];
   policyId?: string;
   observationMode?: ObservationMode;
+  topology?: RulesBotTopologyMode;
 }
 
 export interface PricePointResult {
@@ -460,6 +467,7 @@ export function runPricingExperiment(config?: PricingExperimentConfig): PricingE
   const candidatePrices = config?.candidatePrices ?? [30, 45, 60, 75, 90];
   const policyId = config?.policyId ?? 'rulesBot-v1';
   const observationMode = config?.observationMode ?? 'player-limited';
+  const topology = config?.topology ?? 'none';
   const runs = config?.runs ?? 10;
   const seconds = config?.seconds ?? 60;
   const seeds = config?.seeds;
@@ -477,6 +485,7 @@ export function runPricingExperiment(config?: PricingExperimentConfig): PricingE
       candidatePrice,
       policyId,
       observationMode,
+      topology,
     });
 
     // Evaluate closed-loop affordability & purchase metrics across candidate price runs
@@ -535,6 +544,7 @@ export interface CompoundTreatmentConfig {
   policyId?: string;
   observationMode?: ObservationMode;
   enableGarbage?: boolean;
+  topology?: RulesBotTopologyMode;
 }
 
 export interface CompoundStepRecord {
@@ -587,6 +597,7 @@ export function runCompoundTreatment(config?: CompoundTreatmentConfig): Compound
   const costPolicy = config?.costPolicy ?? 'reference-price';
   const policyId = config?.policyId ?? 'rulesBot-v1';
   const observationMode = config?.observationMode ?? 'player-limited';
+  const topology = config?.topology ?? 'none';
 
   const setupCatalog = SHOP_ITEM_BY_ID.get(setupItemId);
   const payoffCatalog = SHOP_ITEM_BY_ID.get(payoffItemId);
@@ -614,6 +625,7 @@ export function runCompoundTreatment(config?: CompoundTreatmentConfig): Compound
       enableShop: true,
       enableGarbage,
       botModes: { p1: observationMode, p2: observationMode },
+      botTopology: { p1: topology, p2: topology },
       shopPolicies: {},
     });
     const ctrlReport = ctrlRunner.run(durationTicks);
@@ -625,6 +637,7 @@ export function runCompoundTreatment(config?: CompoundTreatmentConfig): Compound
       enableShop: true,
       enableGarbage,
       botModes: { p1: observationMode, p2: observationMode },
+      botTopology: { p1: topology, p2: topology },
       shopPolicies: { p1: setupPolicy },
     });
     const setupReport = setupRunner.run(durationTicks);
@@ -653,6 +666,7 @@ export function runCompoundTreatment(config?: CompoundTreatmentConfig): Compound
       enableShop: true,
       enableGarbage,
       botModes: { p1: observationMode, p2: observationMode },
+      botTopology: { p1: topology, p2: topology },
       shopPolicies: { p1: pairPolicy },
     });
     const pairReport = pairRunner.run(durationTicks);

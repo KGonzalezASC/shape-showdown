@@ -8,8 +8,11 @@ import type { ObservationMode, PlayerObservation } from './observationProjector.
 
 export type { ObservationMode };
 
+export type RulesBotTopologyMode = 'none' | 'surface';
+
 export interface RulesBotOptions {
   mode?: ObservationMode;
+  topology?: RulesBotTopologyMode;
 }
 
 export interface PlacementPlan {
@@ -64,6 +67,8 @@ export interface BoardEvaluation {
   columnCavities: readonly ColumnCavityMetrics[];
   totalCavityDepth: number;
   deepestCavity: number;
+  oddHeightTransitions: number;
+  isolatedOneHighSpikes: number;
 }
 
 export const CAVITY_DEPTH_REDUCTION_WEIGHT = 60;
@@ -72,6 +77,10 @@ export const DEEPEST_CAVITY_REDUCTION_WEIGHT = 25;
 // keep them below that avoidance threshold while still preferring shallower cover.
 export const CAVITY_DEPTH_INCREASE_PENALTY = 70;
 export const DEEPEST_CAVITY_INCREASE_PENALTY = 20;
+// Keep topology below the cavity/height terms. It should break near-ties,
+// not make the bot avoid otherwise useful placements.
+export const SURFACE_PARITY_REDUCTION_WEIGHT = 2;
+export const ISOLATED_SPIKE_REDUCTION_WEIGHT = 12;
 
 export interface PlacementVisibilityRisk {
   unknownCellCount: number;
@@ -177,6 +186,17 @@ export function scoreCavityDepthDelta(
   return score;
 }
 
+/** Scores reductions in odd surface transitions and isolated one-cell peaks. */
+export function scoreSurfaceTopologyDelta(
+  origEval: BoardEvaluation,
+  simEval: BoardEvaluation,
+): number {
+  return (
+    (origEval.oddHeightTransitions - simEval.oddHeightTransitions) * SURFACE_PARITY_REDUCTION_WEIGHT +
+    (origEval.isolatedOneHighSpikes - simEval.isolatedOneHighSpikes) * ISOLATED_SPIKE_REDUCTION_WEIGHT
+  );
+}
+
 /** Evaluates board stack quality, poison cells, holes, and per-column cavity depth for bot heuristics. */
 export function evaluateBoard(
   board: CellValue[][],
@@ -233,11 +253,23 @@ export function evaluateBoard(
 
   let bumpiness = 0;
   let spires = 0;
+  let oddHeightTransitions = 0;
   for (let x = 0; x < BOARD_COLS - 1; x++) {
     const diff = Math.abs(columnHeights[x] - columnHeights[x + 1]);
     bumpiness += diff;
+    if (diff % 2 === 1) {
+      oddHeightTransitions++;
+    }
     if (diff > 2) {
       spires += diff - 2;
+    }
+  }
+
+  let isolatedOneHighSpikes = 0;
+  for (let x = 1; x < BOARD_COLS - 1; x++) {
+    const height = columnHeights[x];
+    if (height === columnHeights[x - 1] + 1 && height === columnHeights[x + 1] + 1) {
+      isolatedOneHighSpikes++;
     }
   }
 
@@ -266,6 +298,8 @@ export function evaluateBoard(
     columnCavities,
     totalCavityDepth,
     deepestCavity,
+    oddHeightTransitions,
+    isolatedOneHighSpikes,
   };
 }
 
@@ -303,6 +337,7 @@ export function applyBomberBlastSimulation(
 export class RulesBot implements InputDriver {
   public readonly mode: ObservationMode;
   public readonly observationMode: ObservationMode;
+  public readonly topology: RulesBotTopologyMode;
   public lastDecisionTrace: BotDecisionTrace | null = null;
 
   private currentPlan: PlacementPlan | null = null;
@@ -314,6 +349,7 @@ export class RulesBot implements InputDriver {
   constructor(options?: RulesBotOptions) {
     this.mode = options?.mode ?? 'omniscient';
     this.observationMode = this.mode;
+    this.topology = options?.topology ?? 'none';
   }
 
   public next(observation: DriverObservation): PlayerCommand {
@@ -571,6 +607,9 @@ export class RulesBot implements InputDriver {
         const holeCountScore = -simEval.holes * 180;
         const holeCountDeltaScore = holesDelta > 0 ? -holesDelta * 350 : 0;
         const cavityScore = scoreCavityDepthDelta(origEval, simEval);
+        const surfaceTopologyScore = this.topology === 'surface'
+          ? scoreSurfaceTopologyDelta(origEval, simEval)
+          : 0;
         const holesScore = holeCountScore + holeCountDeltaScore + cavityScore;
 
         let heightScore = -simEval.aggregateHeight * 2;
@@ -604,7 +643,8 @@ export class RulesBot implements InputDriver {
           spiresScore +
           wellsScore +
           poisonScore +
-          dropDepthBonus -
+          dropDepthBonus +
+          surfaceTopologyScore -
           visibilityRiskPenalty +
           finalAdjustmentScore;
 
@@ -618,6 +658,7 @@ export class RulesBot implements InputDriver {
           spiresScore,
           wellsScore,
           poisonScore,
+          surfaceTopologyScore,
           dropDepthBonus,
           visibilityRiskPenalty,
           finalAdjustmentScore,

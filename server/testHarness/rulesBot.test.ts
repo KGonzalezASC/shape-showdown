@@ -4,6 +4,7 @@ import {
   evaluateBoard,
   deriveVisibilityFromObservation,
   scoreCavityDepthDelta,
+  scoreSurfaceTopologyDelta,
   evaluatePlacementVisibilityRisk,
   calculatePlacementVisibilityRiskScore,
   UNCERTAIN_LINE_CLEAR_PENALTY,
@@ -483,6 +484,43 @@ describe('RulesBot Adapter & Attack Preview', () => {
 
       assert.ok(plan);
       assert.notEqual(plan.x, 0);
+    });
+
+    it('measures odd surface transitions and isolated one-cell peaks', () => {
+      const board = createEmptyBoard();
+      const heights = [4, 5, 4, 4, 6, 6, 6, 6, 6, 6];
+
+      for (let x = 0; x < BOARD_COLS; x++) {
+        for (let y = BOARD_ROWS - heights[x]; y < BOARD_ROWS; y++) {
+          board[y][x] = 'I';
+        }
+      }
+
+      const metrics = evaluateBoard(board);
+
+      assert.equal(metrics.oddHeightTransitions, 2);
+      assert.equal(metrics.isolatedOneHighSpikes, 1);
+    });
+
+    it('rewards topology improvements without overpowering existing stack metrics', () => {
+      const origBoard = createEmptyBoard();
+      const smoothBoard = createEmptyBoard();
+      const origHeights = [4, 5, 4, 4, 6, 6, 6, 6, 6, 6];
+      const smoothHeights = [4, 4, 4, 4, 6, 6, 6, 6, 6, 6];
+
+      for (let x = 0; x < BOARD_COLS; x++) {
+        for (let y = BOARD_ROWS - origHeights[x]; y < BOARD_ROWS; y++) {
+          origBoard[y][x] = 'I';
+        }
+        for (let y = BOARD_ROWS - smoothHeights[x]; y < BOARD_ROWS; y++) {
+          smoothBoard[y][x] = 'I';
+        }
+      }
+
+      const topologyScore = scoreSurfaceTopologyDelta(evaluateBoard(origBoard), evaluateBoard(smoothBoard));
+
+      assert.equal(topologyScore, 16);
+      assert.ok(topologyScore < 100);
     });
   });
 

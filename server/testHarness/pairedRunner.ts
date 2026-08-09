@@ -2,7 +2,7 @@ import type { GameState, MatchEvent } from '../../src/types.js';
 import { SHOP_ITEM_BY_ID } from '../../src/shop/shopCatalog.js';
 import type { DriverObservation, InputDriver } from './inputDriver.js';
 import type { PlayerFixture } from './fixtures.js';
-import { RulesBot, type ObservationMode } from './rulesBot.js';
+import { RulesBot, type ObservationMode, type RulesBotTopologyMode } from './rulesBot.js';
 import { defaultObservationProjector } from './observationProjector.js';
 import { Scenario, type PlayerMetrics, type ScenarioReport } from './scenario.js';
 
@@ -17,6 +17,7 @@ export interface PairedRunnerConfig {
   players?: Record<string, PlayerFixture>;
   drivers?: Record<string, InputDriver>;
   botModes?: Record<string, ObservationMode>;
+  botTopology?: Record<string, RulesBotTopologyMode>;
   shopPolicies?: Record<string, BotShopPolicy>;
   enableShop?: boolean;
   enableGarbage?: boolean;
@@ -77,7 +78,7 @@ export class PairedRunner {
     for (const id of this.playerIds) {
       if (!drivers[id]) {
         const mode = config.botModes?.[id] ?? 'omniscient';
-        drivers[id] = new RulesBot({ mode });
+        drivers[id] = new RulesBot({ mode, topology: config.botTopology?.[id] ?? 'none' });
       }
     }
 

@@ -59,6 +59,7 @@ function contributionsFor(sub: CandidateSubScores): Contribution[] {
     { label: 'Existing holes', value: sub.holeCountScore, tone: 'negative' },
     { label: 'Hole-count change', value: sub.holeCountDeltaScore, tone: 'negative' },
     { label: 'Cavity-depth change', value: sub.cavityScore, tone: 'neutral' },
+    { label: 'Surface topology', value: sub.surfaceTopologyScore ?? 0, tone: 'neutral' },
     { label: 'Stack height', value: sub.heightScore, tone: 'negative' },
     { label: 'Surface bumpiness', value: sub.bumpinessScore, tone: 'negative' },
     { label: 'Spires', value: sub.spiresScore, tone: 'negative' },
