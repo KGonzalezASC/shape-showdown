@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useReducer, useRef, useState } from 'react';
 import { Activity, BarChart3, FileUp, Target, Trophy } from 'lucide-react';
-import { GameState, PlayerState, ReplayData, ReplayDataV2 } from './types';
+import { BotDecisionTrace, GameState, PlayerState, ReplayData, ReplayDataV2 } from './types';
 import GameField from './components/GameField';
 import { GameFieldsLayout } from './components/GameFieldsLayout';
 import { CandidateInspector } from './components/CandidateInspector';
@@ -19,6 +19,14 @@ function winnerText(p1: PlayerState | null, p2: PlayerState | null): string {
 function normalizeReplay(json: ReplayData): ReplayDataV2 | null {
   if (json.version === 2) return json;
   return null;
+}
+
+function orderedPlayerIds(replay: ReplayDataV2 | null, players: Record<string, PlayerState>): string[] {
+  return Object.keys(players).sort((a, b) => {
+    const aSlot = replay?.playerSlots?.[a] ?? Number.MAX_SAFE_INTEGER;
+    const bSlot = replay?.playerSlots?.[b] ?? Number.MAX_SAFE_INTEGER;
+    return aSlot - bSlot || a.localeCompare(b);
+  });
 }
 
 interface ReplayState {
@@ -73,12 +81,12 @@ export default function ReplayApp() {
   const [state, dispatch] = useReducer(replayReducer, initialReplayState);
   const { replay, error, playing, speed, tick } = state;
   const [activeTab, setActiveTab] = useState<'inspector' | 'habits'>('inspector');
+  const [inspectedPlayerId, setInspectedPlayerId] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const rafRef = useRef<number>(0);
   const lastTimeRef = useRef<number>(0);
 
   const totalTicks = useMemo(() => replay?.keyframes[replay.keyframes.length - 1]?.tick ?? 1, [replay]);
-  const keyframeIntervalTicks = replay?.keyframeIntervalTicks ?? null;
 
   const diagnosticReport: ReplayDiagnosticReport | null = useMemo(() => {
     if (!replay) return null;
@@ -122,10 +130,42 @@ export default function ReplayApp() {
     };
   }, [replay, viewFrame]);
 
+  const playerIds = useMemo(
+    () => (viewState ? orderedPlayerIds(replay, viewState.players) : []),
+    [replay, viewState],
+  );
+
+  const playerLabel = (playerId: string): string => {
+    const index = playerIds.indexOf(playerId);
+    return `Player ${index >= 0 ? index + 1 : '?'} · ${playerId}`;
+  };
+
+  const activeInspectedPlayerId = inspectedPlayerId && playerIds.includes(inspectedPlayerId)
+    ? inspectedPlayerId
+    : playerIds[0] ?? null;
+  const currentFrameTraces: Record<string, BotDecisionTrace> = viewFrame?.decisionTraces ?? {};
+
+  useEffect(() => {
+    if (playerIds.length > 0 && !playerIds.includes(inspectedPlayerId ?? '')) {
+      setInspectedPlayerId(playerIds[0]);
+    }
+  }, [inspectedPlayerId, playerIds]);
+
   const currentDecisionTrace = useMemo(() => {
     if (!viewFrame) return null;
-    return viewFrame.decisionTraces?.p1 || viewFrame.decisionTraces?.p2 || null;
-  }, [viewFrame]);
+    const traces: Record<string, BotDecisionTrace> = viewFrame.decisionTraces ?? {};
+    if (activeInspectedPlayerId) {
+      const direct = traces[activeInspectedPlayerId];
+      if (direct) return direct;
+      const matching = Object.values(traces).find((trace) => trace.playerId === activeInspectedPlayerId);
+      if (matching) return matching;
+    }
+    return null;
+  }, [activeInspectedPlayerId, viewFrame]);
+
+  const inspectedPlayer = activeInspectedPlayerId && viewState
+    ? viewState.players[activeInspectedPlayerId] ?? null
+    : null;
 
   const loadReplayFromUrl = (url: string) => {
     fetch(url)
@@ -149,9 +189,8 @@ export default function ReplayApp() {
     loadReplayFromUrl(targetFile);
   }, []);
 
-  const pids = viewState ? Object.keys(viewState.players) : [];
-  const p1 = viewState && pids[0] ? viewState.players[pids[0]] : null;
-  const p2 = viewState && pids[1] ? viewState.players[pids[1]] : null;
+  const p1 = playerIds[0] && viewState ? viewState.players[playerIds[0]] : null;
+  const p2 = playerIds[1] && viewState ? viewState.players[playerIds[1]] : null;
 
   const onFile = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -229,8 +268,8 @@ export default function ReplayApp() {
           {error && <div className="absolute z-30 left-3 top-3 text-xs text-rose-300 bg-rose-950/50 px-2 py-1 rounded">{error}</div>}
           <div className="flex-1 min-h-0 relative">
             <GameFieldsLayout>
-              {p1 && <GameField player={p1} isMe={false} title="Player 1 (Bot)" borderColorClass="border-emerald-500/20" shadowColorClass="" />}
-              {p2 && <GameField player={p2} isMe={false} title="Player 2 (Opponent)" borderColorClass="border-rose-500/20" shadowColorClass="" />}
+              {p1 && <GameField player={p1} isMe={false} title={playerLabel(playerIds[0])} borderColorClass="border-emerald-500/20" shadowColorClass="" hatchingEnabled={false} showEffectPills effectTick={viewFrame?.tick} />}
+              {p2 && <GameField player={p2} isMe={false} title={playerLabel(playerIds[1])} borderColorClass="border-rose-500/20" shadowColorClass="" hatchingEnabled={false} showEffectPills effectTick={viewFrame?.tick} />}
             </GameFieldsLayout>
             {replay && tick >= totalTicks - 1 && (
               <div className="absolute inset-0 z-40 bg-[#0a0a0f]/40 flex items-center justify-center">
@@ -246,10 +285,18 @@ export default function ReplayApp() {
           {/* Timeline Scrubber + Powerup Bands */}
           <div className="flex-none pt-3 border-t border-white/10 flex flex-col gap-1.5">
             <div className="flex justify-between text-[11px] font-mono text-zinc-400">
-              <span>Active Powerup Timeline Bands</span>
+              <span>Effects & purchase timeline</span>
               <span>{(tick / 60).toFixed(1)}s / {(totalTicks / 60).toFixed(1)}s</span>
             </div>
-            {replay && <TimelinePowerupBands replay={replay} totalTicks={totalTicks} />}
+            {replay && (
+              <TimelinePowerupBands
+                replay={replay}
+                totalTicks={totalTicks}
+                playerIds={playerIds}
+                currentTick={tick}
+                playerLabel={playerLabel}
+              />
+            )}
             <div className="flex items-center gap-3">
               <span className="text-xs font-mono w-10 text-zinc-400">{(tick / 60).toFixed(1)}s</span>
               <input
@@ -295,13 +342,44 @@ export default function ReplayApp() {
 
           {/* Dedicated Sub-Scrollable Body Pane */}
           <div className="flex-1 min-h-0 overflow-y-auto p-4 custom-scrollbar">
+            <div className="mb-4 rounded-lg border border-white/10 bg-black/25 p-3">
+              <div className="mb-2 text-[9px] font-mono font-bold uppercase tracking-wider text-zinc-500">Inspecting decision owner</div>
+              <div className="flex flex-wrap gap-2">
+                {playerIds.map((playerId) => {
+                  const hasTrace = !!currentFrameTraces[playerId] || Object.values(currentFrameTraces).some((trace) => trace.playerId === playerId);
+                  const isActive = playerId === activeInspectedPlayerId;
+                  return (
+                    <button
+                      type="button"
+                      key={playerId}
+                      onClick={() => setInspectedPlayerId(playerId)}
+                      className={`flex items-center gap-1.5 rounded border px-2.5 py-1.5 text-[10px] font-bold transition-colors ${isActive ? 'border-emerald-500/40 bg-emerald-500/15 text-emerald-300' : 'border-white/10 bg-white/5 text-zinc-400 hover:text-white'}`}
+                    >
+                      <span className={`h-1.5 w-1.5 rounded-full ${hasTrace ? 'bg-emerald-400' : 'bg-zinc-700'}`} />
+                      {playerLabel(playerId)}
+                    </button>
+                  );
+                })}
+              </div>
+              <div className="mt-2 text-[9px] text-zinc-600">The selected owner controls the candidate inspector. Both players remain visible in the replay field.</div>
+            </div>
             {activeTab === 'inspector' ? (
-              <CandidateInspector trace={currentDecisionTrace} />
+              <CandidateInspector
+                trace={currentDecisionTrace}
+                player={inspectedPlayer}
+                playerLabel={activeInspectedPlayerId ? playerLabel(activeInspectedPlayerId) : 'No player selected'}
+                frameTick={viewFrame?.tick}
+              />
             ) : diagnosticReport ? (
               <HabitReportDashboard
                 report={diagnosticReport}
                 selectedTick={tick}
                 onJumpToTick={(targetTick) => dispatch({ type: 'SET_TICK', payload: targetTick })}
+                onJumpToDecision={(playerId, targetTick) => {
+                  setInspectedPlayerId(playerId);
+                  dispatch({ type: 'SET_TICK', payload: targetTick });
+                }}
+                playerLabel={playerLabel}
               />
             ) : (
               <div className="p-6 text-center text-zinc-500 text-xs">

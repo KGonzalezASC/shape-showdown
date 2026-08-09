@@ -574,7 +574,16 @@ export class RulesBot implements InputDriver {
         const poisonScore = -simEval.poisonCells * 20;
         const dropDepthBonus = dropY * 4;
 
-        let score =
+        let finalAdjustmentScore = 0;
+        if (visibilityRisk.uncertainLineClearCount > 0 && perfectClear) {
+          finalAdjustmentScore -= 500;
+        }
+
+        if (causesTopOut) {
+          finalAdjustmentScore -= 100000;
+        }
+
+        const score =
           lineClearScore +
           holesScore +
           heightScore +
@@ -583,15 +592,8 @@ export class RulesBot implements InputDriver {
           wellsScore +
           poisonScore +
           dropDepthBonus -
-          visibilityRiskPenalty;
-
-        if (visibilityRisk.uncertainLineClearCount > 0 && perfectClear) {
-          score -= 500;
-        }
-
-        if (causesTopOut) {
-          score -= 100000;
-        }
+          visibilityRiskPenalty +
+          finalAdjustmentScore;
 
         const subScores = {
           lineClearScore,
@@ -605,6 +607,7 @@ export class RulesBot implements InputDriver {
           poisonScore,
           dropDepthBonus,
           visibilityRiskPenalty,
+          finalAdjustmentScore,
           totalScore: score,
         };
 

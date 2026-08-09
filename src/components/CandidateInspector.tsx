@@ -1,216 +1,351 @@
 import React, { useState } from 'react';
-import type { BotDecisionTrace, CandidateEvaluationTrace, MisstepTag } from '../types';
+import type { BotDecisionTrace, CandidateEvaluationTrace, CandidateSubScores, MisstepTag } from '../types';
 import { AlertTriangle, ChevronDown, ChevronUp, Layers, Target } from 'lucide-react';
+import { styleForFieldEffect } from '../shop/effectStyles';
+import type { PublicPlayerState } from '../state/publicSnapshots';
 
 interface CandidateInspectorProps {
   trace: BotDecisionTrace | null;
-  onJumpToTick?: (tick: number) => void;
+  player: PublicPlayerState | null;
+  playerLabel: string;
+  frameTick?: number;
 }
 
 const MISSTEP_BADGE_STYLES: Record<MisstepTag, { label: string; bg: string; text: string; border: string }> = {
   BuriedCavity: {
-    label: 'Buried Cavity',
+    label: 'Cavity burial risk',
     bg: 'bg-rose-500/10',
     text: 'text-rose-400',
     border: 'border-rose-500/30',
   },
   MisjudgedGarbageUrgency: {
-    label: 'Misjudged Urgency',
+    label: 'Garbage urgency',
     bg: 'bg-amber-500/10',
     text: 'text-amber-400',
     border: 'border-amber-500/30',
   },
   HighFrontierRisk: {
-    label: 'Frontier Risk',
+    label: 'Frontier risk',
     bg: 'bg-purple-500/10',
     text: 'text-purple-400',
     border: 'border-purple-500/30',
   },
   MissedGarbageCancel: {
-    label: 'Missed Cancel',
+    label: 'Missed garbage cancel',
     bg: 'bg-cyan-500/10',
     text: 'text-cyan-400',
     border: 'border-cyan-500/30',
   },
 };
 
-export const CandidateInspector: React.FC<CandidateInspectorProps> = ({ trace }) => {
-  const [expanded, setExpanded] = useState(false);
+interface Contribution {
+  label: string;
+  value: number;
+  tone: 'positive' | 'negative' | 'neutral';
+}
+
+function formatScore(value: number): string {
+  const rounded = Math.round(value * 10) / 10;
+  return `${rounded > 0 ? '+' : ''}${rounded}`;
+}
+
+function contributionsFor(sub: CandidateSubScores): Contribution[] {
+  return [
+    { label: 'Line clears / attack', value: sub.lineClearScore, tone: 'positive' },
+    { label: 'Existing holes', value: sub.holeCountScore, tone: 'negative' },
+    { label: 'Hole-count change', value: sub.holeCountDeltaScore, tone: 'negative' },
+    { label: 'Cavity-depth change', value: sub.cavityScore, tone: 'neutral' },
+    { label: 'Stack height', value: sub.heightScore, tone: 'negative' },
+    { label: 'Surface bumpiness', value: sub.bumpinessScore, tone: 'negative' },
+    { label: 'Spires', value: sub.spiresScore, tone: 'negative' },
+    { label: 'Wells', value: sub.wellsScore, tone: 'negative' },
+    { label: 'Poison cells', value: sub.poisonScore, tone: 'negative' },
+    { label: 'Drop-depth bonus', value: sub.dropDepthBonus, tone: 'positive' },
+    { label: 'Visibility / frontier risk', value: -sub.visibilityRiskPenalty, tone: 'negative' },
+    { label: 'Safety / terminal adjustment', value: sub.finalAdjustmentScore ?? 0, tone: 'negative' },
+  ];
+}
+
+function candidateSubScores(candidate: CandidateEvaluationTrace): CandidateSubScores {
+  return candidate.subScores ?? {
+    lineClearScore: 0,
+    holeCountScore: 0,
+    holeCountDeltaScore: 0,
+    cavityScore: 0,
+    heightScore: 0,
+    bumpinessScore: 0,
+    spiresScore: 0,
+    wellsScore: 0,
+    poisonScore: 0,
+    dropDepthBonus: 0,
+    visibilityRiskPenalty: 0,
+    finalAdjustmentScore: 0,
+    totalScore: candidate.score,
+  };
+}
+
+function ScorePosition({ score, min, max }: { score: number; min: number; max: number }) {
+  const range = Math.max(1, max - min);
+  const position = ((score - min) / range) * 100;
+  return (
+    <div className="relative h-2 overflow-hidden rounded-full border border-white/10 bg-zinc-950">
+      <div className="absolute inset-y-0 left-0 bg-emerald-500/25" style={{ width: `${position}%` }} />
+      <div
+        className="absolute top-[-2px] h-3 w-1 rounded-full bg-emerald-300 shadow-[0_0_8px_rgba(110,231,183,0.9)]"
+        style={{ left: `calc(${position}% - 2px)` }}
+      />
+    </div>
+  );
+}
+
+function ScoreContributionTable({ candidate }: { candidate: CandidateEvaluationTrace }) {
+  const sub = candidateSubScores(candidate);
+  const contributions = contributionsFor(sub);
+  const sum = contributions.reduce((total, contribution) => total + contribution.value, 0);
+
+  return (
+    <div className="rounded-lg border border-white/10 bg-black/30 p-3">
+      <div className="mb-2 flex items-center justify-between gap-2">
+        <div>
+          <div className="text-[10px] font-bold uppercase tracking-wider text-zinc-300">Why this score?</div>
+          <div className="text-[9px] text-zinc-500">Every signed term below contributes to the net heuristic score.</div>
+        </div>
+        <span className="font-mono text-sm font-bold text-emerald-300">{formatScore(candidate.score)}</span>
+      </div>
+      <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-x-4 gap-y-1 text-[10px] font-mono">
+        {contributions.map((contribution) => (
+          <React.Fragment key={contribution.label}>
+            <span className="truncate text-zinc-400">{contribution.label}</span>
+            <span
+              className={
+                contribution.value > 0
+                  ? 'text-emerald-300'
+                  : contribution.value < 0
+                    ? 'text-rose-300'
+                    : 'text-zinc-600'
+              }
+            >
+              {formatScore(contribution.value)}
+            </span>
+          </React.Fragment>
+        ))}
+      </div>
+      <div className="mt-2 flex justify-between border-t border-white/10 pt-2 text-[10px] font-mono">
+        <span className="text-zinc-500">Sum of terms</span>
+        <span className="font-bold text-white">{formatScore(sum)} = {formatScore(candidate.score)}</span>
+      </div>
+    </div>
+  );
+}
+
+export const CandidateInspector: React.FC<CandidateInspectorProps> = ({
+  trace,
+  player,
+  playerLabel,
+  frameTick,
+}) => {
+  const [expanded, setExpanded] = useState(true);
 
   if (!trace) {
     return (
-      <div className="p-6 text-center text-zinc-500 text-xs border border-white/5 rounded-xl bg-[#111116]">
-        <Layers className="mx-auto mb-2 text-zinc-600" size={24} />
-        No solver decision trace recorded at this frame. Scrub to a piece drop tick to inspect candidate evaluations.
+      <div className="flex flex-col gap-3 rounded-xl border border-white/10 bg-[#111116] p-5 text-xs text-zinc-400">
+        <div className="flex items-center gap-2 font-bold text-emerald-400">
+          <Layers size={16} /> CANDIDATE INSPECTOR
+        </div>
+        <p className="leading-relaxed">
+          No solver decision is recorded for <span className="font-semibold text-white">{playerLabel}</span> at this frame.
+          Scrub to a piece-lock decision or select another player.
+        </p>
       </div>
     );
   }
 
   const selected = trace.selectedCandidate;
-  const candidates: CandidateEvaluationTrace[] = [
-    selected,
-    ...(trace.runnerUpCandidates || []),
-  ].filter(Boolean);
+  const candidates: CandidateEvaluationTrace[] = [selected, ...(trace.runnerUpCandidates || [])].filter(Boolean);
+  const scores = candidates.map((candidate) => candidate.score);
+  const scoreMin = Math.min(0, ...scores);
+  const scoreMax = Math.max(0, ...scores);
+  const runnerUp = candidates.find((candidate) => !candidate.selected);
+  const scoreMargin = runnerUp ? selected.score - runnerUp.score : null;
+  const decisionTick = trace.tick;
 
-  const maxScore = Math.max(...candidates.map((c) => Math.max(1, Math.abs(c.score))));
+  const effects = trace.activeEffects ?? [];
 
   return (
-    <div className="flex flex-col gap-4 bg-[#111116] border border-white/10 rounded-xl p-4 text-white text-xs">
-      <div className="flex justify-between items-center pb-3 border-b border-white/10">
+    <div className="flex flex-col gap-4 rounded-xl border border-white/10 bg-[#111116] p-4 text-white text-xs">
+      <div className="flex items-start justify-between gap-3 border-b border-white/10 pb-3">
         <div>
           <div className="flex items-center gap-2 font-bold text-emerald-400">
             <Target size={15} /> SOLVER DECISION INSPECTOR
           </div>
-          <p className="text-[10px] text-zinc-400 mt-0.5">
-            Tick {trace.tick} • Piece <span className="font-mono text-white font-bold">{trace.pieceType}</span>
-            {trace.isBomber && <span className="ml-1.5 text-rose-400 font-bold">💣 Bomber</span>}
+          <p className="mt-1 text-[10px] text-zinc-400">
+            <span className="font-semibold text-white">{playerLabel}</span> · decision tick{' '}
+            <span className="font-mono text-white">{decisionTick}</span>
+            {frameTick !== undefined && frameTick !== decisionTick && (
+              <span className="text-zinc-600"> · shown in frame {frameTick}</span>
+            )}
+            {' · '}piece <span className="font-mono font-bold text-white">{trace.pieceType}</span>
+            {trace.isBomber && <span className="ml-1.5 font-bold text-rose-400">· Bomber</span>}
           </p>
         </div>
         <button
           type="button"
           onClick={() => setExpanded(!expanded)}
-          className="p-1.5 bg-white/5 hover:bg-white/10 rounded text-zinc-400 hover:text-white transition-colors flex items-center gap-1 text-[11px]"
+          className="flex shrink-0 items-center gap-1 rounded bg-white/5 px-2 py-1.5 text-[10px] text-zinc-400 transition-colors hover:bg-white/10 hover:text-white"
         >
-          {expanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
-          {expanded ? 'Compact' : 'Expanded'}
+          {expanded ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
+          {expanded ? 'Hide term details' : 'Show term details'}
         </button>
       </div>
 
-      {/* Retrospective Misstep Badges */}
-      {trace.misstepTags && trace.misstepTags.length > 0 && (
-        <div className="flex flex-wrap gap-2 p-2.5 bg-rose-950/20 border border-rose-500/20 rounded-lg">
-          <div className="flex items-center gap-1 text-rose-400 font-bold text-[11px] w-full">
-            <AlertTriangle size={13} /> RETROSPECTIVE MISSTEP DIAGNOSIS:
+      <div className="rounded-lg border border-emerald-500/20 bg-emerald-950/15 p-3">
+        <div className="text-[9px] font-bold uppercase tracking-wider text-emerald-300">Two different scores</div>
+        <div className="mt-2 grid grid-cols-2 gap-2">
+          <div>
+            <div className="text-[9px] uppercase text-zinc-500">Player score / wallet</div>
+            <div className="mt-0.5 font-mono text-lg font-bold text-white">{player?.score ?? '—'}</div>
+            <div className="text-[9px] text-zinc-500">Match points and shop currency for {playerLabel}.</div>
           </div>
-          {trace.misstepTags.map((tag) => {
-            const style = MISSTEP_BADGE_STYLES[tag];
-            return (
-              <span
-                key={tag}
-                className={`px-2 py-0.5 rounded border text-[10px] font-bold ${style.bg} ${style.text} ${style.border}`}
-              >
-                ⚠️ {style.label}
-              </span>
-            );
-          })}
-        </div>
-      )}
-
-      {/* Active State Context Cards */}
-      <div className="grid grid-cols-3 gap-2">
-        <div className="p-2 bg-black/40 border border-white/5 rounded">
-          <div className="text-[9px] text-zinc-500 uppercase font-mono">Max Height</div>
-          <div className="text-sm font-bold font-mono text-zinc-200">{trace.maxHeight} / 20</div>
-        </div>
-        <div className="p-2 bg-black/40 border border-white/5 rounded">
-          <div className="text-[9px] text-zinc-500 uppercase font-mono">Cavity Depth</div>
-          <div className="text-sm font-bold font-mono text-amber-400">{trace.totalCavityDepth}</div>
-        </div>
-        <div className="p-2 bg-black/40 border border-white/5 rounded">
-          <div className="text-[9px] text-zinc-500 uppercase font-mono">Imminent Garbage</div>
-          <div className="text-sm font-bold font-mono text-rose-400">{trace.imminentGarbageLines} lines</div>
+          <div>
+            <div className="text-[9px] uppercase text-zinc-500">Selected net heuristic</div>
+            <div className="mt-0.5 font-mono text-lg font-bold text-emerald-300">{formatScore(selected.score)}</div>
+            <div className="text-[9px] text-zinc-500">Placement estimate; higher wins among this piece's candidates.</div>
+          </div>
         </div>
       </div>
 
-      {/* Candidate Sub-Score Stacked Bars */}
-      <div className="flex flex-col gap-3 mt-1">
-        <div className="text-[10px] font-mono text-zinc-400 uppercase tracking-wider flex justify-between">
-          <span>Candidate Placements (Sub-Score Decompositions)</span>
-          <span>Total Score</span>
+      {trace.misstepTags && trace.misstepTags.length > 0 && (
+        <div className="rounded-lg border border-rose-500/20 bg-rose-950/20 p-2.5">
+          <div className="flex items-center gap-1 text-[11px] font-bold text-rose-400">
+            <AlertTriangle size={13} /> RETROSPECTIVE HEURISTIC FLAGS
+          </div>
+          <p className="mt-1 text-[9px] leading-relaxed text-zinc-400">
+            These flags identify suspicious patterns in recorded alternatives and later board state; they are not proof that the move lost the match.
+          </p>
+          <div className="mt-2 flex flex-wrap gap-2">
+            {trace.misstepTags.map((tag) => {
+              const style = MISSTEP_BADGE_STYLES[tag];
+              return (
+                <span
+                  key={tag}
+                  className={`rounded border px-2 py-0.5 text-[10px] font-bold ${style.bg} ${style.text} ${style.border}`}
+                >
+                  {style.label}
+                </span>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+        <div className="rounded border border-white/5 bg-black/40 p-2">
+          <div className="font-mono text-[9px] uppercase text-zinc-500">Max height</div>
+          <div className="font-mono text-sm font-bold text-zinc-200">{trace.maxHeight} / 20</div>
+        </div>
+        <div className="rounded border border-white/5 bg-black/40 p-2">
+          <div className="font-mono text-[9px] uppercase text-zinc-500">Cavity depth</div>
+          <div className="font-mono text-sm font-bold text-amber-400">{trace.totalCavityDepth}</div>
+        </div>
+        <div className="rounded border border-white/5 bg-black/40 p-2">
+          <div className="font-mono text-[9px] uppercase text-zinc-500">Pending garbage</div>
+          <div className="font-mono text-sm font-bold text-zinc-200">{trace.pendingGarbageLines} lines</div>
+        </div>
+        <div className="rounded border border-white/5 bg-black/40 p-2">
+          <div className="font-mono text-[9px] uppercase text-zinc-500">Arriving soon</div>
+          <div className="font-mono text-sm font-bold text-rose-400">{trace.imminentGarbageLines} lines</div>
+        </div>
+      </div>
+
+      <div className="rounded-lg border border-white/10 bg-black/20 p-3">
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <div className="font-mono text-[10px] font-bold uppercase tracking-wider text-zinc-300">Active effects at this decision</div>
+            <div className="mt-0.5 text-[9px] text-zinc-500">Captured on {playerLabel}'s board before the placement was chosen.</div>
+          </div>
+          {player?.linesCleared !== undefined && (
+            <span className="font-mono text-[10px] text-zinc-500">{player.linesCleared} clears</span>
+          )}
+        </div>
+        {effects.length > 0 ? (
+          <div className="mt-2 flex flex-wrap gap-1.5">
+            {effects.map((effect) => {
+              const style = styleForFieldEffect(effect);
+              const remaining = effect.expiresAtTick === undefined
+                ? null
+                : Math.max(0, effect.expiresAtTick - decisionTick);
+              return (
+                <span
+                  key={effect.id}
+                  className={`inline-flex items-center gap-1 rounded-full border px-2 py-1 font-mono text-[9px] font-bold ${style.bgClass} ${style.borderClass} ${style.textClass}`}
+                >
+                  {effect.icon && <span>{effect.icon}</span>}
+                  {effect.label}
+                  <span className="opacity-75">{remaining === null ? 'active' : `${remaining}t left`}</span>
+                </span>
+              );
+            })}
+          </div>
+        ) : (
+          <div className="mt-2 text-[10px] italic text-zinc-600">No active field effects were recorded.</div>
+        )}
+      </div>
+
+      <div className="flex flex-col gap-3">
+        <div>
+          <div className="flex items-end justify-between gap-3">
+            <div>
+              <div className="font-mono text-[10px] font-bold uppercase tracking-wider text-zinc-300">Candidate placements</div>
+              <div className="mt-0.5 text-[9px] text-zinc-500">Net heuristic score, not player score. Candidates are ranked for this piece at this tick.</div>
+            </div>
+            <span className="shrink-0 text-[9px] text-zinc-600">higher is better</span>
+          </div>
+          <div className="mt-2 flex justify-between font-mono text-[9px] text-zinc-600">
+            <span>worst {formatScore(scoreMin)}</span>
+            <span>0 baseline</span>
+            <span>best {formatScore(scoreMax)}</span>
+          </div>
         </div>
 
         {candidates.slice(0, expanded ? 8 : 3).map((candidate, idx) => {
           const isSelected = candidate.selected;
-          const sub = candidate.subScores || {
-            lineClearScore: 0,
-            holeCountScore: 0,
-            holeCountDeltaScore: 0,
-            cavityScore: 0,
-            heightScore: 0,
-            bumpinessScore: 0,
-            spiresScore: 0,
-            wellsScore: 0,
-            poisonScore: 0,
-            dropDepthBonus: 0,
-            visibilityRiskPenalty: 0,
-            totalScore: candidate.score,
-          };
-
+          const scoreDifference = candidate.score - selected.score;
           return (
             <div
               key={`${candidate.rotation}_${candidate.x}_${idx}`}
-              className={`p-2.5 rounded-lg border transition-all ${
+              className={`rounded-lg border p-2.5 transition-all ${
                 isSelected
-                  ? 'bg-emerald-950/20 border-emerald-500/40 shadow-[0_0_15px_rgba(16,185,129,0.1)]'
-                  : 'bg-black/20 border-white/5 opacity-80 hover:opacity-100'
+                  ? 'border-emerald-500/40 bg-emerald-950/20 shadow-[0_0_15px_rgba(16,185,129,0.1)]'
+                  : 'border-white/5 bg-black/20 opacity-85 hover:opacity-100'
               }`}
             >
-              <div className="flex justify-between items-center mb-1.5">
-                <div className="flex items-center gap-2">
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex min-w-0 items-center gap-2">
                   <span
-                    className={`font-mono text-[10px] px-1.5 py-0.5 rounded font-bold ${
-                      isSelected ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30' : 'bg-zinc-800 text-zinc-400'
+                    className={`rounded px-1.5 py-0.5 font-mono text-[10px] font-bold ${
+                      isSelected
+                        ? 'border border-emerald-500/30 bg-emerald-500/20 text-emerald-300'
+                        : 'bg-zinc-800 text-zinc-400'
                     }`}
                   >
-                    {isSelected ? 'SELECTED' : `#${idx + 1}`}
+                    {isSelected ? 'SELECTED · #1' : `#${idx + 1}`}
                   </span>
-                  <span className="font-mono text-xs text-zinc-300">
-                    rot: {candidate.rotation} • col: {candidate.x}
-                  </span>
+                  <span className="truncate font-mono text-xs text-zinc-300">rotation {candidate.rotation} · column {candidate.x}</span>
                 </div>
-                <span className={`font-mono font-bold text-xs ${isSelected ? 'text-emerald-400' : 'text-zinc-400'}`}>
-                  {candidate.score > 0 ? `+${candidate.score}` : candidate.score}
-                </span>
+                <div className="shrink-0 text-right font-mono">
+                  <div className={`text-sm font-bold ${isSelected ? 'text-emerald-300' : 'text-zinc-300'}`}>
+                    {formatScore(candidate.score)}
+                  </div>
+                  {!isSelected && <div className="text-[9px] text-zinc-600">{formatScore(scoreDifference)} vs selected</div>}
+                  {isSelected && scoreMargin !== null && <div className="text-[9px] text-emerald-500/70">margin {formatScore(scoreMargin)}</div>}
+                </div>
               </div>
-
-              {/* Segmented Stacked Bar Visualization */}
-              <div className="h-3 bg-black/60 rounded overflow-hidden flex w-full border border-white/5">
-                {sub.lineClearScore > 0 && (
-                  <div
-                    title={`Line Clear: +${sub.lineClearScore}`}
-                    style={{ width: `${Math.min(100, (sub.lineClearScore / maxScore) * 100)}%` }}
-                    className="bg-emerald-500 h-full border-r border-black/40"
-                  />
-                )}
-                {Math.abs(sub.cavityScore) > 0 && (
-                  <div
-                    title={`Cavity Depth Delta: ${sub.cavityScore}`}
-                    style={{ width: `${Math.min(100, (Math.abs(sub.cavityScore) / maxScore) * 100)}%` }}
-                    className="bg-cyan-500 h-full border-r border-black/40"
-                  />
-                )}
-                {Math.abs(sub.holeCountScore + sub.holeCountDeltaScore) > 0 && (
-                  <div
-                    title={`Holes Penalty: ${sub.holeCountScore + sub.holeCountDeltaScore}`}
-                    style={{ width: `${Math.min(100, (Math.abs(sub.holeCountScore + sub.holeCountDeltaScore) / maxScore) * 100)}%` }}
-                    className="bg-amber-500 h-full border-r border-black/40"
-                  />
-                )}
-                {Math.abs(sub.heightScore) > 0 && (
-                  <div
-                    title={`Height Penalty: ${sub.heightScore}`}
-                    style={{ width: `${Math.min(100, (Math.abs(sub.heightScore) / maxScore) * 100)}%` }}
-                    className="bg-rose-500 h-full border-r border-black/40"
-                  />
-                )}
-                {sub.visibilityRiskPenalty > 0 && (
-                  <div
-                    title={`Frontier Risk Penalty: -${sub.visibilityRiskPenalty}`}
-                    style={{ width: `${Math.min(100, (sub.visibilityRiskPenalty / maxScore) * 100)}%` }}
-                    className="bg-purple-500 h-full border-r border-black/40"
-                  />
-                )}
+              <div className="mt-2">
+                <ScorePosition score={candidate.score} min={scoreMin} max={scoreMax} />
               </div>
-
-              {/* Segmented Legend Chips (Shown in Expanded View) */}
-              {expanded && (
-                <div className="grid grid-cols-2 gap-x-4 gap-y-1 mt-2 text-[10px] font-mono text-zinc-400 pt-1.5 border-t border-white/5">
-                  <div>Line Clear: <span className="text-emerald-400 font-bold">+{sub.lineClearScore}</span></div>
-                  <div>Cavity Delta: <span className="text-cyan-400 font-bold">{sub.cavityScore}</span></div>
-                  <div>Holes Penalty: <span className="text-amber-400 font-bold">{sub.holeCountScore + sub.holeCountDeltaScore}</span></div>
-                  <div>Height Penalty: <span className="text-rose-400 font-bold">{sub.heightScore}</span></div>
-                  <div>Frontier Risk: <span className="text-purple-400 font-bold">-{sub.visibilityRiskPenalty}</span></div>
-                  <div>Drop Bonus: <span className="text-zinc-300 font-bold">+{sub.dropDepthBonus}</span></div>
+              {expanded && isSelected && (
+                <div className="mt-2">
+                  <ScoreContributionTable candidate={candidate} />
                 </div>
               )}
             </div>

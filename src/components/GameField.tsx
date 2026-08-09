@@ -32,6 +32,10 @@ interface GameFieldProps {
   status?: MatchStatus;
   hatchingEnabled: boolean;
   performanceId?: string;
+  /** Replay diagnostics can show effect pills for both players, not only the local player. */
+  showEffectPills?: boolean;
+  /** Current replay tick used to show remaining effect duration. */
+  effectTick?: number;
 }
 
 export interface GameFieldRef {
@@ -88,8 +92,31 @@ const GameField = forwardRef<GameFieldRef, GameFieldProps>(({
   status = 'playing',
   hatchingEnabled,
   performanceId = title,
+  showEffectPills = false,
+  effectTick,
 }, ref) => {
   const activeEffects = player.activeEffects || [];
+  const effectPills = useMemo(() => {
+    const grouped = new Map<string, {
+      effect: typeof activeEffects[number];
+      count: number;
+      remaining: number | null;
+    }>();
+    for (const effect of activeEffects) {
+      const key = `${effect.kind}:${effect.label}`;
+      const remaining = effectTick === undefined || effect.expiresAtTick === undefined
+        ? null
+        : Math.max(0, effect.expiresAtTick - effectTick);
+      const existing = grouped.get(key);
+      if (existing) {
+        existing.count += 1;
+        if (remaining !== null) existing.remaining = existing.remaining === null ? remaining : Math.min(existing.remaining, remaining);
+      } else {
+        grouped.set(key, { effect, count: 1, remaining });
+      }
+    }
+    return [...grouped.values()];
+  }, [activeEffects, effectTick]);
   const layoutCellSize = useContext(PlayfieldCellSizeContext);
   const cellSize = cellSizeProp ?? layoutCellSize;
   const [shakeClass, setShakeClass] = useState('');
@@ -282,9 +309,9 @@ const GameField = forwardRef<GameFieldRef, GameFieldProps>(({
         </h2>
 
         {/* Active-effect pills — only renders when effects are present */}
-        {isMe && activeEffects.length > 0 && (
+        {(isMe || showEffectPills) && effectPills.length > 0 && (
           <div className="flex min-w-0 flex-1 flex-wrap items-center justify-center gap-1 overflow-hidden px-1">
-            {activeEffects.map((effect) => {
+            {effectPills.map(({ effect, count, remaining }) => {
               const style = styleForFieldEffect(effect);
               return (
               <span
@@ -301,6 +328,8 @@ const GameField = forwardRef<GameFieldRef, GameFieldProps>(({
               >
                 {effect.icon && <span className="text-[10px] leading-none">{effect.icon}</span>}
                 {effect.label}
+                {count > 1 && <span className="opacity-80">×{count}</span>}
+                {remaining !== null && <span className="opacity-80">{remaining}t</span>}
               </span>
               );
             })}

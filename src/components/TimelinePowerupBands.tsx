@@ -1,80 +1,149 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import type { ReplayDataV2 } from '../types';
 
 interface TimelinePowerupBandsProps {
   replay: ReplayDataV2;
   totalTicks: number;
+  playerIds: string[];
+  currentTick?: number;
+  playerLabel?: (playerId: string) => string;
 }
 
 const EFFECT_COLORS: Record<string, string> = {
-  curtain: 'bg-cyan-500/40 border-cyan-400/60',
-  'curtain-warn': 'bg-cyan-500/20 border-cyan-400/40',
-  poison: 'bg-purple-500/40 border-purple-400/60',
-  magnet: 'bg-amber-500/40 border-amber-400/60',
-  satellite: 'bg-indigo-500/40 border-indigo-400/60',
-  sticky: 'bg-emerald-500/40 border-emerald-400/60',
-  snag: 'bg-rose-500/40 border-rose-400/60',
-  retrim: 'bg-blue-500/40 border-blue-400/60',
+  curtain: 'bg-cyan-500/60 border-cyan-300',
+  'curtain-warn': 'bg-cyan-500/30 border-cyan-300/70',
+  poison: 'bg-purple-500/60 border-purple-300',
+  'storage-poison': 'bg-fuchsia-500/60 border-fuchsia-300',
+  magnet: 'bg-amber-500/60 border-amber-300',
+  satellite: 'bg-indigo-500/60 border-indigo-300',
+  sticky: 'bg-emerald-500/60 border-emerald-300',
+  snag: 'bg-rose-500/60 border-rose-300',
+  retrim: 'bg-blue-500/60 border-blue-300',
+  bomber: 'bg-orange-500/60 border-orange-300',
+  freeze: 'bg-sky-500/60 border-sky-300',
+  purge: 'bg-violet-500/60 border-violet-300',
+  'purge-warn': 'bg-violet-500/30 border-violet-300/70',
+  'wildcard-four': 'bg-lime-500/60 border-lime-300',
+  'tectonic-shift': 'bg-orange-500/60 border-orange-300',
+  taxed: 'bg-red-500/60 border-red-300',
+  'tax-siphon': 'bg-red-500/30 border-red-300/70',
 };
+
+interface EffectSpan {
+  id: string;
+  kind: string;
+  label: string;
+  startTick: number;
+  endTick: number;
+}
+
+function buildEffectSpans(replay: ReplayDataV2, playerId: string, totalTicks: number): EffectSpan[] {
+  const spans: EffectSpan[] = [];
+  const active = new Map<string, EffectSpan>();
+  const interval = Math.max(1, replay.keyframeIntervalTicks ?? 1);
+
+  for (const frame of replay.keyframes) {
+    const effects = frame.players?.[playerId]?.activeEffects ?? [];
+    const activeIds = new Set<string>();
+
+    for (const effect of effects) {
+      const effectKey = `${effect.id}:${effect.kind}`;
+      activeIds.add(effectKey);
+      const knownEnd = effect.expiresAtTick ?? Math.min(totalTicks, frame.tick + interval);
+      const existing = active.get(effectKey);
+      if (existing) {
+        existing.endTick = Math.max(existing.endTick, knownEnd, frame.tick + interval);
+      } else {
+        active.set(effectKey, {
+          id: effect.id,
+          kind: effect.kind,
+          label: effect.label,
+          startTick: frame.tick,
+          endTick: Math.min(totalTicks, Math.max(frame.tick + interval, knownEnd)),
+        });
+      }
+    }
+
+    for (const [effectKey, span] of active) {
+      if (!activeIds.has(effectKey)) {
+        spans.push(span);
+        active.delete(effectKey);
+      }
+    }
+  }
+
+  spans.push(...active.values());
+  return spans;
+}
+
+function purchaseMarkers(replay: ReplayDataV2, playerId: string) {
+  return replay.inputs
+    .flatMap((input) => {
+      if (input.kind !== 'shopPurchase' || input.playerId !== playerId || !input.accepted) return [];
+      return [{ tick: input.tick, itemId: input.itemId }];
+    });
+}
 
 export const TimelinePowerupBands: React.FC<TimelinePowerupBandsProps> = ({
   replay,
   totalTicks,
+  playerIds,
+  currentTick,
+  playerLabel = (playerId) => playerId,
 }) => {
-  if (!replay || !replay.keyframes || totalTicks <= 0) return null;
+  const rows = useMemo(
+    () => playerIds.map((playerId) => ({
+      playerId,
+      spans: buildEffectSpans(replay, playerId, totalTicks),
+      purchases: purchaseMarkers(replay, playerId),
+    })),
+    [playerIds, replay, totalTicks],
+  );
 
-  // Extract active effect duration spans from keyframes
-  const effectSpans: Array<{
-    kind: string;
-    label: string;
-    startTick: number;
-    endTick: number;
-  }> = [];
-
-  let currentSpan: { kind: string; label: string; startTick: number; endTick: number } | null = null;
-
-  for (const frame of replay.keyframes) {
-    const p1 = frame.players?.p1;
-    const activeEffect = p1?.activeEffects?.[0];
-
-    if (activeEffect) {
-      if (!currentSpan || currentSpan.kind !== activeEffect.kind) {
-        if (currentSpan) effectSpans.push(currentSpan);
-        currentSpan = {
-          kind: activeEffect.kind,
-          label: activeEffect.label,
-          startTick: frame.tick,
-          endTick: frame.tick + 60,
-        };
-      } else {
-        currentSpan.endTick = frame.tick;
-      }
-    } else if (currentSpan) {
-      effectSpans.push(currentSpan);
-      currentSpan = null;
-    }
-  }
-  if (currentSpan) effectSpans.push(currentSpan);
+  if (!replay || !replay.keyframes || totalTicks <= 0 || rows.length === 0) return null;
 
   return (
-    <div className="relative w-full h-3 bg-black/40 rounded border border-white/10 overflow-hidden my-1">
-      {effectSpans.map((span, idx) => {
-        const leftPercent = (span.startTick / totalTicks) * 100;
-        const widthPercent = Math.max(0.5, ((span.endTick - span.startTick) / totalTicks) * 100);
-        const styleClass = EFFECT_COLORS[span.kind] || 'bg-white/30 border-white/50';
-
-        return (
-          <div
-            key={`${span.kind}_${span.startTick}_${idx}`}
-            title={`Active ${span.label} (Ticks ${span.startTick}-${span.endTick})`}
-            className={`absolute h-full rounded border-t border-b ${styleClass}`}
-            style={{
-              left: `${leftPercent}%`,
-              width: `${widthPercent}%`,
-            }}
-          />
-        );
-      })}
+    <div className="flex flex-col gap-1.5" aria-label="Power-up effects and purchase timeline">
+      {rows.map((row) => (
+        <div key={row.playerId} className="flex min-w-0 items-center gap-2">
+          <span className="w-28 shrink-0 truncate font-mono text-[9px] uppercase tracking-wider text-zinc-500">
+            {playerLabel(row.playerId)}
+          </span>
+          <div className="relative h-4 min-w-0 flex-1 overflow-hidden rounded border border-white/10 bg-black/50">
+            {row.spans.map((span, index) => {
+              const leftPercent = (span.startTick / totalTicks) * 100;
+              const widthPercent = Math.max(0.4, ((span.endTick - span.startTick) / totalTicks) * 100);
+              const styleClass = EFFECT_COLORS[span.kind] || 'bg-white/40 border-white/70';
+              return (
+                <div
+                  key={`${span.id}_${span.startTick}_${index}`}
+                  title={`${playerLabel(row.playerId)} · ${span.label} · ticks ${span.startTick}–${span.endTick}`}
+                  className={`absolute inset-y-0 rounded border-y ${styleClass}`}
+                  style={{ left: `${leftPercent}%`, width: `${widthPercent}%` }}
+                />
+              );
+            })}
+            {row.purchases.map((purchase) => (
+              <div
+                key={`${purchase.itemId}_${purchase.tick}`}
+                title={`${playerLabel(row.playerId)} purchased ${purchase.itemId} at tick ${purchase.tick}`}
+                className="absolute top-0.5 z-10 h-3 w-1 rounded-full bg-white shadow-[0_0_5px_rgba(255,255,255,0.9)]"
+                style={{ left: `calc(${(purchase.tick / totalTicks) * 100}% - 2px)` }}
+              />
+            ))}
+            {currentTick !== undefined && (
+              <div
+                className="pointer-events-none absolute inset-y-0 z-20 w-px bg-white"
+                style={{ left: `${(currentTick / totalTicks) * 100}%` }}
+              />
+            )}
+          </div>
+        </div>
+      ))}
+      <div className="flex items-center gap-2 pl-30 text-[9px] text-zinc-600">
+        <span className="h-1.5 w-1.5 rounded-full bg-white" /> purchase tick
+        <span className="ml-2">colored spans = active effect duration</span>
+      </div>
     </div>
   );
 };

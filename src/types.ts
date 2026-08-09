@@ -387,12 +387,16 @@ export interface CandidateSubScores {
   poisonScore: number;
   dropDepthBonus: number;
   visibilityRiskPenalty: number;
+  /** Extra penalties applied after the named board terms (for example, uncertain clears or top-out). */
+  finalAdjustmentScore: number;
+  /** Exact net score used to rank this candidate. Higher is preferred. */
   totalScore: number;
 }
 
 export interface CandidateEvaluationTrace {
   rotation: number;
   x: number;
+  /** Net placement heuristic for this piece at this decision tick; not PlayerState.score. */
   score: number;
   subScores: CandidateSubScores;
   selected: boolean;
