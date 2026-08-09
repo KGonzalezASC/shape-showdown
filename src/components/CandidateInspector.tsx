@@ -243,6 +243,12 @@ export const CandidateInspector: React.FC<CandidateInspectorProps> = ({
         </div>
       )}
 
+      {!trace.decisionBoard && (
+        <div className="rounded-lg border border-amber-500/20 bg-amber-950/15 p-2.5 text-[9px] leading-relaxed text-amber-200/80">
+          This legacy trace has no decision-time board snapshot, so placement silhouettes are unavailable. Scores and alternatives remain inspectable.
+        </div>
+      )}
+
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
         <div className="rounded border border-white/5 bg-black/40 p-2">
           <div className="font-mono text-[9px] uppercase text-zinc-500">Max height</div>

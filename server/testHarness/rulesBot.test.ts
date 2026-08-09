@@ -95,6 +95,11 @@ describe('RulesBot Adapter & Attack Preview', () => {
     const cmd = bot.next(obs);
     assert.ok(cmd.inputState !== undefined || (cmd.actions && cmd.actions.length > 0));
     assert.equal(JSON.stringify(p1.board), boardBefore);
+    assert.equal(bot.lastDecisionTrace?.committed, true);
+    assert.equal(bot.lastDecisionTrace?.decisionSource, 'active');
+    assert.equal(bot.lastDecisionTrace?.pieceType, p1.activePiece?.type);
+    assert.equal(typeof bot.lastDecisionTrace?.decisionId, 'number');
+    assert.deepEqual(bot.lastDecisionTrace?.decisionBoard, p1.board);
   });
 
   it('differentiates plan selection and scores between projected imminent (arrivalTick=10) and delayed (arrivalTick=65) garbage', () => {

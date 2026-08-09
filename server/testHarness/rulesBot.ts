@@ -309,6 +309,7 @@ export class RulesBot implements InputDriver {
   private lastPieceKey = '';
   private lastRevision = '';
   private lastImminentState = false;
+  private decisionSequence = 0;
 
   constructor(options?: RulesBotOptions) {
     this.mode = options?.mode ?? 'omniscient';
@@ -338,6 +339,7 @@ export class RulesBot implements InputDriver {
     if (!active) {
       this.currentPlan = null;
       this.lastPieceKey = '';
+      this.lastDecisionTrace = null;
       return { inputState: { left: false, right: false, softDrop: false }, actions: [] };
     }
 
@@ -361,11 +363,20 @@ export class RulesBot implements InputDriver {
       if (holdPlan && activePlan && holdPlan.score > activePlan.score + holdMargin) {
         this.currentPlan = null;
         this.lastPieceKey = '';
+        this.lastDecisionTrace = null;
         return { actions: ['hold'] };
       }
 
       this.currentPlan = activePlan;
       this.lastPieceKey = pieceKey;
+      this.lastDecisionTrace = activePlan?.trace
+        ? {
+            ...activePlan.trace,
+            decisionId: ++this.decisionSequence,
+            decisionSource: 'active',
+            committed: true,
+          }
+        : null;
     }
 
     if (!this.currentPlan) {
@@ -635,10 +646,11 @@ export class RulesBot implements InputDriver {
 
       const runnerUps = allCandidates.filter((c) => !c.selected).slice(0, 4);
 
-      this.lastDecisionTrace = {
+      const trace: BotDecisionTrace = {
         tick: currentTick ?? 0,
         playerId: player.id,
         pieceType: type,
+        decisionBoard: player.board.map((row) => [...row]),
         isBomber,
         selectedCandidate: topCandidate,
         runnerUpCandidates: runnerUps,
@@ -648,7 +660,7 @@ export class RulesBot implements InputDriver {
         maxHeight: origEval.maxHeight,
         totalCavityDepth: origEval.totalCavityDepth,
       };
-      bestPlan.trace = this.lastDecisionTrace;
+      bestPlan.trace = trace;
     }
 
     return bestPlan;

@@ -98,7 +98,7 @@ function classifyMissteps(
   // a recorded alternative materially reduced it. It is not a claim that the
   // alternative would have won the full match.
   let futureHoleIncreased = false;
-  const currentBoard = replay.keyframes[frameIndex]?.players?.[trace.playerId]?.board;
+  const currentBoard = trace.decisionBoard ?? replay.keyframes[frameIndex]?.players?.[trace.playerId]?.board;
   if (currentBoard) {
     const currentHoles = countBoardHoles(currentBoard);
     for (let j = 1; j <= 3 && frameIndex + j < replay.keyframes.length; j += 1) {
@@ -185,7 +185,8 @@ export function analyzeReplayDiagnostics(
     const frame = keyframes[frameIndex];
     for (const [traceKey, originalTrace] of Object.entries(frame.decisionTraces ?? {})) {
       const playerId = originalTrace.playerId || traceKey;
-      const decisionKey = `${playerId}:${originalTrace.tick}`;
+      const legacyCandidateKey = `${originalTrace.tick}:${originalTrace.pieceType}:${originalTrace.selectedCandidate.rotation}:${originalTrace.selectedCandidate.x}`;
+      const decisionKey = `${playerId}:${originalTrace.decisionId !== undefined ? `id:${originalTrace.decisionId}` : legacyCandidateKey}`;
       if (seenDecisionKeys.has(decisionKey)) continue;
       seenDecisionKeys.add(decisionKey);
       const trace = { ...originalTrace, playerId };

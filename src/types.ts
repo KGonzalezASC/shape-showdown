@@ -406,6 +406,14 @@ export interface BotDecisionTrace {
   tick: number;
   playerId: string;
   pieceType: TetrominoType;
+  /** Monotonic bot-local decision id; optional for legacy replay files. */
+  decisionId?: number;
+  /** Whether this trace came from the active piece or a speculative hold evaluation. */
+  decisionSource?: 'active' | 'hold';
+  /** Legacy traces omit this; current traces are true only for committed active plans. */
+  committed?: boolean;
+  /** Locked-board snapshot used to project this decision without a later sparse frame. */
+  decisionBoard?: CellValue[][];
   isBomber?: boolean;
   selectedCandidate: CandidateEvaluationTrace;
   runnerUpCandidates: CandidateEvaluationTrace[];

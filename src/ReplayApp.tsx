@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useReducer, useRef, useState } from 'react';
-import { Activity, BarChart3, FileUp, Target, Trophy } from 'lucide-react';
+import { Activity, BarChart3, ChevronLeft, ChevronRight, FileUp, Target, Trophy } from 'lucide-react';
 import { BotDecisionTrace, CandidateEvaluationTrace, GameState, PlayerState, ReplayData, ReplayDataV2 } from './types';
 import GameField from './components/GameField';
 import { GameFieldsLayout } from './components/GameFieldsLayout';
@@ -28,6 +28,20 @@ function orderedPlayerIds(replay: ReplayDataV2 | null, players: Record<string, P
     const bSlot = replay?.playerSlots?.[b] ?? Number.MAX_SAFE_INTEGER;
     return aSlot - bSlot || a.localeCompare(b);
   });
+}
+
+function decisionTraceKey(trace: BotDecisionTrace): string {
+  return `${trace.playerId}:${trace.decisionId ?? `${trace.tick}:${trace.pieceType}:${trace.selectedCandidate.rotation}:${trace.selectedCandidate.x}`}`;
+}
+
+function isRenderableDecisionTrace(trace: BotDecisionTrace): boolean {
+  return trace.committed !== false && trace.decisionSource !== 'hold';
+}
+
+interface CandidatePreviewSelection {
+  playerId: string;
+  traceKey: string;
+  candidate: CandidateEvaluationTrace;
 }
 
 interface ReplayState {
@@ -83,7 +97,7 @@ export default function ReplayApp() {
   const { replay, error, playing, speed, tick } = state;
   const [activeTab, setActiveTab] = useState<'inspector' | 'habits'>('inspector');
   const [inspectedPlayerId, setInspectedPlayerId] = useState<string | null>(null);
-  const [previewCandidate, setPreviewCandidate] = useState<CandidateEvaluationTrace | null>(null);
+  const [previewSelection, setPreviewSelection] = useState<CandidatePreviewSelection | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const rafRef = useRef<number>(0);
   const lastTimeRef = useRef<number>(0);
@@ -158,52 +172,50 @@ export default function ReplayApp() {
     const traces: Record<string, BotDecisionTrace> = viewFrame.decisionTraces ?? {};
     if (activeInspectedPlayerId) {
       const direct = traces[activeInspectedPlayerId];
-      if (direct) return direct;
+      if (direct && isRenderableDecisionTrace(direct)) return direct;
       const matching = Object.values(traces).find((trace) => trace.playerId === activeInspectedPlayerId);
-      if (matching) return matching;
+      if (matching && isRenderableDecisionTrace(matching)) return matching;
     }
     return null;
   }, [activeInspectedPlayerId, viewFrame]);
+
+  const currentTraceKey = currentDecisionTrace ? decisionTraceKey(currentDecisionTrace) : null;
+  const previewCandidate = previewSelection
+    && activeInspectedPlayerId
+    && currentTraceKey
+    && previewSelection.playerId === activeInspectedPlayerId
+    && previewSelection.traceKey === currentTraceKey
+    ? previewSelection.candidate
+    : null;
 
   const inspectedPlayer = activeInspectedPlayerId && viewState
     ? viewState.players[activeInspectedPlayerId] ?? null
     : null;
 
-  const decisionPlayer = useMemo(() => {
-    if (!replay || !activeInspectedPlayerId || !currentDecisionTrace) return inspectedPlayer;
-    const decisionFrame = replay.keyframes.find((frame) => {
-      const direct = frame.decisionTraces?.[activeInspectedPlayerId];
-      const trace = direct || (Object.values(frame.decisionTraces ?? {}) as BotDecisionTrace[]).find(
-        (candidateTrace) => candidateTrace.playerId === activeInspectedPlayerId,
-      );
-      return trace?.tick === currentDecisionTrace.tick;
-    });
-    return decisionFrame?.players[activeInspectedPlayerId] ?? inspectedPlayer;
-  }, [activeInspectedPlayerId, currentDecisionTrace, inspectedPlayer, replay]);
-
   useEffect(() => {
-    setPreviewCandidate(null);
-  }, [activeInspectedPlayerId, viewFrame?.tick]);
+    setPreviewSelection(null);
+  }, [activeInspectedPlayerId, currentTraceKey, viewFrame?.tick]);
 
   const replayCandidateOverlay = useMemo<ReplayCandidateOverlay | null>(() => {
-    if (!currentDecisionTrace || !decisionPlayer) return null;
+    if (!currentDecisionTrace || !isRenderableDecisionTrace(currentDecisionTrace) || !currentDecisionTrace.decisionBoard) return null;
+    const decisionBoard = currentDecisionTrace.decisionBoard;
     return {
       botChoice: projectCandidatePlacement(
-        decisionPlayer.board,
+        decisionBoard,
         currentDecisionTrace.pieceType,
         currentDecisionTrace.selectedCandidate,
         currentDecisionTrace.isBomber,
       ),
       alternative: previewCandidate && !previewCandidate.selected
         ? projectCandidatePlacement(
-            decisionPlayer.board,
+            decisionBoard,
             currentDecisionTrace.pieceType,
             previewCandidate,
             currentDecisionTrace.isBomber,
           )
         : null,
     };
-  }, [currentDecisionTrace, decisionPlayer, previewCandidate]);
+  }, [currentDecisionTrace, previewCandidate]);
 
   const loadReplayFromUrl = (url: string) => {
     fetch(url)
@@ -248,6 +260,14 @@ export default function ReplayApp() {
       }
     };
     reader.readAsText(file);
+  };
+
+  const stepTimelineTick = (direction: -1 | 1) => {
+    const targetTick = direction < 0 ? Math.ceil(tick) - 1 : Math.floor(tick) + 1;
+    dispatch({
+      type: 'SET_TICK',
+      payload: Math.max(0, Math.min(totalTicks, targetTick)),
+    });
   };
 
   return (
@@ -335,7 +355,23 @@ export default function ReplayApp() {
                 playerLabel={playerLabel}
               />
             )}
+            {replay && replay.keyframeIntervalTicks && replay.keyframeIntervalTicks > 1 && (
+              <div className="text-center text-[9px] text-zinc-600">
+                Timeline steps are exact; board snapshots are recorded every {replay.keyframeIntervalTicks} ticks.
+              </div>
+            )}
             <div className="flex items-center gap-3">
+              <button
+                type="button"
+                onClick={() => stepTimelineTick(-1)}
+                disabled={!replay || tick <= 0}
+                aria-label="Previous tick"
+                title="Previous tick"
+                className="inline-flex h-7 shrink-0 items-center gap-1 rounded border border-white/10 bg-white/5 px-2 text-[10px] font-bold text-zinc-300 transition-colors hover:bg-white/10 hover:text-white disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                <ChevronLeft size={13} />
+                <span>-1 tick</span>
+              </button>
               <span className="text-xs font-mono w-10 text-zinc-400">{(tick / 60).toFixed(1)}s</span>
               <input
                 type="range"
@@ -345,7 +381,21 @@ export default function ReplayApp() {
                 onChange={(e) => dispatch({ type: 'SET_TICK', payload: Number(e.target.value) })}
                 className="flex-1 accent-emerald-500 cursor-pointer h-2 bg-zinc-800 rounded-lg"
               />
+              <button
+                type="button"
+                onClick={() => stepTimelineTick(1)}
+                disabled={!replay || tick >= totalTicks}
+                aria-label="Next tick"
+                title="Next tick"
+                className="inline-flex h-7 shrink-0 items-center gap-1 rounded border border-white/10 bg-white/5 px-2 text-[10px] font-bold text-zinc-300 transition-colors hover:bg-white/10 hover:text-white disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                <span>+1 tick</span>
+                <ChevronRight size={13} />
+              </button>
               <span className="text-xs font-mono w-10 text-zinc-500 text-right">{(totalTicks / 60).toFixed(1)}s</span>
+            </div>
+            <div className="text-center text-[9px] font-mono uppercase tracking-wider text-zinc-600">
+              Tick {Math.round(tick)} / {totalTicks}
             </div>
           </div>
         </div>
@@ -384,7 +434,9 @@ export default function ReplayApp() {
               <div className="mb-2 text-[9px] font-mono font-bold uppercase tracking-wider text-zinc-500">Inspecting decision owner</div>
               <div className="flex flex-wrap gap-2">
                 {playerIds.map((playerId) => {
-                  const hasTrace = !!currentFrameTraces[playerId] || Object.values(currentFrameTraces).some((trace) => trace.playerId === playerId);
+                  const hasTrace = Object.values(currentFrameTraces).some(
+                    (trace) => trace.playerId === playerId && isRenderableDecisionTrace(trace),
+                  );
                   const isActive = playerId === activeInspectedPlayerId;
                   return (
                     <button
@@ -408,7 +460,17 @@ export default function ReplayApp() {
                 playerLabel={activeInspectedPlayerId ? playerLabel(activeInspectedPlayerId) : 'No player selected'}
                 frameTick={viewFrame?.tick}
                 previewCandidate={previewCandidate}
-                onPreviewCandidate={setPreviewCandidate}
+                onPreviewCandidate={(candidate) => {
+                  if (!candidate || !activeInspectedPlayerId || !currentTraceKey) {
+                    setPreviewSelection(null);
+                    return;
+                  }
+                  setPreviewSelection({
+                    playerId: activeInspectedPlayerId,
+                    traceKey: currentTraceKey,
+                    candidate,
+                  });
+                }}
               />
             ) : diagnosticReport ? (
               <HabitReportDashboard

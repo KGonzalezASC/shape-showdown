@@ -116,4 +116,17 @@ describe('replay diagnostics', () => {
     ]);
     assert.equal(originalP2Trace?.misstepTags, undefined);
   });
+
+  it('keeps committed decisions distinct when player-limited traces share tick zero', () => {
+    const replay = replayWithBothPlayers();
+    const first = makeTrace('p1', { tick: 0, decisionId: 1 });
+    const second = makeTrace('p1', { tick: 0, decisionId: 2, pieceType: 'T' });
+    replay.keyframes[1].decisionTraces = { p1: first };
+    replay.keyframes[2].decisionTraces = { p1: second };
+
+    const report = analyzeReplayDiagnostics(replay);
+
+    assert.equal(report.totalDecisionTraces, 2);
+    assert.deepEqual(report.annotatedDecisions.map((decision) => decision.trace.decisionId), [1, 2]);
+  });
 });
