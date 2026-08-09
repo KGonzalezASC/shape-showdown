@@ -327,7 +327,8 @@ export class RulesBot implements InputDriver {
       this.lastRevision = obs.context.revision;
     }
 
-    const currentTick = this.mode === 'omniscient' ? obs.tick : undefined;
+    const currentTick = this.mode === 'omniscient' ? observation.tick : undefined;
+    const replayTick = observation.replayTick ?? currentTick ?? 0;
     const isImminentNow = (player.pendingGarbage || []).some(
       (p) => getPacketTicksUntilArrival(p, currentTick) <= 18,
     );
@@ -347,13 +348,13 @@ export class RulesBot implements InputDriver {
 
     const pieceKey = `${active.type}_${active.x}_${active.y}_${active.rotation}_${active.bomber ? 'b' : 'n'}`;
     if (!this.currentPlan || this.lastPieceKey !== pieceKey) {
-      const activePlan = this.findBestPlacement(player, active.type, !!active.bomber, currentTick, visibility);
+      const activePlan = this.findBestPlacement(player, active.type, !!active.bomber, currentTick, visibility, replayTick);
 
       let holdPlan: PlacementPlan | null = null;
       if (player.canHold) {
         const holdType = player.holdPiece ? player.holdPiece.type : player.nextQueue?.[0] ?? null;
         if (holdType && holdType !== active.type) {
-          holdPlan = this.findBestPlacement(player, holdType, false, currentTick, visibility);
+          holdPlan = this.findBestPlacement(player, holdType, false, currentTick, visibility, replayTick);
         }
       }
 
@@ -435,6 +436,7 @@ export class RulesBot implements InputDriver {
     isBomber: boolean,
     currentTick?: number,
     visibility?: BoardMetricVisibility,
+    replayTick?: number,
   ): PlacementPlan | null {
     const shapeRotations = SHAPES[type];
     if (!shapeRotations || shapeRotations.length === 0) return null;
@@ -648,9 +650,16 @@ export class RulesBot implements InputDriver {
 
       const trace: BotDecisionTrace = {
         tick: currentTick ?? 0,
+        replayTick: replayTick ?? currentTick ?? 0,
         playerId: player.id,
         pieceType: type,
         decisionBoard: player.board.map((row) => [...row]),
+        evaluatedCandidateCount: allCandidates.length,
+        decisionScore: player.score,
+        observationMode: this.mode,
+        unknownCellCount: visibility
+          ? (BOARD_ROWS - (visibility.knownRowEndExclusive - visibility.knownRowStart)) * BOARD_COLS
+          : 0,
         isBomber,
         selectedCandidate: topCandidate,
         runnerUpCandidates: runnerUps,

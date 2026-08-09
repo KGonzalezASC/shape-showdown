@@ -489,6 +489,7 @@ export function detonateBomberBlast(player: PlayerState, centers: Array<{ x: num
 
 function lockPiece(player: PlayerState, tick: number): { lines: number; tSpin: 'full' | 'mini' | false; perfectClear: boolean; poisonedRatio: number } {
   if (!player.activePiece) return { lines: 0, tSpin: false, perfectClear: false, poisonedRatio: 0 };
+  player.lastLockTick = tick;
   const poison = ensurePoisonBoard(player);
   const piece = player.activePiece;
   const wasPoisoned = !!piece.poisoned;

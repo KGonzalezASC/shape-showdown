@@ -179,6 +179,7 @@ export class Scenario {
           const driverTick = mode === 'player-limited' ? 0 : this.gameState.tick;
           const cmd = driver.next({
             tick: driverTick,
+            replayTick: this.gameState.tick,
             player: playerObs,
           });
 

@@ -8,6 +8,7 @@ import { HabitReportDashboard } from './components/HabitReportDashboard';
 import { TimelinePowerupBands } from './components/TimelinePowerupBands';
 import { analyzeReplayDiagnostics, type ReplayDiagnosticReport } from './replayDiagnostics';
 import { projectCandidatePlacement, type ReplayCandidateOverlay } from './replayCandidateOverlay';
+import { deriveReplayDecisionOutcome } from './replayDecisionOutcome';
 
 function winnerText(p1: PlayerState | null, p2: PlayerState | null): string {
   if (!p1 || !p2) return 'Unknown winner';
@@ -31,7 +32,8 @@ function orderedPlayerIds(replay: ReplayDataV2 | null, players: Record<string, P
 }
 
 function decisionTraceKey(trace: BotDecisionTrace): string {
-  return `${trace.playerId}:${trace.decisionId ?? `${trace.tick}:${trace.pieceType}:${trace.selectedCandidate.rotation}:${trace.selectedCandidate.x}`}`;
+  const decisionTick = trace.replayTick ?? trace.tick;
+  return `${trace.playerId}:${trace.decisionId ?? `${decisionTick}:${trace.pieceType}:${trace.selectedCandidate.rotation}:${trace.selectedCandidate.x}`}`;
 }
 
 function isRenderableDecisionTrace(trace: BotDecisionTrace): boolean {
@@ -216,6 +218,11 @@ export default function ReplayApp() {
         : null,
     };
   }, [currentDecisionTrace, previewCandidate]);
+
+  const observedDecisionOutcome = useMemo(() => {
+    if (!replay || !currentDecisionTrace) return null;
+    return deriveReplayDecisionOutcome(replay, currentDecisionTrace);
+  }, [currentDecisionTrace, replay]);
 
   const loadReplayFromUrl = (url: string) => {
     fetch(url)
@@ -460,6 +467,7 @@ export default function ReplayApp() {
                 playerLabel={activeInspectedPlayerId ? playerLabel(activeInspectedPlayerId) : 'No player selected'}
                 frameTick={viewFrame?.tick}
                 previewCandidate={previewCandidate}
+                observedOutcome={observedDecisionOutcome}
                 onPreviewCandidate={(candidate) => {
                   if (!candidate || !activeInspectedPlayerId || !currentTraceKey) {
                     setPreviewSelection(null);

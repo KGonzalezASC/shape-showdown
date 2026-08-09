@@ -18,6 +18,8 @@ export type PlayerObservation = ObservationProjectorPlayerObservation;
 
 export interface DriverObservation {
   tick: number;
+  /** Absolute simulation tick for replay diagnostics; player-limited policy time may remain normalized. */
+  replayTick?: number;
   player: PlayerObservation;
 }
 

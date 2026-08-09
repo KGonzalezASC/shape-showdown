@@ -100,6 +100,18 @@ describe('RulesBot Adapter & Attack Preview', () => {
     assert.equal(bot.lastDecisionTrace?.pieceType, p1.activePiece?.type);
     assert.equal(typeof bot.lastDecisionTrace?.decisionId, 'number');
     assert.deepEqual(bot.lastDecisionTrace?.decisionBoard, p1.board);
+    assert.equal(bot.lastDecisionTrace?.observationMode, 'omniscient');
+    assert.equal(bot.lastDecisionTrace?.decisionScore, p1.score);
+    assert.equal(bot.lastDecisionTrace?.replayTick, 1);
+    assert.ok((bot.lastDecisionTrace?.evaluatedCandidateCount ?? 0) >= 1);
+
+    const limitedBot = new RulesBot({ mode: 'player-limited' });
+    limitedBot.next({
+      tick: 1,
+      player: defaultObservationProjector.project(scenario.getReport().gameState, 'p1', 'player-limited'),
+    });
+    assert.equal(limitedBot.lastDecisionTrace?.observationMode, 'player-limited');
+    assert.equal(limitedBot.lastDecisionTrace?.unknownCellCount, BOARD_HIDDEN_ROWS * BOARD_COLS);
   });
 
   it('differentiates plan selection and scores between projected imminent (arrivalTick=10) and delayed (arrivalTick=65) garbage', () => {

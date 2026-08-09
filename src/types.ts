@@ -294,6 +294,8 @@ export interface PlayerState {
   pieceHasHardDropped?: boolean;
   /** Last simulation tick containing a successful hard drop; retained for visual consumers. */
   lastHardDropTick?: number;
+  /** Last simulation tick on which this player's active piece locked, regardless of lock path. */
+  lastLockTick?: number;
   /** Snag: hard drop blocked on this piece until lock/hold. */
   snagHardDropBlocked?: boolean;
   /** Snag: apply block to the next spawned piece. */
@@ -404,6 +406,8 @@ export interface CandidateEvaluationTrace {
 
 export interface BotDecisionTrace {
   tick: number;
+  /** Absolute replay/simulation tick; player-limited policy time may be normalized. */
+  replayTick?: number;
   playerId: string;
   pieceType: TetrominoType;
   /** Monotonic bot-local decision id; optional for legacy replay files. */
@@ -412,8 +416,16 @@ export interface BotDecisionTrace {
   decisionSource?: 'active' | 'hold';
   /** Legacy traces omit this; current traces are true only for committed active plans. */
   committed?: boolean;
-  /** Locked-board snapshot used to project this decision without a later sparse frame. */
+  /** Decision-time board snapshot used to project this decision without a later sparse frame. */
   decisionBoard?: CellValue[][];
+  /** Number of legal rotation/column placements scored before retaining runner-ups. */
+  evaluatedCandidateCount?: number;
+  /** Player score captured before this placement decision. */
+  decisionScore?: number;
+  /** Information available to the bot while evaluating this decision. */
+  observationMode?: 'omniscient' | 'player-limited';
+  /** Number of board cells outside the bot's known visibility window. */
+  unknownCellCount?: number;
   isBomber?: boolean;
   selectedCandidate: CandidateEvaluationTrace;
   runnerUpCandidates: CandidateEvaluationTrace[];

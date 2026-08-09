@@ -3,6 +3,7 @@ import type { BotDecisionTrace, CandidateEvaluationTrace, CandidateSubScores, Mi
 import { AlertTriangle, ChevronDown, ChevronUp, Layers, Target } from 'lucide-react';
 import { styleForFieldEffect } from '../shop/effectStyles';
 import type { PublicPlayerState } from '../state/publicSnapshots';
+import type { ReplayDecisionOutcome } from '../replayDecisionOutcome';
 
 interface CandidateInspectorProps {
   trace: BotDecisionTrace | null;
@@ -11,6 +12,7 @@ interface CandidateInspectorProps {
   frameTick?: number;
   previewCandidate?: CandidateEvaluationTrace | null;
   onPreviewCandidate?: (candidate: CandidateEvaluationTrace | null) => void;
+  observedOutcome?: ReplayDecisionOutcome | null;
 }
 
 const MISSTEP_BADGE_STYLES: Record<MisstepTag, { label: string; bg: string; text: string; border: string }> = {
@@ -140,6 +142,55 @@ function ScoreContributionTable({ candidate }: { candidate: CandidateEvaluationT
   );
 }
 
+function ScoreComparisonTable({ botChoice, alternative }: { botChoice: CandidateEvaluationTrace; alternative: CandidateEvaluationTrace }) {
+  const botTerms = contributionsFor(candidateSubScores(botChoice));
+  const alternativeTerms = contributionsFor(candidateSubScores(alternative));
+  const deltas = botTerms.map((term, index) => ({
+    label: term.label,
+    value: alternativeTerms[index].value - term.value,
+  }));
+  const largestSwing = [...deltas].sort((a, b) => Math.abs(b.value) - Math.abs(a.value))[0];
+
+  return (
+    <div className="rounded-lg border border-cyan-500/20 bg-cyan-950/15 p-3">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <div className="text-[10px] font-bold uppercase tracking-wider text-cyan-200">Counterfactual difference</div>
+          <div className="mt-0.5 text-[9px] text-zinc-400">Alternative − bot choice. Positive means the alternative scored better on that term.</div>
+        </div>
+        <span className="font-mono text-sm font-bold text-cyan-200">{formatScore(alternative.score - botChoice.score)}</span>
+      </div>
+      <div className="mt-2 grid grid-cols-[minmax(0,1fr)_auto] gap-x-4 gap-y-1 text-[10px] font-mono">
+        {deltas.map((delta) => (
+          <React.Fragment key={delta.label}>
+            <span className="truncate text-zinc-400">{delta.label}</span>
+            <span className={delta.value > 0 ? 'text-emerald-300' : delta.value < 0 ? 'text-rose-300' : 'text-zinc-600'}>
+              {formatScore(delta.value)}
+            </span>
+          </React.Fragment>
+        ))}
+      </div>
+      {largestSwing && (
+        <div className="mt-2 border-t border-cyan-500/15 pt-2 text-[9px] text-zinc-400">
+          Largest swing: <span className="font-semibold text-cyan-200">{largestSwing.label}</span>{' '}
+          <span className="font-mono text-zinc-200">{formatScore(largestSwing.value)}</span>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function OutcomeMetric({ label, value, tone = 'neutral' }: { label: string; value: string; tone?: 'positive' | 'negative' | 'neutral' }) {
+  return (
+    <div className="rounded border border-white/5 bg-black/30 p-2">
+      <div className="font-mono text-[9px] uppercase text-zinc-500">{label}</div>
+      <div className={`mt-0.5 font-mono text-sm font-bold ${tone === 'positive' ? 'text-emerald-300' : tone === 'negative' ? 'text-rose-300' : 'text-zinc-200'}`}>
+        {value}
+      </div>
+    </div>
+  );
+}
+
 export const CandidateInspector: React.FC<CandidateInspectorProps> = ({
   trace,
   player,
@@ -147,6 +198,7 @@ export const CandidateInspector: React.FC<CandidateInspectorProps> = ({
   frameTick,
   previewCandidate = null,
   onPreviewCandidate,
+  observedOutcome = null,
 }) => {
   const [expanded, setExpanded] = useState(true);
 
@@ -172,7 +224,11 @@ export const CandidateInspector: React.FC<CandidateInspectorProps> = ({
   const runnerUp = candidates.find((candidate) => !candidate.selected);
   const scoreMargin = runnerUp ? selected.score - runnerUp.score : null;
   const alternativeCount = Math.max(0, candidates.length - 1);
+  const candidateCoverage = trace.evaluatedCandidateCount === undefined
+    ? `${candidates.length} retained placements recorded`
+    : `${candidates.length} retained of ${trace.evaluatedCandidateCount} legal placements evaluated`;
   const decisionTick = trace.tick;
+  const replayDecisionTick = trace.replayTick ?? decisionTick;
 
   const effects = trace.activeEffects ?? [];
 
@@ -185,13 +241,30 @@ export const CandidateInspector: React.FC<CandidateInspectorProps> = ({
           </div>
           <p className="mt-1 text-[10px] text-zinc-400">
             <span className="font-semibold text-white">{playerLabel}</span> · decision tick{' '}
-            <span className="font-mono text-white">{decisionTick}</span>
-            {frameTick !== undefined && frameTick !== decisionTick && (
+            <span className="font-mono text-white">{replayDecisionTick}</span>
+            {frameTick !== undefined && frameTick !== replayDecisionTick && (
               <span className="text-zinc-600"> · shown in frame {frameTick}</span>
             )}
             {' · '}piece <span className="font-mono font-bold text-white">{trace.pieceType}</span>
             {trace.isBomber && <span className="ml-1.5 font-bold text-rose-400">· Bomber</span>}
           </p>
+          {trace.observationMode ? (
+            <div className="mt-2 text-[9px] text-zinc-500">
+              Information basis:{' '}
+              <span className="font-semibold text-zinc-300">
+                {trace.observationMode === 'omniscient' ? 'full board' : 'visible board only'}
+              </span>
+              {trace.observationMode === 'player-limited' && (
+                <span className="text-amber-300/80">
+                  {' · '}{trace.unknownCellCount ?? 'Some'} hidden cells treated as uncertain
+                </span>
+              )}
+            </div>
+          ) : (
+            <div className="mt-2 text-[9px] text-amber-300/80">
+              Information basis unavailable in this legacy trace.
+            </div>
+          )}
         </div>
         <button
           type="button"
@@ -308,7 +381,7 @@ export const CandidateInspector: React.FC<CandidateInspectorProps> = ({
             <div>
               <div className="font-mono text-[10px] font-bold uppercase tracking-wider text-zinc-300">Placements considered by the bot</div>
               <div className="mt-0.5 text-[9px] text-zinc-500">
-                1 executed choice + {alternativeCount} retained alternative{alternativeCount === 1 ? '' : 's'} · net heuristic score, not player score.
+                1 executed choice + {alternativeCount} retained alternative{alternativeCount === 1 ? '' : 's'} · {candidateCoverage} · net heuristic score, not player score.
               </div>
             </div>
             <span className="shrink-0 text-[9px] text-zinc-600">higher is better</span>
@@ -395,6 +468,48 @@ export const CandidateInspector: React.FC<CandidateInspectorProps> = ({
             </div>
           );
         })}
+        {previewCandidate && !previewCandidate.selected && (
+          <ScoreComparisonTable botChoice={selected} alternative={previewCandidate} />
+        )}
+        {observedOutcome && (
+          <div className="rounded-lg border border-violet-500/20 bg-violet-950/15 p-3">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <div className="text-[10px] font-bold uppercase tracking-wider text-violet-200">Observed post-lock outcome</div>
+                {observedOutcome.lockTick === null ? (
+                  <div className="mt-1 text-[9px] leading-relaxed text-zinc-400">No later lock is recorded in this replay yet.</div>
+                ) : (
+                  <div className="mt-1 text-[9px] leading-relaxed text-zinc-400">
+                    Recorded through lock tick <span className="font-mono text-zinc-200">{observedOutcome.lockTick}</span>
+                    {observedOutcome.snapshotTick !== null && observedOutcome.snapshotTick !== observedOutcome.lockTick && (
+                      <span> · nearest recorded board snapshot {observedOutcome.snapshotTick}; board metrics use that snapshot</span>
+                    )}
+                  </div>
+                )}
+              </div>
+              <span className="text-[9px] font-mono uppercase tracking-wider text-violet-300/70">Observed evidence</span>
+            </div>
+            {observedOutcome.lockTick !== null && (
+              <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-3">
+                <OutcomeMetric
+                  label="Score change"
+                  value={observedOutcome.scoreDelta === null ? '—' : formatScore(observedOutcome.scoreDelta)}
+                  tone={observedOutcome.scoreDelta !== null && observedOutcome.scoreDelta < 0 ? 'negative' : 'positive'}
+                />
+                <OutcomeMetric label="Lines cleared" value={`${observedOutcome.linesCleared}`} />
+                <OutcomeMetric label="Attack sent" value={`${observedOutcome.attackSent}`} />
+                <OutcomeMetric label="Garbage received" value={`${observedOutcome.garbageApplied}`} />
+                <OutcomeMetric
+                  label="Max height"
+                  value={observedOutcome.maxHeightBefore === null || observedOutcome.maxHeightAfter === null
+                    ? '—'
+                    : `${observedOutcome.maxHeightBefore} → ${observedOutcome.maxHeightAfter} (${formatScore(observedOutcome.maxHeightDelta ?? 0)})`}
+                  tone={(observedOutcome.maxHeightDelta ?? 0) > 0 ? 'negative' : 'neutral'}
+                />
+              </div>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );
