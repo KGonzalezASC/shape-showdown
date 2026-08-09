@@ -431,7 +431,7 @@ export default function ReplayApp() {
                   : 'text-zinc-400 hover:text-white hover:bg-white/5'
               }`}
             >
-              <BarChart3 size={14} /> Habit Trend Report
+              <BarChart3 size={14} /> Replay Misstep Timeline
             </button>
           </div>
 
@@ -482,8 +482,11 @@ export default function ReplayApp() {
               />
             ) : diagnosticReport ? (
               <HabitReportDashboard
+                replay={replay}
                 report={diagnosticReport}
                 selectedTick={tick}
+                selectedPlayerId={activeInspectedPlayerId}
+                onSelectPlayer={(playerId) => setInspectedPlayerId(playerId)}
                 onJumpToTick={(targetTick) => dispatch({ type: 'SET_TICK', payload: targetTick })}
                 onJumpToDecision={(playerId, targetTick) => {
                   setInspectedPlayerId(playerId);
