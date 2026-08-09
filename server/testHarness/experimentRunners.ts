@@ -22,6 +22,14 @@ function calculateMedian(numbers: number[]): number {
   return sorted.length % 2 !== 0 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
 }
 
+function resolveRulesBotPolicyId(
+  policyId: string | undefined,
+  topology: RulesBotTopologyMode,
+): string {
+  if (policyId) return policyId;
+  return topology === 'surface' ? 'rulesBot-v2-topology' : 'rulesBot-v1';
+}
+
 // --- Bot Quality Runner ---
 
 export interface BotQualityConfig {
@@ -37,6 +45,7 @@ export interface BotQualityConfig {
 export interface BotQualityReport {
   evidenceType: EvidenceType;
   policyId: string;
+  topology: RulesBotTopologyMode;
   observationMode: ObservationMode;
   runCount: number;
   durationSeconds: number;
@@ -57,7 +66,8 @@ export function runBotQuality(config?: BotQualityConfig): BotQualityReport {
   const runs = Math.max(1, config?.runs ?? 10);
   const seconds = Math.max(1, config?.seconds ?? 60);
   const durationTicks = Math.round(seconds * 60);
-  const policyId = config?.policyId ?? 'rulesBot-v1';
+  const topology = config?.topology ?? 'none';
+  const policyId = resolveRulesBotPolicyId(config?.policyId, topology);
   const observationMode = config?.observationMode ?? 'player-limited';
   const enableGarbage = config?.enableGarbage ?? true;
 
@@ -154,6 +164,7 @@ export function runBotQuality(config?: BotQualityConfig): BotQualityReport {
   return {
     evidenceType: 'deterministic in-process simulation',
     policyId,
+    topology,
     observationMode,
     runCount: runs,
     durationSeconds: seconds,
@@ -212,7 +223,8 @@ export function runItemImpact(config?: ItemImpactConfig): ItemImpactReport {
   const durationTicks = Math.round(seconds * 60);
   const targetItemId = config?.targetItemId ?? 'frost-shift';
   const costPolicy = config?.costPolicy ?? 'reference-price';
-  const policyId = config?.policyId ?? 'rulesBot-v1';
+  const topology = config?.topology ?? 'none';
+  const policyId = resolveRulesBotPolicyId(config?.policyId, topology);
   const observationMode = config?.observationMode ?? 'player-limited';
   const enableGarbage = config?.enableGarbage ?? true;
 
@@ -465,9 +477,9 @@ export interface PricingExperimentReport {
 export function runPricingExperiment(config?: PricingExperimentConfig): PricingExperimentReport {
   const targetItemId = config?.targetItemId ?? 'frost-shift';
   const candidatePrices = config?.candidatePrices ?? [30, 45, 60, 75, 90];
-  const policyId = config?.policyId ?? 'rulesBot-v1';
-  const observationMode = config?.observationMode ?? 'player-limited';
   const topology = config?.topology ?? 'none';
+  const policyId = resolveRulesBotPolicyId(config?.policyId, topology);
+  const observationMode = config?.observationMode ?? 'player-limited';
   const runs = config?.runs ?? 10;
   const seconds = config?.seconds ?? 60;
   const seeds = config?.seeds;
@@ -595,9 +607,9 @@ export function runCompoundTreatment(config?: CompoundTreatmentConfig): Compound
   const setupItemId = config?.setupItemId ?? 'elixir-pulse';
   const payoffItemId = config?.payoffItemId ?? 'vortex-step';
   const costPolicy = config?.costPolicy ?? 'reference-price';
-  const policyId = config?.policyId ?? 'rulesBot-v1';
-  const observationMode = config?.observationMode ?? 'player-limited';
   const topology = config?.topology ?? 'none';
+  const policyId = resolveRulesBotPolicyId(config?.policyId, topology);
+  const observationMode = config?.observationMode ?? 'player-limited';
 
   const setupCatalog = SHOP_ITEM_BY_ID.get(setupItemId);
   const payoffCatalog = SHOP_ITEM_BY_ID.get(payoffItemId);
