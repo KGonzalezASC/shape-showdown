@@ -333,8 +333,8 @@ export default function ReplayApp() {
           {error && <div className="absolute z-30 left-3 top-3 text-xs text-rose-300 bg-rose-950/50 px-2 py-1 rounded">{error}</div>}
           <div className="flex-1 min-h-0 relative">
             <GameFieldsLayout>
-              {p1 && <GameField player={p1} isMe={false} title={playerLabel(playerIds[0])} borderColorClass="border-emerald-500/20" shadowColorClass="" hatchingEnabled={false} showEffectPills effectTick={viewFrame?.tick} replayCandidateOverlay={activeInspectedPlayerId === playerIds[0] ? replayCandidateOverlay : null} />}
-              {p2 && <GameField player={p2} isMe={false} title={playerLabel(playerIds[1])} borderColorClass="border-rose-500/20" shadowColorClass="" hatchingEnabled={false} showEffectPills effectTick={viewFrame?.tick} replayCandidateOverlay={activeInspectedPlayerId === playerIds[1] ? replayCandidateOverlay : null} />}
+              {p1 && <GameField player={p1} isMe={false} title={playerLabel(playerIds[0])} borderColorClass="border-emerald-500/20" shadowColorClass="" hatchingEnabled={false} showEffectPills effectTick={viewFrame?.tick} suppressBomberExplosionAnimation replayCandidateOverlay={activeInspectedPlayerId === playerIds[0] ? replayCandidateOverlay : null} />}
+              {p2 && <GameField player={p2} isMe={false} title={playerLabel(playerIds[1])} borderColorClass="border-rose-500/20" shadowColorClass="" hatchingEnabled={false} showEffectPills effectTick={viewFrame?.tick} suppressBomberExplosionAnimation replayCandidateOverlay={activeInspectedPlayerId === playerIds[1] ? replayCandidateOverlay : null} />}
             </GameFieldsLayout>
             {replay && tick >= totalTicks - 1 && (
               <div className="absolute inset-0 z-40 bg-[#0a0a0f]/40 flex items-center justify-center">

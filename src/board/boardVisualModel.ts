@@ -143,7 +143,7 @@ export function buildBoardVisualModel(
     options.isMe && player.activeEffects?.some((effect) => effect.kind === 'curtain')
       ? {
           cutoffRow: player.swapCutoffRow,
-          frostRows: CURTAIN_FROST_ROWS,
+          frostRows: CURTAIN_FROST_ROWS + (player.curtainDefenseLevel ?? 0),
         }
       : null;
 

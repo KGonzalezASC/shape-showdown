@@ -1,5 +1,5 @@
 import React, { memo } from 'react';
-import { Timer, Users, Zap } from 'lucide-react';
+import { Users, Zap } from 'lucide-react';
 
 interface MatchHeaderProps {
   myScore: number;
@@ -7,7 +7,6 @@ interface MatchHeaderProps {
   availableShopScore: number;
   myPendingGarbage: number;
   oppPendingGarbage: number;
-  remainingTime: number;
   hasMyPlayer: boolean;
 }
 
@@ -17,7 +16,6 @@ export const MatchHeader: React.FC<MatchHeaderProps> = ({
   availableShopScore,
   myPendingGarbage,
   oppPendingGarbage,
-  remainingTime,
   hasMyPlayer,
 }) => (
   <div className="mb-1 flex w-full max-w-5xl shrink-0 items-center justify-between gap-1 self-center overflow-visible rounded-lg border border-white/5 bg-[#1a1a1a] px-2 py-1.5 shadow-xl sm:mb-3 sm:gap-2 sm:rounded-2xl sm:p-3 md:p-4">
@@ -45,16 +43,6 @@ export const MatchHeader: React.FC<MatchHeaderProps> = ({
           <span className="text-rose-200">{myPendingGarbage}</span>
         </div>
       </div>
-    </div>
-
-    <div className="flex shrink-0 flex-col items-center px-1 sm:px-2">
-      <div className="hidden items-center gap-2 sm:mb-1 sm:flex">
-        <Timer className="h-4 w-4 text-zinc-500" />
-        <span className="text-xs font-bold uppercase tracking-widest text-zinc-500">Remaining</span>
-      </div>
-      <p className="font-mono text-base leading-none tracking-tighter text-zinc-300 sm:text-3xl">
-        {Math.floor(remainingTime / 60)}:{Math.floor(remainingTime % 60).toString().padStart(2, '0')}
-      </p>
     </div>
 
     <div className="flex flex-1 items-center justify-end gap-1.5 min-w-0 sm:gap-4">

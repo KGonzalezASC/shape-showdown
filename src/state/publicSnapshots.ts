@@ -33,6 +33,7 @@ export interface PublicPlayerState {
   activeEffects?: ActiveFieldEffect[];
   topOut: boolean;
   swapCutoffRow: number;
+  curtainDefenseLevel?: number;
   poisonBoard?: number[][];
   poisonSpread?: PoisonSpreadState | null;
   customNextPieceSourceCells?: [number, number][];
@@ -100,6 +101,7 @@ export function toPublicPlayerState(player: PlayerState): PublicPlayerState {
     activeEffects: player.activeEffects,
     topOut: player.topOut,
     swapCutoffRow: player.swapCutoffRow,
+    curtainDefenseLevel: player.curtainDefenseLevel ?? 0,
     poisonBoard: player.poisonBoard,
     poisonSpread: player.poisonSpread,
     customNextPieceSourceCells: player.customNextPieceSourceCells,
@@ -248,6 +250,7 @@ export function publicPlayersEqual(a: PublicPlayerState | null, b: PublicPlayerS
     a.topOut !== b.topOut ||
     a.landingForecastTicksRemaining !== b.landingForecastTicksRemaining ||
     a.swapCutoffRow !== b.swapCutoffRow ||
+    a.curtainDefenseLevel !== b.curtainDefenseLevel ||
     a.holdFrozenUntilTick !== b.holdFrozenUntilTick ||
     a.magnetPermanentStacks !== b.magnetPermanentStacks ||
     a.magnetPieceBoost !== b.magnetPieceBoost ||

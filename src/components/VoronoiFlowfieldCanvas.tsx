@@ -24,6 +24,7 @@ import {
   type ActivePiecePoint,
 } from '../board/activePieceMotion';
 import type { ActiveVisualCell } from '../board/boardVisualModel';
+import { shouldAnimateBomberExplosion } from '../replayVisualEffects';
 import {
   activeVoronoiCellHandoff,
   activeVoronoiCellMorph,
@@ -498,6 +499,8 @@ interface VoronoiFlowfieldCanvasProps {
   poisonSpread?: PoisonSpreadState | null;
   board?: CellValue[][];
   activePiece?: TetrisPiece | null;
+  /** Sparse replay snapshots cannot attribute every cleared cell to Bomber. */
+  suppressBomberExplosionAnimation?: boolean;
   performanceId: string;
 }
 
@@ -735,6 +738,7 @@ export const VoronoiFlowfieldCanvas: React.FC<VoronoiFlowfieldCanvasProps> = Rea
   poisonSpread,
   board,
   activePiece,
+  suppressBomberExplosionAnimation = false,
   performanceId,
 }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -781,7 +785,12 @@ export const VoronoiFlowfieldCanvas: React.FC<VoronoiFlowfieldCanvasProps> = Rea
       activePiece.type !== previousActivePiece.type ||
       activePiece.y < previousActivePiece.y
     );
-    if (previousBoard && board && pieceLocked && previousActivePiece?.bomber) {
+    if (
+      previousBoard &&
+      board &&
+      pieceLocked &&
+      shouldAnimateBomberExplosion(suppressBomberExplosionAnimation, previousActivePiece)
+    ) {
       for (let row = 0; row < BOARD_VISIBLE_ROWS; row += 1) {
         const boardRow = BOARD_HIDDEN_ROWS + row;
         for (let column = 0; column < BOARD_COLS; column += 1) {
@@ -942,6 +951,7 @@ export const VoronoiFlowfieldCanvas: React.FC<VoronoiFlowfieldCanvasProps> = Rea
     poisonSpread,
     board,
     activePiece,
+    suppressBomberExplosionAnimation,
   ]);
 
   useEffect(() => {

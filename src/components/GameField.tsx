@@ -125,7 +125,7 @@ const GameField = forwardRef<GameFieldRef, GameFieldProps>(({
   const cellSize = cellSizeProp ?? layoutCellSize;
   const [shakeClass, setShakeClass] = useState('');
   const [rotationBlocked, setRotationBlocked] = useState(false);
-  const startHardDropForecastRef = useRef<() => void>(() => {});
+  const startHardDropForecastRef = useRef<() => void>(() => { });
 
   useEffect(() => {
     if (!player.activePiece?.isWildcard || !player.activePiece.rotationBlockedNonce) return;
@@ -292,15 +292,15 @@ const GameField = forwardRef<GameFieldRef, GameFieldProps>(({
     ? { text: 'Frozen — no store/swap', tone: 'text-sky-300' }
     : holdPoisoned
       ? { text: 'Poisoned — no hold', tone: 'text-fuchsia-300' }
-    : snagged
-      ? { text: 'Snagged — no hard drop', tone: 'text-orange-300' }
-      : !player.activePiece
-      ? { text: 'No active piece', tone: 'text-zinc-300' }
-      : !player.canHold
-        ? { text: 'Used this piece', tone: 'text-amber-300' }
-        : !canHoldByHeight
-          ? { text: 'Past swap line', tone: 'text-rose-300' }
-          : { text: 'Ready', tone: 'text-emerald-300' };
+      : snagged
+        ? { text: 'Snagged — no hard drop', tone: 'text-orange-300' }
+        : !player.activePiece
+          ? { text: 'No active piece', tone: 'text-zinc-300' }
+          : !player.canHold
+            ? { text: 'Used this piece', tone: 'text-amber-300' }
+            : !canHoldByHeight
+              ? { text: 'Past swap line', tone: 'text-rose-300' }
+              : { text: 'Ready', tone: 'text-emerald-300' };
 
   return (
     <div className={`relative ${opacityClass}`}>
@@ -318,131 +318,134 @@ const GameField = forwardRef<GameFieldRef, GameFieldProps>(({
             {effectPills.map(({ effect, count, remaining }) => {
               const style = styleForFieldEffect(effect);
               return (
-              <span
-                key={effect.id}
-                className={[
-                  'inline-flex items-center gap-0.5 rounded-full border px-2 py-0.5',
-                  'font-mono text-[9px] font-bold uppercase tracking-wider leading-none',
-                  'animate-pulse',
-                  style.bgClass,
-                  style.borderClass,
-                  style.textClass,
-                  style.glowClass ?? '',
-                ].join(' ')}
-              >
-                {effect.icon && <span className="text-[10px] leading-none">{effect.icon}</span>}
-                {effect.label}
-                {count > 1 && <span className="opacity-80">×{count}</span>}
-                {remaining !== null && <span className="opacity-80">{remaining}t</span>}
-              </span>
+                <span
+                  key={effect.id}
+                  className={[
+                    'inline-flex items-center gap-0.5 rounded-full border px-2 py-0.5',
+                    'font-mono text-[9px] font-bold uppercase tracking-wider leading-none',
+                    'animate-pulse',
+                    style.bgClass,
+                    style.borderClass,
+                    style.textClass,
+                    style.glowClass ?? '',
+                  ].join(' ')}
+                >
+                  {effect.icon && <span className="text-[10px] leading-none">{effect.icon}</span>}
+                  {effect.label}
+                  {count > 1 && <span className="opacity-80">×{count}</span>}
+                  {remaining !== null && <span className="opacity-80">{remaining}t</span>}
+                </span>
               );
             })}
           </div>
         )}
 
-        <div className="flex shrink-0 items-center gap-1.5">
-          <span className="rounded-full border border-white/10 bg-zinc-900/80 px-2 py-0.5 font-mono text-[9px] uppercase tracking-wider text-zinc-500">
-            {BOARD_COLS}×{BOARD_VISIBLE_ROWS} arena
-          </span>
-          <span className="rounded-full bg-zinc-800 px-2 py-0.5 font-mono text-[10px] tabular-nums text-zinc-300">
-            {player.linesCleared} clears
-          </span>
-        </div>
+        <span className="shrink-0 rounded-full bg-zinc-800/90 px-2 py-0.5 font-mono text-[10px] tabular-nums text-zinc-300">
+          {player.linesCleared} clears
+        </span>
       </div>
-      <div
-        className={`relative overflow-hidden rounded-xl border-2 ${borderColorClass} shadow-2xl ${shadowColorClass} ${shakeClass || ''}`}
-        style={{ width: BOARD_COLS * cellSize, height: BOARD_VISIBLE_ROWS * cellSize }}
-      >
-        {showSwapLine && (
-          <>
-            <div
-              className="pointer-events-none absolute left-0 right-0 z-20 border-t-2 border-dashed border-white/90"
-              style={{ top: swapLineY }}
-            />
-            <div
-              className="pointer-events-none absolute right-1 z-20 -translate-y-1/2 rounded bg-black/70 px-1 py-0.5 font-mono text-[9px] uppercase tracking-wide text-white/80"
-              style={{ top: swapLineY }}
-            >
-              swap line
-            </div>
-          </>
-        )}
-        {/* ── Curtain: a frosted band right below the swap line, fully opaque beyond it ── */}
-        {visualModel.curtain && (
-          <>
-            {/* Frosted/blurred transition band — semi-visible for the first few rows */}
-            <div
-              className="pointer-events-none absolute left-0 right-0 bottom-0 z-20 overflow-hidden border-t-2 border-indigo-300/50 bg-indigo-950/30 backdrop-blur-md"
-              style={{ top: swapLineY }}
-            />
-            {/* Solid blackout — impossible to see through — covers everything past the band */}
-            <div
-              className="pointer-events-none absolute left-0 right-0 bottom-0 z-30 flex items-center justify-center bg-[#0b0b16]"
-              style={{ top: swapLineY + CURTAIN_FROST_ROWS * cellSize }}
-            >
-              <span className="select-none text-4xl opacity-50 drop-shadow-[0_0_8px_rgba(129,140,248,0.8)]">
-                🎭
-              </span>
-            </div>
-          </>
+      <div className="relative">
+        {isMe && (
+          <span
+            aria-hidden
+            className="pointer-events-none absolute -left-4 top-[calc(50%+1em)] z-10 -translate-x-1/2 -translate-y-1/2 -rotate-90 select-none whitespace-nowrap font-mono font-bold uppercase tracking-[0.28em] bg-gradient-to-t from-white/05 via-white/15 to-white/30 bg-clip-text text-transparent"
+            style={{ fontSize: Math.max(16, Math.round(cellSize * 0.85)) }}
+          >
+            {BOARD_COLS}×{BOARD_VISIBLE_ROWS}
+          </span>
         )}
         <div
-          className="arena-grid grid relative"
-          data-board-renderer="canvas"
-          style={{
-            gridTemplateColumns: `repeat(${BOARD_COLS}, ${cellSize}px)`,
-            width: BOARD_COLS * cellSize,
-            height: BOARD_VISIBLE_ROWS * cellSize,
-            backgroundColor: '#101112',
-            backgroundImage:
-              'linear-gradient(rgba(255,255,255,0.045) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.045) 1px, transparent 1px)',
-            backgroundSize: `${cellSize}px ${cellSize}px`,
-          }}
+          className={`relative overflow-hidden rounded-xl border-2 ${borderColorClass} shadow-2xl ${shadowColorClass} ${shakeClass || ''}`}
+          style={{ width: BOARD_COLS * cellSize, height: BOARD_VISIBLE_ROWS * cellSize }}
         >
-          <VoronoiFlowfieldCanvas
-            visibleRows={visibleRows}
-            visiblePoison={visiblePoison}
-            activeCells={visualModel.activeCells}
-            activePieceKey={visualModel.activePieceKey}
-            cellSize={cellSize}
-            poisonSpread={player.poisonSpread}
-            board={player.board}
-            activePiece={player.activePiece}
-            performanceId={performanceId}
-          />
-          <BoardCanvasOverlay
-            model={visualModel}
-            cellSize={cellSize}
-            performanceId={performanceId}
-          />
-        </div>
-        {landingForecastRender.phase !== 'hidden' && landingForecastRender.cells.length > 0 && (
-          <svg
-            className={`pointer-events-none absolute inset-0 z-10 overflow-visible ${
-              landingForecastRender.phase === 'timeout'
-                ? 'landing-forecast-layer-timeout'
-                : landingForecastRender.phase === 'hard-drop'
-                  ? 'landing-forecast-layer-hard-drop'
-                  : ''
-            }`}
-            width={BOARD_COLS * cellSize}
-            height={BOARD_VISIBLE_ROWS * cellSize}
-            aria-label="Landing forecast"
+          {showSwapLine && (
+            <>
+              <div
+                className="pointer-events-none absolute left-0 right-0 z-20 border-t-2 border-dashed border-white/90"
+                style={{ top: swapLineY }}
+              />
+              <div
+                className="pointer-events-none absolute right-1 z-20 -translate-y-1/2 rounded bg-black/70 px-1 py-0.5 font-mono text-[9px] uppercase tracking-wide text-white/80"
+                style={{ top: swapLineY }}
+              >
+                swap line
+              </div>
+            </>
+          )}
+          {/* ── Curtain: a frosted band right below the swap line, fully opaque beyond it ── */}
+          {visualModel.curtain && (
+            <>
+              {/* Frosted/blurred transition band — semi-visible for the first few rows */}
+              <div
+                className="pointer-events-none absolute left-0 right-0 bottom-0 z-20 overflow-hidden border-t-2 border-indigo-300/50 bg-indigo-950/30 backdrop-blur-md"
+                style={{ top: swapLineY }}
+              />
+              {/* Solid blackout — impossible to see through — covers everything past the band */}
+              <div
+                className="pointer-events-none absolute left-0 right-0 bottom-0 z-30 flex items-center justify-center bg-[#0b0b16]"
+                style={{ top: swapLineY + CURTAIN_FROST_ROWS * cellSize }}
+              >
+                <span className="select-none text-4xl opacity-50 drop-shadow-[0_0_8px_rgba(129,140,248,0.8)]">
+                  🎭
+                </span>
+              </div>
+            </>
+          )}
+          <div
+            className="arena-grid grid relative"
+            data-board-renderer="canvas"
+            style={{
+              gridTemplateColumns: `repeat(${BOARD_COLS}, ${cellSize}px)`,
+              width: BOARD_COLS * cellSize,
+              height: BOARD_VISIBLE_ROWS * cellSize,
+              backgroundColor: '#101112',
+              backgroundImage:
+                'linear-gradient(rgba(255,255,255,0.045) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.045) 1px, transparent 1px)',
+              backgroundSize: `${cellSize}px ${cellSize}px`,
+            }}
           >
-            {landingForecastRender.cells.map(({ x, y }, index) => (
-              <rect
-                key={`landing-forecast-${x}-${y}`}
-                className={`landing-forecast-cell ${
-                  landingForecastRender.phase === 'timeout'
-                    ? 'landing-forecast-timeout'
-                    : landingForecastRender.phase === 'hard-drop'
-                      ? 'landing-forecast-hard-drop'
-                      : ''
+            <VoronoiFlowfieldCanvas
+              visibleRows={visibleRows}
+              visiblePoison={visiblePoison}
+              activeCells={visualModel.activeCells}
+              activePieceKey={visualModel.activePieceKey}
+              cellSize={cellSize}
+              poisonSpread={player.poisonSpread}
+              board={player.board}
+              activePiece={player.activePiece}
+              performanceId={performanceId}
+            />
+            <BoardCanvasOverlay
+              model={visualModel}
+              cellSize={cellSize}
+              performanceId={performanceId}
+            />
+          </div>
+          {landingForecastRender.phase !== 'hidden' && landingForecastRender.cells.length > 0 && (
+            <svg
+              className={`pointer-events-none absolute inset-0 z-10 overflow-visible ${landingForecastRender.phase === 'timeout'
+                  ? 'landing-forecast-layer-timeout'
+                  : landingForecastRender.phase === 'hard-drop'
+                    ? 'landing-forecast-layer-hard-drop'
+                    : ''
                 }`}
-                onAnimationEnd={
-                  (landingForecastRender.phase === 'timeout' || landingForecastRender.phase === 'hard-drop') &&
-                  index === landingForecastRender.cells.length - 1
-                    ? () => {
+              width={BOARD_COLS * cellSize}
+              height={BOARD_VISIBLE_ROWS * cellSize}
+              aria-label="Landing forecast"
+            >
+              {landingForecastRender.cells.map(({ x, y }, index) => (
+                <rect
+                  key={`landing-forecast-${x}-${y}`}
+                  className={`landing-forecast-cell ${landingForecastRender.phase === 'timeout'
+                      ? 'landing-forecast-timeout'
+                      : landingForecastRender.phase === 'hard-drop'
+                        ? 'landing-forecast-hard-drop'
+                        : ''
+                    }`}
+                  onAnimationEnd={
+                    (landingForecastRender.phase === 'timeout' || landingForecastRender.phase === 'hard-drop') &&
+                      index === landingForecastRender.cells.length - 1
+                      ? () => {
                         const completedPhase = landingForecastRender.phase;
                         setLandingForecastRender((previous) => {
                           if (previous.phase !== completedPhase) return previous;
@@ -457,79 +460,78 @@ const GameField = forwardRef<GameFieldRef, GameFieldProps>(({
                           return { cells: [], phase: 'hidden' };
                         });
                       }
-                    : undefined
-                }
-                style={
-                  landingForecastRender.phase === 'hard-drop'
-                    ? { animationDelay: `${index * LANDING_FORECAST_HARD_DROP_STAGGER_MS}ms` }
-                    : undefined
-                }
-                x={x * cellSize + 2}
-                y={y * cellSize + 2}
-                width={Math.max(1, cellSize - 4)}
-                height={Math.max(1, cellSize - 4)}
-                rx={Math.max(2, Math.round(cellSize * 0.12))}
-              />
-            ))}
-          </svg>
-        )}
-        {replayCandidateOverlay && (
-          <svg
-            className="pointer-events-none absolute inset-0 z-[15] overflow-visible"
-            width={BOARD_COLS * cellSize}
-            height={BOARD_VISIBLE_ROWS * cellSize}
-            aria-label="Solver candidate placement preview"
-          >
-            {replayCandidateOverlay.alternative?.cells.map(({ x, y }) => (
-              <rect
-                key={`candidate-alternative-${x}-${y}`}
-                className="landing-forecast-cell replay-candidate-alternative"
-                x={x * cellSize + 2}
-                y={y * cellSize + 2}
-                width={Math.max(1, cellSize - 4)}
-                height={Math.max(1, cellSize - 4)}
-                rx={Math.max(2, Math.round(cellSize * 0.12))}
-              />
-            ))}
-            {replayCandidateOverlay.botChoice.cells.map(({ x, y }) => (
-              <rect
-                key={`candidate-bot-choice-${x}-${y}`}
-                className={replayCandidateOverlay.botChoice.lineClearCount === 0
-                  ? 'replay-bot-choice-cell'
-                  : 'replay-bot-choice-line-clear-cell'}
-                x={x * cellSize + 2}
-                y={y * cellSize + 2}
-                width={Math.max(1, cellSize - 4)}
-                height={Math.max(1, cellSize - 4)}
-                rx={Math.max(2, Math.round(cellSize * 0.12))}
-              />
-            ))}
-          </svg>
-        )}
-        {status === 'playing' && isMe && landingForecastRender.phase !== 'hidden' && (
-          <div className="pointer-events-none absolute inset-x-0 top-2 z-20 flex justify-center">
-            <span className={`landing-forecast-label ${
-              landingForecastRender.phase === 'timeout'
-                ? 'landing-forecast-timeout'
-                : landingForecastRender.phase === 'hard-drop'
-                  ? 'landing-forecast-hard-drop'
-                  : ''
-            }`}>Landing forecast</span>
-          </div>
-        )}
-        {rotationBlocked && (
-          <div className="pointer-events-none absolute inset-x-0 top-2 z-30 flex justify-center">
-            <span className="wildcard-rotation-blocked rounded border border-rose-200/80 bg-rose-950/90 px-2 py-1 font-mono text-[10px] font-bold uppercase tracking-widest text-rose-100">
-              rotation blocked
-            </span>
-          </div>
-        )}
+                      : undefined
+                  }
+                  style={
+                    landingForecastRender.phase === 'hard-drop'
+                      ? { animationDelay: `${index * LANDING_FORECAST_HARD_DROP_STAGGER_MS}ms` }
+                      : undefined
+                  }
+                  x={x * cellSize + 2}
+                  y={y * cellSize + 2}
+                  width={Math.max(1, cellSize - 4)}
+                  height={Math.max(1, cellSize - 4)}
+                  rx={Math.max(2, Math.round(cellSize * 0.12))}
+                />
+              ))}
+            </svg>
+          )}
+          {replayCandidateOverlay && (
+            <svg
+              className="pointer-events-none absolute inset-0 z-[15] overflow-visible"
+              width={BOARD_COLS * cellSize}
+              height={BOARD_VISIBLE_ROWS * cellSize}
+              aria-label="Solver candidate placement preview"
+            >
+              {replayCandidateOverlay.alternative?.cells.map(({ x, y }) => (
+                <rect
+                  key={`candidate-alternative-${x}-${y}`}
+                  className="landing-forecast-cell replay-candidate-alternative"
+                  x={x * cellSize + 2}
+                  y={y * cellSize + 2}
+                  width={Math.max(1, cellSize - 4)}
+                  height={Math.max(1, cellSize - 4)}
+                  rx={Math.max(2, Math.round(cellSize * 0.12))}
+                />
+              ))}
+              {replayCandidateOverlay.botChoice.cells.map(({ x, y }) => (
+                <rect
+                  key={`candidate-bot-choice-${x}-${y}`}
+                  className={replayCandidateOverlay.botChoice.lineClearCount === 0
+                    ? 'replay-bot-choice-cell'
+                    : 'replay-bot-choice-line-clear-cell'}
+                  x={x * cellSize + 2}
+                  y={y * cellSize + 2}
+                  width={Math.max(1, cellSize - 4)}
+                  height={Math.max(1, cellSize - 4)}
+                  rx={Math.max(2, Math.round(cellSize * 0.12))}
+                />
+              ))}
+            </svg>
+          )}
+          {status === 'playing' && isMe && landingForecastRender.phase !== 'hidden' && (
+            <div className="pointer-events-none absolute inset-x-0 top-2 z-20 flex justify-center">
+              <span className={`landing-forecast-label ${landingForecastRender.phase === 'timeout'
+                  ? 'landing-forecast-timeout'
+                  : landingForecastRender.phase === 'hard-drop'
+                    ? 'landing-forecast-hard-drop'
+                    : ''
+                }`}>Landing forecast</span>
+            </div>
+          )}
+          {rotationBlocked && (
+            <div className="pointer-events-none absolute inset-x-0 top-2 z-30 flex justify-center">
+              <span className="wildcard-rotation-blocked rounded border border-rose-200/80 bg-rose-950/90 px-2 py-1 font-mono text-[10px] font-bold uppercase tracking-widest text-rose-100">
+                rotation blocked
+              </span>
+            </div>
+          )}
+        </div>
       </div>
       {isMe && (
         <div
-          className={`mt-1.5 rounded-lg border border-white/10 bg-black/25 px-2 py-1 ${
-            compactStorageLayout ? 'flex flex-col gap-1.5' : 'flex items-center justify-between gap-2'
-          }`}
+          className={`mt-1.5 rounded-lg border border-white/10 bg-black/25 px-2 py-1 ${compactStorageLayout ? 'flex flex-col gap-1.5' : 'flex items-center justify-between gap-2'
+            }`}
         >
           <div className="min-w-0">
             <p className="text-[10px] font-bold uppercase tracking-wider text-zinc-300">Storage (Shift)</p>

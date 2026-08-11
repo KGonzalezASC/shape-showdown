@@ -9,6 +9,8 @@ interface ImportMetaEnv {
   readonly VITE_GAME_SERVER_HOST?: string;
   /** Public base path for assets (set in vite.config via VITE_BASE_URL). */
   readonly BASE_URL: string;
+  /** Opt-in dev/QA UI for non-local builds (e.g. internal staging). */
+  readonly VITE_DEV_TOOLS?: string;
 }
 
 interface ImportMeta {

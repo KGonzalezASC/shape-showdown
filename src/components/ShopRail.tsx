@@ -1,5 +1,6 @@
 import React, { memo } from 'react';
-import { ShopItem } from '../types';
+import { BOARD_COLS, BOARD_VISIBLE_ROWS, ShopItem } from '../types';
+import { DEV_TOOLS_ENABLED } from '../devTools';
 
 interface ShopRailProps {
   items: ShopItem[];
@@ -13,7 +14,7 @@ interface ShopRailProps {
   isItemDisabled?: (item: ShopItem) => boolean;
   onConfirm: () => void;
   hatchingEnabled: boolean;
-  onToggleHatching: () => void;
+  onToggleHatching?: () => void;
   viewportMode: 'mobile' | 'tabletDesktop';
 }
 
@@ -109,18 +110,20 @@ const ShopRail: React.FC<ShopRailProps> = ({
           </button>
         )}
       </div>
-      <button
-        type="button"
-        aria-pressed={hatchingEnabled}
-        onClick={onToggleHatching}
-        className={`mt-1 w-full rounded border px-2 py-1 text-center font-mono text-[9px] uppercase tracking-wider transition active:scale-95 ${
-          hatchingEnabled
-            ? 'border-emerald-400/60 bg-emerald-500/20 text-emerald-100 hover:bg-emerald-500/30'
-            : 'border-zinc-600/70 bg-zinc-900/70 text-zinc-400 hover:border-zinc-500 hover:text-zinc-200'
-        }`}
-      >
-        Hatch: {hatchingEnabled ? 'On' : 'Off'}
-      </button>
+      {DEV_TOOLS_ENABLED && onToggleHatching && (
+        <button
+          type="button"
+          aria-pressed={hatchingEnabled}
+          onClick={onToggleHatching}
+          className={`mt-1 w-full rounded border px-2 py-1 text-center font-mono text-[9px] uppercase tracking-wider transition active:scale-95 ${
+            hatchingEnabled
+              ? 'border-emerald-400/60 bg-emerald-500/20 text-emerald-100 hover:bg-emerald-500/30'
+              : 'border-zinc-600/70 bg-zinc-900/70 text-zinc-400 hover:border-zinc-500 hover:text-zinc-200'
+          }`}
+        >
+          Hatch: {hatchingEnabled ? 'On' : 'Off'}
+        </button>
+      )}
     </div>
   );
 };

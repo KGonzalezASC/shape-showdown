@@ -35,7 +35,7 @@ interface PlayfieldShellProps {
   myDesktopFieldRef: React.RefObject<GameFieldRef | null>;
   oppDesktopFieldRef: React.RefObject<GameFieldRef | null>;
   hatchingEnabled: boolean;
-  onToggleHatching: () => void;
+  onToggleHatching?: () => void;
 }
 
 export const PlayfieldShell: React.FC<PlayfieldShellProps> = ({
@@ -76,7 +76,7 @@ export const PlayfieldShell: React.FC<PlayfieldShellProps> = ({
                   ref={myMobileFieldRef}
                   player={myPlayer}
                   isMe={true}
-                  title="👤 YOUR FIELD"
+                  title="Your Field"
                   borderColorClass="border-emerald-500/20"
                   shadowColorClass="shadow-[0_0_30px_rgba(16,185,129,0.1)]"
                   cellSize={mobileCellSize}
@@ -137,7 +137,7 @@ export const PlayfieldShell: React.FC<PlayfieldShellProps> = ({
                   ref={myDesktopFieldRef}
                   player={myPlayer}
                   isMe={true}
-                  title="👤 YOUR FIELD"
+                  title="Your Field"
                   borderColorClass="border-emerald-500/20"
                   shadowColorClass="shadow-[0_0_30px_rgba(16,185,129,0.1)]"
                   status={playfield.status}

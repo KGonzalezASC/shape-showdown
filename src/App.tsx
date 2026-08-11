@@ -8,6 +8,7 @@ import { ShopRailVariations } from './components/ShopRailVariations';
 import MobileControls from './components/MobileControls';
 import { GameFieldRef } from './components/GameField';
 import { BackgroundPrototype } from './components/BackgroundPrototype';
+import { DEV_TOOLS_ENABLED } from './devTools';
 import { useLockDrill } from './hooks/useLockDrill';
 import { useShopConfirm } from './hooks/useShopConfirm';
 import {
@@ -61,7 +62,11 @@ const AppShell: React.FC = () => {
   const mobilePlayfieldRef = useRef<HTMLDivElement>(null);
   const railRef = useRef<HTMLDivElement>(null);
   const [mobileCellSize, setMobileCellSize] = useState(28);
-  const [showVariations, setShowVariations] = useState(false);
+  const [showVariations, setShowVariations] = useState(() => (
+    DEV_TOOLS_ENABLED
+    && typeof window !== 'undefined'
+    && new URLSearchParams(window.location.search).get('shopMock') === '1'
+  ));
   const [hatchingEnabled, setHatchingEnabled] = useState(false);
   const [drill, drillDispatch] = useReducer(drillReducer, { enabled: false, result: null });
 
@@ -73,7 +78,26 @@ const AppShell: React.FC = () => {
     drillDispatch({ type: 'SET_RESULT', payload: result });
   }, []);
 
-  useLockDrill(drill.enabled, gameState, myId, sendAction, sendInputState, handleDrillResult);
+  const setShopMockVisibility = useCallback((visible: boolean) => {
+    setShowVariations(visible);
+    if (typeof window === 'undefined') return;
+    const url = new URL(window.location.href);
+    if (visible) {
+      url.searchParams.set('shopMock', '1');
+    } else {
+      url.searchParams.delete('shopMock');
+    }
+    window.history.replaceState({}, '', url);
+  }, []);
+
+  useLockDrill(
+    DEV_TOOLS_ENABLED && drill.enabled,
+    gameState,
+    myId,
+    sendAction,
+    sendInputState,
+    handleDrillResult,
+  );
 
   const triggerShake = useCallback((isMe: boolean, type: 'soft' | 'medium') => {
     if (isMe) {
@@ -141,10 +165,17 @@ const AppShell: React.FC = () => {
 
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'F6') {
-        e.preventDefault();
-        drillDispatch({ type: 'TOGGLE' });
-        return;
+      if (DEV_TOOLS_ENABLED) {
+        if (e.key === 'F6') {
+          e.preventDefault();
+          drillDispatch({ type: 'TOGGLE' });
+          return;
+        }
+        if (e.key.toLowerCase() === 'v') {
+          e.preventDefault();
+          setShopMockVisibility(!showVariations);
+          return;
+        }
       }
       const { playfield: pf, myId: id } = stateRef.current;
       if (pf.status !== 'playing' || !id || !pf.myPlayer) return;
@@ -178,9 +209,6 @@ const AppShell: React.FC = () => {
       } else if (e.key.toLowerCase() === 'c') {
         e.preventDefault();
         handleShopConfirm();
-      } else if (e.key.toLowerCase() === 'v') {
-        e.preventDefault();
-        setShowVariations((prev) => !prev);
       }
     };
     const onKeyUp = (e: KeyboardEvent) => {
@@ -207,7 +235,7 @@ const AppShell: React.FC = () => {
       window.removeEventListener('keyup', onKeyUp);
       window.removeEventListener('blur', clearInput);
     };
-  }, [handleAction, sendInputState, handleShopConfirm]);
+  }, [handleAction, sendInputState, handleShopConfirm, setShopMockVisibility, showVariations]);
 
   useEffect(() => {
     const evt = chrome.lastMatchEvent;
@@ -221,7 +249,7 @@ const AppShell: React.FC = () => {
   }, [chrome.lastMatchEvent, myId, triggerShake]);
 
   if (showVariations) {
-    return <ShopRailVariations />;
+    return <ShopRailVariations onClose={() => setShopMockVisibility(false)} />;
   }
 
   if (!connected) {
@@ -238,7 +266,7 @@ const AppShell: React.FC = () => {
   return (
     <div className="flex h-dvh max-h-dvh min-h-0 flex-col overflow-hidden bg-[#0a0a0a] px-2 py-2 font-sans text-white sm:px-4 sm:py-3">
       <MatchChrome />
-      {gameState && myId && gameState.players[myId] && (
+      {DEV_TOOLS_ENABLED && gameState && myId && gameState.players[myId] && (
         <DrillConsole
           player={gameState.players[myId]}
           enabled={drill.enabled}
@@ -254,8 +282,12 @@ const AppShell: React.FC = () => {
         myMobileFieldRef={myMobileFieldRef}
         myDesktopFieldRef={myDesktopFieldRef}
         oppDesktopFieldRef={oppDesktopFieldRef}
-        hatchingEnabled={hatchingEnabled}
-        onToggleHatching={() => setHatchingEnabled((enabled) => !enabled)}
+        hatchingEnabled={DEV_TOOLS_ENABLED && hatchingEnabled}
+        onToggleHatching={
+          DEV_TOOLS_ENABLED
+            ? () => setHatchingEnabled((enabled) => !enabled)
+            : undefined
+        }
       />
 
       <LazyMotion features={domAnimation}>
@@ -348,14 +380,18 @@ const AppShell: React.FC = () => {
   );
 };
 
-const App: React.FC = () => (
-  new URLSearchParams(window.location.search).get('prototype') === 'background' ? (
-    <BackgroundPrototype />
-  ) : (
+const App: React.FC = () => {
+  if (
+    DEV_TOOLS_ENABLED
+    && new URLSearchParams(window.location.search).get('prototype') === 'background'
+  ) {
+    return <BackgroundPrototype />;
+  }
+  return (
     <GameStateProvider>
       <AppShell />
     </GameStateProvider>
-  )
-);
+  );
+};
 
 export default App;

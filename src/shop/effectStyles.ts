@@ -98,6 +98,12 @@ const EFFECT_STYLES: Record<FieldEffectKind, FieldEffectStyle> = {
     textClass: 'text-emerald-100',
     glowClass: 'shadow-[0_0_10px_rgba(52,211,153,0.7)]',
   },
+  'curtain-def': {
+    bgClass: 'bg-indigo-900/80',
+    borderClass: 'border-indigo-400',
+    textClass: 'text-indigo-100',
+    glowClass: 'shadow-[0_0_10px_rgba(129,140,248,0.7)]',
+  },
   'wildcard-four': {
     bgClass: 'bg-fuchsia-950/80',
     borderClass: 'border-fuchsia-400',
@@ -112,6 +118,13 @@ const EFFECT_STYLES: Record<FieldEffectKind, FieldEffectStyle> = {
   },
 };
 
+const DEFAULT_EFFECT_STYLE: FieldEffectStyle = {
+  bgClass: 'bg-indigo-900/80',
+  borderClass: 'border-indigo-400',
+  textClass: 'text-indigo-100',
+  glowClass: 'shadow-[0_0_10px_rgba(129,140,248,0.7)]',
+};
+
 export function styleForFieldEffect(effect: ActiveFieldEffect): FieldEffectStyle {
-  return EFFECT_STYLES[effect.kind];
+  return EFFECT_STYLES[effect.kind] ?? DEFAULT_EFFECT_STYLE;
 }
