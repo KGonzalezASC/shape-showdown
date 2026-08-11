@@ -39,7 +39,8 @@ A task-oriented field guide to the **Shape Showdown** codebase (fork lineage: **
 |---------|---------|
 | `bun install` | Install deps |
 | `bun run dev` | **Full stack local**: `bun server.ts` runs Express + Socket.IO on **http://localhost:3000** with Vite mounted as middleware. Open two tabs to play both sides. |
-| `bun run build` | `build:client` → `dist/`, `build:replay`, `build:server` → `dist-server/server.mjs` |
+| `bun run build` | `build:client` → `dist/client`, `build:server` → `dist-server/server.mjs` |
+| `bun run build:internal` | Also builds `build:replay` → `dist/replay-viewer` (QA fixtures; not prod-deployed) |
 | `bun run build:server:bin` | Compile the standalone Linux server binary used in production |
 | `bun run start` | Production server only (`NODE_ENV=production`, serves `dist-server/server.mjs`) |
 | `bun run lint` | `tsc --noEmit` |

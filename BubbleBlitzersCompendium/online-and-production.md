@@ -83,7 +83,7 @@ flowchart LR
 | Server process | `shape-showdown-server.x86_64`, a `bun build --compile` binary under systemd unit `shape-showdown-server.service` (sets `PORT=10906`, `REPLAYS_DIR`, `REPLAY_KEYFRAME_INTERVAL_TICKS=1`, `NETCAST_HZ`) |
 | Static client | served by nginx (`serveClient:false`); nginx also proxies `/socket.io/` |
 | Public URL | `https://skillcade.games:10106/`, socket `wss://skillcade.games:10106` |
-| CI | `.github/workflows/deploy.yml` (env `shape-showdown-prod`): setup-bun → `bun install --frozen-lockfile` → bake `public/game-config.json` → `build:client` + `build:replay` + `build:server:bin` → scp client/replay/binary → `sudo systemctl restart shape-showdown-server` |
+| CI | `.github/workflows/deploy.yml` (env `shape-showdown-prod`): setup-bun → `bun install --frozen-lockfile` → bake `public/game-config.json` → `build:client` + `build:server:bin` → scp client/binary → `sudo systemctl restart shape-showdown-server`. Replay viewer / RulesBot fixtures are **not** part of this deploy (`bun run build:internal` locally). |
 
 > [!WARNING]
 > `build:server:bin` **must** pass `--define 'process.env.NODE_ENV="production"'`. Without it the compiled binary freezes `NODE_ENV` at build time, runs the **dev branch** of [server.ts](../server.ts), tries to `import('vite')`, and crashes on the missing `@rollup/rollup-linux-x64-gnu` native module. The npm script already includes this flag — don't strip it.

@@ -1,4 +1,4 @@
-import { BOARD_COLS, BOARD_HIDDEN_ROWS, BOARD_ROWS, CURTAIN_FROST_ROWS } from '../../src/constants.js';
+import { BOARD_COLS, BOARD_HIDDEN_ROWS, BOARD_ROWS, CURTAIN_FROST_ROWS, HOLD_SWAP_CUTOFF_VISIBLE_ROW } from '../../src/constants.js';
 import {
   PublicPlayerState,
   toPublicPlayerState,
@@ -156,8 +156,8 @@ export class StandardObservationProjector implements ObservationProjector {
     let poisonVisibility: BoardVisibility | null = null;
 
     if (curtainActive) {
-      const cutoffRow = publicPlayer.swapCutoffRow ?? (BOARD_ROWS - BOARD_HIDDEN_ROWS - 10);
-      const frostRows = CURTAIN_FROST_ROWS;
+      const cutoffRow = publicPlayer.swapCutoffRow ?? HOLD_SWAP_CUTOFF_VISIBLE_ROW;
+      const frostRows = CURTAIN_FROST_ROWS + (publicPlayer.curtainDefenseLevel ?? 0);
       const maskedRowsStart = Math.min(BOARD_ROWS, BOARD_HIDDEN_ROWS + cutoffRow + frostRows);
 
       boardVisibility = { cutoffRow, frostRows, maskedRowsStart };

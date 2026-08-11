@@ -7,13 +7,16 @@ import {
   scoreSurfaceTopologyDelta,
   evaluatePlacementVisibilityRisk,
   calculatePlacementVisibilityRiskScore,
+  scoreMagnetControl,
+  scoreCurtainReference,
+  CURTAIN_BOT_HARD_DROP_INTERVAL_TICKS,
   UNCERTAIN_LINE_CLEAR_PENALTY,
   BoardMetricVisibility,
   PlacementPlan,
   RulesBot,
 } from './rulesBot.js';
 import { Scenario } from './scenario.js';
-import { PairedRunner } from './pairedRunner.js';
+import { createSimpleShopPolicy, PairedRunner } from './pairedRunner.js';
 import { createEmptyBoard, detectTSpinFor, previewAttackFromClear } from '../tetris/engine.js';
 import { BOARD_COLS, BOARD_ROWS, BOARD_HIDDEN_ROWS } from '../../src/constants.js';
 import type { DriverObservation } from './inputDriver.js';
@@ -113,6 +116,114 @@ describe('RulesBot Adapter & Attack Preview', () => {
     });
     assert.equal(limitedBot.lastDecisionTrace?.observationMode, 'player-limited');
     assert.equal(limitedBot.lastDecisionTrace?.unknownCellCount, BOARD_HIDDEN_ROWS * BOARD_COLS);
+  });
+
+  it('responds to visible Magnet gravity by penalizing higher-control placements', () => {
+    const scenario = new Scenario({ seed: 1212 });
+    const player = scenario.getPlayerState('p1');
+    player.activePiece = { type: 'O', rotation: 0, x: 0, y: BOARD_ROWS - 2 };
+
+    const normalScore = scoreMagnetControl(player, 8, 3, BOARD_ROWS - 2);
+    player.magnetPermanentStacks = 3;
+    player.magnetPieceBoost = 2;
+    const magnetScore = scoreMagnetControl(player, 8, 3, BOARD_ROWS - 2);
+
+    assert.equal(normalScore, 0);
+    assert.ok(magnetScore < normalScore);
+  });
+
+  it('uses the player score tier and fresh hold spawn state for Magnet control', () => {
+    const scenario = new Scenario({ seed: 1313 });
+    const player = scenario.getPlayerState('p1');
+    player.activePiece = { type: 'O', rotation: 2, x: 0, y: 0 };
+    player.magnetPermanentStacks = 3;
+    player.magnetPieceBoost = 2;
+
+    player.score = 0;
+    const lowTierScore = scoreMagnetControl(player, 8, 0, 2);
+    player.score = 3000;
+    const highTierScore = scoreMagnetControl(player, 8, 0, 2);
+    const heldSpawnScore = scoreMagnetControl(
+      player,
+      8,
+      0,
+      2,
+      { x: 3, y: 0, rotation: 0 },
+      0,
+    );
+
+    assert.ok(lowTierScore < highTierScore);
+    assert.equal(Math.abs(heldSpawnScore), 0);
+  });
+
+  it('does not flag a one-cell move and rotation that fit in the same Magnet tick', () => {
+    const scenario = new Scenario({ seed: 1414 });
+    const player = scenario.getPlayerState('p1');
+    player.activePiece = { type: 'O', rotation: 0, x: 3, y: 0 };
+    player.magnetPermanentStacks = 3;
+    player.score = 0;
+
+    assert.equal(Math.abs(scoreMagnetControl(player, 4, 1, 1)), 0);
+  });
+
+  it('passes a fresh spawn and cleared temporary Magnet boost into the real hold plan', () => {
+    const scenario = new Scenario({ seed: 1515 });
+    const player = scenario.getPlayerState('p1');
+    player.activePiece = { type: 'I', rotation: 0, x: 3, y: 0 };
+    player.holdPiece = { type: 'O' };
+    player.canHold = true;
+    player.magnetPermanentStacks = 3;
+    player.magnetPieceBoost = 2;
+
+    const calls: Array<{ type: string; evaluationPiece?: unknown; evaluationBoost?: unknown }> = [];
+    const bot = new RulesBot({ mode: 'omniscient' });
+    (bot as unknown as {
+      findBestPlacement: (...args: unknown[]) => PlacementPlan;
+    }).findBestPlacement = (...args) => {
+      calls.push({ type: args[1] as string, evaluationPiece: args[6], evaluationBoost: args[7] });
+      return { rotation: 0, x: 0, score: args[1] === 'O' ? 100 : 0 };
+    };
+
+    const observation: DriverObservation = {
+      tick: 1,
+      player: defaultObservationProjector.project(scenario.getReport().gameState, 'p1', 'omniscient'),
+    };
+    const command = bot.next(observation);
+
+    assert.deepEqual(command.actions, ['hold']);
+    assert.deepEqual(calls, [
+      { type: 'I', evaluationPiece: undefined, evaluationBoost: undefined },
+      { type: 'O', evaluationPiece: { x: 3, y: 0, rotation: 0 }, evaluationBoost: 0 },
+    ]);
+  });
+
+  it('evaluates a held Bomber with its blast effect before choosing hold', () => {
+    const scenario = new Scenario({ seed: 808 });
+    const player = scenario.getPlayerState('p1');
+    player.activePiece = { type: 'I', rotation: 0, x: 3, y: 0, bomber: false };
+    player.holdPiece = { type: 'O', bomber: true };
+    player.canHold = true;
+
+    const calls: Array<{ type: string; isBomber: boolean }> = [];
+    const bot = new RulesBot({ mode: 'omniscient' });
+    (bot as unknown as {
+      findBestPlacement: (p: typeof player, type: string, isBomber: boolean) => PlacementPlan;
+    }).findBestPlacement = (_p, type, isBomber) => {
+      calls.push({ type, isBomber });
+      return { rotation: 0, x: 0, score: type === 'O' ? 100 : 0 };
+    };
+
+    const observation: DriverObservation = {
+      tick: 1,
+      player: defaultObservationProjector.project(scenario.getReport().gameState, 'p1', 'omniscient'),
+    };
+    const command = bot.next(observation);
+
+    assert.deepEqual(command.actions, ['hold']);
+    assert.deepEqual(calls, [
+      { type: 'I', isBomber: false },
+      { type: 'O', isBomber: true },
+    ]);
   });
 
   it('differentiates plan selection and scores between projected imminent (arrivalTick=10) and delayed (arrivalTick=65) garbage', () => {
@@ -525,6 +636,139 @@ describe('RulesBot Adapter & Attack Preview', () => {
   });
 
   describe('Step 4 — Curtain Frontier and Unknown-Region Risk', () => {
+    it('scores a coherent Curtain frontier above an internally hollow one', () => {
+      const coherent = createEmptyBoard();
+      const hollow = createEmptyBoard();
+      for (let x = 0; x < BOARD_COLS; x++) {
+        coherent[12][x] = 'I';
+        coherent[11][x] = 'I';
+        hollow[12][x] = 'I';
+      }
+      hollow[11][4] = null;
+      hollow[10][4] = 'I';
+
+      assert.ok(scoreCurtainReference(coherent, 13) > scoreCurtainReference(hollow, 13));
+    });
+
+    it('plans from the last player-visible board after Curtain masks it', () => {
+      const scenario = new Scenario({ seed: 8079 });
+      const p1 = scenario.getPlayerState('p1');
+      p1.board[BOARD_ROWS - 1][0] = 'I';
+      p1.activePiece = { type: 'O', rotation: 0, x: 3, y: 0 };
+      p1.canHold = false;
+      p1.swapCutoffRow = 7;
+      const bot = new RulesBot({ mode: 'player-limited', garbageEnabled: false });
+
+      p1.activeEffects = [{ id: 'curtain-warning', kind: 'curtain-warn', label: 'Curtain warning' }];
+      bot.next({
+        tick: 0,
+        replayTick: 0,
+        player: defaultObservationProjector.project(scenario.getReport().gameState, 'p1', 'player-limited'),
+      });
+
+      p1.activeEffects = [{ id: 'curtain-active', kind: 'curtain', label: 'Curtain' }];
+      const activeObservation = defaultObservationProjector.project(
+        scenario.getReport().gameState,
+        'p1',
+        'player-limited',
+      );
+      assert.equal(activeObservation.player.board[BOARD_ROWS - 1][0], null);
+
+      bot.next({ tick: 1, replayTick: 1, player: activeObservation });
+      assert.equal(bot.lastDecisionTrace?.decisionBoard[BOARD_ROWS - 1][0], 'I');
+    });
+
+    it('throttles Curtain hard-drops while leaving the initial warning at normal speed', () => {
+      const scenario = new Scenario({ seed: 8080 });
+      const p1 = scenario.getPlayerState('p1');
+      p1.activePiece = { type: 'O', rotation: 0, x: 3, y: 0 };
+      p1.lastHardDropTick = 0;
+      const bot = new RulesBot({ mode: 'omniscient' });
+      (bot as unknown as {
+        findBestPlacement: () => PlacementPlan;
+      }).findBestPlacement = () => ({ rotation: 0, x: 3, score: 0 });
+
+      p1.activeEffects = [{ id: 'curtain-warning', kind: 'curtain-warn', label: 'Curtain warning' }];
+      const warningCommand = bot.next({
+        tick: CURTAIN_BOT_HARD_DROP_INTERVAL_TICKS + 10,
+        replayTick: CURTAIN_BOT_HARD_DROP_INTERVAL_TICKS + 10,
+        player: defaultObservationProjector.project(scenario.getReport().gameState, 'p1', 'omniscient'),
+      });
+      assert.deepEqual(warningCommand.actions, ['hardDrop']);
+
+      p1.activeEffects = [{ id: 'curtain-active', kind: 'curtain', label: 'Curtain' }];
+      const firstActiveCommand = bot.next({
+        tick: CURTAIN_BOT_HARD_DROP_INTERVAL_TICKS + 11,
+        replayTick: CURTAIN_BOT_HARD_DROP_INTERVAL_TICKS + 11,
+        player: defaultObservationProjector.project(scenario.getReport().gameState, 'p1', 'omniscient'),
+      });
+      assert.deepEqual(firstActiveCommand.actions, ['hardDrop']);
+
+      const activeCommand = bot.next({
+        tick: CURTAIN_BOT_HARD_DROP_INTERVAL_TICKS + 12,
+        replayTick: CURTAIN_BOT_HARD_DROP_INTERVAL_TICKS + 12,
+        player: defaultObservationProjector.project(scenario.getReport().gameState, 'p1', 'omniscient'),
+      });
+      assert.deepEqual(activeCommand.actions, []);
+      assert.deepEqual(activeCommand.inputState, { left: false, right: false, softDrop: false });
+    });
+
+    it('carries active Curtain cadence through an overlapping warning', () => {
+      const scenario = new Scenario({ seed: 8081 });
+      const p1 = scenario.getPlayerState('p1');
+      p1.activePiece = { type: 'O', rotation: 0, x: 3, y: 0 };
+      p1.lastHardDropTick = 0;
+      const bot = new RulesBot({ mode: 'omniscient' });
+      (bot as unknown as {
+        findBestPlacement: () => PlacementPlan;
+      }).findBestPlacement = () => ({ rotation: 0, x: 3, score: 0 });
+
+      p1.activeEffects = [{ id: 'curtain-active', kind: 'curtain', label: 'Curtain' }];
+      const activeCommand = bot.next({
+        tick: CURTAIN_BOT_HARD_DROP_INTERVAL_TICKS + 10,
+        replayTick: CURTAIN_BOT_HARD_DROP_INTERVAL_TICKS + 10,
+        player: defaultObservationProjector.project(scenario.getReport().gameState, 'p1', 'omniscient'),
+      });
+      assert.deepEqual(activeCommand.actions, ['hardDrop']);
+
+      p1.activeEffects = [{ id: 'curtain-warning', kind: 'curtain-warn', label: 'Curtain warning' }];
+      const warningCommand = bot.next({
+        tick: CURTAIN_BOT_HARD_DROP_INTERVAL_TICKS + 11,
+        replayTick: CURTAIN_BOT_HARD_DROP_INTERVAL_TICKS + 11,
+        player: defaultObservationProjector.project(scenario.getReport().gameState, 'p1', 'omniscient'),
+      });
+      assert.deepEqual(warningCommand.actions, []);
+    });
+
+    it('uses a reachable counter-clockwise SRS route when the clockwise route is blocked', () => {
+      const board = createEmptyBoard();
+      board[5][4] = 'T';
+      board[6][3] = 'T';
+      board[8][5] = 'T';
+      board[9][0] = 'T';
+      board[9][1] = 'T';
+      const scenario = new Scenario({ seed: 8082 });
+      const p1 = scenario.getPlayerState('p1');
+      p1.board = board;
+      p1.swapCutoffRow = 7;
+      p1.activePiece = { type: 'L', rotation: 0, x: 3, y: 4 };
+      p1.activeEffects = [{ id: 'curtain-test', kind: 'curtain', label: 'Curtain' }];
+      const bot = new RulesBot({ mode: 'player-limited' });
+      const observation = () => defaultObservationProjector.project(
+        scenario.getReport().gameState,
+        'p1',
+        'player-limited',
+      );
+
+      const command = bot.next({ tick: 0, replayTick: 0, player: observation() });
+      assert.deepEqual(command.actions, ['rotateCCW']);
+      scenario.action('p1', 'rotateCCW');
+      scenario.advance(1);
+
+      assert.equal(scenario.getPlayerState('p1').activePiece?.rotation, 3);
+      assert.equal(scenario.getPlayerState('p1').activePiece?.x, 4);
+    });
+
     it('produces zero unknown risk for omniscient observation mode', () => {
       const visibility = { knownRowStart: 0, knownRowEndExclusive: BOARD_ROWS };
       const placedCells: Array<[number, number]> = [[0, 0], [0, 1], [0, 18], [0, 19]];
@@ -608,7 +852,7 @@ describe('RulesBot Adapter & Attack Preview', () => {
       assert.ok(plan);
     });
 
-    it('maintains survival on 120-second seed 2039 regression', () => {
+    it('maintains survival on 120-second seed 2039 regression', { timeout: 30000 }, () => {
       const runner = new PairedRunner({
         seed: 2039,
         enableShop: false,
@@ -617,6 +861,19 @@ describe('RulesBot Adapter & Attack Preview', () => {
       });
       const report = runner.run(7200); // 120 seconds
       assert.equal(report.scenarioReport.gameState.players.p1.topOut, false);
+      assert.equal(report.scenarioReport.gameState.players.p2.topOut, false);
+    });
+
+    it('keeps the Curtain recipient alive on full-catalog garbage seed 910060', { timeout: 30000 }, () => {
+      const runner = new PairedRunner({
+        seed: 910060,
+        enableShop: true,
+        enableGarbage: true,
+        botModes: { p1: 'player-limited', p2: 'player-limited' },
+        shopPolicies: { p1: createSimpleShopPolicy('curtain', 140) },
+      });
+      const report = runner.run(7200);
+
       assert.equal(report.scenarioReport.gameState.players.p2.topOut, false);
     });
   });

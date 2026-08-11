@@ -1,6 +1,7 @@
 /**
  * Builds public/poison/poison-sheet.svg — 8-frame × 4-variant poison overlay
  * (Gen III–style zigzag screen; original art, not ripped sprites).
+ * This asset is a production client dependency (referenced from src/index.css).
  */
 import { writeFileSync, mkdirSync } from 'fs';
 import { join, dirname } from 'path';

@@ -11,3 +11,6 @@ coverage/
 
 # Game replay files (local recordings; not for version control)
 *.replay
+
+# Generated RulesBot replay suites (regenerate via scripts/generate-*-replays.mts)
+fixtures/replays/

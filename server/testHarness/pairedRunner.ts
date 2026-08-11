@@ -1,14 +1,44 @@
 import type { GameState, MatchEvent } from '../../src/types.js';
 import { SHOP_ITEM_BY_ID } from '../../src/shop/shopCatalog.js';
-import type { DriverObservation, InputDriver } from './inputDriver.js';
+import type { DriverObservation, InputDriver, PlayerObservation } from './inputDriver.js';
 import type { PlayerFixture } from './fixtures.js';
 import { RulesBot, type ObservationMode, type RulesBotTopologyMode } from './rulesBot.js';
 import { defaultObservationProjector } from './observationProjector.js';
 import { Scenario, type PlayerMetrics, type ScenarioReport } from './scenario.js';
 
-export type BotShopPolicy = (
-  observation: DriverObservation,
-) => { openShop?: boolean; purchaseItemId?: string; overrideCost?: number } | null;
+export interface ShopPolicyObservation extends DriverObservation {
+  opponents: Readonly<Record<string, PlayerObservation>>;
+}
+
+export interface ShopPolicyDecision {
+  openShop?: boolean;
+  purchaseItemId?: string;
+  overrideCost?: number;
+}
+
+export interface BotShopPolicy {
+  (observation: ShopPolicyObservation): ShopPolicyDecision | null;
+  onPurchaseResult?: (record: PurchaseRecord) => void;
+}
+
+export type PairPurchasePhase = 'setup' | 'waiting-for-activation' | 'payoff' | 'complete';
+
+export interface PairShopPolicyConfig {
+  setupItemId: string;
+  payoffItemId: string;
+  setupRequiredScore?: number;
+  payoffRequiredScore?: number;
+  setupOverrideCost?: number;
+  payoffOverrideCost?: number;
+  /** Defaults to immediate readiness once the setup purchase is accepted. */
+  setupIsActive?: (observation: ShopPolicyObservation) => boolean;
+  /** Defaults to true so a full-session bot continues buying complete pairs. */
+  repeat?: boolean;
+}
+
+export interface PairShopPolicy extends BotShopPolicy {
+  getPhase(): PairPurchasePhase;
+}
 
 export interface PairedRunnerConfig {
   seed: number;
@@ -19,6 +49,7 @@ export interface PairedRunnerConfig {
   botModes?: Record<string, ObservationMode>;
   botTopology?: Record<string, RulesBotTopologyMode>;
   shopPolicies?: Record<string, BotShopPolicy>;
+  shopPolicyModes?: Record<string, ObservationMode>;
   enableShop?: boolean;
   enableGarbage?: boolean;
 }
@@ -64,10 +95,63 @@ export function createSimpleShopPolicy(
   };
 }
 
+/**
+ * Stateful setup -> activation -> payoff policy. Movement remains owned by the
+ * InputDriver; this policy only acts on player-visible shop and prerequisite state.
+ */
+export function createPairShopPolicy(config: PairShopPolicyConfig): PairShopPolicy {
+  const setupCatalogCost = SHOP_ITEM_BY_ID.get(config.setupItemId)?.cost ?? 0;
+  const payoffCatalogCost = SHOP_ITEM_BY_ID.get(config.payoffItemId)?.cost ?? 0;
+  const setupRequiredScore = config.setupRequiredScore
+    ?? config.setupOverrideCost
+    ?? setupCatalogCost;
+  const payoffRequiredScore = config.payoffRequiredScore
+    ?? config.payoffOverrideCost
+    ?? payoffCatalogCost;
+  const repeat = config.repeat ?? true;
+  let phase: PairPurchasePhase = 'setup';
+
+  const decide = ((observation: ShopPolicyObservation): ShopPolicyDecision | null => {
+    if (phase === 'waiting-for-activation') {
+      if (!config.setupIsActive?.(observation)) return null;
+      phase = 'payoff';
+    }
+    if (phase === 'complete') return null;
+
+    const isSetup = phase === 'setup';
+    const targetItemId = isSetup ? config.setupItemId : config.payoffItemId;
+    const requiredScore = isSetup ? setupRequiredScore : payoffRequiredScore;
+    const overrideCost = isSetup ? config.setupOverrideCost : config.payoffOverrideCost;
+    const player = observation.player.player;
+
+    if (player.score < requiredScore) return null;
+    if (player.shop.phase === 'ready') return { openShop: true };
+    if (player.shop.phase !== 'cycling') return null;
+
+    const highlightedItemId = player.shop.offerIds[player.shop.cycleIndex];
+    if (highlightedItemId !== targetItemId) return null;
+    return { purchaseItemId: targetItemId, overrideCost };
+  }) as PairShopPolicy;
+
+  decide.onPurchaseResult = (record: PurchaseRecord): void => {
+    if (!record.accepted) return;
+    if (phase === 'setup' && record.itemId === config.setupItemId) {
+      phase = config.setupIsActive ? 'waiting-for-activation' : 'payoff';
+      return;
+    }
+    if (phase === 'payoff' && record.itemId === config.payoffItemId) {
+      phase = repeat ? 'setup' : 'complete';
+    }
+  };
+  decide.getPhase = (): PairPurchasePhase => phase;
+  return decide;
+}
+
 export class PairedRunner {
   private readonly scenario: Scenario;
   private readonly playerIds: string[];
   private readonly shopPolicies: Record<string, BotShopPolicy>;
+  private readonly shopPolicyModes: Record<string, ObservationMode>;
   private readonly purchases: PurchaseRecord[] = [];
   private readonly walletHistory: Record<string, number[]>;
 
@@ -78,11 +162,16 @@ export class PairedRunner {
     for (const id of this.playerIds) {
       if (!drivers[id]) {
         const mode = config.botModes?.[id] ?? 'omniscient';
-        drivers[id] = new RulesBot({ mode, topology: config.botTopology?.[id] ?? 'none' });
+        drivers[id] = new RulesBot({
+          mode,
+          topology: config.botTopology?.[id] ?? 'none',
+          garbageEnabled: config.enableGarbage ?? true,
+        });
       }
     }
 
     this.shopPolicies = config.shopPolicies ?? {};
+    this.shopPolicyModes = config.shopPolicyModes ?? {};
 
     this.scenario = new Scenario({
       seed: config.seed,
@@ -108,9 +197,19 @@ export class PairedRunner {
       for (const id of this.playerIds) {
         const policy = this.shopPolicies[id];
         if (policy) {
-          const obs = {
+          const observationMode = this.shopPolicyModes[id] ?? 'omniscient';
+          const opponents = Object.fromEntries(
+            this.playerIds
+              .filter((playerId) => playerId !== id)
+              .map((playerId) => [
+                playerId,
+                defaultObservationProjector.project(stateBefore, playerId, observationMode),
+              ]),
+          );
+          const obs: ShopPolicyObservation = {
             tick: stateBefore.tick,
-            player: defaultObservationProjector.project(stateBefore, id, 'omniscient'),
+            player: defaultObservationProjector.project(stateBefore, id, observationMode),
+            opponents,
           };
           const decision = policy(obs);
           if (decision?.openShop) {
@@ -121,13 +220,15 @@ export class PairedRunner {
             const accepted = this.scenario.purchase(id, decision.purchaseItemId, options);
             const catalogCost = SHOP_ITEM_BY_ID.get(decision.purchaseItemId)?.cost ?? 0;
             const actualCost = decision.overrideCost !== undefined ? decision.overrideCost : catalogCost;
-            this.purchases.push({
+            const purchaseRecord = {
               tick: stateBefore.tick,
               playerId: id,
               itemId: decision.purchaseItemId,
               accepted,
               cost: actualCost,
-            });
+            } satisfies PurchaseRecord;
+            this.purchases.push(purchaseRecord);
+            policy.onPurchaseResult?.(purchaseRecord);
           }
         }
       }

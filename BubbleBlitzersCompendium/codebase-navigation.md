@@ -111,7 +111,7 @@ See [docs/SHOP_POWERUPS.md](../docs/SHOP_POWERUPS.md) for the design specs of ap
 - **Run:** `npm run dev`, open **two** tabs at `http://localhost:3000` (the match needs 2 players to leave `waiting`).
 - **Type-check:** `npm run lint` (`tsc --noEmit`) — catches a missing re-export or a `PlayerState` field mismatch instantly.
 - **Engine tests:** the simulation has unit coverage in [server/tetris/engine.test.ts](../server/tetris/engine.test.ts) — run them when you touch `engine.ts`.
-- **Replays:** every finished match auto-saves a `.replay` JSON to `public/replays` (see `saveReplay()` in [GameManager.ts](../server/GameManager.ts)); open it in the replay viewer to inspect a run frame-by-frame.
+- **Replays:** every finished match auto-saves a `.replay` JSON to `fixtures/replays` (see `saveReplay()` in [GameManager.ts](../server/GameManager.ts)); open it in the replay viewer to inspect a run frame-by-frame.
 
 ---
 

@@ -58,4 +58,50 @@ describe('Compound Treatment Runner (C, P, P+S Arms)', () => {
     assert.equal(report.payoffItemId, 'wildcard-four');
     assert.equal(report.cases.length, 3);
   });
+
+  it('supports Re-Trim <-> Curtain optional order permutations (forward and reverse)', { timeout: 30000 }, () => {
+    const forwardReport = runCompoundTreatment({
+      runs: 3,
+      seconds: 5,
+      setupItemId: 'retrim',
+      payoffItemId: 'curtain',
+      costPolicy: 'reference-price',
+    });
+    assert.equal(forwardReport.setupItemId, 'retrim');
+    assert.equal(forwardReport.payoffItemId, 'curtain');
+    assert.equal(forwardReport.cases.length, 3);
+
+    const reverseReport = runCompoundTreatment({
+      runs: 3,
+      seconds: 5,
+      setupItemId: 'curtain',
+      payoffItemId: 'retrim',
+      costPolicy: 'reference-price',
+    });
+    assert.equal(reverseReport.setupItemId, 'curtain');
+    assert.equal(reverseReport.payoffItemId, 'retrim');
+    assert.equal(reverseReport.cases.length, 3);
+  });
+
+  it('enforces mandatory-order gating and rejects payoff attempts before Elixir poison activation', () => {
+    // 1. Verify policy phase remains 'setup' and ignores payoff offer prior to setup purchase
+    const report = runCompoundTreatment({
+      runs: 3,
+      seconds: 5,
+      setupItemId: 'elixir-pulse',
+      payoffItemId: 'vortex-step',
+      costPolicy: 'reference-price',
+    });
+
+    for (const c of report.cases) {
+      // In pairTrace, no payoff purchase record precedes the setup purchase record
+      const setupIndex = c.pairTrace.purchases.findIndex((p) => p.itemId === 'elixir-pulse' && p.accepted);
+      const payoffIndex = c.pairTrace.purchases.findIndex((p) => p.itemId === 'vortex-step' && p.accepted);
+      if (payoffIndex !== -1) {
+        assert.ok(setupIndex !== -1, 'Payoff must not succeed without setup');
+        assert.ok(payoffIndex > setupIndex, 'Payoff accepted index must follow setup accepted index');
+      }
+    }
+  });
 });
+

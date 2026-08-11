@@ -37,6 +37,8 @@ export default defineConfig(({ mode }) => {
   return {
     base: normalizedBase,
     plugins: [react(), tailwindcss()],
+    // QA replays + mockups live under fixtures/ — not the production client public/.
+    publicDir: path.resolve(projectRoot, 'fixtures'),
     define: {
       'process.env.GEMINI_API_KEY': JSON.stringify(env.GEMINI_API_KEY),
     },

@@ -1,4 +1,9 @@
-import { PairedRunner, createSimpleShopPolicy, type BotShopPolicy } from './pairedRunner.js';
+import {
+  PairedRunner,
+  createPairShopPolicy,
+  createSimpleShopPolicy,
+  type ShopPolicyObservation,
+} from './pairedRunner.js';
 import {
   computeRoleOutcomeDelta,
   type ArmType,
@@ -656,22 +661,25 @@ export function runCompoundTreatment(config?: CompoundTreatmentConfig): Compound
 
     // Arm P+S: Setup then Payoff (p1 buys setupItemId, then payoffItemId)
     const stepRecords: CompoundStepRecord[] = [];
-    const pairPolicy: BotShopPolicy = (obs) => {
-      const player = obs.player.player;
-      if (player.shop.phase === 'ready') {
-        return { openShop: true };
-      }
-      if (player.shop.phase === 'cycling') {
-        const hasSetup = obs.player.player.shop.lastPurchasedItemId === setupItemId;
-        const targetItem = hasSetup ? payoffItemId : setupItemId;
-        const reqCost = targetItem === setupItemId ? setupCost : payoffCost;
-        const itemOverrideCost = targetItem === setupItemId ? setupOverrideCost : payoffOverrideCost;
-        if (player.score >= reqCost) {
-          return { purchaseItemId: targetItem, overrideCost: itemOverrideCost };
-        }
-      }
-      return null;
-    };
+    const requiresVisiblePoison = setupItemId === 'elixir-pulse'
+      && (payoffItemId === 'vortex-step' || payoffItemId === 'wildcard-four');
+    const setupIsActive = requiresVisiblePoison
+      ? (observation: ShopPolicyObservation): boolean => Object.values(observation.opponents).some(
+          (opponent) => opponent.player.poisonBoard?.some(
+            (row) => row.some((generation) => generation > 0),
+          ) ?? false,
+        )
+      : undefined;
+    const pairPolicy = createPairShopPolicy({
+      setupItemId,
+      payoffItemId,
+      setupRequiredScore: setupCost,
+      payoffRequiredScore: payoffCost,
+      setupOverrideCost,
+      payoffOverrideCost,
+      setupIsActive,
+      repeat: true,
+    });
 
     const pairRunner = new PairedRunner({
       seed,
@@ -680,6 +688,7 @@ export function runCompoundTreatment(config?: CompoundTreatmentConfig): Compound
       botModes: { p1: observationMode, p2: observationMode },
       botTopology: { p1: topology, p2: topology },
       shopPolicies: { p1: pairPolicy },
+      shopPolicyModes: { p1: observationMode },
     });
     const pairReport = pairRunner.run(durationTicks);
 

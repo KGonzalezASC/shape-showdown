@@ -58,8 +58,13 @@ docs/
 config/
   server.json
   client.json
-public/
+public/                        # Production client static only (copied into dist/client)
   game-config.json
+  poison/                      # In-game poison sheet (CSS)
+fixtures/                      # QA / internal only — NOT copied into dist/client
+  README.md
+  replays/                     # RulesBot suites + match recordings
+  mockups/                     # Standalone HTML visual studies
 ```
 
 ## How to run
@@ -68,7 +73,9 @@ public/
 |---------|---------|
 | `bun install` | Install deps |
 | `bun run dev` | Full stack via Bun (`server.ts` + Vite middleware). Default **http://localhost:3000** |
-| `bun run build` | Client + replay viewer + server bundle |
+| `bun run build` | Production client + server bundle |
+| `bun run build:internal` | Same as `build`, plus replay viewer under `dist/replay-viewer` |
+| `bun run build:replay` | Internal replay viewer only (serves `fixtures/`) |
 | `bun run start` | Production server (`dist-server/server.mjs`) |
 | `bun run start:serve-client` | Production + serve `./dist` |
 | `bun run lint` | `tsc --noEmit` |

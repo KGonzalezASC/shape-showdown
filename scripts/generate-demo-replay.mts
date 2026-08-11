@@ -71,7 +71,7 @@ const replayData: ReplayDataV2 = {
   events: finalReport.events,
 };
 
-const outDir = path.resolve('public/replays');
+const outDir = path.resolve('fixtures/replays');
 if (!fs.existsSync(outDir)) {
   fs.mkdirSync(outDir, { recursive: true });
 }

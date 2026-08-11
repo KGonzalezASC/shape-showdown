@@ -1,0 +1,758 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Shape Showdown — Dispersed Piece Shapes Voronoi BG Mockup</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg-pure-black: #050505;
+      --surface-base: #0d0d0f;
+      --surface-raised: #141417;
+      --surface-overlay: #1a1a1e;
+      --border-hairline: rgba(255, 255, 255, 0.09);
+      --border-raised: rgba(255, 255, 255, 0.15);
+      --text-primary: #f4f4f5;
+      --text-muted: #8e8e93;
+    }
+
+    body {
+      font-family: 'Outfit', -apple-system, BlinkMacSystemFont, sans-serif;
+      color: var(--text-primary);
+      background-color: var(--bg-pure-black);
+      min-height: 100vh;
+      overflow-x: hidden;
+      margin: 0;
+      padding: 0;
+    }
+
+    .font-mono {
+      font-family: 'JetBrains Mono', monospace;
+    }
+
+    /* Distinct raised surface cards with hair-line borders */
+    .surface-card {
+      background: var(--surface-raised);
+      border: 1px solid var(--border-hairline);
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6);
+      backdrop-filter: blur(12px);
+      transition: border-color 0.2s ease, transform 0.2s ease;
+    }
+
+    .surface-card:hover {
+      border-color: var(--border-raised);
+    }
+
+    .surface-base {
+      background: var(--surface-base);
+      border: 1px solid var(--border-hairline);
+    }
+
+    .surface-overlay {
+      background: var(--surface-overlay);
+      border: 1px solid var(--border-hairline);
+    }
+
+    /* Canvas playfield container */
+    .playfield-canvas-container {
+      background: rgba(0, 0, 0, 0.88);
+      border: 2px solid rgba(255, 255, 255, 0.12);
+      border-radius: 8px;
+      box-shadow: inset 0 0 25px rgba(0, 0, 0, 0.9), 0 0 15px rgba(0, 0, 0, 0.6);
+      position: relative;
+    }
+
+    canvas {
+      display: block;
+    }
+  </style>
+</head>
+<body class="p-4 md:p-8 min-h-screen flex flex-col relative">
+
+  <!-- Fixed t3code Scrim / Dimmer Overlay for Background Focus -->
+  <div id="bg-scrim-layer" class="fixed inset-0 pointer-events-none z-0 transition-all duration-300 bg-black/60 backdrop-blur-[2px]"></div>
+
+  <!-- Header Section -->
+  <header class="w-full max-w-7xl mx-auto mb-6 relative z-10">
+    <div class="surface-card rounded-2xl p-4 md:p-6 flex flex-col gap-4">
+      <div class="flex flex-wrap items-center justify-between gap-4">
+        <div class="flex items-center gap-3">
+          <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500 p-0.5 shadow-lg shadow-purple-500/20 flex items-center justify-center">
+            <div class="w-full h-full bg-black rounded-[10px] flex items-center justify-center font-bold text-lg text-white">SS</div>
+          </div>
+          <div>
+            <h1 class="text-xl md:text-2xl font-extrabold tracking-tight bg-gradient-to-r from-white via-zinc-200 to-zinc-400 bg-clip-text text-transparent">
+              SHAPE SHOWDOWN <span class="text-xs font-mono text-purple-400 border border-purple-500/40 px-2 py-0.5 rounded-full ml-2">4% PIECE SHAPE VORONOI BG</span>
+            </h1>
+            <p class="text-xs text-zinc-400 font-mono">Dispersed Tetromino Voronoi Groups (I, J, L, O, S, T, Z Shapes)</p>
+          </div>
+        </div>
+
+        <div class="flex items-center gap-3">
+          <button id="regen-btn" onclick="generateBackground()" class="surface-overlay hover:bg-zinc-800 text-zinc-200 text-xs font-mono py-2 px-4 rounded-xl flex items-center gap-2 transition border border-white/10 active:scale-95">
+            <svg class="w-4 h-4 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
+            Re-seed Tetromino BG (4% Coverage)
+          </button>
+
+          <div class="surface-base px-3 py-1.5 rounded-xl border border-white/10 flex items-center gap-2 text-xs font-mono">
+            <span class="w-2 h-2 rounded-full bg-purple-400 animate-pulse"></span>
+            <span class="text-purple-300 font-semibold">4% SHAPES DISPERSED</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- t3code Focus & Visibility Controls (Black Opacity Scrim & Blur) -->
+      <div class="w-full flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-white/10 text-xs font-mono">
+        <div class="flex items-center gap-2 text-zinc-400">
+          <svg class="w-4 h-4 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path></svg>
+          <span>Background Scrim (Black Opacity):</span>
+          <div class="flex items-center gap-1 bg-black/40 p-1 rounded-lg border border-white/10">
+            <button onclick="setBgScrim(0, this)" class="scrim-btn px-2 py-0.5 rounded text-[11px] hover:text-white transition text-zinc-400">0% (Raw)</button>
+            <button onclick="setBgScrim(0.35, this)" class="scrim-btn px-2 py-0.5 rounded text-[11px] hover:text-white transition text-zinc-400">35% (Subtle)</button>
+            <button onclick="setBgScrim(0.60, this)" class="scrim-btn px-2 py-0.5 rounded text-[11px] active-scrim text-indigo-300 font-bold bg-indigo-950/60 border border-indigo-500/40">60% (Focused)</button>
+            <button onclick="setBgScrim(0.85, this)" class="scrim-btn px-2 py-0.5 rounded text-[11px] hover:text-white transition text-zinc-400">85% (Deep)</button>
+          </div>
+        </div>
+
+        <div class="flex items-center gap-2 text-zinc-400">
+          <span>Backdrop Blur:</span>
+          <div class="flex items-center gap-1 bg-black/40 p-1 rounded-lg border border-white/10">
+            <button onclick="setBgBlur('0px', this)" class="blur-btn px-2 py-0.5 rounded text-[11px] hover:text-white transition text-zinc-400">None</button>
+            <button onclick="setBgBlur('2px', this)" class="blur-btn px-2 py-0.5 rounded text-[11px] active-blur text-indigo-300 font-bold bg-indigo-950/60 border border-indigo-500/40">Soft (2px)</button>
+            <button onclick="setBgBlur('6px', this)" class="blur-btn px-2 py-0.5 rounded text-[11px] hover:text-white transition text-zinc-400">Medium (6px)</button>
+            <button onclick="setBgBlur('12px', this)" class="blur-btn px-2 py-0.5 rounded text-[11px] hover:text-white transition text-zinc-400">Heavy (12px)</button>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </header>
+
+  <!-- Main Game Layout -->
+  <main class="w-full max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-12 gap-6 flex-1 items-start">
+
+    <!-- Player 1 Playfield -->
+    <section class="lg:col-span-4 surface-card rounded-2xl p-5 flex flex-col items-center">
+      <div class="w-full flex items-center justify-between mb-4 border-b border-white/10 pb-3">
+        <div class="flex items-center gap-2">
+          <span class="w-3 h-3 rounded-full bg-cyan-400 shadow-sm shadow-cyan-400/50"></span>
+          <h2 class="font-bold text-sm tracking-wider uppercase text-zinc-200">Neon_Blitz (P1)</h2>
+        </div>
+        <span class="font-mono text-xs text-cyan-400 font-bold bg-cyan-950/40 border border-cyan-500/30 px-2 py-0.5 rounded">SCORE: 18,920</span>
+      </div>
+
+      <div class="flex gap-4 items-start w-full justify-center">
+        <!-- Left Rail: Hold Piece & Stats -->
+        <div class="flex flex-col gap-3">
+          <div class="surface-base rounded-xl p-2 text-center w-16">
+            <span class="text-[10px] font-mono text-zinc-400 block mb-1 uppercase">Hold</span>
+            <div class="w-12 h-12 bg-black/60 rounded border border-white/5 flex items-center justify-center">
+              <canvas id="hold-canvas-p1" width="44" height="44"></canvas>
+            </div>
+          </div>
+
+          <div class="surface-base rounded-xl p-2 text-center w-16 text-xs font-mono">
+            <span class="text-[9px] text-zinc-500 block uppercase">Lines</span>
+            <span class="font-bold text-zinc-200">34</span>
+          </div>
+
+          <div class="surface-base rounded-xl p-2 text-center w-16 text-xs font-mono">
+            <span class="text-[9px] text-zinc-500 block uppercase">APM</span>
+            <span class="font-bold text-purple-400">72.4</span>
+          </div>
+        </div>
+
+        <!-- Center: 10x18 Playfield Canvas (Voronoi Cells) -->
+        <div class="playfield-canvas-container p-1 rounded-lg overflow-hidden">
+          <canvas id="board-p1-canvas" width="220" height="396"></canvas>
+        </div>
+
+        <!-- Right Rail: Next Queue -->
+        <div class="flex flex-col gap-2">
+          <span class="text-[10px] font-mono text-zinc-400 text-center uppercase block">Next</span>
+          <div class="surface-base rounded-xl p-2 w-16 flex flex-col gap-2 items-center">
+            <div class="w-12 h-10 bg-black/60 rounded border border-white/5 flex items-center justify-center">
+              <canvas id="next1-canvas-p1" width="44" height="36"></canvas>
+            </div>
+            <div class="w-12 h-10 bg-black/60 rounded border border-white/5 flex items-center justify-center">
+              <canvas id="next2-canvas-p1" width="44" height="36"></canvas>
+            </div>
+            <div class="w-12 h-10 bg-black/60 rounded border border-white/5 flex items-center justify-center">
+              <canvas id="next3-canvas-p1" width="44" height="36"></canvas>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Center Column: Voronoi Info & Shop Catalog -->
+    <section class="lg:col-span-4 flex flex-col gap-4">
+      <!-- Voronoi Engine Highlights -->
+      <div class="surface-card rounded-2xl p-5 border-l-4 border-l-purple-500">
+        <div class="flex items-center gap-2 mb-2">
+          <svg class="w-4 h-4 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 10l-2 1m0 0l-2-1m2 1v2.5M20 7l-2 1m2-1l-2-1m2 1v2.5M14 4l-2-1-2 1M4 7l2-1M4 7l2 1M4 7v2.5M12 21l-2-1m2 1l2-1m-2 1v-2.5M6 18l-2-1v-2.5M18 18l2-1v-2.5"></path></svg>
+          <h3 class="font-bold text-sm text-purple-200 tracking-wide uppercase">4% Dispersed Tetromino Background</h3>
+        </div>
+        <p class="text-xs text-zinc-300 leading-relaxed">
+          The background generator creates a uniform Voronoi cell mesh with ~<strong>4% total coverage</strong> dedicated to scattered game piece shape clusters (<strong>I, J, L, O, S, T, Z</strong>). Each piece cluster uses uniform shading & distinct stroke tones.
+        </p>
+      </div>
+
+      <!-- Shop Power-Ups Rail -->
+      <div class="surface-card rounded-2xl p-5">
+        <div class="flex items-center justify-between mb-3">
+          <div class="flex items-center gap-2">
+            <svg class="w-4 h-4 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z"></path></svg>
+            <h3 class="font-bold text-sm tracking-wide uppercase text-zinc-200">Shop Catalog</h3>
+          </div>
+          <span class="text-xs font-mono text-amber-400 bg-amber-950/40 border border-amber-500/30 px-2 py-0.5 rounded">SHOP READY</span>
+        </div>
+
+        <div class="space-y-2.5">
+          <div class="surface-overlay rounded-xl p-3 flex items-center justify-between hover:border-amber-500/40 transition cursor-pointer">
+            <div>
+              <div class="flex items-center gap-2">
+                <span class="font-bold text-sm text-zinc-100">Elixir Purge</span>
+                <span class="text-[10px] font-mono bg-emerald-950 text-emerald-400 px-1.5 py-0.5 rounded border border-emerald-800">SELF</span>
+              </div>
+              <p class="text-xs text-zinc-400 mt-0.5">Clears poison cells & bottom 2 garbage rows.</p>
+            </div>
+            <div class="text-right">
+              <span class="font-mono text-xs font-bold text-amber-400 block">$4.00</span>
+              <button class="bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 text-[11px] font-mono px-2.5 py-1 rounded-lg border border-amber-500/40 mt-1 transition">BUY</button>
+            </div>
+          </div>
+
+          <div class="surface-overlay rounded-xl p-3 flex items-center justify-between hover:border-red-500/40 transition cursor-pointer">
+            <div>
+              <div class="flex items-center gap-2">
+                <span class="font-bold text-sm text-zinc-100">Bomber Strike</span>
+                <span class="text-[10px] font-mono bg-red-950 text-red-400 px-1.5 py-0.5 rounded border border-red-800">ATTACK</span>
+              </div>
+              <p class="text-xs text-zinc-400 mt-0.5">Spawns 4 volatile bomb blocks on opponent board.</p>
+            </div>
+            <div class="text-right">
+              <span class="font-mono text-xs font-bold text-amber-400 block">$6.50</span>
+              <button class="bg-red-500/20 hover:bg-red-500/30 text-red-300 text-[11px] font-mono px-2.5 py-1 rounded-lg border border-red-500/40 mt-1 transition">BUY</button>
+            </div>
+          </div>
+
+          <div class="surface-overlay rounded-xl p-3 flex items-center justify-between hover:border-purple-500/40 transition cursor-pointer">
+            <div>
+              <div class="flex items-center gap-2">
+                <span class="font-bold text-sm text-zinc-100">Tectonic Shift</span>
+                <span class="text-[10px] font-mono bg-purple-950 text-purple-400 px-1.5 py-0.5 rounded border border-purple-800">FIELD</span>
+              </div>
+              <p class="text-xs text-zinc-400 mt-0.5">Reshuffles bottom matrix rows with gap alignment.</p>
+            </div>
+            <div class="text-right">
+              <span class="font-mono text-xs font-bold text-amber-400 block">$8.00</span>
+              <button class="bg-purple-500/20 hover:bg-purple-500/30 text-purple-300 text-[11px] font-mono px-2.5 py-1 rounded-lg border border-purple-500/40 mt-1 transition">BUY</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Design Citation Box -->
+      <div class="surface-card rounded-2xl p-5 border-l-4 border-l-indigo-500">
+        <div class="flex items-center gap-2 mb-2">
+          <svg class="w-4 h-4 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+          <h3 class="font-bold text-sm text-indigo-200 tracking-wide uppercase">Design Citation (t3code GitHub)</h3>
+        </div>
+        <div class="surface-base rounded-xl p-3 font-mono text-[11px] text-zinc-300 space-y-2.5 border border-white/10">
+          <div>
+            <span class="text-purple-400 font-bold block mb-0.5">PR #4068 Commit 70d022d:</span>
+            <blockquote class="italic text-zinc-200">"Dark canvas goes from #161616 to pure black with raised card surfaces, a light primary, and a rounder composer."</blockquote>
+          </div>
+          <div class="pt-2 border-t border-white/10">
+            <span class="text-indigo-400 font-bold block mb-0.5">PR #5911 & #4443 (Scrim & Opacity):</span>
+            <blockquote class="italic text-zinc-200">"Fixed background scrim overlay (`bg-black/60`) and `backdrop-blur-[2px]` keep the user focused on active playfield elements while maintaining ambient texture."</blockquote>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Player 2 Playfield -->
+    <section class="lg:col-span-4 surface-card rounded-2xl p-5 flex flex-col items-center">
+      <div class="w-full flex items-center justify-between mb-4 border-b border-white/10 pb-3">
+        <div class="flex items-center gap-2">
+          <span class="w-3 h-3 rounded-full bg-pink-400 shadow-sm shadow-pink-400/50"></span>
+          <h2 class="font-bold text-sm tracking-wider uppercase text-zinc-200">Cyber_Pro (P2)</h2>
+        </div>
+        <span class="font-mono text-xs text-pink-400 font-bold bg-pink-950/40 border border-pink-500/30 px-2 py-0.5 rounded">SCORE: 16,450</span>
+      </div>
+
+      <div class="flex gap-4 items-start w-full justify-center">
+        <!-- Left Rail: Hold Piece & Stats -->
+        <div class="flex flex-col gap-3">
+          <div class="surface-base rounded-xl p-2 text-center w-16">
+            <span class="text-[10px] font-mono text-zinc-400 block mb-1 uppercase">Hold</span>
+            <div class="w-12 h-12 bg-black/60 rounded border border-white/5 flex items-center justify-center">
+              <canvas id="hold-canvas-p2" width="44" height="44"></canvas>
+            </div>
+          </div>
+
+          <div class="surface-base rounded-xl p-2 text-center w-16 text-xs font-mono">
+            <span class="text-[9px] text-zinc-500 block uppercase">Lines</span>
+            <span class="font-bold text-zinc-200">29</span>
+          </div>
+
+          <div class="surface-base rounded-xl p-2 text-center w-16 text-xs font-mono">
+            <span class="text-[9px] text-zinc-500 block uppercase">APM</span>
+            <span class="font-bold text-pink-400">66.1</span>
+          </div>
+        </div>
+
+        <!-- Center: 10x18 Playfield Canvas (Voronoi Cells) -->
+        <div class="playfield-canvas-container p-1 rounded-lg overflow-hidden">
+          <canvas id="board-p2-canvas" width="220" height="396"></canvas>
+        </div>
+
+        <!-- Right Rail: Next Queue -->
+        <div class="flex flex-col gap-2">
+          <span class="text-[10px] font-mono text-zinc-400 text-center uppercase block">Next</span>
+          <div class="surface-base rounded-xl p-2 w-16 flex flex-col gap-2 items-center">
+            <div class="w-12 h-10 bg-black/60 rounded border border-white/5 flex items-center justify-center">
+              <canvas id="next1-canvas-p2" width="44" height="36"></canvas>
+            </div>
+            <div class="w-12 h-10 bg-black/60 rounded border border-white/5 flex items-center justify-center">
+              <canvas id="next2-canvas-p2" width="44" height="36"></canvas>
+            </div>
+            <div class="w-12 h-10 bg-black/60 rounded border border-white/5 flex items-center justify-center">
+              <canvas id="next3-canvas-p2" width="44" height="36"></canvas>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- Footer Info -->
+  <footer class="w-full max-w-7xl mx-auto mt-6 text-center text-xs font-mono text-zinc-500 surface-card rounded-xl p-3">
+    Background generator powered by Jack Rugile Engine • 4% Coverage Dispersed Tetromino Voronoi Groups
+  </footer>
+
+  <script>
+    /* =============================================================
+       t3code Scrim & Opacity Control Handlers (PR #5911 & #4443 pattern)
+       ============================================================= */
+    let currentScrimOpacity = 0.60;
+    let currentBlurPx = '2px';
+
+    function setBgScrim(opacity, btn) {
+      currentScrimOpacity = opacity;
+      const scrimLayer = document.getElementById('bg-scrim-layer');
+      if (scrimLayer) {
+        scrimLayer.style.backgroundColor = `rgba(5, 5, 5, ${opacity})`;
+      }
+      if (btn) {
+        document.querySelectorAll('.scrim-btn').forEach(b => {
+          b.className = 'scrim-btn px-2 py-0.5 rounded text-[11px] hover:text-white transition text-zinc-400';
+        });
+        btn.className = 'scrim-btn px-2 py-0.5 rounded text-[11px] active-scrim text-indigo-300 font-bold bg-indigo-950/60 border border-indigo-500/40';
+      }
+    }
+
+    function setBgBlur(blurPx, btn) {
+      currentBlurPx = blurPx;
+      const scrimLayer = document.getElementById('bg-scrim-layer');
+      if (scrimLayer) {
+        scrimLayer.style.backdropFilter = blurPx === '0px' ? 'none' : `blur(${blurPx})`;
+      }
+      if (btn) {
+        document.querySelectorAll('.blur-btn').forEach(b => {
+          b.className = 'blur-btn px-2 py-0.5 rounded text-[11px] hover:text-white transition text-zinc-400';
+        });
+        btn.className = 'blur-btn px-2 py-0.5 rounded text-[11px] active-blur text-indigo-300 font-bold bg-indigo-950/60 border border-indigo-500/40';
+      }
+    }
+    /* =============================================================
+       Pre-computed static polygon unit circle angles for N=5, 6, 7
+       ============================================================= */
+    const POLYGON_BASE_ANGLES = {};
+    for (let sides = 5; sides <= 7; sides++) {
+      POLYGON_BASE_ANGLES[sides] = Array.from({ length: sides }, (_, i) => {
+        const a = (i * 2 * Math.PI) / sides;
+        return { cos: Math.cos(a), sin: Math.sin(a) };
+      });
+    }
+
+    function traceVoronoiBgPolygon( ctx, cx, cy, radius, sides, seed ) {
+      var baseAngles = POLYGON_BASE_ANGLES[sides] || POLYGON_BASE_ANGLES[5];
+      ctx.beginPath();
+      for (var i = 0; i < sides; i++) {
+        var base = baseAngles[i];
+        var angleOffset = Math.sin( seed * 0.7 + i ) * 0.14;
+        var rad = radius + Math.cos( seed * 1.3 + i ) * ( radius * 0.18 );
+
+        var cosO = Math.cos( angleOffset );
+        var sinO = Math.sin( angleOffset );
+        var cosVal = base.cos * cosO - base.sin * sinO;
+        var sinVal = base.sin * cosO + base.cos * sinO;
+
+        var px = cx + rad * cosVal;
+        var py = cy + rad * sinVal;
+
+        if (i === 0) ctx.moveTo( px, py );
+        else ctx.lineTo( px, py );
+      }
+      ctx.closePath();
+    }
+
+    /* =============================================================
+       TETROMINO SHAPES WITH SUBTLE MUTED COLOR TINTS
+       ============================================================= */
+    const TETROMINO_PIECES = [
+      // I-piece (Muted Cyan Tint)
+      {
+        name: 'I',
+        fill: 'rgb(20, 52, 64)', stroke: 'rgb(45, 110, 130)',
+        shapes: [ [[0,0], [0,1], [0,2], [0,3]], [[0,0], [1,0], [2,0], [3,0]] ]
+      },
+      // J-piece (Muted Blue Tint)
+      {
+        name: 'J',
+        fill: 'rgb(22, 40, 68)', stroke: 'rgb(50, 85, 140)',
+        shapes: [ [[0,0], [1,0], [1,1], [1,2]], [[0,0], [0,1], [1,0], [2,0]], [[0,0], [0,1], [0,2], [1,2]], [[0,1], [1,1], [2,0], [2,1]] ]
+      },
+      // L-piece (Muted Orange Tint)
+      {
+        name: 'L',
+        fill: 'rgb(60, 42, 24)', stroke: 'rgb(125, 85, 45)',
+        shapes: [ [[0,2], [1,0], [1,1], [1,2]], [[0,0], [1,0], [2,0], [2,1]], [[0,0], [0,1], [0,2], [1,0]], [[0,0], [0,1], [1,1], [2,1]] ]
+      },
+      // O-piece (Muted Yellow Tint)
+      {
+        name: 'O',
+        fill: 'rgb(56, 52, 22)', stroke: 'rgb(115, 105, 40)',
+        shapes: [ [[0,0], [0,1], [1,0], [1,1]] ]
+      },
+      // S-piece (Muted Green Tint)
+      {
+        name: 'S',
+        fill: 'rgb(22, 54, 34)', stroke: 'rgb(45, 110, 70)',
+        shapes: [ [[0,1], [0,2], [1,0], [1,1]], [[0,0], [1,0], [1,1], [2,1]] ]
+      },
+      // T-piece (Muted Purple Tint)
+      {
+        name: 'T',
+        fill: 'rgb(46, 28, 62)', stroke: 'rgb(95, 60, 125)',
+        shapes: [ [[0,1], [1,0], [1,1], [1,2]], [[0,0], [1,0], [1,1], [2,0]], [[0,0], [0,1], [0,2], [1,1]], [[0,1], [1,0], [1,1], [2,1]] ]
+      },
+      // Z-piece (Muted Red Tint)
+      {
+        name: 'Z',
+        fill: 'rgb(60, 26, 28)', stroke: 'rgb(125, 52, 58)',
+        shapes: [ [[0,0], [0,1], [1,1], [1,2]], [[0,1], [1,0], [1,1], [2,0]] ]
+      }
+    ];
+
+    /* =============================================================
+       1. Jack Rugile Pattern Generator (nmBQbe) — ALL VORONOI CELLS
+          with organic size variation. 4% of background contains
+          valid tetromino piece shapes with subtle muted color pops.
+
+       Tile: 54×54 grid = 270px tile. Larger tile reduces visual
+       repetition density across the viewport.
+       ============================================================= */
+    var c = document.createElement( 'canvas' ),
+        ctx = c.getContext( '2d' ),
+        bgRows = 54, bgCols = 54, gap = 1,
+        grays = [
+          [ 26, 29 ],
+          [ 32, 37 ],
+          [ 42, 50 ],
+          [ 46, 56 ],
+          [ 54, 66 ]
+        ],
+        cellSize = 4,
+        cw = ( cellSize + gap ) * bgRows;
+
+    c.width = cw; c.height = cw;
+
+    function random( max, min ) {
+      var minVal = min || 0;
+      return Math.random() * ( max - minVal ) + minVal;
+    }
+
+    function generateBackground() {
+      // 1. Build tetromino placement map
+      //    54×54 = 2916 cells. 4% = ~116 cells = ~29 pieces
+      var totalCells = bgRows * bgCols;
+      var grid = [];
+      for (var gr = 0; gr < bgRows; gr++) {
+        grid[gr] = [];
+        for (var gc = 0; gc < bgCols; gc++) {
+          grid[gr][gc] = null;
+        }
+      }
+
+      var targetPieces = Math.round( totalCells * 0.04 / 4 );
+      var piecesPlaced = 0;
+      var attempts = 0;
+
+      while ( piecesPlaced < targetPieces && attempts < 1000 ) {
+        attempts++;
+        var pieceDef = TETROMINO_PIECES[ Math.floor( Math.random() * TETROMINO_PIECES.length ) ];
+        var shape = pieceDef.shapes[ Math.floor( Math.random() * pieceDef.shapes.length ) ];
+        var startR = Math.floor( Math.random() * ( bgRows - 4 ) );
+        var startC = Math.floor( Math.random() * ( bgCols - 4 ) );
+
+        // Need 1-cell padding around each piece so shapes stay visually separate
+        var canPlace = true;
+        for ( var si = 0; si < shape.length; si++ ) {
+          var pr = startR + shape[si][0];
+          var pc = startC + shape[si][1];
+          if ( pr >= bgRows || pc >= bgCols ) { canPlace = false; break; }
+          for ( var dr = -1; dr <= 1; dr++ ) {
+            for ( var dc = -1; dc <= 1; dc++ ) {
+              var nr = pr + dr, nc = pc + dc;
+              if ( nr >= 0 && nr < bgRows && nc >= 0 && nc < bgCols && grid[nr][nc] !== null ) {
+                canPlace = false; break;
+              }
+            }
+            if ( !canPlace ) break;
+          }
+          if ( !canPlace ) break;
+        }
+
+        if ( canPlace ) {
+          var pieceData = {
+            fill: pieceDef.fill,
+            stroke: pieceDef.stroke,
+            pieceId: piecesPlaced + 1
+          };
+          for ( var si = 0; si < shape.length; si++ ) {
+            grid[ startR + shape[si][0] ][ startC + shape[si][1] ] = pieceData;
+          }
+          piecesPlaced++;
+        }
+      }
+
+      console.log( 'BG tile: ' + bgRows + 'x' + bgCols + ' = ' + totalCells + ' cells, ' +
+                   piecesPlaced + ' pieces placed (' + (piecesPlaced * 4) + ' cells = ' +
+                   ((piecesPlaced * 4 / totalCells) * 100).toFixed(1) + '%)' );
+
+      // 2. Render the tile — ALL cells are Voronoi polygons
+      ctx.fillStyle = 'rgb(18, 18, 18)';
+      ctx.fillRect( 0, 0, cw, cw );
+
+      for ( var r = 0; r < bgRows; r++ ) {
+        for ( var col = 0; col < bgCols; col++ ) {
+          var x = col * ( cellSize + gap );
+          var y = r * ( cellSize + gap );
+          var sides = 5 + ( ( r + col ) % 3 );
+          var cx = x + cellSize / 2;
+          var cy = y + cellSize / 2;
+
+          var cellPiece = grid[r][col];
+
+          if ( cellPiece ) {
+            // ── Tetromino Piece Cell: All 4 cells share uniform muted piece color & scale ──
+            ctx.fillStyle = cellPiece.fill;
+            ctx.strokeStyle = cellPiece.stroke;
+            ctx.lineWidth = 1.0;
+
+            var pieceSizeVar = 1 + 0.28 * Math.abs( Math.sin( cellPiece.pieceId * 4.7 ) );
+            var radius = ( cellSize * 0.50 ) * pieceSizeVar;
+
+            traceVoronoiBgPolygon( ctx, cx, cy, radius, sides, cellPiece.pieceId * 2.3 + (r + col) * 0.1 );
+          } else {
+            // ── Base Background Grid Cell: Dark gray Voronoi polygon ──
+            var grayIdx = Math.floor( random( grays.length ) );
+            var fill = grays[grayIdx][0];
+            var stroke = grays[grayIdx][1];
+            ctx.fillStyle = 'rgb(' + fill + ', ' + fill + ', ' + fill + ')';
+            ctx.strokeStyle = 'rgb(' + stroke + ', ' + stroke + ', ' + stroke + ')';
+            ctx.lineWidth = 0.8;
+
+            var sizeVar = 1 + 0.35 * Math.abs( Math.sin( r * 3.7 + col * 5.3 ) );
+            var radius = ( cellSize * 0.48 ) * sizeVar;
+
+            traceVoronoiBgPolygon( ctx, cx, cy, radius, sides, r * 1.7 + col * 0.9 );
+          }
+
+          ctx.fill();
+          ctx.stroke();
+        }
+      }
+
+      document.body.style.background = 'url(' + c.toDataURL() + ')';
+    }
+
+    generateBackground();
+
+    /* =============================================================
+       2. Authoritative Voronoi Cell Polygon Canvas Painter
+       ============================================================= */
+    const COLOR_MAP = {
+      'i-piece': { fill: '#06b6d4', stroke: '#67e8f9', glow: 'rgba(6, 182, 212, 0.5)' },
+      'j-piece': { fill: '#3b82f6', stroke: '#93c5fd', glow: 'rgba(59, 130, 246, 0.5)' },
+      'l-piece': { fill: '#f97316', stroke: '#fdba74', glow: 'rgba(249, 115, 22, 0.5)' },
+      'o-piece': { fill: '#eab308', stroke: '#fef08a', glow: 'rgba(234, 179, 8, 0.5)' },
+      's-piece': { fill: '#22c55e', stroke: '#86efac', glow: 'rgba(34, 197, 94, 0.5)' },
+      't-piece': { fill: '#a855f7', stroke: '#d8b4fe', glow: 'rgba(168, 85, 247, 0.5)' },
+      'z-piece': { fill: '#ef4444', stroke: '#fca5a5', glow: 'rgba(239, 68, 68, 0.5)' },
+      'garbage': { fill: '#475569', stroke: '#94a3b8', glow: 'rgba(71, 85, 105, 0.3)' },
+      'ghost':   { fill: 'rgba(255, 255, 255, 0.08)', stroke: 'rgba(255, 255, 255, 0.3)', glow: 'transparent' }
+    };
+
+    function voronoiCellSides(row, column) {
+      return 5 + ((row + column) % 3);
+    }
+
+    function traceVoronoiCell(ctx, cx, cy, radius, sides, time, wobblePhase) {
+      const baseAngles = POLYGON_BASE_ANGLES[sides] || POLYGON_BASE_ANGLES[5];
+      ctx.beginPath();
+      for (let i = 0; i < sides; i++) {
+        const base = baseAngles[i];
+        const angleOffset = Math.sin(time * 0.35 + i) * 0.12;
+        const rad = radius + Math.cos(time * 0.7 + wobblePhase + i) * 1.8;
+
+        const cosO = Math.cos(angleOffset);
+        const sinO = Math.sin(angleOffset);
+        const cosVal = base.cos * cosO - base.sin * sinO;
+        const sinVal = base.sin * cosO + base.cos * sinO;
+
+        const px = cx + rad * cosVal;
+        const py = cy + rad * sinVal;
+
+        if (i === 0) ctx.moveTo(px, py);
+        else ctx.lineTo(px, py);
+      }
+      ctx.closePath();
+    }
+
+    function renderVoronoiBoard(canvasId, matrix, activePieceInfo, time) {
+      const canvas = document.getElementById(canvasId);
+      const ctx = canvas.getContext('2d');
+      const cols = 10, rows = 18;
+      const cellSize = canvas.width / cols;
+
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      const renderMatrix = matrix.map(row => [...row]);
+      if (activePieceInfo) {
+        const { type, shape, r: pr, c: pc } = activePieceInfo;
+        
+        shape.forEach(([dr, dc]) => {
+          const gr = pr + 8 + dr;
+          const gc = pc + dc;
+          if (gr < rows && gc < cols && !renderMatrix[gr][gc]) {
+            renderMatrix[gr][gc] = 'ghost';
+          }
+        });
+
+        shape.forEach(([dr, dc]) => {
+          const ar = pr + dr;
+          const ac = pc + dc;
+          if (ar < rows && ac < cols) {
+            renderMatrix[ar][ac] = type;
+          }
+        });
+      }
+
+      for (let r = 0; r < rows; r++) {
+        for (let c = 0; c < cols; c++) {
+          const cellType = renderMatrix[r][c];
+          if (!cellType) continue;
+
+          const cx = c * cellSize + cellSize / 2;
+          const cy = r * cellSize + cellSize / 2;
+          const sides = voronoiCellSides(r, c);
+          const style = COLOR_MAP[cellType] || COLOR_MAP['garbage'];
+          const radius = cellSize * 0.44;
+
+          if (style.glow !== 'transparent') {
+            ctx.shadowColor = style.glow;
+            ctx.shadowBlur = 10;
+          }
+
+          traceVoronoiCell(ctx, cx, cy, radius, sides, time, r);
+          ctx.fillStyle = style.fill;
+          ctx.fill();
+
+          ctx.lineWidth = cellType === 'ghost' ? 1 : 1.5;
+          ctx.strokeStyle = style.stroke;
+          ctx.stroke();
+
+          ctx.shadowBlur = 0;
+        }
+      }
+    }
+
+    function renderMiniVoronoiPiece(canvasId, type, shape, time) {
+      const canvas = document.getElementById(canvasId);
+      if (!canvas) return;
+      const ctx = canvas.getContext('2d');
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      const style = COLOR_MAP[type] || COLOR_MAP['i-piece'];
+      const scale = 8;
+      const offsetX = canvas.width / 2;
+      const offsetY = canvas.height / 2;
+
+      shape.forEach(([dr, dc]) => {
+        const cx = offsetX + (dc - 0.5) * scale * 1.4;
+        const cy = offsetY + (dr - 0.5) * scale * 1.4;
+        traceVoronoiCell(ctx, cx, cy, scale * 0.65, 6, time, dr);
+        ctx.fillStyle = style.fill;
+        ctx.fill();
+        ctx.lineWidth = 1;
+        ctx.strokeStyle = style.stroke;
+        ctx.stroke();
+      });
+    }
+
+    // Sample Board State Data
+    const p1Matrix = Array(18).fill(null).map(() => Array(10).fill(''));
+    for (let r = 12; r < 18; r++) {
+      for (let c = 0; c < 10; c++) {
+        if (Math.random() > 0.35 && !(r === 17 && c === 4)) {
+          const types = ['i-piece', 'j-piece', 'l-piece', 'o-piece', 's-piece', 't-piece', 'z-piece', 'garbage'];
+          p1Matrix[r][c] = types[Math.floor(Math.random() * types.length)];
+        }
+      }
+    }
+
+    const p2Matrix = Array(18).fill(null).map(() => Array(10).fill(''));
+    for (let r = 13; r < 18; r++) {
+      for (let c = 0; c < 10; c++) {
+        if (Math.random() > 0.4 && !(r === 17 && c === 3)) {
+          const types = ['i-piece', 'j-piece', 'l-piece', 'o-piece', 's-piece', 't-piece', 'z-piece', 'garbage'];
+          p2Matrix[r][c] = types[Math.floor(Math.random() * types.length)];
+        }
+      }
+    }
+
+    const p1Active = { type: 't-piece', shape: [[0,1], [1,0], [1,1], [1,2]], r: 4, c: 3 };
+    const p2Active = { type: 'i-piece', shape: [[1,0], [1,1], [1,2], [1,3]], r: 5, c: 3 };
+
+    let animTime = 0;
+    function loop() {
+      animTime += 0.05;
+      renderVoronoiBoard('board-p1-canvas', p1Matrix, p1Active, animTime);
+      renderVoronoiBoard('board-p2-canvas', p2Matrix, p2Active, animTime);
+
+      renderMiniVoronoiPiece('hold-canvas-p1', 'i-piece', [[0,0],[0,1],[0,2],[0,3]], animTime);
+      renderMiniVoronoiPiece('next1-canvas-p1', 't-piece', [[0,1],[1,0],[1,1],[1,2]], animTime);
+      renderMiniVoronoiPiece('next2-canvas-p1', 'o-piece', [[0,0],[0,1],[1,0],[1,1]], animTime);
+      renderMiniVoronoiPiece('next3-canvas-p1', 's-piece', [[0,1],[0,2],[1,0],[1,1]], animTime);
+
+      renderMiniVoronoiPiece('hold-canvas-p2', 'z-piece', [[0,0],[0,1],[1,1],[1,2]], animTime);
+      renderMiniVoronoiPiece('next1-canvas-p2', 'j-piece', [[0,0],[1,0],[1,1],[1,2]], animTime);
+      renderMiniVoronoiPiece('next2-canvas-p2', 'l-piece', [[0,2],[1,0],[1,1],[1,2]], animTime);
+      renderMiniVoronoiPiece('next3-canvas-p2', 'i-piece', [[0,0],[0,1],[0,2],[0,3]], animTime);
+
+      requestAnimationFrame(loop);
+    }
+
+    loop();
+  </script>
+</body>
+</html>
