@@ -9,6 +9,7 @@ import { resolveShopOffers, SHOP_ITEM_BY_ID } from '../shop/shopCatalog';
 import { useMatchChromeSnapshot, usePlayfieldSnapshot } from '../state/GameStateProvider';
 import { useShopConfirm } from '../hooks/useShopConfirm';
 import { BoardProfiler } from '../performance/BoardProfiler';
+import { IncomingGarbageReadout } from './IncomingGarbageReadout';
 
 function WaitingForOpponentBoard() {
   const cell = useContext(PlayfieldCellSizeContext);
@@ -16,6 +17,7 @@ function WaitingForOpponentBoard() {
     <div className="relative shrink-0">
       <div className="mb-2">
         <h2 className="text-sm font-bold uppercase tracking-widest text-rose-400">Opponent Field</h2>
+        <IncomingGarbageReadout fieldTitle="Opponent Field" lines={0} />
       </div>
       <div
         className="flex items-center justify-center rounded-xl border-2 border-rose-500/10 bg-[#141414]"
@@ -93,7 +95,6 @@ export const PlayfieldShell: React.FC<PlayfieldShellProps> = ({
           >
             <OpponentMiniField
               player={opponentPlayer}
-              pendingGarbage={chrome.oppPendingGarbage}
               hatchingEnabled={hatchingEnabled}
             />
             <ShopRail

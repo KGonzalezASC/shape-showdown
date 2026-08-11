@@ -8,10 +8,10 @@ function fitCellSizeForDualBoard(outerWidth: number, outerHeight: number): numbe
   // 7rem rail (112px) + board gap (12px) + tiny breathing room.
   const shopRailReserve = outerWidth >= 768 ? 128 : 0;
   const horizontalPad = 16;
-  // Exact chrome height: title(~28px) + storage row layout(~58px) = 86px.
-  // We use 90 to give a tiny bit of breathing room and ensure the board scales as large as mathematically possible without overflowing.
+  // Exact chrome height: title/incoming rows(~44px) + storage row layout(~58px) = 102px.
+  // We use 106 to give a tiny bit of breathing room and ensure the board scales as large as mathematically possible without overflowing.
   const desktopTopOffset = outerWidth >= 768 ? 40 : 0;
-  const verticalPad = 90 + desktopTopOffset;
+  const verticalPad = 106 + desktopTopOffset;
   const fromW = (outerWidth - horizontalPad - gap - shopRailReserve) / (2 * BOARD_COLS);
   const fromH = (outerHeight - verticalPad) / BOARD_VISIBLE_ROWS;
   const MIN_CELL_SIZE = 22;

@@ -5,8 +5,6 @@ interface MatchHeaderProps {
   myScore: number;
   oppScore: number;
   availableShopScore: number;
-  myPendingGarbage: number;
-  oppPendingGarbage: number;
   hasMyPlayer: boolean;
 }
 
@@ -14,8 +12,6 @@ export const MatchHeader: React.FC<MatchHeaderProps> = ({
   myScore,
   oppScore,
   availableShopScore,
-  myPendingGarbage,
-  oppPendingGarbage,
   hasMyPlayer,
 }) => (
   <div className="mb-1 flex w-full max-w-5xl shrink-0 items-center justify-between gap-1 self-center overflow-visible rounded-lg border border-white/5 bg-[#1a1a1a] px-2 py-1.5 shadow-xl sm:mb-3 sm:gap-2 sm:rounded-2xl sm:p-3 md:p-4">
@@ -38,19 +34,11 @@ export const MatchHeader: React.FC<MatchHeaderProps> = ({
             <span className="font-mono text-xs text-cyan-200 sm:text-sm">{availableShopScore}</span>
           </div>
         )}
-        <div className="flex items-center text-[10px] font-mono sm:hidden">
-          <span className="mr-0.5 text-rose-400/80">In:</span>
-          <span className="text-rose-200">{myPendingGarbage}</span>
-        </div>
       </div>
     </div>
 
     <div className="flex flex-1 items-center justify-end gap-1.5 min-w-0 sm:gap-4">
       <div className="flex flex-row flex-wrap items-center justify-end gap-x-1.5 gap-y-0.5 sm:flex-col sm:items-end sm:gap-0 min-w-0">
-        <div className="flex items-center text-[10px] font-mono sm:hidden">
-          <span className="mr-0.5 text-rose-400/80">In:</span>
-          <span className="text-rose-200">{oppPendingGarbage}</span>
-        </div>
         <p className="hidden text-[10px] font-semibold uppercase leading-tight tracking-wider text-rose-400/60 sm:block">
           Opponent Attack Score
         </p>

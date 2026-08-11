@@ -2,15 +2,16 @@ import React, { useMemo } from 'react';
 import { BoardCanvasOverlay } from '../board/BoardCanvasOverlay';
 import { buildBoardVisualModel } from '../board/boardVisualModel';
 import {
+  pendingGarbageTotal,
   publicPlayersEqual,
   type PublicPlayerState,
 } from '../state/publicSnapshots';
 import { BOARD_COLS, BOARD_VISIBLE_ROWS } from '../types';
 import { VoronoiFlowfieldCanvas } from './VoronoiFlowfieldCanvas';
+import { IncomingGarbageReadout } from './IncomingGarbageReadout';
 
 interface OpponentMiniFieldProps {
   player: PublicPlayerState | null;
-  pendingGarbage: number;
   hatchingEnabled: boolean;
 }
 
@@ -18,7 +19,6 @@ const MINI_CELL_SIZE = 5;
 
 const OpponentMiniField: React.FC<OpponentMiniFieldProps> = ({
   player,
-  pendingGarbage,
   hatchingEnabled,
 }) => {
   const visualModel = useMemo(
@@ -59,6 +59,7 @@ const OpponentMiniField: React.FC<OpponentMiniFieldProps> = ({
         <p className="text-[8px] font-bold uppercase tracking-[0.18em] text-rose-300/80">
           Opp
         </p>
+        <IncomingGarbageReadout fieldTitle="Opponent Field" lines={0} compact />
         <div className="mt-1 flex h-[100px] items-center justify-center rounded border border-rose-500/15 bg-[#141414] px-1">
           <p className="text-center text-[8px] uppercase tracking-widest text-zinc-500">
             Waiting
@@ -70,11 +71,14 @@ const OpponentMiniField: React.FC<OpponentMiniFieldProps> = ({
 
   return (
     <div className="w-[5.75rem] rounded-lg border border-rose-500/30 bg-[#140f13]/90 p-1.5 shadow-xl backdrop-blur">
-      <div className="mb-1 flex items-center justify-between">
-        <p className="text-[8px] font-bold uppercase tracking-[0.18em] text-rose-300/80">
-          Opp
-        </p>
-        <p className="font-mono text-[9px] text-rose-100">{player.score}</p>
+      <div className="mb-1">
+        <div className="flex items-center justify-between">
+          <p className="text-[8px] font-bold uppercase tracking-[0.18em] text-rose-300/80">
+            Opp
+          </p>
+          <p className="font-mono text-[9px] text-rose-100">{player.score}</p>
+        </div>
+        <IncomingGarbageReadout fieldTitle="Opponent Field" lines={pendingGarbageTotal(player.pendingGarbage)} compact />
       </div>
       <div className="overflow-hidden rounded border border-rose-500/20">
         <div
@@ -104,16 +108,12 @@ const OpponentMiniField: React.FC<OpponentMiniFieldProps> = ({
         <span className="text-zinc-400">
           Ln <span className="font-mono text-zinc-200">{player.linesCleared}</span>
         </span>
-        <span className="text-rose-300/80">
-          In <span className="font-mono text-rose-100">{pendingGarbage}</span>
-        </span>
       </div>
     </div>
   );
 };
 
 export default React.memo(OpponentMiniField, (prev, next) => (
-  prev.pendingGarbage === next.pendingGarbage &&
   prev.hatchingEnabled === next.hatchingEnabled &&
   publicPlayersEqual(prev.player, next.player)
 ));

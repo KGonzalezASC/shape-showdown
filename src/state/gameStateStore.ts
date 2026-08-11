@@ -1,4 +1,4 @@
-import { GameState, MatchEvent, MatchStatus, PlayerState, ShopPhase } from '../types';
+import { GameState, MatchEvent, MatchStatus, ShopPhase } from '../types';
 import {
   PublicPlayerState,
   publicPlayersEqual,
@@ -12,8 +12,6 @@ export interface MatchChromeSnapshot {
   myId: string | null;
   myScore: number;
   oppScore: number;
-  myPendingGarbage: number;
-  oppPendingGarbage: number;
   availableShopScore: number;
   shopOfferIds: string[];
   shopPhase: ShopPhase;
@@ -54,8 +52,6 @@ function emptyChromeSnapshot(): MatchChromeSnapshot {
     myId: null,
     myScore: 0,
     oppScore: 0,
-    myPendingGarbage: 0,
-    oppPendingGarbage: 0,
     availableShopScore: 0,
     shopOfferIds: [],
     shopPhase: 'waiting',
@@ -76,11 +72,6 @@ function emptyPlayfieldSnapshot(): PlayfieldSnapshot {
   };
 }
 
-function pendingGarbageTotal(player: PlayerState | null | undefined): number {
-  if (!player) return 0;
-  return player.pendingGarbage.reduce((sum, packet) => sum + packet.lines, 0);
-}
-
 function buildChromeSnapshot(): MatchChromeSnapshot {
   if (!gameState) return emptyChromeSnapshot();
 
@@ -96,8 +87,6 @@ function buildChromeSnapshot(): MatchChromeSnapshot {
     myId,
     myScore: me?.score ?? 0,
     oppScore: opponent?.score ?? 0,
-    myPendingGarbage: pendingGarbageTotal(me),
-    oppPendingGarbage: pendingGarbageTotal(opponent),
     availableShopScore: me?.score ?? 0,
     shopOfferIds: shop?.offerIds ?? [],
     shopPhase: shop?.phase ?? 'waiting',
@@ -133,8 +122,6 @@ function chromeSnapshotsEqual(a: MatchChromeSnapshot, b: MatchChromeSnapshot): b
   if (a.myId !== b.myId) return false;
   if (a.myScore !== b.myScore) return false;
   if (a.oppScore !== b.oppScore) return false;
-  if (a.myPendingGarbage !== b.myPendingGarbage) return false;
-  if (a.oppPendingGarbage !== b.oppPendingGarbage) return false;
   if (a.availableShopScore !== b.availableShopScore) return false;
   if (a.shopPhase !== b.shopPhase) return false;
   if (a.shopCycleIndex !== b.shopCycleIndex) return false;

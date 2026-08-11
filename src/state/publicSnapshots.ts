@@ -124,6 +124,10 @@ export function toPublicPlayerState(player: PlayerState): PublicPlayerState {
   };
 }
 
+export function pendingGarbageTotal(packets: readonly PendingGarbagePacket[]): number {
+  return packets.reduce((total, packet) => total + packet.lines, 0);
+}
+
 export function toPublicGameState(state: GameState): PublicGameState {
   const players: Record<string, PublicPlayerState> = {};
   for (const id of Object.keys(state.players)) {
@@ -247,6 +251,7 @@ export function publicPlayersEqual(a: PublicPlayerState | null, b: PublicPlayerS
     a.linesCleared !== b.linesCleared ||
     a.combo !== b.combo ||
     a.backToBack !== b.backToBack ||
+    pendingGarbageTotal(a.pendingGarbage) !== pendingGarbageTotal(b.pendingGarbage) ||
     a.topOut !== b.topOut ||
     a.landingForecastTicksRemaining !== b.landingForecastTicksRemaining ||
     a.swapCutoffRow !== b.swapCutoffRow ||

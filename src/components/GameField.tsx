@@ -15,11 +15,13 @@ import type { ReplayCandidateOverlay } from '../replayCandidateOverlay';
 import { styleForFieldEffect } from '../shop/effectStyles';
 import {
   normalizeHeldPiece,
+  pendingGarbageTotal,
   publicPlayersEqual,
   PublicPlayerState,
 } from '../state/publicSnapshots';
 import { PlayfieldCellSizeContext } from './playfieldCellSizeContext';
 import { VoronoiFlowfieldCanvas } from './VoronoiFlowfieldCanvas';
+import { IncomingGarbageReadout } from './IncomingGarbageReadout';
 
 interface GameFieldProps {
   player: PublicPlayerState;
@@ -344,6 +346,7 @@ const GameField = forwardRef<GameFieldRef, GameFieldProps>(({
           {player.linesCleared} clears
         </span>
       </div>
+      <IncomingGarbageReadout fieldTitle={title} lines={pendingGarbageTotal(player.pendingGarbage)} />
       <div className="relative">
         {isMe && (
           <span
