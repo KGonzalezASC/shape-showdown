@@ -28,6 +28,7 @@ import {
   BOARD_VISIBLE_ROWS,
   BOARD_HIDDEN_ROWS,
   HOLD_SWAP_CUTOFF_VISIBLE_ROW,
+  HOLD_SWAP_CUTOFF_MIN_ROW,
   COUNTDOWN_SECONDS,
   GAME_DURATION,
   LANDING_FORECAST_TICKS,
@@ -56,7 +57,8 @@ describe('tetris engine', () => {
     assert.equal(BOARD_VISIBLE_ROWS, 18);
     assert.equal(BOARD_HIDDEN_ROWS, 2);
     assert.equal(BOARD_ROWS, 20);
-    assert.equal(HOLD_SWAP_CUTOFF_VISIBLE_ROW, 8);
+    assert.equal(HOLD_SWAP_CUTOFF_VISIBLE_ROW, 10);
+    assert.equal(HOLD_SWAP_CUTOFF_MIN_ROW, 5);
     assert.equal(player.swapCutoffRow, HOLD_SWAP_CUTOFF_VISIBLE_ROW);
     assert.equal(player.activePiece?.y, BOARD_HIDDEN_ROWS - 2);
   });
@@ -565,5 +567,24 @@ describe('tetris engine', () => {
     assert.equal(events.some((e) => e.type === 'tectonicComplete' && e.rowsCleared === 1), true);
     // Silent clear must NOT increment score or linesCleared
     assert.equal(player.score, 0);
+  });
+
+  it('caps Re-Trim swapCutoffRow at HOLD_SWAP_CUTOFF_MIN_ROW (5) after 5+ purchases', () => {
+    const rng = makeRng(404);
+    const player = makePlayer('p1', rng);
+
+    assert.equal(player.swapCutoffRow, 10);
+
+    // Apply 7 retrim shop effects to test capping
+    for (let i = 0; i < 7; i++) {
+      player.pendingShopEffects.push({
+        itemId: 'retrim',
+        activationTick: i + 1,
+      });
+      stepPlayer(i + 1, player, rng, []);
+    }
+
+    // Must be capped at row 5 (5 purchases from 10 to 5, extra purchases stay at 5)
+    assert.equal(player.swapCutoffRow, 5);
   });
 });

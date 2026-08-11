@@ -15,6 +15,7 @@ import {
   GARBAGE_ARRIVAL_DELAY_TICKS,
   GRAVITY_TICKS_PER_CELL,
   HOLD_SWAP_CUTOFF_VISIBLE_ROW,
+  HOLD_SWAP_CUTOFF_MIN_ROW,
   HORIZONTAL_SPEED_THRESHOLDS,
   LOCK_DELAY_TICKS,
   LOCK_RESET_CAP,
@@ -110,6 +111,7 @@ export type FieldEffectKind =
   | 'bomber'
   | 'taxed'
   | 'tax-siphon'
+  | 'curtain-def'
   | 'wildcard-four'
   | 'tectonic-shift';
 
@@ -257,6 +259,8 @@ export interface PlayerState {
    * modified permanently by re-trim and similar effects.
    */
   swapCutoffRow: number;
+  /** Permanent curtain defense stacks. */
+  curtainDefenseLevel?: number;
   /** Shop effects queued and waiting for their activationTick. */
   pendingShopEffects: PendingShopEffect[];
   /**
@@ -493,6 +497,7 @@ export {
   GARBAGE_ARRIVAL_DELAY_TICKS,
   GRAVITY_TICKS_PER_CELL,
   HOLD_SWAP_CUTOFF_VISIBLE_ROW,
+  HOLD_SWAP_CUTOFF_MIN_ROW,
   HORIZONTAL_SPEED_THRESHOLDS,
   LOCK_DELAY_TICKS,
   LOCK_RESET_CAP,

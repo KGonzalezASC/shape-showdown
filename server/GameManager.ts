@@ -345,9 +345,9 @@ export class GameManager {
   private saveReplay() {
     if (!this.activeReplay) return;
     try {
-      const replaysDir = process.env.REPLAYS_DIR 
+      const replaysDir = process.env.REPLAYS_DIR
         ? path.resolve(process.env.REPLAYS_DIR)
-        : path.join(process.cwd(), 'public', 'replays');
+        : path.join(process.cwd(), 'fixtures', 'replays');
 
       if (!fs.existsSync(replaysDir)) {
         fs.mkdirSync(replaysDir, { recursive: true });

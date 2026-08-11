@@ -46,7 +46,8 @@ export const SHOP_CATALOG: ShopItem[] = [
     target: 'opponent',
     colorClass: 'bg-rose-900/70',
     borderColorClass: 'border-rose-300/65',
-    description: "Permanently moves the opponent's swap line up one row.",
+    description:
+      "Permanently moves the opponent's swap line up 1 row (capped at row 5). Each purchase also grants you permanent +1 Curtain defense (+1 visible glassy frost row against opponent Curtains).",
   },
   {
     id: 'curtain',
@@ -132,8 +133,6 @@ export const SHOP_CATALOG: ShopItem[] = [
     borderColorClass: 'border-lime-400/65',
     description:
       "Poisons the opponent's stored piece — when they swap it onto the field it seeds poison on lock. Requires something in storage.",
-    synergyTargetId: 'elixir-pulse',
-    synergyBoost: 2.5,
   },
   {
     id: 'vortex-step',
@@ -180,8 +179,6 @@ export const SHOP_CATALOG: ShopItem[] = [
     borderColorClass: 'border-orange-300/65',
     description:
       "Hooks the opponent's piece — no hard drop until it locks. Current piece if not dropped yet, otherwise the next spawn.",
-    synergyTargetId: 'gravity-lure',
-    synergyBoost: 2.5,
   },
   {
     id: 'quickstep-clock',

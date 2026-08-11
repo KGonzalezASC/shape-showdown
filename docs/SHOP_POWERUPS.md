@@ -70,14 +70,27 @@ Living design doc for Shape Showdown shop items. Implementation status is noted 
 |---------|------|--------|
 | `retrim` | `curtain` | Geometry + vision (shipped) |
 | `elixir-pulse` | `vortex-step` | Poison + purge (shipped) |
-| **`gravity-lure`** | **`fortify-frame`** | **Magnet + Snag** (approved) |
+| `elixir-pulse` | `wildcard-four` | Poison + copied poison shape (shipped) |
 | `quickstep-clock` | — | Sticky; no new pair required |
+
+Contagion (`storage-toxin`) and Snag (`fortify-frame`) remain purchasable standalone powerups. They do not receive or consume Elixir/Magnet synergy seeds.
+
+### Bot pair purchasing model
+
+Pair-aware harness bots keep shop purchasing separate from board movement and advance through four states:
+
+1. `setup` — wait until the setup item is highlighted and affordable, then purchase it.
+2. `waiting-for-activation` — when required, wait for the setup effect to become visible in the player-limited observation.
+3. `payoff` — wait until the payoff item is highlighted and affordable, then purchase it.
+4. `complete` — stop, or return to `setup` for a full-session repeating policy.
+
+Re-Trim immediately satisfies Curtain's setup requirement. Elixir only satisfies Wild Purge or Wildcard +4 after poison is visible on the opponent's board; accepting the Elixir purchase alone is not treated as activation.
 
 ---
 
 ## Suggested implementation order
 
-1. **Snag** — small flag in `processActions`, pairs with future Magnet.
+1. **Snag** — small flag in `processActions`; standalone powerup.
 2. **Satellite** — buyer branch in `GameManager`, mutate `pendingGarbage`.
 3. **Magnet** — match-wide speed gate + `HORIZONTAL_SPEED_THRESHOLDS` / gravity hookup.
 4. **Bomber** — engine blast + client bomb skin.

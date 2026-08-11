@@ -9,6 +9,7 @@ import {
   POISON_GENERATIONS,
   POISON_PURGE_TELEGRAPH_TICKS,
   RETRIM_ACTIVATION_TICKS,
+  HOLD_SWAP_CUTOFF_MIN_ROW,
 } from '../src/types.js';
 import { MutableRng, RngChannels, ensureRngChannels, rngInt } from '../src/rng.js';
 import { SHOP_ITEM_BY_ID } from '../src/shop/shopCatalog.js';
@@ -192,13 +193,17 @@ function opponentHasPoison(opponent: PlayerState): boolean {
 
 const SHOP_HANDLERS: Record<string, ShopHandler> = {
   retrim: {
-    onPurchase: ({ opponent, tick }) => {
-      if (!opponent) return;
-      opponent.pendingShopEffects.push({
-        itemId: 'retrim',
-        activationTick: tick + RETRIM_ACTIVATION_TICKS,
-      });
-      pushFieldEffect(opponent, 'retrim', tick, 'Retrimmed', '✂️', tick + 240);
+    onPurchase: ({ buyer, opponent, tick }) => {
+      buyer.curtainDefenseLevel = (buyer.curtainDefenseLevel ?? 0) + 1;
+      pushFieldEffect(buyer, 'curtain-def', tick, `Curtain Def +${buyer.curtainDefenseLevel}`, '🛡️', tick + 240);
+
+      if (opponent && opponent.swapCutoffRow > HOLD_SWAP_CUTOFF_MIN_ROW) {
+        opponent.pendingShopEffects.push({
+          itemId: 'retrim',
+          activationTick: tick + RETRIM_ACTIVATION_TICKS,
+        });
+        pushFieldEffect(opponent, 'retrim', tick, 'Retrimmed', '✂️', tick + 240);
+      }
     },
   },
   curtain: {

@@ -9,6 +9,7 @@ import {
   GAME_TICK_RATE,
   GARBAGE_ARRIVAL_DELAY_TICKS,
   HOLD_SWAP_CUTOFF_VISIBLE_ROW,
+  HOLD_SWAP_CUTOFF_MIN_ROW,
   InputState,
   LOCK_DELAY_TICKS,
   LOCK_RESET_CAP,
@@ -119,6 +120,7 @@ export function makePlayer(id: string, rng: RngChannels | MutableRng): PlayerSta
     pendingGarbage: [],
     topOut: false,
     swapCutoffRow: HOLD_SWAP_CUTOFF_VISIBLE_ROW,
+    curtainDefenseLevel: 0,
     pendingShopEffects: [],
     activeEffects: [],
     poisonBoard: createEmptyPoisonBoard(),
@@ -1019,7 +1021,7 @@ export function stepPlayer(
     for (const effect of player.pendingShopEffects) {
       if (effect.activationTick <= tick) {
         if (effect.itemId === 'retrim') {
-          player.swapCutoffRow = Math.max(0, player.swapCutoffRow - 1);
+          player.swapCutoffRow = Math.max(HOLD_SWAP_CUTOFF_MIN_ROW, player.swapCutoffRow - 1);
         } else if (effect.itemId === 'curtain') {
           pushFieldEffect(
             player,
