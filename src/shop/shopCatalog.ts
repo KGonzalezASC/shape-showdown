@@ -235,4 +235,4 @@ export function resolveShopOffers(offerIds: string[]): ShopItem[] {
 }
 
 /** @deprecated Use SHOP_CATALOG / SHOP_ROLL_POOL. */
-export const SHOP_MOCK_POOL = SHOP_ROLL_POOL;
+export const SHOP_MOCK_POOL = SHOP_ROLL_POOL.slice();

@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useReducer, useRef } from 'react';
 import { AnimatePresence, m } from 'motion/react';
 import { PlayerState } from '../types';
 
@@ -6,8 +6,15 @@ interface SRSKickOverlayProps {
   player: PlayerState;
 }
 
+type KickPopup = { kx: number; ky: number } | null;
+type KickPopupAction = { type: 'SHOW'; popup: { kx: number; ky: number } } | { type: 'HIDE' };
+
+function kickPopupReducer(_state: KickPopup, action: KickPopupAction): KickPopup {
+  return action.type === 'SHOW' ? action.popup : null;
+}
+
 export const SRSKickOverlay: React.FC<SRSKickOverlayProps> = ({ player }) => {
-  const [kickPopup, setKickPopup] = useState<{ kx: number; ky: number } | null>(null);
+  const [kickPopup, dispatchKickPopup] = useReducer(kickPopupReducer, null);
   const prevKickNonceRef = useRef(0);
   const kickPopupTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -21,8 +28,8 @@ export const SRSKickOverlay: React.FC<SRSKickOverlayProps> = ({ player }) => {
     const n = player.srsKickNonce ?? 0;
     if (n > prevKickNonceRef.current && player.lastSrsKick) {
       if (kickPopupTimeoutRef.current) clearTimeout(kickPopupTimeoutRef.current);
-      setKickPopup({ kx: player.lastSrsKick.kx, ky: player.lastSrsKick.ky });
-      kickPopupTimeoutRef.current = setTimeout(() => setKickPopup(null), 480);
+      dispatchKickPopup({ type: 'SHOW', popup: { kx: player.lastSrsKick.kx, ky: player.lastSrsKick.ky } });
+      kickPopupTimeoutRef.current = setTimeout(() => dispatchKickPopup({ type: 'HIDE' }), 480);
     }
     prevKickNonceRef.current = n;
   }, [player.srsKickNonce, player.lastSrsKick]);

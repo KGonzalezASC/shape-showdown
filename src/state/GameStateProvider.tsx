@@ -1,10 +1,10 @@
-import React, { createContext, useContext, useEffect, useMemo, useSyncExternalStore } from 'react';
+import React, { createContext, useContext, useMemo, useSyncExternalStore } from 'react';
 import { ActionType, InputState } from '../types';
 import { useGameSocket } from '../hooks/useGameSocket';
 import {
   getChromeSnapshot,
   getIsConnected,
-  getMyId,
+  getMyId as getStoredMyId,
   getPlayfieldSnapshot,
   getRawGameState,
   setGameStateStore,
@@ -13,6 +13,18 @@ import {
   subscribeConnection,
   subscribePlayfield,
 } from './gameStateStore';
+
+function publishGameState(state: ReturnType<typeof getRawGameState>): void {
+  setGameStateStore(state, getStoredMyId());
+}
+
+function publishMyId(id: string | null): void {
+  setGameStateStore(getRawGameState(), id);
+}
+
+function publishMatchEvent(event: Parameters<typeof setLastMatchEventStore>[0]): void {
+  setLastMatchEventStore(event);
+}
 
 export interface GameActions {
   sendInputState: (input: InputState) => void;
@@ -25,22 +37,15 @@ const GameActionsContext = createContext<GameActions | null>(null);
 
 export function GameStateProvider({ children }: { children: React.ReactNode }) {
   const {
-    gameState,
-    myId,
-    lastMatchEvent,
     sendInputState,
     sendAction,
     sendShopOpen,
     sendShopPurchase,
-  } = useGameSocket();
-
-  useEffect(() => {
-    setGameStateStore(gameState, myId);
-  }, [gameState, myId]);
-
-  useEffect(() => {
-    setLastMatchEventStore(lastMatchEvent);
-  }, [lastMatchEvent]);
+  } = useGameSocket({
+    onGameState: publishGameState,
+    onMyId: publishMyId,
+    onMatchEvent: publishMatchEvent,
+  });
 
   const actions = useMemo(
     () => ({ sendInputState, sendAction, sendShopOpen, sendShopPurchase }),
@@ -69,7 +74,7 @@ export function useIsConnected() {
 }
 
 export function useMyId() {
-  return useSyncExternalStore(subscribeConnection, getMyId, getMyId);
+  return useSyncExternalStore(subscribeConnection, getStoredMyId, getStoredMyId);
 }
 
 /** Full game state — prefer narrow hooks when possible. */

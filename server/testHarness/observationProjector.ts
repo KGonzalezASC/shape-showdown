@@ -42,7 +42,7 @@ export interface ObservationProjector {
   ): PlayerObservation;
 }
 
-export function sanitizeEffectId(id: string): string {
+function sanitizeEffectId(id: string): string {
   let hash = 0;
   for (let i = 0; i < id.length; i++) {
     hash = (hash << 5) - hash + id.charCodeAt(i);
@@ -53,7 +53,7 @@ export function sanitizeEffectId(id: string): string {
   return `${prefix}_${hex}`;
 }
 
-export function computeEffectsHash(effects?: readonly ObservedEffect[], limited = false): string {
+function computeEffectsHash(effects?: readonly ObservedEffect[], limited = false): string {
   if (!effects || effects.length === 0) return 'none';
   if (limited) {
     return effects.map((e) => `${e.kind}:${e.id}`).join(';');

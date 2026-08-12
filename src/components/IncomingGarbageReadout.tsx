@@ -42,5 +42,3 @@ export const IncomingGarbageReadout: React.FC<IncomingGarbageReadoutProps> = ({
     )}
   </div>
 );
-
-export default IncomingGarbageReadout;

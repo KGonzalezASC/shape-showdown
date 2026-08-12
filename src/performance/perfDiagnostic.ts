@@ -98,20 +98,20 @@ function onFrame(timestamp: number): void {
   }
 }
 
-export function startFpsMonitor(): void {
+function startFpsMonitor(): void {
   if (typeof window === 'undefined' || rAFHandle !== null) return;
   lastFrameTimestamp = null;
   rAFHandle = window.requestAnimationFrame(onFrame);
 }
 
-export function stopFpsMonitor(): void {
+function stopFpsMonitor(): void {
   if (typeof window === 'undefined' || rAFHandle === null) return;
   window.cancelAnimationFrame(rAFHandle);
   rAFHandle = null;
   lastFrameTimestamp = null;
 }
 
-export function calculateFpsMetrics(): FpsMetrics {
+function calculateFpsMetrics(): FpsMetrics {
   if (frameDurations.length === 0) {
     return {
       fps: 0,
@@ -273,7 +273,7 @@ export function exposePerfDebugInterface(): ShapeShowdownPerfDebug {
   return debugApi;
 }
 
-export async function runAutoProfileSuite(): Promise<Record<string, PerformanceSnapshot>> {
+async function runAutoProfileSuite(): Promise<Record<string, PerformanceSnapshot>> {
   const perf = exposePerfDebugInterface();
   perf.startFpsMonitor();
   perf.reset();
@@ -348,4 +348,3 @@ export function initPerfDiagnostics(): void {
     }
   }
 }
-

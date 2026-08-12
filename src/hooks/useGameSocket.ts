@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
 import { io, Socket } from 'socket.io-client';
 import { ActionType, GameState, InputState, MatchEvent } from '../types';
 import { localDevelopmentGameServerUrl } from '../network/localGameServer';
@@ -99,15 +99,31 @@ async function resolveGameServerUrl(): Promise<string> {
   return defaultUrl;
 }
 
-export const useGameSocket = () => {
+interface GameSocketCallbacks {
+  onGameState?: (state: GameState | null) => void;
+  onMyId?: (id: string | null) => void;
+  onMatchEvent?: (event: MatchEvent | null) => void;
+}
+
+export const useGameSocket = ({
+  onGameState,
+  onMyId,
+  onMatchEvent,
+}: GameSocketCallbacks = {}) => {
   const [socket, setSocket] = useState<Socket | null>(null);
-  const [gameState, setGameState] = useState<GameState | null>(null);
-  const [myId, setMyId] = useState<string | null>(null);
-  const [lastMatchEvent, setLastMatchEvent] = useState<MatchEvent | null>(null);
+  const callbacksRef = useRef<GameSocketCallbacks>({});
+
+  useEffect(() => {
+    callbacksRef.current = { onGameState, onMyId, onMatchEvent };
+  }, [onGameState, onMatchEvent, onMyId]);
 
   useEffect(() => {
     let cancelled = false;
     let sock: Socket | null = null;
+
+    callbacksRef.current.onGameState?.(null);
+    callbacksRef.current.onMyId?.(null);
+    callbacksRef.current.onMatchEvent?.(null);
 
     (async () => {
       const url = await resolveGameServerUrl();
@@ -120,7 +136,8 @@ export const useGameSocket = () => {
 
       sock.on('connect', () => {
         console.log(`[Socket] Connected successfully with ID: ${sock?.id}`);
-        setMyId(sock?.id || null);
+        const nextId = sock?.id || null;
+        callbacksRef.current.onMyId?.(nextId);
       });
 
       sock.on('connect_error', (error) => {
@@ -131,10 +148,10 @@ export const useGameSocket = () => {
         // socket.io already hands us a freshly-deserialized object per message,
         // so structuredClone here is pure wasted CPU/GC — deep-cloning two
         // 10x20 boards on every network update would be wasteful on phones. Use directly.
-        setGameState(state);
+        callbacksRef.current.onGameState?.(state);
       });
       sock.on('matchEvent', (evt: MatchEvent) => {
-        setLastMatchEvent(evt);
+        callbacksRef.current.onMatchEvent?.(evt);
       });
     })();
 
@@ -162,9 +179,6 @@ export const useGameSocket = () => {
 
   return {
     socket,
-    gameState,
-    myId,
-    lastMatchEvent,
     sendInputState,
     sendAction,
     sendShopOpen,

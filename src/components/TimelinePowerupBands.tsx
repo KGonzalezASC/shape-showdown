@@ -110,13 +110,13 @@ export const TimelinePowerupBands: React.FC<TimelinePowerupBandsProps> = ({
             {playerLabel(row.playerId)}
           </span>
           <div className="relative h-4 min-w-0 flex-1 overflow-hidden rounded border border-white/10 bg-black/50">
-            {row.spans.map((span, index) => {
+            {row.spans.map((span) => {
               const leftPercent = (span.startTick / totalTicks) * 100;
               const widthPercent = Math.max(0.4, ((span.endTick - span.startTick) / totalTicks) * 100);
               const styleClass = EFFECT_COLORS[span.kind] || 'bg-white/40 border-white/70';
               return (
                 <div
-                  key={`${span.id}_${span.startTick}_${index}`}
+                  key={`${span.id}_${span.kind}_${span.startTick}`}
                   title={`${playerLabel(row.playerId)} · ${span.label} · ticks ${span.startTick}–${span.endTick}`}
                   className={`absolute inset-y-0 rounded border-y ${styleClass}`}
                   style={{ left: `${leftPercent}%`, width: `${widthPercent}%` }}

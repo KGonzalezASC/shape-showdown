@@ -35,7 +35,7 @@ export interface ReplayRunResult {
 }
 
 /** Driver implementation for playing back recorded input state and action frames. */
-export class ReplayDriver implements InputDriver {
+class ReplayDriver implements InputDriver {
   private readonly framesByTick = new Map<number, ReplayInputFrame[]>();
 
   constructor(frames: readonly ReplayInputFrame[]) {

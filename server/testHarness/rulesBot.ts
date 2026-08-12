@@ -85,7 +85,7 @@ export interface ColumnCavityMetrics {
 }
 
 /** Mode-safe extraction of relative ticks until arrival for a pending garbage packet. */
-export function getPacketTicksUntilArrival(
+function getPacketTicksUntilArrival(
   packet: { lines: number; arrivalTick?: number; ticksUntilArrival?: number },
   currentTick?: number,
 ): number {
@@ -115,16 +115,16 @@ export interface BoardEvaluation {
   isolatedOneHighSpikes: number;
 }
 
-export const CAVITY_DEPTH_REDUCTION_WEIGHT = 60;
-export const DEEPEST_CAVITY_REDUCTION_WEIGHT = 25;
+const CAVITY_DEPTH_REDUCTION_WEIGHT = 60;
+const DEEPEST_CAVITY_REDUCTION_WEIGHT = 25;
 // Stronger increase penalties made the bot build around cavities until top-out;
 // keep them below that avoidance threshold while still preferring shallower cover.
-export const CAVITY_DEPTH_INCREASE_PENALTY = 70;
-export const DEEPEST_CAVITY_INCREASE_PENALTY = 20;
+const CAVITY_DEPTH_INCREASE_PENALTY = 70;
+const DEEPEST_CAVITY_INCREASE_PENALTY = 20;
 // Keep topology below the cavity/height terms. It should break near-ties,
 // not make the bot avoid otherwise useful placements.
-export const SURFACE_PARITY_REDUCTION_WEIGHT = 2;
-export const ISOLATED_SPIKE_REDUCTION_WEIGHT = 12;
+const SURFACE_PARITY_REDUCTION_WEIGHT = 2;
+const ISOLATED_SPIKE_REDUCTION_WEIGHT = 12;
 
 export interface PlacementVisibilityRisk {
   unknownCellCount: number;
@@ -136,14 +136,14 @@ export interface PlacementVisibilityRisk {
 // Curtain masking makes bottom-row occupancy uncertain, but entering that
 // region is still normal play. Keep these penalties below the initial
 // frontier-risk calibration so the bot does not stack above the mask and top out.
-export const UNKNOWN_PLACED_CELL_PENALTY = 40;
-export const UNKNOWN_ROW_DEPTH_PENALTY = 20;
+const UNKNOWN_PLACED_CELL_PENALTY = 40;
+const UNKNOWN_ROW_DEPTH_PENALTY = 20;
 export const UNCERTAIN_LINE_CLEAR_PENALTY = 150;
 
 export const CURTAIN_BOT_HARD_DROP_INTERVAL_TICKS = 90;
-export const CURTAIN_REFERENCE_GAP_WEIGHT = 60;
-export const CURTAIN_REFERENCE_ROUGHNESS_WEIGHT = 20;
-export const CURTAIN_REFERENCE_HOLE_WEIGHT = 240;
+const CURTAIN_REFERENCE_GAP_WEIGHT = 60;
+const CURTAIN_REFERENCE_ROUGHNESS_WEIGHT = 20;
+const CURTAIN_REFERENCE_HOLE_WEIGHT = 240;
 
 /**
  * Score the known three-row Curtain frontier separately from the older visible
@@ -191,7 +191,7 @@ export function scoreCurtainReference(board: CellValue[][], unknownFromRow: numb
 // Visible Magnet state reduces the time available to reach a placement. Keep
 // reachable placements unchanged, but make a plan that misses its control
 // window decisively unattractive.
-export const MAGNET_CONTROL_OVERRUN_WEIGHT = 1000;
+const MAGNET_CONTROL_OVERRUN_WEIGHT = 1000;
 
 type MagnetControlPiece = Pick<TetrisPiece, 'x' | 'y' | 'rotation'>;
 

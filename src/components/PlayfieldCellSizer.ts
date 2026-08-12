@@ -1,7 +1,7 @@
 import { BOARD_COLS, BOARD_VISIBLE_ROWS, CELL_SIZE } from '../types';
 
-export const MOBILE_CELL_MIN_PX = 8;
-export const MOBILE_CELL_MAX_PX = 48;
+const MOBILE_CELL_MIN_PX = 8;
+const MOBILE_CELL_MAX_PX = 48;
 
 export interface PlayfieldBox {
   width: number;

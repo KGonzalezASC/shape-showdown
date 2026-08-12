@@ -29,7 +29,7 @@ export interface RngChannels {
   effects: MutableRng;
 }
 
-export function createRngChannels(baseSeed: number): RngChannels {
+function createRngChannels(baseSeed: number): RngChannels {
   return {
     pieces: makeRng((baseSeed ^ 0x11111111) | 0),
     garbage: makeRng((baseSeed ^ 0x22222222) | 0),

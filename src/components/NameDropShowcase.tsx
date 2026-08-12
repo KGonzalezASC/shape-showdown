@@ -1,4 +1,4 @@
-import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import React, { useEffect, useLayoutEffect, useReducer, useRef, useState } from 'react';
 import { ArrowUpRight, Github, Play, Sparkles, Swords } from 'lucide-react';
 import { NameDropLayeredRenderer } from '../nameDrop/nameDropCanvas';
 import {
@@ -19,6 +19,18 @@ type RenderWorkerOut =
   | { type: 'error'; message: string };
 
 const PLAN_CACHE = new Map<string, NameDropPlan>();
+
+type NameDropResult = { name: string; plan: NameDropPlan } | null;
+type NameDropPlanAction = { type: 'SET'; value: { name: string; plan: NameDropPlan } };
+
+function initialNameDropResult(name: string): NameDropResult {
+  const plan = getPrebakedNameDropPlan(name) ?? PLAN_CACHE.get(name);
+  return plan ? { name, plan } : null;
+}
+
+function nameDropPlanReducer(_state: NameDropResult, action: NameDropPlanAction): NameDropResult {
+  return action.value;
+}
 
 function useFittedCellSize(containerRef: React.RefObject<HTMLDivElement | null>): number {
   const [cellSize, setCellSize] = useState(12);
@@ -56,11 +68,10 @@ function useFittedCellSize(containerRef: React.RefObject<HTMLDivElement | null>)
 }
 
 function useNameDropPlan(name: string): NameDropPlan | null {
-  const [result, setResult] = useState<{ name: string; plan: NameDropPlan } | null>(
-    () => {
-      const plan = getPrebakedNameDropPlan(name) ?? PLAN_CACHE.get(name);
-      return plan ? { name, plan } : null;
-    },
+  const [result, dispatchResult] = useReducer(
+    nameDropPlanReducer,
+    name,
+    initialNameDropResult,
   );
   const currentPlan = result?.name === name ? result.plan : null;
 
@@ -68,13 +79,13 @@ function useNameDropPlan(name: string): NameDropPlan | null {
     const prebaked = getPrebakedNameDropPlan(name);
     if (prebaked) {
       PLAN_CACHE.set(name, prebaked);
-      setResult({ name, plan: prebaked });
+      dispatchResult({ type: 'SET', value: { name, plan: prebaked } });
       return;
     }
 
     const cached = PLAN_CACHE.get(name);
     if (cached) {
-      setResult({ name, plan: cached });
+      dispatchResult({ type: 'SET', value: { name, plan: cached } });
       return;
     }
 
@@ -84,7 +95,7 @@ function useNameDropPlan(name: string): NameDropPlan | null {
 
     const finish = (plan: NameDropPlan) => {
       PLAN_CACHE.set(name, plan);
-      if (!disposed) setResult({ name, plan });
+      if (!disposed) dispatchResult({ type: 'SET', value: { name, plan } });
     };
     const calculateFallback = () => {
       if (fallbackStarted) return;
@@ -268,7 +279,7 @@ export interface NameDropShowcaseProps {
 }
 
 /** Landing-page visual: deterministic tetromino drops reveal a compact block-letter name. */
-export const NameDropShowcase: React.FC<NameDropShowcaseProps> = ({
+const NameDropShowcase: React.FC<NameDropShowcaseProps> = ({
   name = 'KEITH GONZALEZ',
   statusLabel = 'Live name drop',
 }) => {

@@ -9,7 +9,7 @@ const BOARD_FILL = '#10131a';
 const GRID_LINE = 'rgba(255, 255, 255, 0.035)';
 const CELL_BORDER = 'rgba(255, 255, 255, 0.2)';
 
-export const PIECE_COLORS: Record<NameDropPiece['type'], string> = {
+const PIECE_COLORS: Record<NameDropPiece['type'], string> = {
   I: '#67e8f9',
   J: '#60a5fa',
   L: '#fdba74',
@@ -24,7 +24,7 @@ export type CanvasLike = OffscreenCanvas | HTMLCanvasElement;
 export type CanvasContext = OffscreenCanvasRenderingContext2D | CanvasRenderingContext2D;
 
 /** Matches the CSS cubic-bezier(0.18, 0.82, 0.24, 1) used by the prior DOM animation. */
-export function cubicBezierEase(t: number, x1: number, y1: number, x2: number, y2: number): number {
+function cubicBezierEase(t: number, x1: number, y1: number, x2: number, y2: number): number {
   if (t <= 0) return 0;
   if (t >= 1) return 1;
 
@@ -110,7 +110,7 @@ function pieceGeometryKey(piece: NameDropPiece): string {
  * Keep this as plain geometry instead of caching Path2D objects: Path2D is not
  * consistently available in OffscreenCanvas workers across browsers.
  */
-export class PiecePathAtlas {
+class PiecePathAtlas {
   private readonly cache = new Map<string, ReadonlyArray<{ x: number; y: number }>>();
 
   get(piece: NameDropPiece, cellSize: number): ReadonlyArray<{ x: number; y: number }> {

@@ -43,6 +43,7 @@ function isRenderableDecisionTrace(trace: BotDecisionTrace): boolean {
 interface CandidatePreviewSelection {
   playerId: string;
   traceKey: string;
+  frameTick: number | null;
   candidate: CandidateEvaluationTrace;
 }
 
@@ -182,21 +183,19 @@ export default function ReplayApp() {
   }, [activeInspectedPlayerId, viewFrame]);
 
   const currentTraceKey = currentDecisionTrace ? decisionTraceKey(currentDecisionTrace) : null;
+  const currentFrameTick = viewFrame?.tick ?? null;
   const previewCandidate = previewSelection
     && activeInspectedPlayerId
     && currentTraceKey
     && previewSelection.playerId === activeInspectedPlayerId
     && previewSelection.traceKey === currentTraceKey
+    && previewSelection.frameTick === currentFrameTick
     ? previewSelection.candidate
     : null;
 
   const inspectedPlayer = activeInspectedPlayerId && viewState
     ? viewState.players[activeInspectedPlayerId] ?? null
     : null;
-
-  useEffect(() => {
-    setPreviewSelection(null);
-  }, [activeInspectedPlayerId, currentTraceKey, viewFrame?.tick]);
 
   const replayCandidateOverlay = useMemo<ReplayCandidateOverlay | null>(() => {
     if (!currentDecisionTrace || !isRenderableDecisionTrace(currentDecisionTrace) || !currentDecisionTrace.decisionBoard) return null;
@@ -476,6 +475,7 @@ export default function ReplayApp() {
                   setPreviewSelection({
                     playerId: activeInspectedPlayerId,
                     traceKey: currentTraceKey,
+                    frameTick: currentFrameTick,
                     candidate,
                   });
                 }}

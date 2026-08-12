@@ -299,6 +299,10 @@ const VariantDeck: React.FC<MockShopProps> = ({
   const selectedItem = getItem(selectedId);
   const selectedState = getScenarioState(selectedId, scenario, overrides[selectedId]);
   const affordable = selectedState.price <= MOCK_WALLET;
+  const allowanceSlots = Array.from(
+    { length: selectedState.allowance },
+    (_, slot) => `${selectedId}-allowance-${slot}`,
+  );
 
   return (
     <div className="mx-auto grid w-full max-w-4xl gap-px overflow-hidden rounded-2xl border border-cyan-400/20 bg-cyan-300/10 shadow-2xl md:grid-cols-[minmax(12rem,0.8fr)_minmax(18rem,1.4fr)]">
@@ -351,8 +355,8 @@ const VariantDeck: React.FC<MockShopProps> = ({
               <span className="font-mono text-cyan-200">{selectedState.purchasesInWindow}/{selectedState.allowance} buys</span>
             </div>
             <div className="flex gap-1">
-              {Array.from({ length: selectedState.allowance }, (_, index) => (
-                <span key={index} className={`h-2 flex-1 rounded-sm ${index < selectedState.purchasesInWindow ? 'bg-cyan-300' : 'bg-zinc-800'}`} />
+              {allowanceSlots.map((slotId, index) => (
+                <span key={slotId} className={`h-2 flex-1 rounded-sm ${index < selectedState.purchasesInWindow ? 'bg-cyan-300' : 'bg-zinc-800'}`} />
               ))}
             </div>
           </div>

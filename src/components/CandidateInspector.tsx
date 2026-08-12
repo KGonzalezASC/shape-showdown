@@ -387,7 +387,7 @@ export const CandidateInspector: React.FC<CandidateInspectorProps> = ({
             </div>
             <span className="shrink-0 text-[9px] text-zinc-600">higher is better</span>
           </div>
-          <div className="mt-2 rounded-lg border border-sky-500/20 bg-sky-950/15 p-2.5 text-[10px] leading-relaxed text-zinc-400">
+          <div className="mt-2 rounded-lg border border-sky-500/20 bg-sky-950/15 p-2.5 text-[10px] leading-relaxed text-sky-100/90">
             <span className="font-bold text-sky-300">What are these rows?</span>
             <span className="block mt-0.5">
               Each row is a legal rotation/column placement for this same <span className="font-mono text-zinc-300">{trace.pieceType}</span> piece.
@@ -407,20 +407,14 @@ export const CandidateInspector: React.FC<CandidateInspectorProps> = ({
           const isPreviewed = candidate === previewCandidate;
           const scoreDifference = candidate.score - selected.score;
           return (
-            <div
-              key={`${candidate.rotation}_${candidate.x}_${idx}`}
-              role={!isSelected && onPreviewCandidate ? 'button' : undefined}
-              tabIndex={!isSelected && onPreviewCandidate ? 0 : undefined}
+            <button
+              type="button"
+              key={`candidate-${candidate.rotation}-${candidate.x}`}
+              disabled={isSelected || !onPreviewCandidate}
               aria-pressed={!isSelected && onPreviewCandidate ? isPreviewed : undefined}
               aria-label={!isSelected && onPreviewCandidate ? `Preview alternative ${idx + 1}` : undefined}
               title={!isSelected && onPreviewCandidate ? 'Click to preview this counterfactual placement on the board' : undefined}
               onClick={!isSelected && onPreviewCandidate ? () => onPreviewCandidate(isPreviewed ? null : candidate) : undefined}
-              onKeyDown={!isSelected && onPreviewCandidate ? (event) => {
-                if (event.key === 'Enter' || event.key === ' ') {
-                  event.preventDefault();
-                  onPreviewCandidate(isPreviewed ? null : candidate);
-                }
-              } : undefined}
               className={`rounded-lg border p-2.5 transition-all ${
                 isSelected
                   ? 'border-emerald-500/40 bg-emerald-950/20 shadow-[0_0_15px_rgba(16,185,129,0.1)]'
@@ -466,7 +460,7 @@ export const CandidateInspector: React.FC<CandidateInspectorProps> = ({
                   <ScoreContributionTable candidate={candidate} />
                 </div>
               )}
-            </div>
+            </button>
           );
         })}
         {previewCandidate && !previewCandidate.selected && (

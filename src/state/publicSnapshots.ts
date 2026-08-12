@@ -131,7 +131,7 @@ export function pendingGarbageTotal(packets: readonly PendingGarbagePacket[]): n
   return packets.reduce((total, packet) => total + packet.lines, 0);
 }
 
-export function toPublicGameState(state: GameState): PublicGameState {
+function toPublicGameState(state: GameState): PublicGameState {
   const players: Record<string, PublicPlayerState> = {};
   for (const id of Object.keys(state.players)) {
     players[id] = toPublicPlayerState(state.players[id]);

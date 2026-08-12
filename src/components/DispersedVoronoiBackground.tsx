@@ -139,7 +139,7 @@ function traceVoronoiBgPolygon(
 }
 
 /** Jack Rugile–style tiled Voronoi mesh with ~4% dispersed tetromino clusters. Fresh Math.random seed each call. */
-export function generateDispersedVoronoiTileDataUrl(): string {
+function generateDispersedVoronoiTileDataUrl(): string {
   const canvas = getSharedTileCanvas();
   if (!canvas) return '';
   const ctx = canvas.getContext('2d');

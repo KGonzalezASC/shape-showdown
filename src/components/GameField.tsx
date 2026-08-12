@@ -1,4 +1,4 @@
-import React, { forwardRef, useContext, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react';
+import React, { forwardRef, useContext, useEffect, useImperativeHandle, useMemo, useReducer, useRef, useState } from 'react';
 import {
   BOARD_COLS,
   BOARD_HIDDEN_ROWS,
@@ -43,6 +43,53 @@ interface GameFieldProps {
   effectTick?: number;
   /** Replay-only counterfactual placement overlay for the inspected player. */
   replayCandidateOverlay?: ReplayCandidateOverlay | null;
+}
+
+type LandingForecastPhase = 'hidden' | 'visible' | 'timeout' | 'hard-drop';
+
+interface LandingForecastRender {
+  cells: Array<{ x: number; y: number }>;
+  phase: LandingForecastPhase;
+}
+
+type LandingForecastAction =
+  | { type: 'NOOP' }
+  | { type: 'HIDE' }
+  | { type: 'HARD_DROP'; cells: Array<{ x: number; y: number }>; fallbackCells: Array<{ x: number; y: number }> }
+  | { type: 'SHOW'; cells: Array<{ x: number; y: number }>; phase: 'visible' | 'timeout' }
+  | { type: 'TIMEOUT' }
+  | { type: 'COMPLETE'; completedPhase: 'timeout' | 'hard-drop'; ticksRemaining: number; cells: Array<{ x: number; y: number }> };
+
+function landingForecastReducer(
+  state: LandingForecastRender,
+  action: LandingForecastAction,
+): LandingForecastRender {
+  switch (action.type) {
+    case 'HIDE':
+      return { cells: [], phase: 'hidden' };
+    case 'HARD_DROP':
+      return action.cells.length > 0
+        ? { cells: action.cells, phase: 'hard-drop' }
+        : state.cells.length > 0
+          ? { ...state, phase: 'hard-drop' }
+          : { cells: action.fallbackCells, phase: 'visible' };
+    case 'SHOW':
+      return state.phase === 'hard-drop' ? state : { cells: action.cells, phase: action.phase };
+    case 'TIMEOUT':
+      return state.cells.length > 0 ? { ...state, phase: 'timeout' } : state;
+    case 'COMPLETE':
+      if (state.phase !== action.completedPhase) return state;
+      if (action.completedPhase === 'hard-drop' && action.ticksRemaining > 0) {
+        return {
+          cells: action.cells,
+          phase: action.ticksRemaining <= LANDING_FORECAST_FADE_TICKS ? 'timeout' : 'visible',
+        };
+      }
+      return { cells: [], phase: 'hidden' };
+    case 'NOOP':
+    default:
+      return state;
+  }
 }
 
 export interface GameFieldRef {
@@ -129,14 +176,17 @@ const GameField = forwardRef<GameFieldRef, GameFieldProps>(({
   const layoutCellSize = useContext(PlayfieldCellSizeContext);
   const cellSize = cellSizeProp ?? layoutCellSize;
   const [shakeClass, setShakeClass] = useState('');
-  const [rotationBlocked, setRotationBlocked] = useState(false);
+  const [rotationBlocked, dispatchRotationBlocked] = useReducer(
+    (_state: boolean, next: boolean) => next,
+    false,
+  );
   const startHardDropForecastRef = useRef<() => void>(() => { });
 
   useEffect(() => {
     if (!player.activePiece?.isWildcard || !player.activePiece.rotationBlockedNonce) return;
-    setRotationBlocked(false);
-    const showTimer = window.setTimeout(() => setRotationBlocked(true), 10);
-    const hideTimer = window.setTimeout(() => setRotationBlocked(false), 420);
+    dispatchRotationBlocked(false);
+    const showTimer = window.setTimeout(() => dispatchRotationBlocked(true), 10);
+    const hideTimer = window.setTimeout(() => dispatchRotationBlocked(false), 420);
     return () => {
       window.clearTimeout(showTimer);
       window.clearTimeout(hideTimer);
@@ -183,10 +233,10 @@ const GameField = forwardRef<GameFieldRef, GameFieldProps>(({
     return getLandingForecastCells(player);
   }, [status, isMe, player]);
   const landingForecastTicksRemaining = player.landingForecastTicksRemaining ?? 0;
-  const [landingForecastRender, setLandingForecastRender] = useState<{
-    cells: Array<{ x: number; y: number }>;
-    phase: 'hidden' | 'visible' | 'timeout' | 'hard-drop';
-  }>({ cells: [], phase: 'hidden' });
+  const [landingForecastRender, dispatchLandingForecast] = useReducer(
+    landingForecastReducer,
+    { cells: [], phase: 'hidden' as const },
+  );
 
   const prevForecastTicksRef = useRef(landingForecastTicksRemaining);
   const prevHardDropTickRef = useRef(player.lastHardDropTick ?? -1);
@@ -196,63 +246,52 @@ const GameField = forwardRef<GameFieldRef, GameFieldProps>(({
     const hardDropCells = lastCalculatedForecastCellsRef.current.length > 0
       ? lastCalculatedForecastCellsRef.current
       : calculatedLandingForecastCells;
-    setLandingForecastRender((previous) => {
-      const cells = hardDropCells.length > 0 ? hardDropCells : previous.cells;
-      return cells.length > 0 ? { cells, phase: 'hard-drop' } : previous;
+    dispatchLandingForecast({
+      type: 'HARD_DROP',
+      cells: hardDropCells,
+      fallbackCells: calculatedLandingForecastCells,
     });
   };
 
   useEffect(() => {
+    let action: LandingForecastAction = { type: 'NOOP' };
     if (status !== 'playing' || !isMe) {
-      setLandingForecastRender({ cells: [], phase: 'hidden' });
+      action = { type: 'HIDE' };
       prevForecastTicksRef.current = landingForecastTicksRemaining;
       prevHardDropTickRef.current = player.lastHardDropTick ?? -1;
       lastCalculatedForecastCellsRef.current = [];
-      return;
+    } else {
+      const hardDropOccurred = (player.lastHardDropTick ?? -1) !== prevHardDropTickRef.current;
+      if (hardDropOccurred) {
+        action = {
+          type: 'HARD_DROP',
+          cells: lastCalculatedForecastCellsRef.current,
+          fallbackCells: calculatedLandingForecastCells,
+        };
+        prevForecastTicksRef.current = landingForecastTicksRemaining;
+        prevHardDropTickRef.current = player.lastHardDropTick ?? -1;
+        lastCalculatedForecastCellsRef.current = calculatedLandingForecastCells;
+      } else if (landingForecastTicksRemaining > 0) {
+        const nextPhase: 'timeout' | 'visible' =
+          landingForecastTicksRemaining <= LANDING_FORECAST_FADE_TICKS
+            ? 'timeout'
+            : 'visible';
+        action = {
+          type: 'SHOW',
+          cells: calculatedLandingForecastCells,
+          phase: nextPhase,
+        };
+        prevForecastTicksRef.current = landingForecastTicksRemaining;
+        lastCalculatedForecastCellsRef.current = calculatedLandingForecastCells;
+      } else {
+        if (prevForecastTicksRef.current > 0) action = { type: 'TIMEOUT' };
+        prevForecastTicksRef.current = landingForecastTicksRemaining;
+        prevHardDropTickRef.current = player.lastHardDropTick ?? -1;
+        lastCalculatedForecastCellsRef.current = calculatedLandingForecastCells;
+      }
     }
 
-    const hardDropOccurred = (player.lastHardDropTick ?? -1) !== prevHardDropTickRef.current;
-    if (hardDropOccurred) {
-      const hardDropCells = lastCalculatedForecastCellsRef.current;
-      setLandingForecastRender((previous) =>
-        hardDropCells.length > 0
-          ? { cells: hardDropCells, phase: 'hard-drop' }
-          : previous.cells.length > 0
-            ? { ...previous, phase: 'hard-drop' }
-            : { cells: calculatedLandingForecastCells, phase: 'visible' },
-      );
-      prevForecastTicksRef.current = landingForecastTicksRemaining;
-      prevHardDropTickRef.current = player.lastHardDropTick ?? -1;
-      lastCalculatedForecastCellsRef.current = calculatedLandingForecastCells;
-      return;
-    }
-
-    if (landingForecastTicksRemaining > 0) {
-      const nextPhase: 'timeout' | 'visible' =
-        landingForecastTicksRemaining <= LANDING_FORECAST_FADE_TICKS
-          ? 'timeout'
-          : 'visible';
-      const nextForecastRender = {
-        cells: calculatedLandingForecastCells,
-        phase: nextPhase,
-      };
-      setLandingForecastRender((previous) =>
-        previous.phase === 'hard-drop' ? previous : nextForecastRender,
-      );
-      prevForecastTicksRef.current = landingForecastTicksRemaining;
-      lastCalculatedForecastCellsRef.current = calculatedLandingForecastCells;
-      return;
-    }
-
-    if (prevForecastTicksRef.current > 0 && landingForecastTicksRemaining <= 0) {
-      setLandingForecastRender((previous) =>
-        previous.cells.length > 0 ? { ...previous, phase: 'timeout' } : previous,
-      );
-    }
-
-    prevForecastTicksRef.current = landingForecastTicksRemaining;
-    prevHardDropTickRef.current = player.lastHardDropTick ?? -1;
-    lastCalculatedForecastCellsRef.current = calculatedLandingForecastCells;
+    dispatchLandingForecast(action);
   }, [
     calculatedLandingForecastCells,
     isMe,
@@ -459,17 +498,11 @@ const GameField = forwardRef<GameFieldRef, GameFieldProps>(({
                       index === landingForecastRender.cells.length - 1
                       ? () => {
                         const completedPhase = landingForecastRender.phase;
-                        setLandingForecastRender((previous) => {
-                          if (previous.phase !== completedPhase) return previous;
-                          if (completedPhase === 'hard-drop' && landingForecastTicksRemaining > 0) {
-                            return {
-                              cells: calculatedLandingForecastCells,
-                              phase: landingForecastTicksRemaining <= LANDING_FORECAST_FADE_TICKS
-                                ? 'timeout'
-                                : 'visible',
-                            };
-                          }
-                          return { cells: [], phase: 'hidden' };
+                        dispatchLandingForecast({
+                          type: 'COMPLETE',
+                          completedPhase,
+                          ticksRemaining: landingForecastTicksRemaining,
+                          cells: calculatedLandingForecastCells,
                         });
                       }
                       : undefined

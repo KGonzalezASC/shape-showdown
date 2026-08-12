@@ -29,7 +29,6 @@ import {
 import { getPricingView } from '../src/shop/shopPricing.js';
 
 export {
-  createInitialPlayerShop,
   openPlayerShop,
   resetPlayerShop,
   rollShopOnLineClear,
@@ -37,10 +36,8 @@ export {
   tickPlayerShop,
 } from '../src/shop/playerShop.js';
 
-export { PRICING_POLICY_VERSION } from '../src/shop/shopPricing.js';
-
 /** Max cells copied onto a Wildcard +4 puzzle piece. */
-export const WILDCARD_FOUR_MAX_CELLS = 6;
+const WILDCARD_FOUR_MAX_CELLS = 6;
 
 const POISON_VARIANT_LABELS = ['Magenta', 'Lime', 'Indigo', 'Teal'] as const;
 

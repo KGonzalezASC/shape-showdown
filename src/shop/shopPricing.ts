@@ -20,7 +20,7 @@ import type { ItemPricingState } from '../types';
 export type { ItemPricingState } from '../types';
 
 export const PRICING_POLICY_VERSION = 'engagement-v1';
-export const PRICING_WINDOW_SECONDS = 20;
+const PRICING_WINDOW_SECONDS = 20;
 export const PRICING_WINDOW_TICKS = GAME_TICK_RATE * PRICING_WINDOW_SECONDS;
 
 export type PricingWindowClosedBy = 'allowance' | 'timer';
@@ -69,11 +69,11 @@ function clampInteger(value: number, minimum: number, maximum?: number): number 
   return Math.max(minimum, maximum === undefined ? integer : Math.min(maximum, integer));
 }
 
-export function roundPriceToNearest5(value: number): number {
+function roundPriceToNearest5(value: number): number {
   return Math.max(5, Math.round(value / 5) * 5);
 }
 
-export function pricingCurveFor(itemId: string): PricingCurve {
+function pricingCurveFor(itemId: string): PricingCurve {
   const curve = SHOP_PRICING_CURVES[itemId];
   if (!curve) throw new Error(`Missing pricing curve for shop item: ${itemId}`);
   return curve;
@@ -95,7 +95,7 @@ export function createInitialPricingState(): Record<string, ItemPricingState> {
   );
 }
 
-export function initialPricingStateFor(itemId: string): ItemPricingState {
+function initialPricingStateFor(itemId: string): ItemPricingState {
   pricingCurveFor(itemId);
   return { level: 0, purchasesInWindow: 0, windowStartedAtTick: null };
 }
@@ -104,7 +104,7 @@ export function initialPricingStateFor(itemId: string): ItemPricingState {
  * Normalize a state at a server tick. Closing a window advances only one level;
  * it never compounds repeatedly while the item remains untouched.
  */
-export function normalizePricingState(
+function normalizePricingState(
   itemId: string,
   state: ItemPricingState | undefined,
   currentTick: number,

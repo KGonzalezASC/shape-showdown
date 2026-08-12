@@ -18,13 +18,13 @@ export function validateBoard(board: CellValue[][]): void {
 }
 
 /** Deep clone board array after validation. */
-export function cloneBoard(board: CellValue[][]): CellValue[][] {
+function cloneBoard(board: CellValue[][]): CellValue[][] {
   validateBoard(board);
   return board.map((row) => [...row]);
 }
 
 /** Base constructor helper for creating a player with isolated RNG channels. */
-export function emptyPlayer(id: string, channels: RngChannels): PlayerState {
+function emptyPlayer(id: string, channels: RngChannels): PlayerState {
   return makePlayer(id, channels);
 }
 
@@ -45,7 +45,7 @@ export function nearTopOutPlayer(topRowsCount = 20): PlayerFixture {
 }
 
 /** Helper fixture: append a pending garbage packet. */
-export function withPendingGarbage(lines: number, arrivalTick: number): PlayerFixture {
+function withPendingGarbage(lines: number, arrivalTick: number): PlayerFixture {
   return (player: PlayerState) => {
     if (lines <= 0) throw new Error(`Garbage lines must be > 0, got ${lines}`);
     player.pendingGarbage.push({ lines, arrivalTick });
@@ -53,7 +53,7 @@ export function withPendingGarbage(lines: number, arrivalTick: number): PlayerFi
 }
 
 /** Helper fixture: set active piece shape & position. */
-export function withActivePiece(piece: TetrisPiece | null): PlayerFixture {
+function withActivePiece(piece: TetrisPiece | null): PlayerFixture {
   return (player: PlayerState) => {
     player.activePiece = piece ? JSON.parse(JSON.stringify(piece)) : null;
   };
@@ -93,7 +93,7 @@ export function shopReadyWithOffer(itemId: string, score = 500): PlayerFixture {
 }
 
 /** Combine multiple player fixtures sequentially. */
-export function combineFixtures(...fixtures: PlayerFixture[]): PlayerFixture {
+function combineFixtures(...fixtures: PlayerFixture[]): PlayerFixture {
   return (player: PlayerState) => {
     for (const fixture of fixtures) {
       fixture(player);

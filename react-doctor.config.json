@@ -1,0 +1,9 @@
+{
+  "ignore": {
+    "rules": [
+      "react-doctor/no-giant-component"
+    ]
+  },
+  "failOn": "warning",
+  "share": false
+}
