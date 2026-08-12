@@ -299,7 +299,7 @@ const AppShell: React.FC = () => {
         </div>
       ) : (
         <>
-          <main className="relative z-10 flex h-[min(820px,calc(100dvh-10px))] min-h-[500px] w-full max-w-[430px] flex-col overflow-hidden border border-[#252929] bg-[#111313]/95 p-1.5 shadow-2xl min-[661px]:h-[min(820px,calc(100dvh-24px))] min-[661px]:max-w-[820px] min-[661px]:p-2.5 min-[901px]:max-w-[1180px]">
+          <main className="relative z-10 flex h-[min(820px,calc(100dvh-10px))] min-h-[500px] w-full max-w-[430px] flex-col overflow-hidden border-0 bg-transparent p-1.5 shadow-none min-[661px]:h-[min(820px,calc(100dvh-24px))] min-[661px]:max-w-[820px] min-[661px]:p-2.5 min-[901px]:max-w-[1180px]">
             <MatchChrome />
             {DEV_TOOLS_ENABLED && drill.enabled && gameState && myId && gameState.players[myId] && (
               <DrillConsole
