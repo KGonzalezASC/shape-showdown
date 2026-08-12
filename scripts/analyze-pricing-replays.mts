@@ -63,7 +63,7 @@ const replayRoot = join(process.cwd(), 'fixtures', 'replays');
 // (highest demonstrated value). It chooses a retention target; it is not an
 // additional multiplier on top of the resulting curve.
 const ITEMS: ItemConfig[] = [
-  { id: 'fortify-frame', name: 'Snag', folder: 'snag', basePrice: 48, strength: 1.00, tier: 'S+', evidence: 'direct' },
+  { id: 'fortify-frame', name: 'Snag', folder: 'snag', basePrice: 60, strength: 1.00, tier: 'S+', evidence: 'direct' },
   { id: 'satellite-link', name: 'Satellite', folder: 'satellite', basePrice: 80, strength: 0.90, tier: 'S', evidence: 'direct' },
   { id: 'curtain', name: 'Curtain', folder: 'curtain', basePrice: 140, strength: 0.78, tier: 'A', evidence: 'direct' },
   { id: 'gravity-lure', name: 'Magnet', folder: 'magnet', basePrice: 125, strength: 0.72, tier: 'A', evidence: 'direct' },

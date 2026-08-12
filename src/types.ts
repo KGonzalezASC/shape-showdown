@@ -122,6 +122,13 @@ export interface ShopBagState {
   tier2Bag: string[];
 }
 
+export interface ItemPricingState {
+  level: number;
+  purchasesInWindow: number;
+  windowStartedAtTick: number | null;
+  lastWindowClosedBy?: 'allowance' | 'timer';
+}
+
 /** Authoritative per-player shop state (rolled and advanced on the server). */
 export interface PlayerShopState {
   offerIds: string[];
@@ -131,6 +138,7 @@ export interface PlayerShopState {
   cycleStartTick: number | null;
   lastPurchasedItemId: string | null;
   activeSynergySeeds: string[];
+  pricing: Record<string, ItemPricingState>;
 }
 
 /**
@@ -233,6 +241,7 @@ export interface PlayerState {
   nextQueue: TetrominoType[];
   bag: TetrominoType[];
   score: number;
+  funds: number;
   linesCleared: number;
   combo: number;
   backToBack: boolean;
@@ -453,6 +462,8 @@ export interface ReplayDataV2 {
   version: 2;
   date: string;
   seed: number;
+  /** Optional pricing policy marker; absent means legacy base-price replay. */
+  pricingPolicyVersion?: string;
   /** Stable player-slot mapping used to derive independent RNG channels. */
   playerSlots?: Record<string, number>;
   /** Optional snapshot cadence in ticks for frame-by-frame or sparse replays. */

@@ -102,6 +102,7 @@ export function makePlayer(id: string, rng: RngChannels | MutableRng): PlayerSta
     nextQueue,
     bag: [],
     score: 0,
+    funds: 0,
     linesCleared: 0,
     combo: -1,
     backToBack: false,
@@ -406,9 +407,8 @@ export function applyMagnetToOpponent(opponent: PlayerState): void {
   const permanent = opponent.magnetPermanentStacks ?? 0;
   if (permanent < MAGNET_PERMANENT_MAX) {
     opponent.magnetPermanentStacks = permanent + 1;
-  } else {
-    opponent.magnetPieceBoost = (opponent.magnetPieceBoost ?? 0) + 1;
   }
+  opponent.magnetPieceBoost = (opponent.magnetPieceBoost ?? 0) + 1;
 }
 
 /** Sticky shop item: cap lock-move resets on the opponent's current (or next) piece. */
@@ -661,7 +661,9 @@ function attackFromClear(
 
   const baseScore = lines * 100 + attack * 10;
   const penalty = Math.round(baseScore * poisonedRatio * POISON_LINE_CLEAR_PENALTY_MAX_RATIO);
-  player.score += baseScore - penalty;
+  const earnedScore = baseScore - penalty;
+  player.score += earnedScore;
+  player.funds += earnedScore;
   return attack;
 }
 
@@ -824,6 +826,7 @@ function processActions(player: PlayerState, tick: number): boolean {
       }
       // Guideline: 2 points per cell hard-dropped.
       player.score += dropped * 2;
+      player.funds += dropped * 2;
       player.lockDelayRemainingTicks = 0;
       player.pieceHasHardDropped = true;
       player.lastHardDropTick = tick;
@@ -967,6 +970,10 @@ export function stepPlayer(
   const channels = ensureRngChannels(rng);
   const enableShop = options?.enableShop ?? true;
 
+  if (player.funds === undefined) {
+    player.funds = player.score ?? 0;
+  }
+
   const result: StepResult = {
     linesClearedThisStep: 0,
     attackLinesQueued: 0,
@@ -1107,7 +1114,10 @@ export function stepPlayer(
     for (let i = 0; i < cellsToDrop; i++) {
       if (tryMove(player, 0, 1)) {
         movedDown = true;
-        if (isSoftDrop) player.score += 1;
+        if (isSoftDrop) {
+          player.score += 1;
+          player.funds += 1;
+        }
       } else {
         break;
       }

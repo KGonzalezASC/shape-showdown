@@ -38,28 +38,6 @@ function drawHatching(
   ctx.restore();
 }
 
-function drawMagnetAura(
-  ctx: CanvasRenderingContext2D,
-  cell: BoardVisualCell,
-  cellSize: number,
-  elapsedMs: number,
-): void {
-  const hue = (elapsedMs * 0.18 + (cell.x + cell.y) * 14) % 360;
-  const inset = Math.max(1, cellSize * 0.07);
-  ctx.save();
-  ctx.strokeStyle = `hsl(${hue} 88% 72%)`;
-  ctx.shadowColor = `hsl(${(hue + 65) % 360} 92% 62%)`;
-  ctx.shadowBlur = Math.max(3, cellSize * 0.28);
-  ctx.lineWidth = Math.max(1.5, cellSize * 0.07);
-  ctx.strokeRect(
-    cell.x * cellSize + inset,
-    cell.y * cellSize + inset,
-    cellSize - inset * 2,
-    cellSize - inset * 2,
-  );
-  ctx.restore();
-}
-
 export function paintBoardCanvasOverlay(
   ctx: CanvasRenderingContext2D,
   model: BoardVisualModel,
@@ -73,7 +51,6 @@ export function paintBoardCanvasOverlay(
 
   for (const cell of model.cells) {
     if (cell.hatched) drawHatching(ctx, cell, cellSize, hatchPhase);
-    if (cell.magnetAura) drawMagnetAura(ctx, cell, cellSize, elapsedMs);
     if (cell.bomber) {
       ctx.save();
       ctx.font = `${Math.max(10, cellSize * 0.48)}px sans-serif`;
@@ -119,9 +96,7 @@ export const BoardCanvasOverlay: React.FC<BoardCanvasOverlayProps> = ({
   const cellSizeRef = useRef(cellSize);
   modelRef.current = model;
   cellSizeRef.current = cellSize;
-  const hasContinuousAnimation =
-    model.wildcardOutline.length > 0 ||
-    model.cells.some((cell) => cell.magnetAura);
+  const hasContinuousAnimation = model.wildcardOutline.length > 0;
   const hasSteppedAnimation = model.cells.some((cell) => cell.hatched);
 
   const paintRef = useRef<(now: number) => void>(() => {});

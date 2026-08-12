@@ -9,6 +9,16 @@ html, body, #root {
   touch-action: none;
 }
 
+.desktop-keyboard-legend {
+  display: none;
+}
+
+@media (min-width: 901px) and (hover: hover) and (pointer: fine) {
+  .desktop-keyboard-legend {
+    display: grid;
+  }
+}
+
 /* Score / bubble floating feedback (CSS avoids Motion + transform clashes and honors visibility). */
 @keyframes score-float-field {
   from {

@@ -41,6 +41,29 @@ describe('PairedRunner Bot vs Bot Harness', () => {
     assert.ok(report.walletHistory.p1.length > 0);
   });
 
+  it('records the current dynamic price after a prior level is exhausted', () => {
+    const runner = new PairedRunner({
+      seed: 9091,
+      players: {
+        p1: (player) => {
+          player.funds = 200;
+          player.shop.pricing['frost-shift'].level = 1;
+          player.shop.offerIds = ['frost-shift'];
+          player.shop.phase = 'ready';
+        },
+      },
+      shopPolicies: {
+        p1: createSimpleShopPolicy('frost-shift'),
+      },
+    });
+
+    const report = runner.run(10);
+    const purchase = report.purchases.find((p) => p.itemId === 'frost-shift');
+    assert.ok(purchase);
+    assert.equal(purchase.accepted, true);
+    assert.equal(purchase.cost, 70);
+  });
+
   it('verifies GameManager does not import testHarness/rulesBot modules', () => {
     const gmPath = path.resolve('server/GameManager.ts');
     const gmSource = fs.readFileSync(gmPath, 'utf8');

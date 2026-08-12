@@ -1,5 +1,6 @@
 import React, { memo } from 'react';
-import { BOARD_COLS, BOARD_VISIBLE_ROWS, ShopItem } from '../types';
+import { BOARD_COLS, BOARD_VISIBLE_ROWS, ItemPricingState, ShopItem } from '../types';
+import { getPricingView } from '../shop/shopPricing';
 import { DEV_TOOLS_ENABLED } from '../devTools';
 
 interface ShopRailProps {
@@ -9,13 +10,15 @@ interface ShopRailProps {
   cycleIndex: number;
   shopPhase: 'waiting' | 'ready' | 'cycling' | 'expired';
   purchasedItem: ShopItem | null;
-  availableScore: number;
+  availableFunds: number;
+  pricing: Record<string, ItemPricingState>;
+  currentTick: number;
   /** Extra per-item gates (e.g. Satellite needs queued garbage). */
   isItemDisabled?: (item: ShopItem) => boolean;
   onConfirm: () => void;
   hatchingEnabled: boolean;
   onToggleHatching?: () => void;
-  viewportMode: 'mobile' | 'tabletDesktop';
+  viewportMode: 'phone' | 'tablet' | 'desktop';
 }
 
 const ShopRail: React.FC<ShopRailProps> = ({
@@ -25,18 +28,24 @@ const ShopRail: React.FC<ShopRailProps> = ({
   cycleIndex,
   shopPhase,
   purchasedItem,
-  availableScore,
+  availableFunds,
+  pricing,
+  currentTick,
   isItemDisabled,
   onConfirm,
   hatchingEnabled,
   onToggleHatching,
   viewportMode,
 }) => {
-  const isTabletDesktop = viewportMode === 'tabletDesktop';
-  const railWidthClass = isTabletDesktop ? 'w-[7rem]' : 'w-[5.75rem]';
-  const iconRowClass = isTabletDesktop ? 'h-9 px-2' : 'h-8 px-1.5';
-  const bodyTextClass = isTabletDesktop ? 'text-[9px]' : 'text-[8px]';
-  const iconClass = isTabletDesktop ? 'text-lg' : 'text-base';
+  const isExpanded = viewportMode !== 'phone';
+  const railWidthClass = viewportMode === 'phone'
+    ? 'w-[5.75rem]'
+    : viewportMode === 'tablet'
+      ? 'w-full'
+      : 'w-[8.875rem]';
+  const iconRowClass = isExpanded ? 'min-h-11 px-2 py-1.5' : 'min-h-8 px-1.5 py-1';
+  const bodyTextClass = isExpanded ? 'text-[9px]' : 'text-[8px]';
+  const iconClass = isExpanded ? 'text-lg' : 'text-base';
 
   const isWaiting = !isPlaying || shopPhase === 'waiting';
   const isReady = isPlaying && shopPhase === 'ready';
@@ -45,55 +54,56 @@ const ShopRail: React.FC<ShopRailProps> = ({
 
   return (
     <div className={`${railWidthClass} select-none ${isWaiting ? 'opacity-70 saturate-50' : ''}`}>
-      <div className={`rounded-lg border border-cyan-500/30 bg-[#10161b]/90 shadow-xl backdrop-blur ${isTabletDesktop ? 'p-2' : 'p-1.5'}`}>
-        <div className="mb-1 flex items-center justify-between">
-          <p className={`${bodyTextClass} font-bold uppercase tracking-[0.2em] text-cyan-300/85`}>Shop</p>
+      <div className={`border border-[#303535] bg-[#171919]/95 shadow-xl ${isExpanded ? 'p-2' : 'p-1'}`}>
+        <div className="mb-2 flex items-center justify-between border-b border-[#303535] pb-1.5">
+          <p className={`${bodyTextClass} font-black uppercase tracking-[0.16em] text-[#8db2ba]`}>Shop · {items.length}</p>
           {isExpired && isPlaying ? (
-            <span className={`${bodyTextClass} rounded bg-amber-500/20 px-1 py-0.5 font-mono text-amber-200`}>WAIT</span>
+            <span className={`${bodyTextClass} border border-amber-500/30 bg-amber-950/30 px-1 py-0.5 font-mono text-amber-200`}>WAIT</span>
           ) : (
-            <span className={`${bodyTextClass} rounded bg-cyan-500/15 px-1 py-0.5 font-mono text-cyan-100`}>{items.length}</span>
-          )}
-        </div>
-        <div className={`mb-1 flex h-8 items-center justify-center rounded border transition-all duration-300 ${
-          purchasedItem
-            ? 'bg-[linear-gradient(90deg,#ff0000,#ff7f00,#ffff00,#00ff00,#0000ff,#4b0082,#9400d3,#ff0000)] bg-[length:200%_auto] animate-[rainbow-bg_3s_linear_infinite] border-transparent shadow-[0_0_12px_rgba(255,255,255,0.3)]'
-            : 'border-cyan-500/25 bg-cyan-950/30'
-        }`}>
-          {purchasedItem ? (
-            <span className="text-xl drop-shadow-md" title={purchasedItem.name}>{purchasedItem.icon}</span>
-          ) : (
-            <span className="text-[9px] font-bold uppercase tracking-widest text-cyan-600/50">Empty</span>
+            <span className="flex items-center gap-1.5">
+              {purchasedItem && <span className="text-sm" title={`Last purchase: ${purchasedItem.name}`}>{purchasedItem.icon}</span>}
+              <span className={`${bodyTextClass} font-mono text-zinc-300`} title="Available funds">{availableFunds}</span>
+            </span>
           )}
         </div>
 
         <div className="relative">
-          <div className={`${isTabletDesktop ? 'max-h-[16rem]' : 'max-h-[13rem]'} space-y-1 overflow-y-auto pr-0.5`}>
+          <div className={`${isExpanded ? 'max-h-[18rem]' : 'max-h-[14rem]'} grid gap-1 overflow-y-auto`}>
             {items.map((item, idx) => {
-              const canAfford = availableScore >= item.cost;
+              const pricingView = getPricingView(item.id, pricing[item.id], currentTick);
+              const canAfford = availableFunds >= pricingView.currentPrice;
               const blocked = isItemDisabled?.(item) ?? false;
               const isHighlighted = isCycling && idx === cycleIndex;
               const disabled = isWaiting || !canAfford || blocked;
               return (
                 <div
                   key={item.id}
-                  className={`relative flex w-full items-center justify-between border-2 transition-all duration-200 ${iconRowClass} ${
-                    isHighlighted && canAfford
-                      ? '!text-amber-200 !border-amber-400 bg-gradient-to-r from-amber-950/90 to-black shadow-[3px_3px_0px_#d97706] scale-[1.06] -translate-y-0.5 z-10 font-bold'
-                      : `${item.colorClass} ${item.borderColorClass} ${disabled ? 'opacity-40 grayscale' : 'opacity-95'}`
-                  } ${isHighlighted && !canAfford ? 'ring-2 ring-rose-400/60 z-10 scale-[1.02]' : ''}`}
+                  className={`relative grid w-full grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-x-1.5 border transition-colors duration-150 ${iconRowClass} ${
+                    isHighlighted
+                      ? canAfford
+                        ? 'border-[#5c777c] bg-[#1a2020] text-zinc-100'
+                        : 'border-rose-400/60 bg-rose-950/25 text-zinc-300'
+                      : `border-[#292e2e] ${item.colorClass} ${disabled ? 'opacity-40 grayscale' : 'opacity-90'}`
+                  }`}
                 >
-                  <span className={`${iconClass} leading-none`}>{item.icon}</span>
-                  <span className={`font-mono ${bodyTextClass} ${disabled ? 'text-zinc-400' : 'text-zinc-100'}`}>
-                    {item.cost}
+                  <span className={`${iconClass} leading-none text-zinc-200`} title={item.name}>{item.icon}</span>
+                  {isExpanded && <span className={`${bodyTextClass} truncate font-extrabold text-zinc-200`}>{item.name}</span>}
+                  <span className={`col-start-3 font-mono ${bodyTextClass} ${disabled ? 'text-zinc-400' : 'text-amber-200'}`}>
+                    {pricingView.currentPrice}
                   </span>
+                  {isExpanded && (
+                    <span className={`col-start-2 col-end-4 font-mono text-[7px] leading-tight text-zinc-500`}>
+                      L{pricingView.level} · {pricingView.purchasesRemaining} left · {blocked ? 'gated' : pricingView.windowActive ? `${pricingView.secondsRemaining}s` : pricingView.windowClosedBy ?? 'fresh'}
+                    </span>
+                  )}
                 </div>
               );
             })}
           </div>
 
           {isWaiting && (
-            <div className="pointer-events-none absolute inset-0 flex items-center justify-center rounded border border-white/10 bg-black/55">
-              <span className={`rounded bg-zinc-900/90 px-1.5 py-0.5 font-mono ${bodyTextClass} uppercase tracking-wider text-zinc-300`}>
+            <div className="pointer-events-none absolute inset-0 flex items-center justify-center border border-white/10 bg-black/55">
+              <span className={`border border-white/10 bg-zinc-900/90 px-1.5 py-0.5 font-mono ${bodyTextClass} uppercase tracking-wider text-zinc-300`}>
                 {isPlaying ? 'Wait Line Clear' : 'Locked'}
               </span>
             </div>
@@ -104,7 +114,7 @@ const ShopRail: React.FC<ShopRailProps> = ({
           <button
             type="button"
             onClick={onConfirm}
-            className="mt-1 w-full rounded border border-cyan-400/50 bg-cyan-500/20 px-2 py-1 text-center font-mono text-[9px] uppercase tracking-wider text-cyan-100 transition hover:bg-cyan-500/35 active:scale-95"
+            className="mt-2 min-h-9 w-full border border-[#4a5151] bg-[#343a3a] px-2 py-1.5 text-center font-mono text-[9px] font-black uppercase tracking-wider text-zinc-200 transition hover:bg-[#414848] active:bg-[#282d2d]"
           >
             {isReady ? 'Start' : 'Confirm'}
           </button>
@@ -115,7 +125,7 @@ const ShopRail: React.FC<ShopRailProps> = ({
           type="button"
           aria-pressed={hatchingEnabled}
           onClick={onToggleHatching}
-          className={`mt-1 w-full rounded border px-2 py-1 text-center font-mono text-[9px] uppercase tracking-wider transition active:scale-95 ${
+          className={`mt-1 w-full border px-2 py-1 text-center font-mono text-[9px] uppercase tracking-wider transition ${
             hatchingEnabled
               ? 'border-emerald-400/60 bg-emerald-500/20 text-emerald-100 hover:bg-emerald-500/30'
               : 'border-zinc-600/70 bg-zinc-900/70 text-zinc-400 hover:border-zinc-500 hover:text-zinc-200'

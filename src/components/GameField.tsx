@@ -32,6 +32,8 @@ interface GameFieldProps {
   opacityClass?: string;
   /** When omitted, uses `PlayfieldCellSizeContext` (desktop layout). */
   cellSize?: number;
+  /** Mobile-only flexible slot used to fit the board around real header and notification height. */
+  boardFitRef?: React.RefObject<HTMLDivElement | null>;
   status?: MatchStatus;
   hatchingEnabled: boolean;
   performanceId?: string;
@@ -94,6 +96,7 @@ const GameField = forwardRef<GameFieldRef, GameFieldProps>(({
   shadowColorClass,
   opacityClass = '',
   cellSize: cellSizeProp,
+  boardFitRef,
   status = 'playing',
   hatchingEnabled,
   performanceId = title,
@@ -280,10 +283,7 @@ const GameField = forwardRef<GameFieldRef, GameFieldProps>(({
     );
   }, [heldPiece]);
   const holdPreviewCell = Math.max(5, Math.round(cellSize * 0.31));
-  const compactStorageLayout = cellSize <= 20;
-  const swapZoneText = compactStorageLayout
-    ? `Swap rows 0-${cutoffRow - 1}`
-    : `Swap zone rows 0-${cutoffRow - 1}`;
+  const swapZoneText = `Swap rows 0-${cutoffRow - 1}`;
   const swapLineY = cutoffRow * cellSize;
   const showSwapLine = isMe && cutoffRow > 0 && cutoffRow < BOARD_VISIBLE_ROWS;
 
@@ -305,7 +305,7 @@ const GameField = forwardRef<GameFieldRef, GameFieldProps>(({
               : { text: 'Ready', tone: 'text-emerald-300' };
 
   return (
-    <div className={`relative ${opacityClass}`}>
+    <div className={`relative flex h-full w-full flex-col ${opacityClass}`}>
       {/* ── Header row: title / active-effect pills / line counter ── */}
       <div className="mb-2 flex items-end justify-between gap-1.5">
         <h2
@@ -323,7 +323,7 @@ const GameField = forwardRef<GameFieldRef, GameFieldProps>(({
                 <span
                   key={effect.id}
                   className={[
-                    'inline-flex items-center gap-0.5 rounded-full border px-2 py-0.5',
+                    'inline-flex items-center gap-0.5 border px-1.5 py-0.5',
                     'font-mono text-[9px] font-bold uppercase tracking-wider leading-none',
                     'animate-pulse',
                     style.bgClass,
@@ -342,23 +342,32 @@ const GameField = forwardRef<GameFieldRef, GameFieldProps>(({
           </div>
         )}
 
-        <span className="shrink-0 rounded-full bg-zinc-800/90 px-2 py-0.5 font-mono text-[10px] tabular-nums text-zinc-300">
+        <span className="shrink-0 border border-white/10 bg-[#171919] px-2 py-0.5 font-mono text-[10px] tabular-nums text-zinc-300">
           {player.linesCleared} clears
         </span>
       </div>
-      <IncomingGarbageReadout fieldTitle={title} lines={pendingGarbageTotal(player.pendingGarbage)} />
-      <div className="relative">
-        {isMe && (
-          <span
-            aria-hidden
-            className="pointer-events-none absolute -left-4 top-[calc(50%+1em)] z-10 -translate-x-1/2 -translate-y-1/2 -rotate-90 select-none whitespace-nowrap font-mono font-bold uppercase tracking-[0.28em] bg-gradient-to-t from-white/05 via-white/15 to-white/30 bg-clip-text text-transparent"
-            style={{ fontSize: Math.max(16, Math.round(cellSize * 0.85)) }}
-          >
-            {BOARD_COLS}×{BOARD_VISIBLE_ROWS}
-          </span>
-        )}
+      <div className="mb-1 flex items-center gap-3 font-mono text-[9px] font-bold uppercase tracking-wider text-zinc-500">
+        <span>
+          Funds <strong className={isMe ? 'text-cyan-200' : 'text-rose-200'}>{player.funds}</strong>
+        </span>
+        <span>
+          Score <strong className={isMe ? 'text-emerald-200' : 'text-rose-200'}>{player.score}</strong>
+        </span>
+      </div>
+      <IncomingGarbageReadout
+        fieldTitle={title}
+        lines={pendingGarbageTotal(player.pendingGarbage)}
+        magnetLevel={player.magnetPermanentStacks ?? 0}
+      />
+      <div
+        ref={boardFitRef}
+        data-board-fit-slot={boardFitRef ? 'mobile' : undefined}
+        className={boardFitRef
+          ? 'relative flex min-h-0 w-full flex-1 items-center justify-center'
+          : 'relative self-center'}
+      >
         <div
-          className={`relative overflow-hidden rounded-xl border-2 ${borderColorClass} shadow-2xl ${shadowColorClass} ${shakeClass || ''}`}
+          className={`relative overflow-hidden border ${borderColorClass} shadow-2xl ${shadowColorClass} ${shakeClass || ''}`}
           style={{ width: BOARD_COLS * cellSize, height: BOARD_VISIBLE_ROWS * cellSize }}
         >
           {showSwapLine && (
@@ -368,7 +377,7 @@ const GameField = forwardRef<GameFieldRef, GameFieldProps>(({
                 style={{ top: swapLineY }}
               />
               <div
-                className="pointer-events-none absolute right-1 z-20 -translate-y-1/2 rounded bg-black/70 px-1 py-0.5 font-mono text-[9px] uppercase tracking-wide text-white/80"
+                className="pointer-events-none absolute right-1 z-20 -translate-y-1/2 border border-white/10 bg-black/80 px-1 py-0.5 font-mono text-[9px] uppercase tracking-wide text-white/80"
                 style={{ top: swapLineY }}
               >
                 swap line
@@ -533,15 +542,14 @@ const GameField = forwardRef<GameFieldRef, GameFieldProps>(({
       </div>
       {isMe && (
         <div
-          className={`mt-1.5 rounded-lg border border-white/10 bg-black/25 px-2 py-1 ${compactStorageLayout ? 'flex flex-col gap-1.5' : 'flex items-center justify-between gap-2'
-            }`}
+          className="mt-1.5 flex items-center justify-between gap-2 border border-white/10 bg-[#101212]/90 px-2 py-1.5"
         >
           <div className="min-w-0">
             <p className="text-[10px] font-bold uppercase tracking-wider text-zinc-300">Storage (Shift)</p>
             <p className={`text-[10px] font-semibold uppercase tracking-wide ${holdStatus.tone}`}>{holdStatus.text}</p>
             <p className="text-[9px] font-mono text-zinc-400">{swapZoneText}</p>
           </div>
-          <div className={`${compactStorageLayout ? 'self-end' : 'shrink-0'} rounded border border-white/15 bg-zinc-950/80 p-1`}>
+          <div className="shrink-0 border border-white/15 bg-zinc-950/80 p-1">
             {holdPreview ? (
               <div className="relative">
                 <div
@@ -591,7 +599,7 @@ const GameField = forwardRef<GameFieldRef, GameFieldProps>(({
               </div>
             ) : (
               <div
-                className="flex items-center justify-center rounded border border-dashed border-zinc-700 text-[10px] font-mono text-zinc-500"
+                className="flex items-center justify-center border border-dashed border-zinc-700 text-[10px] font-mono text-zinc-500"
                 style={{ width: HOLD_PREVIEW_SIZE * holdPreviewCell, height: HOLD_PREVIEW_SIZE * holdPreviewCell }}
               >
                 EMPTY
@@ -609,6 +617,7 @@ export default React.memo(GameField, (prev, next) => {
     prev.isMe !== next.isMe ||
     prev.title !== next.title ||
     prev.cellSize !== next.cellSize ||
+    prev.boardFitRef !== next.boardFitRef ||
     prev.status !== next.status ||
     prev.hatchingEnabled !== next.hatchingEnabled
   ) {

@@ -9,6 +9,7 @@ import type {
 } from '../../src/types.js';
 import { createPlayerRngChannels, type RngChannels } from '../../src/rng.js';
 import { applyShopPurchase, openPlayerShop } from '../shop.js';
+import { PRICING_POLICY_VERSION } from '../../src/shop/shopPricing.js';
 import { matchStep } from '../tetris/matchStep.js';
 import type { DriverObservation, InputDriver, PlayerCommand } from './inputDriver.js';
 
@@ -93,6 +94,13 @@ export function replayMatch(
   }
 
   const replayedEvents: MatchEvent[] = [];
+  if (
+    replayData.pricingPolicyVersion !== undefined &&
+    replayData.pricingPolicyVersion !== PRICING_POLICY_VERSION
+  ) {
+    throw new Error(`Unsupported replay pricing policy: ${replayData.pricingPolicyVersion}`);
+  }
+  const isLegacyPricingReplay = replayData.pricingPolicyVersion === undefined;
   const replayedKeyframes: Array<{ tick: number; players: Record<string, PlayerState> }> = [
     {
       tick: 0,
@@ -138,7 +146,19 @@ export function replayMatch(
         const opponentId = pids.find((id) => id !== frame.playerId);
         const opponent = opponentId ? gameState.players[opponentId] : null;
         const channels = rngChannelsByPlayer.get(frame.playerId)!;
-        const accepted = applyShopPurchase(gameState, player, opponent, frame.itemId, channels.shop);
+        const accepted = applyShopPurchase(
+          gameState,
+          player,
+          opponent,
+          frame.itemId,
+          channels.shop,
+          isLegacyPricingReplay
+            ? {
+                pricingMode: 'legacy',
+                ...(frame.cost === undefined ? {} : { overrideCost: frame.cost }),
+              }
+            : undefined,
+        );
 
         if (!divergence && options?.strictReplayMode && frame.accepted !== undefined && frame.accepted !== accepted) {
           divergence = {

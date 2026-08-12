@@ -1,0 +1,459 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Shape Showdown — Magnet Effect Mockup & Visual Options</title>
+  <style>
+    :root {
+      --bg: #0a0a0c;
+      --card-bg: #141418;
+      --border: rgba(255, 255, 255, 0.1);
+      --text: #e2e8f0;
+      --text-muted: #94a3b8;
+      --accent-cyan: #38bdf8;
+      --accent-purple: #c084fc;
+      --accent-amber: #fbbf24;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background-color: var(--bg);
+      color: var(--text);
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      padding: 2rem;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    header {
+      text-align: center;
+      max-width: 800px;
+      margin-bottom: 2.5rem;
+    }
+
+    h1 {
+      font-size: 1.875rem;
+      font-weight: 800;
+      letter-spacing: -0.025em;
+      margin-bottom: 0.5rem;
+      background: linear-gradient(135deg, #38bdf8, #c084fc);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    p.subtitle {
+      color: var(--text-muted);
+      font-size: 0.95rem;
+      line-height: 1.5;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 1.75rem;
+      width: 100%;
+      max-width: 1280px;
+    }
+
+    .card {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 1rem;
+      padding: 1.25rem;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5);
+      transition: transform 0.2s ease, border-color 0.2s ease;
+    }
+
+    .card:hover {
+      transform: translateY(-2px);
+      border-color: rgba(255, 255, 255, 0.2);
+    }
+
+    .card-header {
+      width: 100%;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 1rem;
+    }
+
+    .card-title {
+      font-size: 1.1rem;
+      font-weight: 700;
+      color: #f8fafc;
+    }
+
+    .tag {
+      font-size: 0.7rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      padding: 0.25rem 0.6rem;
+      border-radius: 9999px;
+      background: rgba(56, 189, 248, 0.15);
+      color: var(--accent-cyan);
+      border: 1px solid rgba(56, 189, 248, 0.3);
+    }
+
+    .tag.current {
+      background: rgba(239, 68, 68, 0.15);
+      color: #f87171;
+      border-color: rgba(239, 68, 68, 0.3);
+    }
+
+    .canvas-container {
+      position: relative;
+      width: 200px;
+      height: 360px;
+      background: #0d0d11;
+      border-radius: 0.5rem;
+      overflow: hidden;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      box-shadow: inset 0 0 20px rgba(0,0,0,0.8);
+    }
+
+    canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+    }
+
+    .card-desc {
+      margin-top: 1rem;
+      font-size: 0.85rem;
+      color: var(--text-muted);
+      line-height: 1.45;
+      text-align: center;
+    }
+
+    .card-features {
+      width: 100%;
+      margin-top: 0.75rem;
+      padding-top: 0.75rem;
+      border-top: 1px solid rgba(255, 255, 255, 0.05);
+      display: flex;
+      flex-direction: column;
+      gap: 0.35rem;
+    }
+
+    .feature-item {
+      font-size: 0.75rem;
+      color: #cbd5e1;
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+    }
+
+    .feature-item::before {
+      content: "•";
+      color: var(--accent-cyan);
+      font-weight: bold;
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <h1>Shape Showdown — Magnet Effect Mockup</h1>
+    <p class="subtitle">
+      Exploration of non-blinking, cohesive visual alternatives for the Magnet effect.
+      These replace the jarring rainbow blinking square outlines with smooth, subtle gravitational field indicators that complement the Voronoi aesthetic.
+    </p>
+  </header>
+
+  <div class="grid">
+
+    <!-- CURRENT (OLD) EFFECT FOR COMPARISON -->
+    <div class="card">
+      <div class="card-header">
+        <span class="card-title">Current Effect</span>
+        <span class="tag current">Original (Jarring)</span>
+      </div>
+      <div class="canvas-container">
+        <canvas id="canvas-old"></canvas>
+      </div>
+      <p class="card-desc">
+        Rapid HSL rainbow blinking square stroke per active cell. Flashes constantly during gameplay.
+      </p>
+      <div class="card-features">
+        <div class="feature-item" style="color: #f87171;">Fast color cycling</div>
+        <div class="feature-item" style="color: #f87171;">Square box outlines (ignores Voronoi)</div>
+      </div>
+    </div>
+
+    <!-- OPTION A: GRAVITY STREAM LINES -->
+    <div class="card">
+      <div class="card-header">
+        <span class="card-title">Option A: Flux Stream</span>
+        <span class="tag">Recommended</span>
+      </div>
+      <div class="canvas-container">
+        <canvas id="canvas-stream"></canvas>
+      </div>
+      <p class="card-desc">
+        Subtle downward magnetic flux particle trails falling cleanly along the piece path. Zero cell blinking.
+      </p>
+      <div class="card-features">
+        <div class="feature-item">Smooth continuous motion</div>
+        <div class="feature-item">Clean piece readability</div>
+        <div class="feature-item">Soft cyan-violet gravity gradient</div>
+      </div>
+    </div>
+
+    <!-- OPTION B: SMOOTH VORONOI PULSE -->
+    <div class="card">
+      <div class="card-header">
+        <span class="card-title">Option B: Field Aura</span>
+        <span class="tag">Soft Glow</span>
+      </div>
+      <div class="canvas-container">
+        <canvas id="canvas-aura"></canvas>
+      </div>
+      <p class="card-desc">
+        Static outer plasma glow around the piece border with a gentle, slow breathing pulse (2.5s cycle).
+      </p>
+      <div class="card-features">
+        <div class="feature-item">No flashing or color shifts</div>
+        <div class="feature-item">Outer piece envelope highlight</div>
+        <div class="feature-item">Soft ambient purple bloom</div>
+      </div>
+    </div>
+
+    <!-- OPTION C: PLAYFIELD SIDE RAILS -->
+    <div class="card">
+      <div class="card-header">
+        <span class="card-title">Option C: Field Rails</span>
+        <span class="tag">Zero Piece Noise</span>
+      </div>
+      <div class="canvas-container">
+        <canvas id="canvas-rails"></canvas>
+      </div>
+      <p class="card-desc">
+        Glowing magnetic force rails along the field borders. Leaves active piece 100% clean and un-altered.
+      </p>
+      <div class="card-features">
+        <div class="feature-item">Zero overlay noise on falling piece</div>
+        <div class="feature-item">Clear playfield status indicator</div>
+        <div class="feature-item">Downward force chevrons</div>
+      </div>
+    </div>
+
+  </div>
+
+  <script>
+    const COLS = 10;
+    const ROWS = 18;
+    const CELL_SIZE = 20;
+
+    // Sample board state
+    const sampleBoard = Array.from({ length: ROWS }, (_, y) => 
+      Array.from({ length: COLS }, (_, x) => {
+        if (y >= 15 && (x < 3 || x > 6)) return 'I';
+        if (y >= 16) return 'J';
+        return null;
+      })
+    );
+
+    // Sample piece (T-piece)
+    const activePiece = {
+      type: 'T',
+      x: 3,
+      y: 6,
+      offsets: [[1, 0], [0, 1], [1, 1], [2, 1]],
+      color: '#a855f7' // Purple
+    };
+
+    function initCanvas(id) {
+      const canvas = document.getElementById(id);
+      canvas.width = COLS * CELL_SIZE;
+      canvas.height = ROWS * CELL_SIZE;
+      return canvas.getContext('2d');
+    }
+
+    function drawBaseBoard(ctx) {
+      ctx.fillStyle = '#0a0a0d';
+      ctx.fillRect(0, 0, COLS * CELL_SIZE, ROWS * CELL_SIZE);
+
+      // Grid lines
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.03)';
+      ctx.lineWidth = 1;
+      for (let x = 0; x <= COLS; x++) {
+        ctx.beginPath();
+        ctx.moveTo(x * CELL_SIZE, 0);
+        ctx.lineTo(x * CELL_SIZE, ROWS * CELL_SIZE);
+        ctx.stroke();
+      }
+      for (let y = 0; y <= ROWS; y++) {
+        ctx.beginPath();
+        ctx.moveTo(0, y * CELL_SIZE);
+        ctx.lineTo(COLS * CELL_SIZE, y * CELL_SIZE);
+        ctx.stroke();
+      }
+
+      // Stack cells
+      for (let y = 0; y < ROWS; y++) {
+        for (let x = 0; x < COLS; x++) {
+          if (sampleBoard[y][x]) {
+            ctx.fillStyle = '#475569';
+            ctx.fillRect(x * CELL_SIZE + 1, y * CELL_SIZE + 1, CELL_SIZE - 2, CELL_SIZE - 2);
+          }
+        }
+      }
+
+      // Active piece
+      for (const [dx, dy] of activePiece.offsets) {
+        const px = (activePiece.x + dx) * CELL_SIZE;
+        const py = (activePiece.y + dy) * CELL_SIZE;
+        ctx.fillStyle = activePiece.color;
+        ctx.fillRect(px + 1, py + 1, CELL_SIZE - 2, CELL_SIZE - 2);
+      }
+    }
+
+    // 1. OLD JARRIING EFFECT
+    const ctxOld = initCanvas('canvas-old');
+    function renderOld(time) {
+      drawBaseBoard(ctxOld);
+      for (const [dx, dy] of activePiece.offsets) {
+        const cx = activePiece.x + dx;
+        const cy = activePiece.y + dy;
+        const hue = (time * 0.18 + (cx + cy) * 14) % 360;
+        ctxOld.save();
+        ctxOld.strokeStyle = `hsl(${hue} 88% 72%)`;
+        ctxOld.shadowColor = `hsl(${(hue + 65) % 360} 92% 62%)`;
+        ctxOld.shadowBlur = 6;
+        ctxOld.lineWidth = 2;
+        ctxOld.strokeRect(cx * CELL_SIZE + 1, cy * CELL_SIZE + 1, CELL_SIZE - 2, CELL_SIZE - 2);
+        ctxOld.restore();
+      }
+    }
+
+    // 2. OPTION A: FLUX STREAM
+    const ctxStream = initCanvas('canvas-stream');
+    const particles = Array.from({ length: 18 }, () => ({
+      x: (activePiece.x + Math.random() * 3) * CELL_SIZE,
+      y: Math.random() * ROWS * CELL_SIZE,
+      speed: 1.5 + Math.random() * 2,
+      len: 8 + Math.random() * 12
+    }));
+
+    function renderStream(time) {
+      drawBaseBoard(ctxStream);
+      ctxStream.save();
+
+      // Magnetic force column background
+      const colX = activePiece.x * CELL_SIZE;
+      const grad = ctxStream.createLinearGradient(colX, 0, colX + CELL_SIZE * 3, 0);
+      grad.addColorStop(0, 'rgba(56, 189, 248, 0.0)');
+      grad.addColorStop(0.5, 'rgba(56, 189, 248, 0.08)');
+      grad.addColorStop(1, 'rgba(56, 189, 248, 0.0)');
+      ctxStream.fillStyle = grad;
+      ctxStream.fillRect(colX - CELL_SIZE * 0.5, 0, CELL_SIZE * 4, ROWS * CELL_SIZE);
+
+      // Particles
+      particles.forEach(p => {
+        p.y += p.speed;
+        if (p.y > ROWS * CELL_SIZE) p.y = -p.len;
+
+        const pGrad = ctxStream.createLinearGradient(0, p.y, 0, p.y + p.len);
+        pGrad.addColorStop(0, 'rgba(56, 189, 248, 0)');
+        pGrad.addColorStop(1, 'rgba(192, 132, 252, 0.7)');
+
+        ctxStream.strokeStyle = pGrad;
+        ctxStream.lineWidth = 1.5;
+        ctxStream.beginPath();
+        ctxStream.moveTo(p.x, p.y);
+        ctxStream.lineTo(p.x, p.y + p.len);
+        ctxStream.stroke();
+      });
+
+      ctxStream.restore();
+    }
+
+    // 3. OPTION B: FIELD AURA
+    const ctxAura = initCanvas('canvas-aura');
+    function renderAura(time) {
+      drawBaseBoard(ctxAura);
+      ctxAura.save();
+
+      const pulse = Math.sin(time * 0.002) * 0.2 + 0.8; // Slow smooth pulse
+      ctxAura.strokeStyle = `rgba(192, 132, 252, ${0.7 * pulse})`;
+      ctxAura.shadowColor = 'rgba(192, 132, 252, 0.9)';
+      ctxAura.shadowBlur = 10 * pulse;
+      ctxAura.lineWidth = 2.5;
+
+      for (const [dx, dy] of activePiece.offsets) {
+        const cx = activePiece.x + dx;
+        const cy = activePiece.y + dy;
+        ctxAura.strokeRect(cx * CELL_SIZE + 1.5, cy * CELL_SIZE + 1.5, CELL_SIZE - 3, CELL_SIZE - 3);
+      }
+
+      ctxAura.restore();
+    }
+
+    // 4. OPTION C: FIELD RAILS
+    const ctxRails = initCanvas('canvas-rails');
+    function renderRails(time) {
+      drawBaseBoard(ctxRails);
+      ctxRails.save();
+
+      const offset = (time * 0.05) % 30;
+
+      // Left rail
+      const gradLeft = ctxRails.createLinearGradient(0, 0, 8, 0);
+      gradLeft.addColorStop(0, 'rgba(56, 189, 248, 0.6)');
+      gradLeft.addColorStop(1, 'rgba(56, 189, 248, 0)');
+      ctxRails.fillStyle = gradLeft;
+      ctxRails.fillRect(0, 0, 8, ROWS * CELL_SIZE);
+
+      // Right rail
+      const gradRight = ctxRails.createLinearGradient(COLS * CELL_SIZE - 8, 0, COLS * CELL_SIZE, 0);
+      gradRight.addColorStop(0, 'rgba(56, 189, 248, 0)');
+      gradRight.addColorStop(1, 'rgba(56, 189, 248, 0.6)');
+      ctxRails.fillStyle = gradRight;
+      ctxRails.fillRect(COLS * CELL_SIZE - 8, 0, 8, ROWS * CELL_SIZE);
+
+      // Downward chevrons along borders
+      ctxRails.strokeStyle = 'rgba(192, 132, 252, 0.8)';
+      ctxRails.lineWidth = 1.5;
+      for (let y = -30 + offset; y < ROWS * CELL_SIZE; y += 30) {
+        // Left chevron
+        ctxRails.beginPath();
+        ctxRails.moveTo(2, y);
+        ctxRails.lineTo(5, y + 4);
+        ctxRails.lineTo(8, y);
+        ctxRails.stroke();
+
+        // Right chevron
+        ctxRails.beginPath();
+        ctxRails.moveTo(COLS * CELL_SIZE - 8, y);
+        ctxRails.lineTo(COLS * CELL_SIZE - 5, y + 4);
+        ctxRails.lineTo(COLS * CELL_SIZE - 2, y);
+        ctxRails.stroke();
+      }
+
+      ctxRails.restore();
+    }
+
+    // Animation Loop
+    function loop(time) {
+      renderOld(time);
+      renderStream(time);
+      renderAura(time);
+      renderRails(time);
+      requestAnimationFrame(loop);
+    }
+    requestAnimationFrame(loop);
+  </script>
+</body>
+</html>

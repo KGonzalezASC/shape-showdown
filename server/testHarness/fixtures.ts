@@ -78,6 +78,7 @@ export function withCompletedBottomRow(holesCount = 0): PlayerFixture {
 export function shopReadyWithOffer(itemId: string, score = 500): PlayerFixture {
   return (player: PlayerState) => {
     player.score = Math.max(player.score, score);
+    player.funds = Math.max(player.funds, score);
     player.shop.phase = 'ready';
     player.shop.cycleIndex = 0;
     if (!player.shop.offerIds.includes(itemId)) {

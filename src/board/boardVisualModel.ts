@@ -116,9 +116,7 @@ export function buildBoardVisualModel(
     const poisonVariant = activePiece.poisoned
       ? (activePiece.poisonVariant ?? 1)
       : 0;
-    const magnetAura =
-      (player.magnetPermanentStacks ?? 0) > 0 ||
-      (player.magnetPieceBoost ?? 0) > 0;
+    const magnetAura = (player.magnetPieceBoost ?? 0) > 0;
 
     offsets.forEach(([dx, dy], offsetIndex) => {
       const x = activePiece.x + dx;

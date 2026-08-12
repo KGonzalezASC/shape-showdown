@@ -158,6 +158,35 @@ describe('GameManager lifecycle harness', () => {
     assert.equal(replay.inputs[1].kind, 'shopPurchase');
   });
 
+  it('records the resolved dynamic price for an accepted purchase', () => {
+    const gm = new GameManager(createFakeIo(), 60);
+    managers.push(gm);
+    const p1Socket = new FakeSocket('p1');
+    gm.handleConnection(p1Socket as unknown as Socket);
+    gm.handleConnection(new FakeSocket('p2') as unknown as Socket);
+
+    const internal = gm as unknown as {
+      gameState: { status: string; players: Record<string, PlayerState> };
+      activeReplay: { inputs: ReplayDataV2['inputs'] } | null;
+    };
+    const buyer = internal.gameState.players.p1;
+    buyer.funds = 100;
+    buyer.shop.offerIds = ['fortify-frame'];
+    buyer.shop.phase = 'cycling';
+    buyer.shop.cycleIndex = 0;
+    internal.gameState.status = 'playing';
+    const replay = { inputs: [] as ReplayDataV2['inputs'] };
+    internal.activeReplay = replay;
+
+    p1Socket.emit('shopPurchase', 'fortify-frame');
+
+    assert.equal(buyer.funds, 40);
+    const purchase = replay.inputs[0];
+    assert.equal(purchase.kind, 'shopPurchase');
+    assert.equal(purchase.accepted, true);
+    assert.equal(purchase.cost, 60);
+  });
+
   it('saves the terminal tick after its events and final keyframe are recorded', () => {
     const replayDir = fs.mkdtempSync(path.join(os.tmpdir(), 'shape-showdown-replay-'));
     const previousReplayDir = process.env.REPLAYS_DIR;

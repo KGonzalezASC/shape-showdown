@@ -203,11 +203,15 @@ function tracePolygon(
   r: number,
 ): void {
   const baseAngles = POLYGON_BASE_ANGLES[sides];
+  // The opponent preview uses 5px cells. Keep the full-size 3px wobble on
+  // normal boards, but scale it down for miniatures so the radius never folds
+  // through zero and turns a tetromino into crossed/fragmented polygons.
+  const radiusWobble = Math.min(3, cellSize * 0.12);
   for (let i = 0; i < sides; i++) {
     const base = baseAngles[i];
     // Exact vertex-by-vertex morphing perturbation from mockup: (time * wobbleSpeed + i)
     const angleOffset = Math.sin(time * wobbleSpeed + i) * 0.15;
-    const rad = cellSize * 0.42 + Math.cos(time * wobbleSpeed * 2 + r + i) * 3;
+    const rad = cellSize * 0.42 + Math.cos(time * wobbleSpeed * 2 + r + i) * radiusWobble;
 
     const cosO = Math.cos(angleOffset);
     const sinO = Math.sin(angleOffset);
@@ -232,11 +236,12 @@ function polygonVertices(
   wobbleSpeed: number,
   wobblePhase: number,
 ): ActivePiecePoint[] {
+  const radiusWobble = Math.min(3, cellSize * 0.12);
   return POLYGON_BASE_ANGLES[sides].map((base, index) => {
     const angleOffset = Math.sin(time * wobbleSpeed + index) * 0.15;
     const rad =
       cellSize * 0.42 +
-      Math.cos(time * wobbleSpeed * 2 + wobblePhase + index) * 3;
+      Math.cos(time * wobbleSpeed * 2 + wobblePhase + index) * radiusWobble;
     const cosO = Math.cos(angleOffset);
     const sinO = Math.sin(angleOffset);
     return {

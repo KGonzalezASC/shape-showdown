@@ -2,7 +2,7 @@
 
 Living design doc for Shape Showdown shop items. Implementation status is noted per item; specs here are authoritative for **approved next work**.
 
-**Related:** shipped items wired in [`src/App.tsx`](../src/App.tsx) (`SHOP_MOCK_POOL`), [`server/GameManager.ts`](../server/GameManager.ts) (`shopPurchase`), [`server/tetris/engine.ts`](../server/tetris/engine.ts) (effects).
+**Related:** shipped items wired in [`src/App.tsx`](../src/App.tsx) (`SHOP_MOCK_POOL`), [`server/GameManager.ts`](../server/GameManager.ts) (`shopPurchase`), [`server/tetris/engine.ts`](../server/tetris/engine.ts) (effects). Runtime prices are defined in [`src/shop/shopPricing.ts`](../src/shop/shopPricing.ts) and described in [`POWERUP_PRICING_CURVE.md`](./POWERUP_PRICING_CURVE.md).
 
 ---
 
@@ -10,12 +10,16 @@ Living design doc for Shape Showdown shop items. Implementation status is noted 
 
 | Rule | Detail |
 |------|--------|
-| **Currency** | Buyer spends **line-clear score** (`buyer.score` deducted server-side). |
+| **Currency** | Buyer spends wallet funds (`buyer.funds`); the server deducts the resolved price after validating the purchase. |
 | **Shop rolls** | Off authoritative `linesCleared` per player, not transient match events. |
 | **Targets** | Most items debuff the **opponent**; new approved items introduce **self** buffs (first time in roster). |
 | **Fairness** | Board mutations on the victim must **not** grant line clears, score, or gravity collapse unless explicitly designed (see Wild Purge). |
 | **Bag pairing** | `synergyTargetId` + `synergyBoost` on tier-2 items; owning the partner raises draw weight in [`App.tsx`](../src/App.tsx). |
 | **Telegraphs** | Debuffs that need reaction time use `pendingShopEffects` + `activeEffects` pills. |
+
+### Runtime pricing
+
+Each item has an independent uncapped curve in [`src/shop/shopPricing.ts`](../src/shop/shopPricing.ts). The first successful purchase at a level starts a 20-second engagement window; purchases within the allowance use the same price. Allowance exhaustion and timer expiration both advance that item one level, without changing any other item. The server resolves and charges the dynamic price; client affordability is only a presentation preflight. See [`POWERUP_PRICING_CURVE.md`](./POWERUP_PRICING_CURVE.md) for the complete curve policy.
 
 ### Price bands (current)
 
@@ -24,7 +28,7 @@ Living design doc for Shape Showdown shop items. Implementation status is noted 
 | Cheap tempo | ~45–70 | Freeze, Sticky, Elixir, Wild Purge |
 | Structural attack | ~120–140 | Re-Trim, Curtain |
 | **Expensive self** | **~100–130** | **Magnet** (approved) |
-| **Cheap attack** | **~45–55** | **Snag** (approved) |
+| **Cheap attack** | **~60** | **Snag** (approved) |
 
 ---
 
@@ -39,7 +43,7 @@ Living design doc for Shape Showdown shop items. Implementation status is noted 
 | `vortex-step` | Wild Purge | 70 | Random poison colour → holes, no gravity/score; pairs `elixir-pulse` |
 | `quickstep-clock` | Sticky | 50 | Active piece lock-reset cap = 2 |
 | `gravity-lure` | Magnet | 125 | Opponent gravity: +2 per permanent buy (max +6), then +1 temp/piece; rainbow edge on fall |
-| `fortify-frame` | Snag | 48 | Opponent cannot hard-drop current/next piece; pairs Magnet |
+| `fortify-frame` | Snag | 60 | Opponent cannot hard-drop current/next piece; pairs Magnet |
 | `satellite-link` | Satellite | 80 | Self: arms on buy, activates when garbage is queued — +90 ticks on queue; +90 on new garbage for 10s |
 | `nova-charge` | Bomber | 110 | Self: next piece shows 💣; radius-2 circle blast on lock (holes only) |
 

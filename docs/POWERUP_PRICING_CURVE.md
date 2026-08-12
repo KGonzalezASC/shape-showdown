@@ -1,12 +1,23 @@
-# Powerup Pricing Curve — Replay-Derived Candidate
+# Powerup Pricing Curve — Replay-Derived Runtime Policy
 
-Status: candidate pricing policy derived from the saved replay corpus. No powerup tests were rerun.
+Status: implemented pricing policy derived from the saved replay corpus. Existing replays were not regenerated.
 
 ## Runtime rule
 
 Pricing state is per player, per item, and resets each match.
 
 The first successful purchase opens a 20-second engagement window. Purchases do not extend the timer. The current level closes when either the timer expires or the same-price purchase allowance is exhausted. The next successful purchase uses the next level and opens a fresh window. An expired window advances only one level; inactivity does not repeatedly inflate an untouched item.
+
+Allowance exhaustion and timer expiration are separate causes with the same economic result:
+
+- **Allowance exhausted:** the buyer used every same-price purchase in the active window. The next purchase is one level higher immediately.
+- **Timer expired:** the buyer did not use the remaining allowance before 20 seconds elapsed. The next purchase is one level higher when the server normalizes the item state.
+
+Both transitions reset the window and preserve the reason in the authoritative state for UI and replay diagnostics. A successful purchase clears the previous close reason and starts a new window. Pricing state is per player and per item and resets between matches.
+
+The live game uses the **Compact Rail** presentation: the current price remains in each offer row, while the highlighted offer expands to show level, same-price purchases remaining, engagement countdown, and next price. The three exploratory layouts remain available through the `V` mockup for comparison.
+
+New powerups do not change existing curves. Each new item must receive its own evidence-backed `basePrice`, `allowance`, and `growthRate` entry before it can be purchased; the runtime intentionally fails fast when a catalog item has no pricing curve.
 
 Prices are uncapped:
 
@@ -55,7 +66,7 @@ Each listed price applies to at most `Allowance` successful purchases during tha
 
 | Item | Evidence | Value tier | Allowance | Growth | L0 | L1 | L2 | L3 | L4 | L5 | L6 |
 | --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| Snag | Direct | S+ | 2 | 1.95x | 48 | 95 | 185 | 355 | 695 | 1,355 | 2,640 |
+| Snag | Direct | S+ | 2 | 1.95x | 60 | 115 | 230 | 445 | 870 | 1,690 | 3,300 |
 | Satellite | Direct | S | 2 | 2.05x | 80 | 165 | 335 | 690 | 1,415 | 2,895 | 5,940 |
 | Curtain | Direct | A | 3 | 1.85x | 140 | 260 | 480 | 885 | 1,640 | 3,035 | 5,615 |
 | Magnet | Direct | A | 3 | 1.95x | 125 | 245 | 475 | 925 | 1,805 | 3,525 | 6,875 |

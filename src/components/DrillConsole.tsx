@@ -24,7 +24,7 @@ export const DrillConsole: React.FC<DrillConsoleProps> = ({ player, enabled, onT
         {result.message}
       </div>
     )}
-    <div className="relative mb-2 hidden w-full max-w-5xl self-center rounded-lg border border-cyan-500/25 bg-cyan-950/15 px-3 py-2 text-xs text-cyan-100 md:block">
+    <div className="relative mb-2 hidden w-full max-w-5xl self-center rounded-lg border border-cyan-500/25 bg-cyan-950/15 px-3 py-2 text-xs text-cyan-100 lg:block">
       <SRSKickOverlay player={player} />
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="font-semibold uppercase tracking-wide">Lock Debug</div>

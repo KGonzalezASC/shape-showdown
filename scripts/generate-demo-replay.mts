@@ -3,6 +3,7 @@ import path from 'node:path';
 import { Scenario } from '../server/testHarness/scenario.js';
 import { RulesBot } from '../server/testHarness/rulesBot.js';
 import type { GameState, ReplayDataV2, ReplayKeyframe } from '../src/types.js';
+import { PRICING_POLICY_VERSION } from '../src/shop/shopPricing.js';
 
 console.log('[Replay Generator] Generating replay of improved RulesBot vs RulesBot match...');
 
@@ -63,6 +64,7 @@ const replayData: ReplayDataV2 = {
   version: 2,
   date: new Date().toISOString().slice(0, 10),
   seed,
+  pricingPolicyVersion: PRICING_POLICY_VERSION,
   playerSlots: { p1: 0, p2: 1 },
   keyframeIntervalTicks,
   initialState,

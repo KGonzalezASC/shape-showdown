@@ -138,6 +138,17 @@ For pre-merge or release verification, run `bun run lint` and the full `bun run 
 - **Effect pills:** Semantic kinds styled by the client adapter.
 - **Snapshots:** Match chrome is equality-gated; playfield publishes only when `PublicPlayerState` changes.
 
+### Board Visual & Frame Design Rules
+- **Canonical Style:** Style E (Watching Shrine Amalgam) is the single canonical board design.
+- **Seeded Procedural Generation:** Frame cut line breaks, watcher face count (1 to max 3), embedded face placements, subtle red sparks (3 total with 0.55–0.7 opacity), and uneven grid line overshoots are deterministically generated driven by match seed (`MutableRng`).
+- **Extended Grid Mesh & Void Cell Dithering:** All interior grid lines (10 columns, 18 rows) extend past the board frame boundary into the surrounding outer void (1-bit pixel grid extension lines that connect flush with the interior 10×18 canvas grid lines), creating a full extended grid matrix while preserving the exact 10×18 playable grid area. Any grid cell drawn in the outer void past the 10×18 main field is rendered with a subtle 1-bit stipple dither texture.
+- **Perimeter & Frame Cut Lines:** Board frame cut lines feature a thick primary white line (3px) on the frame boundary and a staggered thin hairline contour (1.5px) positioned on the OUTSIDE of the thick line (extending into the outer void). Never place decorative lines or overlays inside the playable grid canvas.
+- **Outer Edge Cut-Through:** The outermost thin hairline perimeter line must have clean pixel gap breaks that cut directly into the surrounding dark void (never wrap the frame in a continuous unbroken box-shadow or solid outer border ring).
+- **Embedded Creature Faces/Eyes:** Creature faces/watching eyes (1 to max 3 per board) must be physically embedded on and directly connected to the broken cut line gaps of the board frame (bridging the line segment ends), never floating detached or disconnected.
+- **Subtle Red Sparks:** Red spark accents must be subtle with reduced opacity (0.55–0.7 with soft glow) placed across 3 perimeter gap positions.
+- **Clean Boundary Lines:** Bottom frame lines must use clean, crisp white line segments with pixel gap breaks (no dripping teeth, spikes, or tentacles).
+- **Voronoi Tetromino Cells:** Cells must remain smooth, clean, glowing filled polygons without interior hatching lines or striping overlays.
+
 ## Copying this knowledge elsewhere
 
 - Keep **`AGENTS.md`** in repo root and commit it so clones and other machines get the same context.

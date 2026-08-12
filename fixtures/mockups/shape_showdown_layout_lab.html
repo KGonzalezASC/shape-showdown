@@ -1,0 +1,821 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Shape Showdown Board Style Lab</title>
+  <style>
+    /* PROTOTYPE: current seeded Amalgam versus the first independent-cell one-bit reference on one identical 10x18 state. */
+    :root {
+      color-scheme: dark;
+      --mine: #19c997;
+      --text: #e3e7e6;
+      --muted: #828a88;
+      font-family: Arial, Helvetica, sans-serif;
+    }
+
+    * { box-sizing: border-box; }
+    html, body { min-height: 100%; }
+    body {
+      margin: 0;
+      background: #090b0a;
+      color: var(--text);
+      overflow: hidden;
+    }
+
+    button { font: inherit; }
+
+    .lab {
+      align-items: center;
+      background: #000;
+      display: flex;
+      height: 100dvh;
+      justify-content: center;
+      padding: 14px 14px 82px;
+      position: relative;
+    }
+
+    .study {
+      display: grid;
+      gap: 22px;
+      grid-template-columns: minmax(220px, 330px) minmax(170px, 240px);
+      max-height: calc(100dvh - 100px);
+      max-width: 720px;
+      position: relative;
+      width: 100%;
+      z-index: 1;
+    }
+
+    .field-shell { min-height: 0; }
+
+    .field-head { margin-bottom: 7px; }
+    .title-row { align-items: center; display: flex; justify-content: space-between; }
+    .field-title { color: var(--mine); font-size: 13px; font-weight: 900; letter-spacing: .12em; text-transform: uppercase; }
+    .clears { color: var(--muted); font: 9px Consolas, monospace; }
+    .player-data { color: var(--muted); display: flex; font: 9px Consolas, monospace; gap: 12px; margin-top: 4px; text-transform: uppercase; }
+    .player-data strong { color: var(--text); }
+
+    .garbage-line { align-items: center; border-top: 1px solid #2a302d; display: flex; gap: 8px; margin-top: 7px; padding-top: 6px; }
+    .garbage-flow-item { align-items: center; display: inline-flex; gap: 4px; }
+    .garbage-flow-item strong { font: 700 12px Consolas, monospace; }
+    .garbage-separator { color: #646b68; font: 10px Consolas, monospace; }
+    .garbage-icon { display: inline-block; height: 17px; position: relative; width: 19px; }
+    .garbage-icon .trash { bottom: -1px; font-size: 12px; line-height: 1; position: absolute; right: 0; }
+    .garbage-icon .arrow { font: 900 12px/1 Arial, sans-serif; left: 0; position: absolute; top: -1px; z-index: 1; }
+    .garbage-icon.incoming .arrow { color: #ed5577; }
+    .garbage-icon.outgoing .arrow { color: var(--mine); }
+
+    .effect-row { display: flex; gap: 4px; height: 23px; margin-top: 4px; }
+    .effect-pill { align-items: center; border: 1px solid #59615e; display: inline-flex; font: 700 8px Consolas, monospace; gap: 3px; padding: 3px 5px; }
+    .effect-pill.permanent { border-color: #78653f; color: #e5c176; }
+    .effect-pill.temporary { border-color: #58647d; color: #c3cbea; }
+
+    .board-frame {
+      --frame: #238b5a;
+      --frame-dark: #102c21;
+      aspect-ratio: 10 / 18;
+      background: var(--frame-dark);
+      border: 2px solid var(--frame);
+      height: min(66dvh, 650px);
+      max-width: 100%;
+      padding: 11px;
+      position: relative;
+      transition: background .15s ease, border-color .15s ease;
+    }
+
+    .board {
+      background: transparent;
+      display: block;
+      height: 100%;
+      overflow: visible;
+      position: relative;
+      width: 100%;
+      z-index: 2;
+    }
+    .board canvas {
+      display: block;
+      height: calc(100% + 60px);
+      image-rendering: auto;
+      margin: -30px;
+      width: calc(100% + 60px);
+    }
+
+    .swap-line { border-top: 2px dashed rgba(240,245,243,.9); left: 11px; pointer-events: none; position: absolute; right: 11px; top: calc(11px + (100% - 22px) * .5555); z-index: 4; }
+    .swap-line span { background: #080a09; color: #dfe4e2; font: 7px Consolas, monospace; padding: 2px 4px; position: absolute; right: 2px; top: -9px; }
+
+    .storage { align-items: center; display: flex; justify-content: space-between; min-height: 45px; padding-top: 7px; }
+    .storage p { color: var(--muted); font-size: 8px; line-height: 1.35; margin: 0; }
+    .storage strong { color: var(--mine); display: block; font-size: 9px; letter-spacing: .08em; }
+    .storage-slot { border: 1px solid #3c4541; color: #89908e; font: 8px Consolas, monospace; padding: 10px 6px; }
+
+    .variant-copy { align-self: center; }
+    .variant-index { color: #7c8581; font: 9px Consolas, monospace; letter-spacing: .14em; text-transform: uppercase; }
+    .variant-copy h1 { font-size: clamp(20px, 3vw, 34px); line-height: 1; margin: 10px 0 12px; }
+    .variant-copy p { color: #9ba39f; font-size: 12px; line-height: 1.55; margin: 0; }
+    .focus-list { border-top: 1px solid #29302d; display: grid; gap: 9px; margin-top: 18px; padding-top: 14px; }
+    .focus-item { color: #777f7c; font-size: 10px; }
+    .focus-item strong { color: #cbd1ce; display: block; font-size: 9px; letter-spacing: .1em; margin-bottom: 2px; text-transform: uppercase; }
+
+    .amalgam-marks { display: none; inset: 0; pointer-events: none; position: absolute; z-index: 1; }
+
+    /* Canonical Style E — Watching Shrine Amalgam: Seeded Outer Cut Lines + Staggered Inner Line + Embedded Watcher Faces */
+    .study[data-style="watching-amalgam"] { --mine: #fff; --text: #fff; --muted: #aaa; }
+    .study[data-style="watching-amalgam"] .board-frame {
+      --frame: #fff;
+      --frame-dark: #000;
+      background: #000;
+      border: 0;
+      border-radius: 0;
+      box-shadow: none;
+      padding: 10px;
+      position: relative;
+    }
+
+    /* Outer Hairline Perimeter Line (positioned on the OUTSIDE of the thick primary frame line) */
+    .study[data-style="watching-amalgam"] .board-frame::before {
+      content: "";
+      inset: -5px;
+      pointer-events: none;
+      position: absolute;
+      z-index: 1;
+    }
+
+    .study[data-style="watching-amalgam"] .amalgam-marks {
+      inset: 0;
+      display: block;
+      pointer-events: none;
+      position: absolute;
+      z-index: 6;
+    }
+    .study[data-style="watching-amalgam"] .amalgam-marks span { background: #fff; image-rendering: pixelated; position: absolute; }
+    
+    /* Seeded Uneven Grid Line Extensions (connecting flush to 10x18 canvas grid lines) */
+    .grid-ext-h {
+      background: rgba(255, 255, 255, 0.45);
+      height: 1px;
+      position: absolute;
+      z-index: 5;
+    }
+    .grid-ext-v {
+      background: rgba(255, 255, 255, 0.45);
+      position: absolute;
+      width: 1px;
+      z-index: 5;
+    }
+
+    /* Subtle Red Sparks (3 sparks total, 0.55-0.7 opacity with soft glow) */
+    .spark-red {
+      background: rgba(231, 53, 53, 0.65) !important;
+      box-shadow: 0 0 6px rgba(231, 53, 53, 0.45);
+      height: 3px;
+      position: absolute;
+      width: 3px;
+      z-index: 6;
+    }
+    .spark-red::before,
+    .spark-red::after {
+      background: rgba(231, 53, 53, 0.65) !important;
+      content: "";
+      height: 1px;
+      left: -2px;
+      position: absolute;
+      top: 1px;
+      width: 7px;
+    }
+    .spark-red::after {
+      height: 7px;
+      left: 1px;
+      top: -2px;
+      width: 1px;
+    }
+
+    /* Peering Eye Creatures physically connected & embedded inside perimeter cut line gaps */
+    .watcher-face {
+      background: #fff;
+      border-radius: 52% 48% 44% 46%;
+      box-shadow: -2px 0 0 #fff, 2px 0 0 #fff;
+      display: block;
+      height: 18px;
+      position: absolute;
+      width: 40px;
+      z-index: 6;
+    }
+    .watcher-face::before {
+      background: radial-gradient(circle at 35% 50%, #000 0 2.5px, transparent 3.5px), radial-gradient(circle at 65% 50%, #000 0 2.5px, transparent 3.5px);
+      content: "";
+      inset: 0;
+      position: absolute;
+    }
+    .watcher-face.side-left,
+    .watcher-face.side-right {
+      border-radius: 46% 46% 52% 48%;
+      box-shadow: 0 -2px 0 #fff, 0 2px 0 #fff;
+      height: 40px;
+      width: 18px;
+    }
+    .watcher-face.side-left::before,
+    .watcher-face.side-right::before {
+      background: radial-gradient(circle at 50% 35%, #000 0 2.5px, transparent 3.5px), radial-gradient(circle at 50% 65%, #000 0 2.5px, transparent 3.5px);
+    }
+
+    .study[data-style="watching-amalgam"] .swap-line { left: 9px; right: 9px; top: calc(9px + (100% - 18px) * .5555); }
+
+    /* Toggle reference — first independent-cell One-Bit Amalgam: broken perimeter, no melt. */
+    .study[data-style="original-amalgam"] { --mine: #fff; --text: #fff; --muted: #aaa; }
+    .study[data-style="original-amalgam"] .board-frame {
+      --frame: #fff;
+      --frame-dark: #000;
+      background:
+        linear-gradient(#fff,#fff) 0 0 / 3px 18% no-repeat,
+        linear-gradient(#fff,#fff) 0 25% / 3px 31% no-repeat,
+        linear-gradient(#fff,#fff) 0 65% / 3px 24% no-repeat,
+        linear-gradient(#fff,#fff) 100% 4% / 3px 27% no-repeat,
+        linear-gradient(#fff,#fff) 100% 38% / 3px 21% no-repeat,
+        linear-gradient(#fff,#fff) 100% 70% / 3px 30% no-repeat,
+        linear-gradient(90deg,#fff 0 12%,transparent 12% 18%,#fff 18% 39%,transparent 39% 47%,#fff 47% 73%,transparent 73% 82%,#fff 82%) 0 0 / 100% 3px no-repeat,
+        linear-gradient(90deg,#fff 0 20%,transparent 20% 29%,#fff 29% 54%,transparent 54% 63%,#fff 63% 89%,transparent 89%) 0 100% / 100% 3px no-repeat,
+        #000;
+      border: 0;
+      box-shadow: 0 0 0 4px #000;
+      padding: 9px;
+    }
+    .study[data-style="original-amalgam"] .board-frame::before { display: none; }
+    .study[data-style="original-amalgam"] .board-frame::after { display: none; }
+    .study[data-style="original-amalgam"] .swap-line { left: 9px; right: 9px; top: calc(9px + (100% - 18px) * .5555); }
+
+    .switcher {
+      align-items: center;
+      background: #e8e8e4;
+      border: 1px solid #fff;
+      bottom: 13px;
+      box-shadow: 0 8px 30px rgba(0,0,0,.48);
+      color: #151616;
+      display: flex;
+      gap: 10px;
+      left: 50%;
+      padding: 7px;
+      position: fixed;
+      transform: translateX(-50%);
+      z-index: 5;
+    }
+    .switcher button { background: #181a1a; border: 1px solid #484e4c; color: #fff; cursor: pointer; font-size: 10px; font-weight: 700; height: 32px; padding: 0 9px; white-space: nowrap; }
+    .switcher button:hover { background: #262a29; border-color: #fff; }
+    .switcher-label { font-size: 9px; font-weight: 900; letter-spacing: .08em; min-width: 132px; text-align: center; text-transform: uppercase; }
+
+    /* Mode: Phone styling when data-mode="phone" */
+    .study[data-mode="phone"],
+    .lab[data-mode="phone"] .study {
+      align-items: center;
+      gap: 12px;
+      grid-template-columns: minmax(0, 1fr);
+      max-width: 350px;
+    }
+    .study[data-mode="phone"] .board-frame,
+    .lab[data-mode="phone"] .board-frame {
+      height: min(58dvh, 530px);
+      margin: 0 auto;
+    }
+    .study[data-mode="phone"] .variant-copy,
+    .lab[data-mode="phone"] .variant-copy {
+      display: none;
+    }
+
+    /* Effects: Temporary active state */
+    .effect-pill.temporary.active {
+      border-color: #8da4ff;
+      box-shadow: 0 0 10px rgba(141, 164, 255, .45);
+      color: #ffffff;
+      animation: pulseEffect 1.8s infinite alternate ease-in-out;
+    }
+    @keyframes pulseEffect {
+      from { border-color: #58647d; opacity: .85; }
+      to { border-color: #a4b5ff; opacity: 1; }
+    }
+
+    @media (max-width: 620px) {
+      body { overflow: auto; }
+      .lab { height: auto; min-height: 100dvh; padding: 10px 10px 78px; }
+      .study { align-items: center; gap: 12px; grid-template-columns: minmax(0, 1fr); max-width: 350px; }
+      .board-frame { height: min(58dvh, 530px); margin: 0 auto; }
+      .variant-copy { display: none; }
+      .switcher-label { min-width: 136px; }
+    }
+  </style>
+</head>
+<body>
+  <main class="lab">
+    <section class="study" id="study" data-style="watching-amalgam">
+      <div class="field-shell">
+        <header class="field-head">
+          <div class="title-row"><span class="field-title">Your field</span><span class="clears">12 clears</span></div>
+          <div class="player-data"><span>Funds <strong>1,250</strong></span><span>Score <strong>8,420</strong></span></div>
+          <div class="garbage-line" aria-label="Incoming garbage: 3 lines. Outgoing garbage: 6 lines.">
+            <span class="garbage-flow-item"><span class="garbage-icon incoming" aria-hidden="true"><span class="arrow">↓</span><span class="trash">🗑️</span></span><strong>3</strong></span>
+            <span class="garbage-separator" aria-hidden="true">|</span>
+            <span class="garbage-flow-item"><span class="garbage-icon outgoing" aria-hidden="true"><span class="arrow">↑</span><span class="trash">🗑️</span></span><strong>6</strong></span>
+          </div>
+          <div class="effect-row"><span class="effect-pill permanent">🧲 Magnet L2</span><span class="effect-pill temporary">❄ Curtain · 47t</span></div>
+        </header>
+
+        <div class="board-frame" id="boardFrame">
+          <div class="amalgam-marks" id="amalgamMarks" aria-hidden="true"></div>
+          <div class="board"><canvas id="board" aria-label="Animated 10 by 18 Tetris board made from wobbling Voronoi cells"></canvas></div>
+          <div class="swap-line"><span>SWAP LINE</span></div>
+        </div>
+
+        <footer class="storage"><p>STORAGE (SHIFT)<strong>READY</strong>Swap zone rows 0–9</p><span class="storage-slot">EMPTY</span></footer>
+      </div>
+
+      <aside class="variant-copy">
+        <div class="variant-index" id="variantIndex">Canonical Seeded Design</div>
+        <h1 id="variantName">Watching Shrine Amalgam</h1>
+        <p id="variantDescription">Seeded procedural frame cut lines, 1 to max 3 embedded watching faces, and outer scar symbol placements.</p>
+        <div class="focus-list">
+          <div class="focus-item"><strong>Seeded Geometry</strong>Match seed deterministically generates perimeter line break gaps and watcher face positions.</div>
+          <div class="focus-item"><strong>Rules Enforced</strong>Outer edge cut-throughs, embedded watching faces on gaps, crisp bottom line breaks, clean Voronoi cells.</div>
+        </div>
+      </aside>
+    </section>
+  </main>
+
+  <nav class="switcher" aria-label="Amalgam comparison controls">
+    <button id="reroll" type="button" aria-label="Reroll procedural seed">🎲 SEED</button>
+    <button id="gridToggle" type="button" aria-label="Toggle extended grid mode">🌐 FULL MESH</button>
+    <button id="styleToggle" type="button" aria-label="Show original Amalgam">ORIGINAL</button>
+    <div>
+      <div class="switcher-label" id="switcherLabel">SEED #4207 · 2 WATCHERS</div>
+    </div>
+  </nav>
+
+  <script>
+    const pieceColors = {
+      cyan:   { fill: '#2dd4bf', stroke: 'rgba(255,255,255,.35)' },
+      yellow: { fill: '#facc15', stroke: 'rgba(255,255,255,.35)' },
+      violet: { fill: '#a78bfa', stroke: 'rgba(255,255,255,.35)' },
+      green:  { fill: '#a3e635', stroke: 'rgba(255,255,255,.35)' },
+      orange: { fill: '#f97316', stroke: 'rgba(255,255,255,.35)' },
+      blue:   { fill: '#38bdf8', stroke: 'rgba(255,255,255,.35)' },
+      red:    { fill: '#fb7185', stroke: 'rgba(255,255,255,.35)' },
+    };
+    const originalAmalgamColors = {
+      cyan:   { fill: '#fff', stroke: '#000', pattern: 'vertical' },
+      yellow: { fill: '#fff', stroke: '#000', pattern: 'hatch-left' },
+      violet: { fill: '#fff', stroke: '#000', pattern: 'hatch-right' },
+      green:  { fill: '#fff', stroke: '#000', pattern: 'cross' },
+      orange: { fill: '#fff', stroke: '#000', pattern: 'vertical' },
+      blue:   { fill: '#fff', stroke: '#000', pattern: 'hatch-left' },
+      red:    { fill: '#fff', stroke: '#000', pattern: 'cross' },
+    };
+
+    const watchingStyleConfig = {
+      id: 'watching-amalgam', name: 'Watching Shrine Amalgam', type: 'Canonical Seeded Design',
+      description: 'Seeded procedural frame cut lines, 1 to max 3 embedded watching faces, and outer scar symbol placements.',
+      background: '#030404', grid: 'rgba(255,255,255,.09)', ghost: 'rgba(255,255,255,.45)', colors: pieceColors
+    };
+    const originalStyleConfig = {
+      id: 'original-amalgam', name: 'First One-Bit Amalgam', type: 'Original Independent-Cell Study',
+      description: 'The early one-bit treatment: a clean broken perimeter and independent black-and-white hatched Voronoi cells. No melting edge, faces, scars, or connections.',
+      monochrome: true, activeStroke: '#e73535', background: '#000', grid: 'rgba(255,255,255,.095)', ghost: '#fff', colors: originalAmalgamColors
+    };
+    let activeStyle = watchingStyleConfig;
+
+    const settled = [
+      [0,17,'blue'],[1,17,'blue'],[2,17,'blue'],[3,17,'yellow'],[4,17,'yellow'],[5,17,'red'],[6,17,'red'],[7,17,'green'],[8,17,'green'],[9,17,'green'],
+      [0,16,'blue'],[2,16,'orange'],[3,16,'orange'],[4,16,'yellow'],[5,16,'violet'],[6,16,'red'],[8,16,'green'],[9,16,'cyan'],
+      [0,15,'cyan'],[1,15,'cyan'],[2,15,'orange'],[4,15,'violet'],[5,15,'violet'],[6,15,'violet'],[7,15,'cyan'],[8,15,'cyan'],[9,15,'cyan'],
+      [1,14,'red'],[2,14,'red'],[3,14,'orange'],[6,14,'blue'],[7,14,'blue'],[9,14,'yellow'],
+      [0,13,'green'],[1,13,'green'],[3,13,'orange'],[4,13,'orange'],[6,13,'blue'],[8,13,'yellow'],[9,13,'yellow'],
+    ];
+    const active = [[4,2,'violet',0],[3,3,'violet',1],[4,3,'violet',2],[5,3,'violet',3]];
+    const ghost = [[4,11],[3,12],[4,12],[5,12]];
+    const board = document.getElementById('board');
+    const context = board.getContext('2d');
+
+    function traceCell(ctx, cx, cy, radius, sides, time, phase, strength = 1) {
+      ctx.beginPath();
+      for (let index = 0; index < sides; index += 1) {
+        const baseAngle = -Math.PI / 2 + (Math.PI * 2 * index) / sides;
+        const angle = baseAngle + Math.sin(time * .48 + phase + index * 1.31) * .095 * strength;
+        const liveRadius = radius * (1 + Math.cos(time * .72 + phase * 1.7 + index * 1.13) * .085 * strength);
+        const x = cx + Math.cos(angle) * liveRadius;
+        const y = cy + Math.sin(angle) * liveRadius;
+        if (index === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+      }
+      ctx.closePath();
+    }
+
+    function drawMonochromePattern(ctx, color, cx, cy, radius, sides, time, phase, cellW, cellH) {
+      if (!color.pattern) return;
+      ctx.save();
+      traceCell(ctx, cx, cy, radius * .92, sides, time, phase, .5);
+      ctx.clip();
+      ctx.strokeStyle = '#000';
+      ctx.lineWidth = Math.max(1, cellW * .045);
+      const step = Math.max(4, cellW * .23);
+      for (let offset = -cellW - cellH; offset <= cellW + cellH; offset += step) {
+        ctx.beginPath();
+        if (color.pattern === 'vertical') {
+          ctx.moveTo(cx + offset, cy - cellH);
+          ctx.lineTo(cx + offset, cy + cellH);
+        } else if (color.pattern === 'hatch-left') {
+          ctx.moveTo(cx - cellW + offset, cy - cellH);
+          ctx.lineTo(cx + cellW + offset, cy + cellH);
+        } else {
+          ctx.moveTo(cx - cellW + offset, cy + cellH);
+          ctx.lineTo(cx + cellW + offset, cy - cellH);
+        }
+        ctx.stroke();
+      }
+      if (color.pattern === 'cross') {
+        for (let offset = -cellW - cellH; offset <= cellW + cellH; offset += step) {
+          ctx.beginPath();
+          ctx.moveTo(cx - cellW + offset, cy - cellH);
+          ctx.lineTo(cx + cellW + offset, cy + cellH);
+          ctx.stroke();
+        }
+      }
+      ctx.restore();
+    }
+
+    function drawCell(ctx, entry, cellW, cellH, time, style, kind) {
+      const [column, row, tone = 'violet', activeIndex = 0] = entry;
+      const cx = (column + .5) * cellW;
+      const cy = (row + .5) * cellH;
+      const radius = Math.min(cellW, cellH) * (kind === 'ghost' ? .38 : .44);
+      const sides = 5 + ((kind === 'active' ? activeIndex : row + column) % 3);
+      const phase = kind === 'active' ? activeIndex : row * 1.3 + column * 2.1;
+      traceCell(ctx, cx, cy, radius, sides, time, phase, kind === 'active' ? 1.25 : .72);
+
+      if (kind === 'ghost') {
+        ctx.setLineDash([Math.max(2, cellW * .13), Math.max(2, cellW * .1)]);
+        ctx.strokeStyle = style.ghost;
+        ctx.lineWidth = Math.max(1, cellW * .045);
+        ctx.stroke();
+        ctx.setLineDash([]);
+        return;
+      }
+
+      const color = style.colors[tone];
+      ctx.save();
+      ctx.shadowColor = color.fill;
+      ctx.shadowBlur = style.monochrome ? 0 : kind === 'active' ? cellW * .3 : cellW * .12;
+      ctx.fillStyle = color.fill;
+      ctx.fill();
+      ctx.restore();
+
+      if (style.monochrome) {
+        drawMonochromePattern(ctx, color, cx, cy, radius, sides, time, phase, cellW, cellH);
+        traceCell(ctx, cx, cy, radius, sides, time, phase, kind === 'active' ? 1.25 : .72);
+      }
+      ctx.strokeStyle = kind === 'active' && style.activeStroke ? style.activeStroke : color.stroke;
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+    }
+
+    // Canvas pad: the canvas extends 30px past .board on all sides so grid lines can extend into outer void
+    const PAD = 30;
+
+    function drawBoard(timestamp) {
+      const rect = board.getBoundingClientRect();
+      const ratio = Math.min(devicePixelRatio || 1, 2);
+      const targetWidth = Math.max(1, Math.round(rect.width * ratio));
+      const targetHeight = Math.max(1, Math.round(rect.height * ratio));
+      if (board.width !== targetWidth || board.height !== targetHeight) {
+        board.width = targetWidth;
+        board.height = targetHeight;
+      }
+      context.setTransform(ratio, 0, 0, ratio, 0, 0);
+      const fullW = rect.width;
+      const fullH = rect.height;
+      // The actual board grid area is the center portion (excluding PAD on each side)
+      const width = fullW - PAD * 2;
+      const height = fullH - PAD * 2;
+      const cellW = width / 10;
+      const cellH = height / 18;
+      const time = timestamp / 1000;
+
+      context.clearRect(0, 0, fullW, fullH);
+      // Fill ONLY the main playable board area so the outer frame white cut lines remain unmasked
+      context.fillStyle = activeStyle.background;
+      context.fillRect(PAD, PAD, width, height);
+
+      // Extended grid mesh bounds
+      const extraCols = Math.ceil(PAD / cellW);
+      const extraRows = Math.ceil(PAD / cellH);
+      const minCol = -extraCols;
+      const maxCol = 10 + extraCols;
+      const minRow = -extraRows;
+      const maxRow = 18 + extraRows;
+
+      context.lineWidth = 1;
+
+      // 1. Solid interior grid lines inside the 10x18 main playable board
+      context.setLineDash([]);
+      context.strokeStyle = activeStyle.grid;
+      for (let row = 0; row <= 18; row += 1) {
+        const y = PAD + row * cellH;
+        context.beginPath();
+        context.moveTo(PAD, y);
+        context.lineTo(PAD + width, y);
+        context.stroke();
+      }
+      for (let col = 0; col <= 10; col += 1) {
+        const x = PAD + col * cellW;
+        context.beginPath();
+        context.moveTo(x, PAD);
+        context.lineTo(x, PAD + height);
+        context.stroke();
+      }
+
+      // 2. Gradient-faded 1-bit stipple dither for outer grid line extensions (delicate dissolve into outer void)
+      context.setLineDash([1, 2]); // Airy 1-bit stipple dash
+
+      // Directional distance gradients fading softly from 0.18 (at board frame) down to 0.03 (at outer edge)
+      const gradLeft = context.createLinearGradient(0, 0, PAD, 0);
+      gradLeft.addColorStop(0, 'rgba(255, 255, 255, 0.03)');
+      gradLeft.addColorStop(1, 'rgba(255, 255, 255, 0.18)');
+
+      const gradRight = context.createLinearGradient(PAD + width, 0, fullW, 0);
+      gradRight.addColorStop(0, 'rgba(255, 255, 255, 0.18)');
+      gradRight.addColorStop(1, 'rgba(255, 255, 255, 0.03)');
+
+      const gradTop = context.createLinearGradient(0, 0, 0, PAD);
+      gradTop.addColorStop(0, 'rgba(255, 255, 255, 0.03)');
+      gradTop.addColorStop(1, 'rgba(255, 255, 255, 0.18)');
+
+      const gradBottom = context.createLinearGradient(0, PAD + height, 0, fullH);
+      gradBottom.addColorStop(0, 'rgba(255, 255, 255, 0.18)');
+      gradBottom.addColorStop(1, 'rgba(255, 255, 255, 0.03)');
+
+      // Horizontal dithered grid lines
+      for (let row = minRow; row <= maxRow; row += 1) {
+        const y = PAD + row * cellH;
+        if (row >= 0 && row <= 18) {
+          // Row inside board height: dither left extension with gradLeft, right extension with gradRight
+          context.strokeStyle = gradLeft;
+          context.beginPath(); context.moveTo(0, y); context.lineTo(PAD, y); context.stroke();
+
+          context.strokeStyle = gradRight;
+          context.beginPath(); context.moveTo(PAD + width, y); context.lineTo(fullW, y); context.stroke();
+        } else {
+          // Corner void row (top or bottom): soft gradient fade across canvas width
+          context.strokeStyle = row < 0 ? gradLeft : gradRight;
+          context.beginPath(); context.moveTo(0, y); context.lineTo(fullW, y); context.stroke();
+        }
+      }
+
+      // Vertical dithered grid lines
+      for (let col = minCol; col <= maxCol; col += 1) {
+        const x = PAD + col * cellW;
+        if (col >= 0 && col <= 10) {
+          // Column inside board width: dither top extension with gradTop, bottom extension with gradBottom
+          context.strokeStyle = gradTop;
+          context.beginPath(); context.moveTo(x, 0); context.lineTo(x, PAD); context.stroke();
+
+          context.strokeStyle = gradBottom;
+          context.beginPath(); context.moveTo(x, PAD + height); context.lineTo(x, fullH); context.stroke();
+        } else {
+          // Corner void column (left or right): soft gradient fade across canvas height
+          context.strokeStyle = col < 0 ? gradTop : gradBottom;
+          context.beginPath(); context.moveTo(x, 0); context.lineTo(x, fullH); context.stroke();
+        }
+      }
+
+      // Reset line dash for subsequent rendering
+      context.setLineDash([]);
+
+      // Translate to grid origin for cell drawing (cells compute coords from 0,0)
+      context.save();
+      context.translate(PAD, PAD);
+      ghost.forEach((entry) => drawCell(context, entry, cellW, cellH, time, activeStyle, 'ghost'));
+      settled.forEach((entry) => drawCell(context, entry, cellW, cellH, time, activeStyle, 'settled'));
+      active.forEach((entry) => drawCell(context, entry, cellW, cellH, time, activeStyle, 'active'));
+      context.restore();
+
+      requestAnimationFrame(drawBoard);
+    }
+
+
+    /* Seeded PRNG Generator (Mulberry32) */
+    function mulberry32(a) {
+      return function() {
+        let t = a += 0x6D2B79F5;
+        t = Math.imul(t ^ (t >>> 15), t | 1);
+        t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+        return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+      };
+    }
+
+    function applySeededLayout(seedInt) {
+      const rng = mulberry32(seedInt);
+
+      // 1. Face Count: 1 to max 3
+      const faceCount = Math.floor(rng() * 3) + 1;
+
+      // 2. Generate line break gap centers deterministically per match seed
+      const topGap1Center = 18 + Math.floor(rng() * 6);   // e.g. 18-24%
+      const topGap2Center = 64 + Math.floor(rng() * 6);   // e.g. 64-70%
+      const botGap1Center = 28 + Math.floor(rng() * 6);
+      const botGap2Center = 68 + Math.floor(rng() * 6);
+
+      const leftGap1Center = 24 + Math.floor(rng() * 6);  // e.g. 24-30%
+      const leftGap2Center = 60 + Math.floor(rng() * 6);
+
+      const rightGap1Center = 20 + Math.floor(rng() * 6); // e.g. 20-26%
+      const rightGap2Center = 56 + Math.floor(rng() * 6);
+
+      // Build Outer Line Background CSS: line cut gaps are EXACTLY 36px wide/tall in calc(), matching 40px face with 2px overlap on each side
+      const outerTop = `linear-gradient(90deg, #fff 0 calc(${topGap1Center}% - 18px), transparent calc(${topGap1Center}% - 18px) calc(${topGap1Center}% + 18px), #fff calc(${topGap1Center}% + 18px) calc(${topGap2Center}% - 18px), transparent calc(${topGap2Center}% - 18px) calc(${topGap2Center}% + 18px), #fff calc(${topGap2Center}% + 18px) 100%) 0 0 / 100% 3px no-repeat`;
+      const outerBot = `linear-gradient(90deg, #fff 0 calc(${botGap1Center}% - 10px), transparent calc(${botGap1Center}% - 10px) calc(${botGap1Center}% + 10px), #fff calc(${botGap1Center}% + 10px) calc(${botGap2Center}% - 10px), transparent calc(${botGap2Center}% - 10px) calc(${botGap2Center}% + 10px), #fff calc(${botGap2Center}% + 10px) 100%) 0 100% / 100% 3px no-repeat`;
+      const outerLeft = `linear-gradient(180deg, #fff 0 calc(${leftGap1Center}% - 18px), transparent calc(${leftGap1Center}% - 18px) calc(${leftGap1Center}% + 18px), #fff calc(${leftGap1Center}% + 18px) calc(${leftGap2Center}% - 10px), transparent calc(${leftGap2Center}% - 10px) calc(${leftGap2Center}% + 10px), #fff calc(${leftGap2Center}% + 10px) 88%, transparent 88% 100%) 0 0 / 3px 100% no-repeat`;
+      const outerRight = `linear-gradient(180deg, transparent 0 12%, #fff 12% calc(${rightGap1Center}% - 18px), transparent calc(${rightGap1Center}% - 18px) calc(${rightGap1Center}% + 18px), #fff calc(${rightGap1Center}% + 18px) calc(${rightGap2Center}% - 10px), transparent calc(${rightGap2Center}% - 10px) calc(${rightGap2Center}% + 10px), #fff calc(${rightGap2Center}% + 10px) 100%) 100% 0 / 3px 100% no-repeat`;
+
+      const outerBg = `${outerTop}, ${outerBot}, ${outerLeft}, ${outerRight}, #000`;
+
+      // Staggered Inner Line Background CSS (85%+ complete coverage)
+      const inTop1 = (topGap1Center + 14) % 90;
+      const inTop2 = (topGap2Center + 14) % 90;
+      const inBot1 = (botGap1Center + 14) % 90;
+      const inBot2 = (botGap2Center + 14) % 90;
+
+      const innerTop = `linear-gradient(90deg, transparent 0 ${inTop1}%, rgba(255,255,255,.7) ${inTop1}% ${inTop1 + 24}%, transparent ${inTop1 + 24}% ${inTop2}%, rgba(255,255,255,.7) ${inTop2}% 92%, transparent 92% 100%) 0 0 / 100% 1.5px no-repeat`;
+      const innerBot = `linear-gradient(90deg, rgba(255,255,255,.7) 0 ${inBot1}%, transparent ${inBot1}% ${inBot1 + 6}%, rgba(255,255,255,.7) ${inBot1 + 6}% ${inBot2}%, transparent ${inBot2}% 100%) 0 100% / 100% 1.5px no-repeat`;
+      const innerLeft = `linear-gradient(180deg, transparent 0 28%, rgba(255,255,255,.7) 28% 66%, transparent 66% 72%, rgba(255,255,255,.7) 72% 100%) 0 0 / 1.5px 100% no-repeat`;
+      const innerRight = `linear-gradient(180deg, rgba(255,255,255,.7) 0 30%, transparent 30% 36%, rgba(255,255,255,.7) 36% 64%, transparent 64% 100%) 100% 0 / 1.5px 100% no-repeat`;
+
+      const innerBg = `${innerTop}, ${innerBot}, ${innerLeft}, ${innerRight}`;
+
+      // Apply background styles dynamically
+      const boardFrame = document.getElementById('boardFrame');
+      boardFrame.style.background = outerBg;
+
+      // Inject pseudo element background rule for inner frame line
+      let styleSheet = document.getElementById('dynamicSeededStyle');
+      if (!styleSheet) {
+        styleSheet = document.createElement('style');
+        styleSheet.id = 'dynamicSeededStyle';
+        document.head.appendChild(styleSheet);
+      }
+      styleSheet.textContent = `.study[data-style="watching-amalgam"] .board-frame::before { background: ${innerBg}; }`;
+
+      // 3. Embedded Watcher Face candidates centered at exact gap centers
+      const candidateFaces = [
+        { side: 'top', center: topGap1Center },
+        { side: 'top', center: topGap2Center },
+        { side: 'left', center: leftGap1Center },
+        { side: 'right', center: rightGap1Center }
+      ];
+
+      const activeFaces = candidateFaces.slice(0, faceCount);
+
+      // Build Marks HTML
+      let marksHTML = '';
+      activeFaces.forEach((face) => {
+        if (face.side === 'top') {
+          // 40px x 18px face centered over 36px gap: left edge at center% - 20px, overlaps white line by 2px on left & right
+          marksHTML += `<span class="watcher-face" style="left: calc(${face.center}% - 20px); width: 40px; height: 18px; top: -8px;"></span>`;
+        } else if (face.side === 'left') {
+          // 18px x 40px face centered over 36px gap: top edge at center% - 20px, overlaps white line by 2px on top & bottom
+          marksHTML += `<span class="watcher-face side-left" style="top: calc(${face.center}% - 20px); height: 40px; width: 18px; left: -8px;"></span>`;
+        } else {
+          // 18px x 40px face centered over 36px gap: top edge at center% - 20px, overlaps white line by 2px on top & bottom
+          marksHTML += `<span class="watcher-face side-right" style="top: calc(${face.center}% - 20px); height: 40px; width: 18px; right: -8px;"></span>`;
+        }
+      });
+
+      // 4. Seeded Whole-Grid Extensions for ALL 30 grid lines (19 rows, 11 cols)
+      window._allLineExtLeft = [];
+      window._allLineExtRight = [];
+      for (let r = 0; r <= 18; r += 1) {
+        window._allLineExtLeft[r] = 12 + Math.floor(rng() * 18);
+        window._allLineExtRight[r] = 12 + Math.floor(rng() * 18);
+      }
+
+      window._allLineExtTop = [];
+      window._allLineExtBottom = [];
+      for (let c = 0; c <= 10; c += 1) {
+        window._allLineExtTop[c] = 12 + Math.floor(rng() * 18);
+        window._allLineExtBottom[c] = 12 + Math.floor(rng() * 18);
+      }
+
+      // Add 3 Subtle Red Spark Accents (0.55 - 0.70 opacity)
+      const spark1Right = 8 + Math.floor(rng() * 14);
+      const spark1Top = 5 + Math.floor(rng() * 8);
+      const spark1Op = (0.55 + rng() * 0.15).toFixed(2);
+
+      const spark2Left = -6;
+      const spark2Top = 34 + Math.floor(rng() * 22);
+      const spark2Op = (0.55 + rng() * 0.15).toFixed(2);
+
+      const spark3Right = -6;
+      const spark3Top = 68 + Math.floor(rng() * 20);
+      const spark3Op = (0.55 + rng() * 0.15).toFixed(2);
+
+      marksHTML += `<span class="spark-red" style="right: ${spark1Right}%; top: ${spark1Top}%; opacity: ${spark1Op};"></span>`;
+      marksHTML += `<span class="spark-red" style="left: ${spark2Left}px; top: ${spark2Top}%; opacity: ${spark2Op};"></span>`;
+      marksHTML += `<span class="spark-red" style="right: ${spark3Right}px; top: ${spark3Top}%; opacity: ${spark3Op};"></span>`;
+
+      document.getElementById('amalgamMarks').innerHTML = marksHTML;
+      if (activeStyle.id === 'watching-amalgam') {
+        document.getElementById('switcherLabel').textContent = `SEED #${seedInt} · ${faceCount} WATCHER${faceCount > 1 ? 'S' : ''}`;
+      }
+    }
+
+    const params = new URLSearchParams(location.search);
+    const requestedMode = params.get('mode');
+    const requestedEffects = params.get('effects');
+    const requestedStyle = params.get('style');
+    const requestedSeed = parseInt(params.get('seed') || '4207', 10);
+
+    let currentSeed = isNaN(requestedSeed) ? 4207 : requestedSeed;
+
+    if (requestedMode) {
+      document.getElementById('study').dataset.mode = requestedMode;
+      document.querySelector('.lab').dataset.mode = requestedMode;
+    }
+    if (requestedEffects) {
+      document.getElementById('study').dataset.effects = requestedEffects;
+      if (requestedEffects === 'temporary') {
+        const effectRow = document.querySelector('.effect-row');
+        if (effectRow) {
+          effectRow.innerHTML = '<span class="effect-pill temporary active">❄ Curtain · 47t</span><span class="effect-pill temporary active">🧪 Poison · 12t</span><span class="effect-pill temporary active">💣 Bomber · 3s</span>';
+        }
+      }
+    }
+
+    function rerollSeed() {
+      if (activeStyle.id !== 'watching-amalgam') return;
+      currentSeed = Math.floor(Math.random() * 9000) + 1000;
+      applySeededLayout(currentSeed);
+      const url = new URL(location.href);
+      url.searchParams.set('seed', currentSeed);
+      history.replaceState({}, '', url);
+    }
+
+    function setStyleMode(styleId, updateUrl = true) {
+      const showOriginal = styleId === 'original-amalgam';
+      activeStyle = showOriginal ? originalStyleConfig : watchingStyleConfig;
+      const study = document.getElementById('study');
+      const boardFrame = document.getElementById('boardFrame');
+      const marks = document.getElementById('amalgamMarks');
+      const reroll = document.getElementById('reroll');
+      const toggle = document.getElementById('styleToggle');
+
+      study.dataset.style = activeStyle.id;
+      boardFrame.style.background = '';
+      marks.innerHTML = '';
+      reroll.hidden = showOriginal;
+      toggle.textContent = showOriginal ? 'CURRENT' : 'ORIGINAL';
+      toggle.setAttribute('aria-label', showOriginal ? 'Show current Watching Shrine Amalgam' : 'Show original Amalgam');
+      document.getElementById('variantIndex').textContent = activeStyle.type;
+      document.getElementById('variantName').textContent = activeStyle.name;
+      document.getElementById('variantDescription').textContent = activeStyle.description;
+
+      const focusList = document.querySelector('.focus-list');
+      if (showOriginal) {
+        focusList.innerHTML = '<div class="focus-item"><strong>Original treatment</strong>Broken one-bit perimeter with independent black-and-white hatched Voronoi cells.</div><div class="focus-item"><strong>Explicit exclusions</strong>No melting edge, watcher faces, seeded scars, cell connections, or faces inside pieces.</div>';
+        document.getElementById('switcherLabel').textContent = 'FIRST ONE-BIT';
+      } else {
+        focusList.innerHTML = '<div class="focus-item"><strong>Seeded Geometry</strong>Match seed deterministically generates perimeter line break gaps and watcher face positions.</div><div class="focus-item"><strong>Rules Enforced</strong>Outer edge cut-throughs, embedded watching faces on gaps, crisp bottom line breaks, clean Voronoi cells.</div>';
+        applySeededLayout(currentSeed);
+      }
+
+      if (updateUrl) {
+        const url = new URL(location.href);
+        url.searchParams.set('style', activeStyle.id);
+        history.replaceState({}, '', url);
+      }
+    }
+
+    window._gridExtMode = 'full';
+    const gridToggleBtn = document.getElementById('gridToggle');
+    if (gridToggleBtn) {
+      gridToggleBtn.addEventListener('click', () => {
+        if (window._gridExtMode === 'full') {
+          window._gridExtMode = 'seeded';
+          gridToggleBtn.textContent = '🌐 SEEDED MESH';
+        } else if (window._gridExtMode === 'seeded') {
+          window._gridExtMode = 'faded';
+          gridToggleBtn.textContent = '🌐 FADED MESH';
+        } else {
+          window._gridExtMode = 'full';
+          gridToggleBtn.textContent = '🌐 FULL MESH';
+        }
+      });
+    }
+
+    document.getElementById('reroll').addEventListener('click', rerollSeed);
+    document.getElementById('styleToggle').addEventListener('click', () => {
+      setStyleMode(activeStyle.id === 'watching-amalgam' ? 'original-amalgam' : 'watching-amalgam');
+    });
+    addEventListener('keydown', (event) => {
+      if (event.key === ' ' || event.key === 'r' || event.key === 'R') rerollSeed();
+      if (event.key === 't' || event.key === 'T') setStyleMode(activeStyle.id === 'watching-amalgam' ? 'original-amalgam' : 'watching-amalgam');
+      if (event.key === 'g' || event.key === 'G') gridToggleBtn?.click();
+    });
+
+    setStyleMode(requestedStyle === 'original-amalgam' ? 'original-amalgam' : 'watching-amalgam', false);
+    requestAnimationFrame(drawBoard);
+  </script>
+</body>
+</html>

@@ -3,6 +3,8 @@ import { createPlayerRngChannels, type RngChannels } from '../../src/rng.js';
 import { makePlayer } from '../tetris/engine.js';
 import { matchStep } from '../tetris/matchStep.js';
 import { applyShopPurchase, openPlayerShop } from '../shop.js';
+import { SHOP_ITEM_BY_ID } from '../../src/shop/shopCatalog.js';
+import { getPricingView } from '../../src/shop/shopPricing.js';
 import { clonePlayer, type InputDriver } from './inputDriver.js';
 import { defaultObservationProjector, type ObservationMode } from './observationProjector.js';
 import type { PlayerFixture } from './fixtures.js';
@@ -87,6 +89,10 @@ export class Scenario {
     return Object.keys(this.gameState.players);
   }
 
+  public get tick(): number {
+    return this.gameState.tick;
+  }
+
   public getPlayerState(playerId: string): PlayerState {
     const player = this.gameState.players[playerId];
     if (!player) throw new Error(`Player ${playerId} not found in scenario`);
@@ -152,12 +158,18 @@ export class Scenario {
     const channels = this.rngChannelsByPlayer.get(playerId);
     if (!channels) throw new Error(`No RNG channels for player ${playerId}`);
 
+    const catalogItem = SHOP_ITEM_BY_ID.get(itemId);
+    const actualCost = options?.overrideCost !== undefined
+      ? Math.max(0, options.overrideCost)
+      : catalogItem
+        ? getPricingView(itemId, buyer.shop.pricing?.[itemId], this.gameState.tick).currentPrice
+        : undefined;
     const accepted = applyShopPurchase(this.gameState, buyer, opponent, itemId, channels.shop, options);
     this.commandRecords.push({
       tick: this.gameState.tick,
       playerId,
       kind: 'purchase',
-      detail: { itemId, overrideCost: options?.overrideCost },
+      detail: { itemId, overrideCost: options?.overrideCost, cost: actualCost },
       accepted,
     });
     return accepted;

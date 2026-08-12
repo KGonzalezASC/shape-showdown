@@ -1,8 +1,8 @@
-import React, { useContext, useMemo } from 'react';
+import React, { useContext, useEffect, useMemo, useState } from 'react';
 import GameField, { GameFieldRef } from './GameField';
 import OpponentMiniField from './OpponentMiniField';
 import ShopRail from './ShopRail';
-import { GameFieldsLayout } from './GameFieldsLayout';
+import { PlayfieldLayout } from './PlayfieldLayout';
 import { PlayfieldCellSizeContext } from './playfieldCellSizeContext';
 import { BOARD_COLS, BOARD_VISIBLE_ROWS } from '../types';
 import { resolveShopOffers, SHOP_ITEM_BY_ID } from '../shop/shopCatalog';
@@ -10,6 +10,7 @@ import { useMatchChromeSnapshot, usePlayfieldSnapshot } from '../state/GameState
 import { useShopConfirm } from '../hooks/useShopConfirm';
 import { BoardProfiler } from '../performance/BoardProfiler';
 import { IncomingGarbageReadout } from './IncomingGarbageReadout';
+import DesktopKeyboardLegend from './DesktopKeyboardLegend';
 
 function WaitingForOpponentBoard() {
   const cell = useContext(PlayfieldCellSizeContext);
@@ -31,6 +32,7 @@ function WaitingForOpponentBoard() {
 
 interface PlayfieldShellProps {
   mobilePlayfieldRef: React.RefObject<HTMLDivElement | null>;
+  mobileBoardFitRef: React.RefObject<HTMLDivElement | null>;
   railRef: React.RefObject<HTMLDivElement | null>;
   mobileCellSize: number;
   myMobileFieldRef: React.RefObject<GameFieldRef | null>;
@@ -42,6 +44,7 @@ interface PlayfieldShellProps {
 
 export const PlayfieldShell: React.FC<PlayfieldShellProps> = ({
   mobilePlayfieldRef,
+  mobileBoardFitRef,
   railRef,
   mobileCellSize,
   myMobileFieldRef,
@@ -50,9 +53,13 @@ export const PlayfieldShell: React.FC<PlayfieldShellProps> = ({
   hatchingEnabled,
   onToggleHatching,
 }) => {
+  const [isTabletLayout, setIsTabletLayout] = useState(() => (
+    typeof window !== 'undefined' && window.matchMedia('(min-width: 661px)').matches
+  ));
   const playfield = usePlayfieldSnapshot();
   const chrome = useMatchChromeSnapshot();
   const handleShopConfirm = useShopConfirm();
+  const { myPlayer, opponentPlayer } = playfield;
 
   const shopOffers = useMemo(() => resolveShopOffers(chrome.shopOfferIds), [chrome.shopOfferIds]);
   const purchasedItem = useMemo(() => {
@@ -60,18 +67,36 @@ export const PlayfieldShell: React.FC<PlayfieldShellProps> = ({
     return SHOP_ITEM_BY_ID.get(chrome.shopLastPurchasedItemId) ?? null;
   }, [chrome.shopLastPurchasedItemId]);
 
+  const isItemDisabled = useMemo(() => (item: (typeof shopOffers)[number]) => {
+    if (item.id === 'storage-toxin') return !opponentPlayer?.holdPiece;
+    if (item.id === 'bounty-tax') return chrome.oppFunds <= chrome.myFunds;
+    if (item.id === 'wildcard-four') {
+      return !opponentPlayer?.poisonBoard?.some((row) => row.some((cell) => cell > 0));
+    }
+    return false;
+  }, [chrome.myFunds, chrome.oppFunds, opponentPlayer]);
+
   const shopCanPurchase = chrome.shopPhase === 'cycling' || chrome.shopPhase === 'ready';
   const isPlaying = playfield.status === 'playing';
-  const { myPlayer, opponentPlayer } = playfield;
+
+  useEffect(() => {
+    const query = window.matchMedia('(min-width: 661px)');
+    const update = () => setIsTabletLayout(query.matches);
+    update();
+    query.addEventListener('change', update);
+    return () => query.removeEventListener('change', update);
+  }, []);
+
+  const compactViewportMode = isTabletLayout ? 'tablet' : 'phone';
 
   return (
     <>
-      <div className="relative min-h-0 w-full flex-1 md:hidden">
+      <div className="relative min-h-0 w-full flex-1 min-[901px]:hidden">
         <div
           ref={mobilePlayfieldRef}
-          className="flex h-full w-full items-stretch gap-2 overflow-hidden px-1 pb-3"
+          className="mx-auto grid h-full w-full max-w-[430px] grid-cols-[minmax(0,1fr)_6rem] items-stretch gap-1.5 overflow-visible pb-2 min-[661px]:max-w-[820px] min-[661px]:grid-cols-[minmax(0,1fr)_13.125rem] min-[661px]:gap-3"
         >
-          <div className="flex min-h-0 shrink-0 items-start justify-start">
+          <div className="h-full min-h-0 min-w-0 border border-emerald-500/25 bg-[#121414]/95 p-1.5 min-[661px]:p-2">
             {myPlayer && (
               <BoardProfiler id="mobile-player-field" renderer="board-canvas">
                 <GameField
@@ -82,6 +107,7 @@ export const PlayfieldShell: React.FC<PlayfieldShellProps> = ({
                   borderColorClass="border-emerald-500/20"
                   shadowColorClass="shadow-[0_0_30px_rgba(16,185,129,0.1)]"
                   cellSize={mobileCellSize}
+                  boardFitRef={mobileBoardFitRef}
                   status={playfield.status}
                   hatchingEnabled={hatchingEnabled}
                   performanceId="mobile-player-field"
@@ -91,11 +117,12 @@ export const PlayfieldShell: React.FC<PlayfieldShellProps> = ({
           </div>
           <div
             ref={railRef}
-            className="flex w-[5.75rem] shrink-0 flex-col gap-2 overflow-y-auto"
+            className="flex max-h-full min-h-0 min-w-0 flex-col gap-2 overflow-y-auto"
           >
             <OpponentMiniField
               player={opponentPlayer}
               hatchingEnabled={hatchingEnabled}
+              viewportMode={compactViewportMode}
             />
             <ShopRail
               items={shopOffers}
@@ -105,8 +132,11 @@ export const PlayfieldShell: React.FC<PlayfieldShellProps> = ({
               shopPhase={chrome.shopPhase}
               purchasedItem={purchasedItem}
               onConfirm={handleShopConfirm}
-              availableScore={chrome.availableShopScore}
-              viewportMode="mobile"
+              availableFunds={chrome.availableFunds}
+              pricing={chrome.shopPricing}
+              currentTick={chrome.tick}
+              isItemDisabled={isItemDisabled}
+              viewportMode={compactViewportMode}
               hatchingEnabled={hatchingEnabled}
               onToggleHatching={onToggleHatching}
             />
@@ -114,12 +144,10 @@ export const PlayfieldShell: React.FC<PlayfieldShellProps> = ({
         </div>
       </div>
 
-      <div className="hidden min-h-0 w-full flex-1 md:flex md:flex-col">
-        <GameFieldsLayout>
-          {myPlayer && (
-            <div className="flex shrink-0 items-start gap-3 sm:gap-4">
-              <div className="shrink-0">
-                <ShopRail
+      <div className="hidden min-h-0 w-full flex-1 min-[901px]:flex min-[901px]:flex-col">
+        <PlayfieldLayout>
+          <div className="flex min-h-0 shrink-0 flex-col gap-2">
+            <ShopRail
                   items={shopOffers}
                   isPlaying={isPlaying}
                   canPurchase={shopCanPurchase}
@@ -127,12 +155,18 @@ export const PlayfieldShell: React.FC<PlayfieldShellProps> = ({
                   shopPhase={chrome.shopPhase}
                   purchasedItem={purchasedItem}
                   onConfirm={handleShopConfirm}
-                  availableScore={chrome.availableShopScore}
-                  viewportMode="tabletDesktop"
+                  availableFunds={chrome.availableFunds}
+                  pricing={chrome.shopPricing}
+                  currentTick={chrome.tick}
+                  isItemDisabled={isItemDisabled}
+                  viewportMode="desktop"
                   hatchingEnabled={hatchingEnabled}
                   onToggleHatching={onToggleHatching}
-                />
-              </div>
+            />
+            <DesktopKeyboardLegend />
+          </div>
+          {myPlayer && (
+            <div className="min-w-0 border border-emerald-500/25 bg-[#121414]/95 p-2">
               <BoardProfiler id="desktop-player-field" renderer="board-canvas">
                 <GameField
                   ref={myDesktopFieldRef}
@@ -149,7 +183,7 @@ export const PlayfieldShell: React.FC<PlayfieldShellProps> = ({
             </div>
           )}
 
-          <div className="relative shrink-0">
+          <div className="relative min-w-0 border border-rose-500/25 bg-[#121414]/95 p-2">
             {opponentPlayer ? (
               <BoardProfiler id="desktop-opponent-field" renderer="board-canvas">
                 <GameField
@@ -159,7 +193,6 @@ export const PlayfieldShell: React.FC<PlayfieldShellProps> = ({
                   title="Opponent Field"
                   borderColorClass="border-rose-500/20"
                   shadowColorClass="shadow-[0_0_30px_rgba(244,63,94,0.1)]"
-                  opacityClass="opacity-80"
                   status={playfield.status}
                   hatchingEnabled={hatchingEnabled}
                   performanceId="desktop-opponent-field"
@@ -169,7 +202,7 @@ export const PlayfieldShell: React.FC<PlayfieldShellProps> = ({
               <WaitingForOpponentBoard />
             )}
           </div>
-        </GameFieldsLayout>
+        </PlayfieldLayout>
       </div>
     </>
   );

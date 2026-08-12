@@ -22,6 +22,11 @@ import {
   armSatelliteToBuyer,
   startTectonicShift,
 } from './tetris/engine.js';
+import {
+  ensurePlayerShopPricing,
+  recordShopPurchasePricing,
+} from '../src/shop/playerShop.js';
+import { getPricingView } from '../src/shop/shopPricing.js';
 
 export {
   createInitialPlayerShop,
@@ -31,6 +36,8 @@ export {
   SHOP_CYCLE_TICKS,
   tickPlayerShop,
 } from '../src/shop/playerShop.js';
+
+export { PRICING_POLICY_VERSION } from '../src/shop/shopPricing.js';
 
 /** Max cells copied onto a Wildcard +4 puzzle piece. */
 export const WILDCARD_FOUR_MAX_CELLS = 6;
@@ -316,12 +323,12 @@ const SHOP_HANDLERS: Record<string, ShopHandler> = {
     },
   },
   'bounty-tax': {
-    canPurchase: ({ buyer, opponent }) => !!opponent && opponent.score > buyer.score,
+    canPurchase: ({ buyer, opponent }) => !!opponent && opponent.funds > buyer.funds,
     onPurchase: ({ buyer, opponent, tick }) => {
       if (!opponent) return;
-      const stolen = Math.floor(opponent.score * BOUNTY_TAX_PERCENT);
-      opponent.score -= stolen;
-      buyer.score += stolen;
+      const stolen = Math.floor(opponent.funds * BOUNTY_TAX_PERCENT);
+      opponent.funds -= stolen;
+      buyer.funds += stolen;
       pushFieldEffect(opponent, 'taxed', tick, `Taxed (-${stolen})`, '💸', tick + 120);
       pushFieldEffect(buyer, 'tax-siphon', tick, `Siphoned (+${stolen})`, '💸', tick + 120);
     },
@@ -358,7 +365,12 @@ export function applyShopPurchase(
   opponent: PlayerState | null,
   itemId: string,
   rng: RngChannels | MutableRng,
-  options?: { overrideCost?: number; bypassAffordabilityCheck?: boolean },
+  options?: {
+    overrideCost?: number;
+    bypassAffordabilityCheck?: boolean;
+    /** Internal replay mode for pre-pricing tapes. Never accepted from clients. */
+    pricingMode?: 'dynamic' | 'legacy';
+  },
 ): boolean {
   const shop = buyer.shop;
   if (shop.phase !== 'cycling') return false;
@@ -369,8 +381,16 @@ export function applyShopPurchase(
   const catalogItem = SHOP_ITEM_BY_ID.get(itemId);
   if (!catalogItem || !catalogItem.purchasable) return false;
 
-  const chargedCost = options?.overrideCost !== undefined ? Math.max(0, options.overrideCost) : catalogItem.cost;
-  if (!options?.bypassAffordabilityCheck && buyer.score < chargedCost) return false;
+  const usesDynamicPricing = options?.pricingMode !== 'legacy' && options?.overrideCost === undefined;
+  const pricingView = usesDynamicPricing
+    ? getPricingView(itemId, buyer.shop.pricing?.[itemId], gameState.tick)
+    : null;
+  const chargedCost = options?.overrideCost !== undefined
+    ? Math.max(0, options.overrideCost)
+    : usesDynamicPricing
+      ? pricingView!.currentPrice
+      : catalogItem.cost;
+  if (!options?.bypassAffordabilityCheck && buyer.funds < chargedCost) return false;
   if (catalogItem.target === 'opponent' && !opponent) return false;
 
   const handler = SHOP_HANDLERS[itemId];
@@ -380,7 +400,7 @@ export function applyShopPurchase(
   const ctx: PurchaseCtx = { gameState, buyer, opponent, tick: gameState.tick, rng: channels.effects };
   if (handler.canPurchase && !handler.canPurchase(ctx)) return false;
 
-  buyer.score -= chargedCost;
+  buyer.funds -= chargedCost;
   shop.phase = 'waiting';
   shop.cycleIndex = -1;
   shop.cycleStartTick = null;
@@ -393,5 +413,9 @@ export function applyShopPurchase(
   shop.activeSynergySeeds = nextSeeds;
 
   handler.onPurchase(ctx);
+  if (usesDynamicPricing) {
+    ensurePlayerShopPricing(buyer, gameState.tick);
+    recordShopPurchasePricing(buyer, itemId, gameState.tick);
+  }
   return true;
 }

@@ -6,6 +6,13 @@ import {
   drawWeightedShopOffers,
   SHOP_VISIBLE_COUNT,
 } from './shopRoll';
+import {
+  advancePricingAfterPurchase,
+  createInitialPricingState,
+  ensurePricingRecord,
+  normalizePricingRecord,
+  type ItemPricingState,
+} from './shopPricing';
 
 /** ~700ms highlight interval at 60Hz simulation. */
 export const SHOP_CYCLE_TICKS = 42;
@@ -20,6 +27,7 @@ export function createInitialPlayerShop(rng: MutableRng): PlayerShopState {
     cycleStartTick: null,
     lastPurchasedItemId: null,
     activeSynergySeeds: [],
+    pricing: createInitialPricingState(),
   };
 }
 
@@ -44,6 +52,7 @@ export function rollShopOnLineClear(player: PlayerState, rng: MutableRng): void 
 }
 
 export function tickPlayerShop(player: PlayerState, currentTick: number): void {
+  player.shop.pricing = normalizePricingRecord(player.shop.pricing, currentTick);
   if (player.shop.phase !== 'cycling' || player.shop.cycleStartTick === null) return;
   const elapsed = currentTick - player.shop.cycleStartTick;
   const nextIndex = Math.floor(elapsed / SHOP_CYCLE_TICKS);
@@ -54,6 +63,21 @@ export function tickPlayerShop(player: PlayerState, currentTick: number): void {
     return;
   }
   player.shop.cycleIndex = nextIndex;
+}
+
+export function ensurePlayerShopPricing(player: PlayerState, currentTick: number): void {
+  player.shop.pricing = ensurePricingRecord(player.shop.pricing, currentTick);
+}
+
+export function recordShopPurchasePricing(
+  player: PlayerState,
+  itemId: string,
+  purchaseTick: number,
+): ItemPricingState {
+  ensurePlayerShopPricing(player, purchaseTick);
+  const next = advancePricingAfterPurchase(itemId, player.shop.pricing[itemId], purchaseTick);
+  player.shop.pricing[itemId] = next;
+  return next;
 }
 
 export function openPlayerShop(player: PlayerState, currentTick: number): boolean {

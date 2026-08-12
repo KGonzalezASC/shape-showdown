@@ -26,6 +26,7 @@ export interface PublicPlayerState {
   canHold: boolean;
   nextQueue: TetrominoType[];
   score: number;
+  funds: number;
   linesCleared: number;
   combo: number;
   backToBack: boolean;
@@ -48,7 +49,7 @@ export interface PublicPlayerState {
   tectonicShiftNextStepTick?: number | null;
   shop: Pick<
     PlayerShopState,
-    'offerIds' | 'phase' | 'cycleIndex' | 'lastPurchasedItemId' | 'activeSynergySeeds'
+    'offerIds' | 'phase' | 'cycleIndex' | 'lastPurchasedItemId' | 'activeSynergySeeds' | 'pricing'
   >;
 }
 
@@ -94,6 +95,7 @@ export function toPublicPlayerState(player: PlayerState): PublicPlayerState {
     canHold: player.canHold,
     nextQueue: player.nextQueue,
     score: player.score,
+    funds: player.funds ?? player.score ?? 0,
     linesCleared: player.linesCleared,
     combo: player.combo,
     backToBack: player.backToBack,
@@ -120,6 +122,7 @@ export function toPublicPlayerState(player: PlayerState): PublicPlayerState {
       cycleIndex: player.shop.cycleIndex,
       lastPurchasedItemId: player.shop.lastPurchasedItemId,
       activeSynergySeeds: player.shop.activeSynergySeeds,
+      pricing: player.shop.pricing,
     },
   };
 }
@@ -241,6 +244,25 @@ function sourceCellsEqual(a?: [number, number][], b?: [number, number][]): boole
   return true;
 }
 
+function pricingEqual(
+  a: PublicPlayerState['shop']['pricing'],
+  b: PublicPlayerState['shop']['pricing'],
+): boolean {
+  const itemIds = new Set([...Object.keys(a), ...Object.keys(b)]);
+  for (const itemId of itemIds) {
+    const left = a[itemId];
+    const right = b[itemId];
+    if (!left || !right) return false;
+    if (
+      left.level !== right.level ||
+      left.purchasesInWindow !== right.purchasesInWindow ||
+      left.windowStartedAtTick !== right.windowStartedAtTick ||
+      left.lastWindowClosedBy !== right.lastWindowClosedBy
+    ) return false;
+  }
+  return true;
+}
+
 export function publicPlayersEqual(a: PublicPlayerState | null, b: PublicPlayerState | null): boolean {
   if (a === b) return true;
   if (!a || !b) return false;
@@ -248,6 +270,7 @@ export function publicPlayersEqual(a: PublicPlayerState | null, b: PublicPlayerS
     a.id !== b.id ||
     a.canHold !== b.canHold ||
     a.score !== b.score ||
+    a.funds !== b.funds ||
     a.linesCleared !== b.linesCleared ||
     a.combo !== b.combo ||
     a.backToBack !== b.backToBack ||
@@ -265,7 +288,8 @@ export function publicPlayersEqual(a: PublicPlayerState | null, b: PublicPlayerS
     a.tectonicShiftNextStepTick !== b.tectonicShiftNextStepTick ||
     a.shop.phase !== b.shop.phase ||
     a.shop.cycleIndex !== b.shop.cycleIndex ||
-    a.shop.lastPurchasedItemId !== b.shop.lastPurchasedItemId
+    a.shop.lastPurchasedItemId !== b.shop.lastPurchasedItemId ||
+    !pricingEqual(a.shop.pricing, b.shop.pricing)
   ) {
     return false;
   }

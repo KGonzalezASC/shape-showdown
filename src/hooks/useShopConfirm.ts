@@ -1,9 +1,11 @@
 import { useCallback } from 'react';
 import { SHOP_ITEM_BY_ID } from '../shop/shopCatalog';
-import { useGameActions, useMatchChromeSnapshot } from '../state/GameStateProvider';
+import { getPricingView } from '../shop/shopPricing';
+import { useGameActions, useMatchChromeSnapshot, usePlayfieldSnapshot } from '../state/GameStateProvider';
 
 export function useShopConfirm() {
   const chrome = useMatchChromeSnapshot();
+  const playfield = usePlayfieldSnapshot();
   const { sendShopOpen, sendShopPurchase } = useGameActions();
 
   return useCallback(() => {
@@ -18,8 +20,17 @@ export function useShopConfirm() {
       const pickedId = chrome.shopOfferIds[chrome.shopCycleIndex];
       if (!pickedId) return;
       const picked = SHOP_ITEM_BY_ID.get(pickedId);
-      if (!picked || chrome.availableShopScore < picked.cost) return;
+      if (!picked) return;
+      const pricingView = getPricingView(pickedId, chrome.shopPricing[pickedId], chrome.tick);
+      if (chrome.availableFunds < pricingView.currentPrice) return;
+      const opponent = playfield.opponentPlayer;
+      if (pickedId === 'storage-toxin' && !opponent?.holdPiece) return;
+      if (pickedId === 'bounty-tax' && chrome.oppFunds <= chrome.myFunds) return;
+      if (
+        pickedId === 'wildcard-four' &&
+        !opponent?.poisonBoard?.some((row) => row.some((cell) => cell > 0))
+      ) return;
       sendShopPurchase(pickedId);
     }
-  }, [chrome, sendShopOpen, sendShopPurchase]);
+  }, [chrome, playfield.opponentPlayer, sendShopOpen, sendShopPurchase]);
 }

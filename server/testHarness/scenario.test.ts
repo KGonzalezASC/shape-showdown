@@ -73,7 +73,8 @@ describe('Scenario Harness & Scripted Driver', () => {
     const p1StateAfter = scenario.getPlayerState('p1');
     const p2StateAfter = scenario.getPlayerState('p2');
 
-    assert.equal(p1StateAfter.score, 455); // 500 - FREEZE_COST (45)
+    assert.equal(p1StateAfter.funds, 455); // 500 - FREEZE_COST (45)
+    assert.equal(p1StateAfter.score, 500);
     assert.ok(p2StateAfter.holdFrozenUntilTick && p2StateAfter.holdFrozenUntilTick > 0);
   });
 

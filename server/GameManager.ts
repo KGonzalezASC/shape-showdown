@@ -21,6 +21,7 @@ import {
 import { matchStep } from './tetris/matchStep.js';
 import { createPlayerRngChannels, type RngChannels } from '../src/rng.js';
 import { SHOP_ITEM_BY_ID } from '../src/shop/shopCatalog.js';
+import { getPricingView, PRICING_POLICY_VERSION } from '../src/shop/shopPricing.js';
 import {
   applyShopPurchase,
   openPlayerShop,
@@ -141,15 +142,18 @@ export class GameManager {
       const pids = Object.keys(this.gameState.players);
       const opponentId = pids.find((id) => id !== socket.id);
       const opponent = opponentId ? this.gameState.players[opponentId] : null;
+      const catalogItem = SHOP_ITEM_BY_ID.get(itemId);
+      const resolvedCost = catalogItem
+        ? getPricingView(itemId, buyer.shop.pricing?.[itemId], this.gameState.tick).currentPrice
+        : undefined;
       const accepted = applyShopPurchase(this.gameState, buyer, opponent, itemId, this.playerRng(socket.id));
-      const cost = SHOP_ITEM_BY_ID.get(itemId)?.cost;
       this.recordReplayInput({
         tick: this.gameState.tick,
         playerId: socket.id,
         kind: 'shopPurchase',
         itemId,
         accepted,
-        ...(cost === undefined ? {} : { cost }),
+        ...(resolvedCost === undefined ? {} : { cost: resolvedCost }),
       });
       // Flush immediately so cascade / pills aren't held back by the 30Hz netcast.
       this.io.emit('gameState', this.gameState);
@@ -289,6 +293,7 @@ export class GameManager {
           version: 2,
           date: replayDateLabel(),
           seed: this.gameState.seed,
+          pricingPolicyVersion: PRICING_POLICY_VERSION,
           playerSlots: Object.fromEntries(this.playerSlots.entries()),
           keyframeIntervalTicks: this.replayKeyframeIntervalTicks,
           initialState: JSON.parse(JSON.stringify(this.gameState)),

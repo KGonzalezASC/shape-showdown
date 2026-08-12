@@ -44,18 +44,21 @@ const MobileControls: React.FC<MobileControlsProps> = ({ onInput, onAction, onSh
     onShopPress?.();
   };
 
+  const movementButtonClass = 'h-[46px] w-[46px] select-none touch-none rounded-full border bg-[#1b1e1e] text-lg font-black text-zinc-200 [-webkit-touch-callout:none] [-webkit-tap-highlight-color:transparent] active:bg-[#2a2f2f] min-[661px]:h-[56px] min-[661px]:w-[56px] min-[661px]:text-2xl';
+  const actionButtonClass = 'h-[52px] w-[52px] select-none touch-none rounded-full border bg-[#1b1e1e] text-[8px] font-extrabold tracking-wide text-zinc-200 [-webkit-touch-callout:none] [-webkit-tap-highlight-color:transparent] active:bg-[#2a2f2f] min-[661px]:h-[62px] min-[661px]:w-[62px] min-[661px]:text-[10px]';
+
   return (
     <div
       ref={rootRef}
       onContextMenu={(e) => e.preventDefault()}
-      className="mt-auto shrink-0 select-none touch-none [-webkit-touch-callout:none] [-webkit-tap-highlight-color:transparent] md:hidden"
+      className="relative z-10 mt-auto shrink-0 select-none touch-none [-webkit-touch-callout:none] [-webkit-tap-highlight-color:transparent] min-[901px]:hidden"
     >
-      <div className="mx-auto flex w-full max-w-md items-end justify-between gap-3 px-3 pb-[max(0.85rem,env(safe-area-inset-bottom))]">
-        <div className="grid grid-cols-3 grid-rows-2 gap-2">
+      <div className="mx-auto flex min-h-[108px] w-full max-w-[460px] items-end justify-between gap-3 px-1.5 pt-2.5 pb-[max(0.5rem,env(safe-area-inset-bottom))] min-[661px]:min-h-[164px] min-[661px]:max-w-[660px] min-[661px]:gap-5 min-[661px]:px-6 min-[661px]:pt-3.5">
+        <div className="grid grid-cols-3 grid-rows-2 gap-[5px] min-[661px]:gap-[10px]">
           <div />
           <button
             type="button"
-            className="h-14 w-14 select-none touch-none rounded-full border-2 [-webkit-touch-callout:none] [-webkit-tap-highlight-color:transparent]border-emerald-300/70 bg-emerald-500/20 text-xl font-black text-emerald-200 shadow-[0_0_20px_rgba(16,185,129,0.3)] active:scale-95 active:bg-emerald-500/40"
+            className={`${movementButtonClass} border-[#748e86] text-emerald-100`}
             onTouchStart={tapAction('hardDrop')}
           >
             ↑
@@ -63,7 +66,7 @@ const MobileControls: React.FC<MobileControlsProps> = ({ onInput, onAction, onSh
           <div />
           <button
             type="button"
-            className="h-14 w-14 select-none touch-none rounded-full border-2 [-webkit-touch-callout:none] [-webkit-tap-highlight-color:transparent]border-yellow-300/90 bg-yellow-400/25 text-2xl font-black text-yellow-100 shadow-[0_0_22px_rgba(250,204,21,0.35)] active:scale-95 active:bg-yellow-400/45"
+            className={`${movementButtonClass} border-[#6b7061]`}
             onTouchStart={holdInput({ left: true, right: false, softDrop: false })}
             onTouchEnd={releaseInput}
             onTouchCancel={releaseInput}
@@ -72,7 +75,7 @@ const MobileControls: React.FC<MobileControlsProps> = ({ onInput, onAction, onSh
           </button>
           <button
             type="button"
-            className="h-14 w-14 select-none touch-none rounded-full border-2 [-webkit-touch-callout:none] [-webkit-tap-highlight-color:transparent]border-sky-300/70 bg-sky-500/20 text-xl font-black text-sky-100 shadow-[0_0_20px_rgba(56,189,248,0.35)] active:scale-95 active:bg-sky-500/40"
+            className={`${movementButtonClass} border-[#748e86] text-cyan-100`}
             onTouchStart={holdInput({ left: false, right: false, softDrop: true })}
             onTouchEnd={releaseInput}
             onTouchCancel={releaseInput}
@@ -81,7 +84,7 @@ const MobileControls: React.FC<MobileControlsProps> = ({ onInput, onAction, onSh
           </button>
           <button
             type="button"
-            className="h-14 w-14 select-none touch-none rounded-full border-2 [-webkit-touch-callout:none] [-webkit-tap-highlight-color:transparent]border-yellow-300/90 bg-yellow-400/25 text-2xl font-black text-yellow-100 shadow-[0_0_22px_rgba(250,204,21,0.35)] active:scale-95 active:bg-yellow-400/45"
+            className={`${movementButtonClass} border-[#6b7061]`}
             onTouchStart={holdInput({ left: false, right: true, softDrop: false })}
             onTouchEnd={releaseInput}
             onTouchCancel={releaseInput}
@@ -89,31 +92,31 @@ const MobileControls: React.FC<MobileControlsProps> = ({ onInput, onAction, onSh
             →
           </button>
         </div>
-        <div className="grid grid-cols-2 gap-2">
+        <div className="grid grid-cols-2 gap-[5px] min-[661px]:gap-x-4 min-[661px]:gap-y-3">
           <button
             type="button"
-            className="h-14 w-14 select-none touch-none rounded-full border-2 [-webkit-touch-callout:none] [-webkit-tap-highlight-color:transparent]border-fuchsia-300/70 bg-fuchsia-500/20 text-[10px] font-extrabold tracking-wide text-fuchsia-100 shadow-[0_0_18px_rgba(217,70,239,0.35)] active:scale-95 active:bg-fuchsia-500/45"
+            className={`${actionButtonClass} border-[#745d7d]`}
             onTouchStart={tapAction('hold')}
           >
             STORAGE
           </button>
           <button
             type="button"
-            className="h-14 w-14 select-none touch-none rounded-full border-2 [-webkit-touch-callout:none] [-webkit-tap-highlight-color:transparent]border-cyan-300/70 bg-cyan-500/20 text-[10px] font-extrabold tracking-wide text-cyan-100 shadow-[0_0_18px_rgba(56,189,248,0.35)] active:scale-95 active:bg-cyan-500/45"
+            className={`${actionButtonClass} border-[#557984]`}
             onTouchStart={tapShop}
           >
             SHOP
           </button>
           <button
             type="button"
-            className="h-14 w-14 select-none touch-none rounded-full border-2 [-webkit-touch-callout:none] [-webkit-tap-highlight-color:transparent]border-amber-300/80 bg-amber-500/20 text-xs font-extrabold tracking-wide text-amber-100 shadow-[0_0_18px_rgba(245,158,11,0.35)] active:scale-95 active:bg-amber-500/45"
+            className={`${actionButtonClass} border-[#907b59]`}
             onTouchStart={tapAction('rotateCCW')}
           >
             CCW
           </button>
           <button
             type="button"
-            className="h-14 w-14 select-none touch-none rounded-full border-2 [-webkit-touch-callout:none] [-webkit-tap-highlight-color:transparent]border-amber-300/80 bg-amber-500/20 text-xs font-extrabold tracking-wide text-amber-100 shadow-[0_0_18px_rgba(245,158,11,0.35)] active:scale-95 active:bg-amber-500/45"
+            className={`${actionButtonClass} border-[#907b59]`}
             onTouchStart={tapAction('rotateCW')}
           >
             CW

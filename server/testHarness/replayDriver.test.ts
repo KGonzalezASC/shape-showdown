@@ -7,6 +7,7 @@ import type { ReplayDataV2 } from '../../src/types.js';
 import { EventEmitter } from 'node:events';
 import { createPlayerRngChannels } from '../../src/rng.js';
 import { makePlayer } from '../tetris/engine.js';
+import { PRICING_POLICY_VERSION } from '../../src/shop/shopPricing.js';
 
 class FakeSocket extends EventEmitter {
   id: string;
@@ -139,5 +140,123 @@ describe('Replay Driver & Replay Matcher', () => {
     assert.ok(res.divergence);
     assert.equal(res.divergence?.diverged, true);
     assert.ok(res.divergence?.reason?.includes('acceptance mismatch'));
+  });
+
+  it('plays legacy replays with their recorded base-price override', () => {
+    const seed = 456;
+    const channels = createPlayerRngChannels(seed, 0);
+    const p1 = makePlayer('p1', channels);
+    p1.funds = 110;
+    p1.shop.offerIds = ['nova-charge'];
+    p1.shop.phase = 'cycling';
+    p1.shop.cycleIndex = 0;
+
+    const replayTape: ReplayDataV2 = {
+      version: 2,
+      date: 'legacy-pricing-test',
+      seed,
+      playerSlots: { p1: 0 },
+      initialState: {
+        players: { p1 },
+        status: 'playing',
+        countdown: 0,
+        remainingTime: 120,
+        winnerId: null,
+        tick: 0,
+        seed,
+      },
+      inputs: [
+        {
+          tick: 1,
+          playerId: 'p1',
+          kind: 'shopPurchase',
+          itemId: 'nova-charge',
+          accepted: true,
+          cost: 110,
+        },
+      ],
+      keyframes: [{ tick: 1, players: { p1 } }],
+      events: [],
+    };
+
+    const result = replayMatch(replayTape, { strictReplayMode: true });
+    assert.equal(result.divergence, undefined);
+    assert.equal(result.gameState.players.p1.funds, 0);
+    assert.equal(result.gameState.players.p1.shop.pricing['nova-charge'].level, 0);
+  });
+
+  it('replays dynamic purchases at the recorded policy price', () => {
+    const seed = 789;
+    const channels = createPlayerRngChannels(seed, 0);
+    const p1 = makePlayer('p1', channels);
+    p1.funds = 300;
+    p1.shop.offerIds = ['nova-charge'];
+    p1.shop.phase = 'cycling';
+    p1.shop.cycleIndex = 0;
+    p1.shop.pricing['nova-charge'] = {
+      level: 2,
+      purchasesInWindow: 0,
+      windowStartedAtTick: null,
+    };
+
+    const replayTape: ReplayDataV2 = {
+      version: 2,
+      date: 'dynamic-pricing-test',
+      seed,
+      pricingPolicyVersion: PRICING_POLICY_VERSION,
+      playerSlots: { p1: 0 },
+      initialState: {
+        players: { p1 },
+        status: 'playing',
+        countdown: 0,
+        remainingTime: 120,
+        winnerId: null,
+        tick: 0,
+        seed,
+      },
+      inputs: [
+        {
+          tick: 1,
+          playerId: 'p1',
+          kind: 'shopPurchase',
+          itemId: 'nova-charge',
+          accepted: true,
+          cost: 300,
+        },
+      ],
+      keyframes: [{ tick: 1, players: { p1 } }],
+      events: [],
+    };
+
+    const result = replayMatch(replayTape, { strictReplayMode: true });
+    assert.equal(result.divergence, undefined);
+    assert.equal(result.gameState.players.p1.funds, 0);
+    assert.equal(result.gameState.players.p1.shop.pricing['nova-charge'].level, 2);
+  });
+
+  it('rejects an unknown replay pricing policy instead of treating it as legacy', () => {
+    const seed = 790;
+    const channels = createPlayerRngChannels(seed, 0);
+    const p1 = makePlayer('p1', channels);
+    const replayTape: ReplayDataV2 = {
+      version: 2,
+      date: 'unknown-pricing-test',
+      seed,
+      pricingPolicyVersion: 'future-policy',
+      initialState: {
+        players: { p1 },
+        status: 'playing',
+        countdown: 0,
+        remainingTime: 120,
+        winnerId: null,
+        tick: 0,
+        seed,
+      },
+      inputs: [],
+      keyframes: [],
+      events: [],
+    };
+
+    assert.throws(() => replayMatch(replayTape), /Unsupported replay pricing policy/);
   });
 });

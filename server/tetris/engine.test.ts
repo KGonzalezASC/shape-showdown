@@ -305,20 +305,21 @@ describe('tetris engine', () => {
     applyMagnetToOpponent(player);
     applyMagnetToOpponent(player);
     assert.equal(player.magnetPermanentStacks, 2);
-    assert.equal(magnetGravityLevel(player), 4);
-    assert.equal(player.magnetPieceBoost, 0);
-
-    applyMagnetToOpponent(player);
-    assert.equal(player.magnetPermanentStacks, 3);
-    assert.equal(magnetGravityLevel(player), 6);
-    applyMagnetToOpponent(player);
-    assert.equal(player.magnetPermanentStacks, 3);
-    assert.equal(player.magnetPieceBoost, 1);
-    assert.equal(magnetGravityLevel(player), 7);
-
-    applyMagnetToOpponent(player);
     assert.equal(player.magnetPieceBoost, 2);
-    assert.equal(magnetGravityLevel(player), 8);
+    assert.equal(magnetGravityLevel(player), 6);
+
+    applyMagnetToOpponent(player);
+    assert.equal(player.magnetPermanentStacks, 3);
+    assert.equal(player.magnetPieceBoost, 3);
+    assert.equal(magnetGravityLevel(player), 9);
+    applyMagnetToOpponent(player);
+    assert.equal(player.magnetPermanentStacks, 3);
+    assert.equal(player.magnetPieceBoost, 4);
+    assert.equal(magnetGravityLevel(player), 10);
+
+    applyMagnetToOpponent(player);
+    assert.equal(player.magnetPieceBoost, 5);
+    assert.equal(magnetGravityLevel(player), 11);
     assert.equal(gravityTicksPerCellFor(player), 12); // floor at max combined level
   });
 

@@ -4,10 +4,18 @@ import { AnimatePresence, LazyMotion, domAnimation, m } from 'motion/react';
 import { DrillConsole, DrillResult } from './components/DrillConsole';
 import { MatchChrome } from './components/MatchChrome';
 import { PlayfieldShell } from './components/PlayfieldShell';
+import { fitMobilePlayfieldCellSize } from './components/PlayfieldCellSizer';
 import { ShopRailVariations } from './components/ShopRailVariations';
 import MobileControls from './components/MobileControls';
 import { GameFieldRef } from './components/GameField';
 import { BackgroundPrototype } from './components/BackgroundPrototype';
+import {
+  BG_BLUR_IDLE,
+  BG_BLUR_MATCH,
+  BG_SCRIM_IDLE,
+  BG_SCRIM_MATCH,
+  DispersedVoronoiBackground,
+} from './components/DispersedVoronoiBackground';
 import { DEV_TOOLS_ENABLED } from './devTools';
 import { useLockDrill } from './hooks/useLockDrill';
 import { useShopConfirm } from './hooks/useShopConfirm';
@@ -20,7 +28,7 @@ import {
   useMyId,
   usePlayfieldSnapshot,
 } from './state/GameStateProvider';
-import { ActionType, BOARD_COLS, BOARD_VISIBLE_ROWS } from './types';
+import { ActionType, COUNTDOWN_SECONDS } from './types';
 
 interface DrillState {
   enabled: boolean;
@@ -50,6 +58,7 @@ const AppShell: React.FC = () => {
   const gameState = useGameState();
   const myId = useMyId();
   const playfield = usePlayfieldSnapshot();
+  const hasLocalPlayer = Boolean(playfield.myPlayer);
   const chrome = useMatchChromeSnapshot();
   const { sendAction, sendInputState } = useGameActions();
   const handleShopConfirm = useShopConfirm();
@@ -60,6 +69,7 @@ const AppShell: React.FC = () => {
   }, [playfield, myId]);
 
   const mobilePlayfieldRef = useRef<HTMLDivElement>(null);
+  const mobileBoardFitRef = useRef<HTMLDivElement>(null);
   const railRef = useRef<HTMLDivElement>(null);
   const [mobileCellSize, setMobileCellSize] = useState(28);
   const [showVariations, setShowVariations] = useState(() => (
@@ -69,6 +79,9 @@ const AppShell: React.FC = () => {
   ));
   const [hatchingEnabled, setHatchingEnabled] = useState(false);
   const [drill, drillDispatch] = useReducer(drillReducer, { enabled: false, result: null });
+  const [bgSeedKey, setBgSeedKey] = useState(0);
+  const lastShopPurchaseRef = useRef<string | null | undefined>(undefined);
+  const lastCountdownDigitRef = useRef<number | null>(null);
 
   const myMobileFieldRef = useRef<GameFieldRef>(null);
   const myDesktopFieldRef = useRef<GameFieldRef>(null);
@@ -122,32 +135,21 @@ const AppShell: React.FC = () => {
   );
 
   useLayoutEffect(() => {
-    const outer = mobilePlayfieldRef.current;
-    if (!outer) return;
+    const boardSlot = mobileBoardFitRef.current;
+    if (!boardSlot) return;
     const measure = () => {
-      const ob = outer.getBoundingClientRect();
+      const ob = boardSlot.getBoundingClientRect();
       if (ob.width < 8 || ob.height < 8) return;
-      const scale = (parseFloat(getComputedStyle(document.documentElement).fontSize) || 16) / 16;
-      // Keep the board footprint independent of shop content. The first line
-      // clear adds the Start button, which can create a rail scrollbar; using
-      // the measured rail width here made every board cell shrink in response.
-      const railW = 92 * scale; // ShopRail mobile width: 5.75rem
-      const boardChromeReserve = 118 * scale;
-      const GAP_AND_SAFETY = 16;
-      const availW = ob.width - railW - GAP_AND_SAFETY;
-      const fromW = availW / BOARD_COLS;
-      const fromH = (ob.height - boardChromeReserve) / BOARD_VISIBLE_ROWS;
-      const c = Math.floor(Math.min(fromW, fromH));
-      setMobileCellSize((prev) => {
-        const next = Math.max(8, Math.min(48, c));
-        return prev !== next ? next : prev;
-      });
+      const next = fitMobilePlayfieldCellSize(
+        { width: ob.width, height: ob.height },
+      );
+      setMobileCellSize((prev) => (prev === next ? prev : next));
     };
     measure();
     const ro = new ResizeObserver(measure);
-    ro.observe(outer);
+    ro.observe(boardSlot);
     return () => ro.disconnect();
-  }, [connected]);
+  }, [connected, hasLocalPlayer]);
 
   useEffect(() => {
     if (!drill.result) return;
@@ -248,47 +250,87 @@ const AppShell: React.FC = () => {
     }
   }, [chrome.lastMatchEvent, myId, triggerShake]);
 
+  const isPlaying = chrome.status === 'playing';
+  const bgScrimOpacity = isPlaying ? BG_SCRIM_MATCH : BG_SCRIM_IDLE;
+  const bgBlur = isPlaying ? BG_BLUR_MATCH : BG_BLUR_IDLE;
+
+  useEffect(() => {
+    const purchasedId = chrome.shopLastPurchasedItemId;
+    const prev = lastShopPurchaseRef.current;
+    lastShopPurchaseRef.current = purchasedId;
+    // Skip the first observe so reconnect/hydrate does not reseed.
+    // Reseed only when a purchase lands (null→id or id→other id), not when the shop clears.
+    if (prev === undefined) return;
+    if (purchasedId && purchasedId !== prev) {
+      setBgSeedKey((key) => key + 1);
+    }
+  }, [chrome.shopLastPurchasedItemId]);
+
+  // Reseed once per displayed 3→2→1 digit (not every float tick — that cancels mid-generate).
+  // Post-match restart uses ended + restartTimer, not countdown status.
+  useEffect(() => {
+    if (chrome.status !== 'countdown') {
+      lastCountdownDigitRef.current = null;
+      return;
+    }
+    const digit = Math.ceil(chrome.countdown);
+    if (digit < 1 || digit > COUNTDOWN_SECONDS) return;
+    if (lastCountdownDigitRef.current === digit) return;
+    lastCountdownDigitRef.current = digit;
+    setBgSeedKey((key) => key + 1);
+  }, [chrome.status, chrome.countdown]);
+
   if (showVariations) {
     return <ShopRailVariations onClose={() => setShopMockVisibility(false)} />;
   }
 
-  if (!connected) {
-    return (
-      <div className="flex h-dvh items-center justify-center bg-[#0a0a0f] text-white">
-        <div className="flex flex-col items-center gap-4">
+  return (
+    <div className="relative flex h-dvh max-h-dvh min-h-0 flex-col items-center justify-center overflow-hidden p-[5px] font-sans text-white min-[661px]:p-3">
+      <DispersedVoronoiBackground
+        scrimOpacity={bgScrimOpacity}
+        blur={bgBlur}
+        seedKey={bgSeedKey}
+      />
+
+      {!connected ? (
+        <div className="relative z-10 flex flex-1 flex-col items-center justify-center gap-4">
           <div className="w-12 h-12 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin" />
           <p className="font-mono text-sm tracking-widest uppercase animate-pulse">Connecting to Game Server...</p>
         </div>
-      </div>
-    );
-  }
+      ) : (
+        <>
+          <main className="relative z-10 flex h-[min(820px,calc(100dvh-10px))] min-h-[500px] w-full max-w-[430px] flex-col overflow-hidden border border-[#252929] bg-[#111313]/95 p-1.5 shadow-2xl min-[661px]:h-[min(820px,calc(100dvh-24px))] min-[661px]:max-w-[820px] min-[661px]:p-2.5 min-[901px]:max-w-[1180px]">
+            <MatchChrome />
+            {DEV_TOOLS_ENABLED && drill.enabled && gameState && myId && gameState.players[myId] && (
+              <DrillConsole
+                player={gameState.players[myId]}
+                enabled={drill.enabled}
+                onToggle={() => drillDispatch({ type: 'TOGGLE' })}
+                result={drill.result}
+              />
+            )}
 
-  return (
-    <div className="flex h-dvh max-h-dvh min-h-0 flex-col overflow-hidden bg-[#0a0a0a] px-2 py-2 font-sans text-white sm:px-4 sm:py-3">
-      <MatchChrome />
-      {DEV_TOOLS_ENABLED && gameState && myId && gameState.players[myId] && (
-        <DrillConsole
-          player={gameState.players[myId]}
-          enabled={drill.enabled}
-          onToggle={() => drillDispatch({ type: 'TOGGLE' })}
-          result={drill.result}
-        />
-      )}
-
-      <PlayfieldShell
-        mobilePlayfieldRef={mobilePlayfieldRef}
-        railRef={railRef}
-        mobileCellSize={mobileCellSize}
-        myMobileFieldRef={myMobileFieldRef}
-        myDesktopFieldRef={myDesktopFieldRef}
-        oppDesktopFieldRef={oppDesktopFieldRef}
-        hatchingEnabled={DEV_TOOLS_ENABLED && hatchingEnabled}
-        onToggleHatching={
-          DEV_TOOLS_ENABLED
-            ? () => setHatchingEnabled((enabled) => !enabled)
-            : undefined
-        }
-      />
+            <PlayfieldShell
+              mobilePlayfieldRef={mobilePlayfieldRef}
+              mobileBoardFitRef={mobileBoardFitRef}
+              railRef={railRef}
+              mobileCellSize={mobileCellSize}
+              myMobileFieldRef={myMobileFieldRef}
+              myDesktopFieldRef={myDesktopFieldRef}
+              oppDesktopFieldRef={oppDesktopFieldRef}
+              hatchingEnabled={DEV_TOOLS_ENABLED && hatchingEnabled}
+              onToggleHatching={
+                DEV_TOOLS_ENABLED
+                  ? () => setHatchingEnabled((enabled) => !enabled)
+                  : undefined
+              }
+            />
+            <MobileControls
+              onInput={sendInputState}
+              onAction={handleAction}
+              onShopPress={handleShopConfirm}
+            />
+          </main>
 
       <LazyMotion features={domAnimation}>
         <AnimatePresence>
@@ -344,38 +386,8 @@ const AppShell: React.FC = () => {
         </AnimatePresence>
       </LazyMotion>
 
-      <div className="pointer-events-none fixed bottom-2 left-2 z-30 hidden md:flex flex-col gap-1 md:bottom-8 md:left-8 md:gap-2">
-        <div className="flex items-center gap-2 text-zinc-500 sm:gap-3">
-          <kbd className="rounded border border-white/5 bg-zinc-800 px-1.5 py-0.5 font-mono text-[10px] sm:px-2 sm:py-1 sm:text-xs">←</kbd>
-          <kbd className="rounded border border-white/5 bg-zinc-800 px-1.5 py-0.5 font-mono text-[10px] sm:px-2 sm:py-1 sm:text-xs">→</kbd>
-          <span className="text-[9px] font-bold uppercase tracking-widest sm:text-[10px]">Move</span>
-        </div>
-        <div className="flex items-center gap-2 text-zinc-500 sm:gap-3">
-          <kbd className="rounded border border-white/5 bg-zinc-800 px-2 py-0.5 font-mono text-[10px] sm:px-4 sm:py-1 sm:text-xs">↓</kbd>
-          <span className="text-[9px] font-bold uppercase tracking-widest sm:text-[10px]">Soft Drop</span>
-        </div>
-        <div className="flex items-center gap-2 text-zinc-500 sm:gap-3">
-          <kbd className="rounded border border-white/5 bg-zinc-800 px-2 py-0.5 font-mono text-[10px] sm:px-4 sm:py-1 sm:text-xs">↑</kbd>
-          <span className="text-[9px] font-bold uppercase tracking-widest sm:text-[10px]">Hard Drop</span>
-        </div>
-        <div className="flex items-center gap-2 text-zinc-500 sm:gap-3">
-          <kbd className="rounded border border-white/5 bg-zinc-800 px-2 py-0.5 font-mono text-[10px] sm:px-4 sm:py-1 sm:text-xs">Z / X</kbd>
-          <span className="text-[9px] font-bold uppercase tracking-widest sm:text-[10px]">Rotate</span>
-        </div>
-        <div className="flex items-center gap-2 text-zinc-500 sm:gap-3">
-          <kbd className="rounded border border-white/5 bg-zinc-800 px-2 py-0.5 font-mono text-[10px] sm:px-4 sm:py-1 sm:text-xs">SHIFT</kbd>
-          <span className="text-[9px] font-bold uppercase tracking-widest sm:text-[10px]">Storage</span>
-        </div>
-        <div className="flex items-center gap-2 text-zinc-500 sm:gap-3">
-          <kbd className="rounded border border-white/5 bg-zinc-800 px-2 py-0.5 font-mono text-[10px] sm:px-4 sm:py-1 sm:text-xs">C</kbd>
-          <span className="text-[9px] font-bold uppercase tracking-widest sm:text-[10px]">Shop</span>
-        </div>
-      </div>
-      <MobileControls
-        onInput={sendInputState}
-        onAction={handleAction}
-        onShopPress={handleShopConfirm}
-      />
+        </>
+      )}
     </div>
   );
 };

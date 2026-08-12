@@ -1,4 +1,4 @@
-import { GameState, MatchEvent, MatchStatus, ShopPhase } from '../types';
+import { GameState, MatchEvent, MatchStatus, PlayerShopState, ShopPhase } from '../types';
 import {
   PublicPlayerState,
   publicPlayersEqual,
@@ -9,14 +9,18 @@ export interface MatchChromeSnapshot {
   status: MatchStatus;
   countdown: number;
   remainingTime: number;
+  tick: number;
   myId: string | null;
   myScore: number;
   oppScore: number;
-  availableShopScore: number;
+  myFunds: number;
+  oppFunds: number;
+  availableFunds: number;
   shopOfferIds: string[];
   shopPhase: ShopPhase;
   shopCycleIndex: number;
   shopLastPurchasedItemId: string | null;
+  shopPricing: PlayerShopState['pricing'];
   playerCount: number;
   lastMatchEvent: MatchEvent | null;
   winnerId: string | null;
@@ -49,14 +53,18 @@ function emptyChromeSnapshot(): MatchChromeSnapshot {
     status: 'waiting',
     countdown: 0,
     remainingTime: 0,
+    tick: 0,
     myId: null,
     myScore: 0,
     oppScore: 0,
-    availableShopScore: 0,
+    myFunds: 0,
+    oppFunds: 0,
+    availableFunds: 0,
     shopOfferIds: [],
     shopPhase: 'waiting',
     shopCycleIndex: -1,
     shopLastPurchasedItemId: null,
+    shopPricing: {},
     playerCount: 0,
     lastMatchEvent: null,
     winnerId: null,
@@ -84,14 +92,18 @@ function buildChromeSnapshot(): MatchChromeSnapshot {
     status: gameState.status,
     countdown: gameState.countdown,
     remainingTime: gameState.remainingTime,
+    tick: gameState.tick,
     myId,
     myScore: me?.score ?? 0,
     oppScore: opponent?.score ?? 0,
-    availableShopScore: me?.score ?? 0,
+    myFunds: me ? (me.funds ?? me.score ?? 0) : 0,
+    oppFunds: opponent ? (opponent.funds ?? opponent.score ?? 0) : 0,
+    availableFunds: me ? (me.funds ?? me.score ?? 0) : 0,
     shopOfferIds: shop?.offerIds ?? [],
     shopPhase: shop?.phase ?? 'waiting',
     shopCycleIndex: shop?.cycleIndex ?? -1,
     shopLastPurchasedItemId: shop?.lastPurchasedItemId ?? null,
+    shopPricing: shop?.pricing ?? {},
     playerCount: Object.keys(gameState.players).length,
     lastMatchEvent,
     winnerId: gameState.winnerId,
@@ -119,13 +131,30 @@ function chromeSnapshotsEqual(a: MatchChromeSnapshot, b: MatchChromeSnapshot): b
   if (a.status !== b.status) return false;
   if (a.countdown !== b.countdown) return false;
   if (a.remainingTime !== b.remainingTime) return false;
+  if (a.tick !== b.tick) return false;
   if (a.myId !== b.myId) return false;
   if (a.myScore !== b.myScore) return false;
   if (a.oppScore !== b.oppScore) return false;
-  if (a.availableShopScore !== b.availableShopScore) return false;
+  if (a.myFunds !== b.myFunds) return false;
+  if (a.oppFunds !== b.oppFunds) return false;
+  if (a.availableFunds !== b.availableFunds) return false;
   if (a.shopPhase !== b.shopPhase) return false;
   if (a.shopCycleIndex !== b.shopCycleIndex) return false;
   if (a.shopLastPurchasedItemId !== b.shopLastPurchasedItemId) return false;
+  const aPricing = a.shopPricing;
+  const bPricing = b.shopPricing;
+  const pricingIds = new Set([...Object.keys(aPricing), ...Object.keys(bPricing)]);
+  for (const itemId of pricingIds) {
+    const left = aPricing[itemId];
+    const right = bPricing[itemId];
+    if (!left || !right) return false;
+    if (
+      left.level !== right.level ||
+      left.purchasesInWindow !== right.purchasesInWindow ||
+      left.windowStartedAtTick !== right.windowStartedAtTick ||
+      left.lastWindowClosedBy !== right.lastWindowClosedBy
+    ) return false;
+  }
   if (a.playerCount !== b.playerCount) return false;
   if (a.winnerId !== b.winnerId) return false;
   if (a.technicalVictory !== b.technicalVictory) return false;

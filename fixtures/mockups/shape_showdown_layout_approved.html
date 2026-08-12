@@ -1,0 +1,657 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Shape Showdown Approved Responsive Layout</title>
+  <style>
+    /* PROTOTYPE: explicit phone/tablet/desktop compositions. No game UI may overlap a board. */
+    :root {
+      color-scheme: dark;
+      --bg: #111313;
+      --panel: #171919;
+      --panel-2: #101212;
+      --line: #303535;
+      --muted: #858b8b;
+      --text: #d9dddd;
+      --mine: #19c997;
+      --opp: #ed5577;
+      --shop: #8db2ba;
+      --amber: #d7a947;
+      font-family: Arial, Helvetica, sans-serif;
+    }
+
+    * { box-sizing: border-box; }
+    html, body { min-height: 100%; }
+    body {
+      margin: 0;
+      background: #090a0a;
+      color: var(--text);
+      overflow-x: auto;
+      overflow-y: auto;
+    }
+
+    button { font: inherit; }
+    .game-button:focus-visible,
+    .prototype-button:focus-visible,
+    .shop-action:focus-visible { outline: 2px solid var(--text); outline-offset: 2px; }
+
+    .page {
+      align-items: center;
+      display: flex;
+      min-height: 100dvh;
+      justify-content: center;
+      padding: clamp(5px, 2vw, 12px) clamp(5px, 2vw, 12px) max(84px, calc(env(safe-area-inset-bottom) + 72px));
+    }
+
+    .screen {
+      background-color: var(--bg);
+      background-image:
+        radial-gradient(circle, rgba(105, 117, 117, .18) 1px, transparent 1.5px),
+        radial-gradient(circle, rgba(23, 201, 151, .16) 1px, transparent 1.5px),
+        radial-gradient(circle, rgba(237, 85, 119, .12) 1px, transparent 1.5px);
+      background-position: 0 0, 23px 31px, 61px 17px;
+      background-size: 8px 8px, 83px 71px, 97px 89px;
+      border: 1px solid #252929;
+      display: grid;
+      grid-template-rows: auto minmax(0, 1fr) auto;
+      height: min(820px, calc(100dvh - 96px));
+      max-width: 1180px;
+      min-height: 0;
+      overflow: visible;
+      padding: 10px;
+      width: 100%;
+    }
+
+    .screen[data-mode="phone"] { max-width: 430px; }
+    .screen[data-mode="tablet"] { max-width: 820px; }
+
+    .match-state {
+      color: #a2a7a7;
+      font-size: clamp(0.5625rem, calc(0.4375rem + 1vw), 0.6875rem);
+      font-weight: 700;
+      letter-spacing: .02em;
+      padding: 2px 0 8px;
+      text-align: center;
+    }
+
+    .play-area {
+      display: grid;
+      gap: 12px;
+      min-height: 0;
+      overflow: visible;
+    }
+
+    .field,
+    .shop {
+      background: rgba(18, 20, 20, .96);
+      border: 1px solid var(--line);
+      min-width: 0;
+      min-height: 0;
+    }
+
+    .field {
+      display: grid;
+      grid-template-rows: auto minmax(0, 1fr) auto;
+      overflow: visible;
+    }
+
+    .field.mine { border-color: rgba(25, 201, 151, .42); }
+    .field.opponent { border-color: rgba(237, 85, 119, .38); }
+
+    .field-head { padding: 8px 9px 7px; }
+    .title-row { align-items: center; display: flex; justify-content: space-between; gap: 8px; }
+    .field-title { font-size: clamp(0.625rem, calc(0.5rem + 1vw), 0.75rem); font-weight: 900; letter-spacing: .1em; text-transform: uppercase; }
+    .mine .field-title { color: var(--mine); }
+    .opponent .field-title { color: var(--opp); }
+    .clears { color: var(--muted); font: clamp(0.5rem, calc(0.4375rem + .5vw), 0.5625rem) Consolas, monospace; white-space: nowrap; }
+
+    .player-data {
+      color: var(--muted);
+      display: flex;
+      font: clamp(0.5rem, calc(0.4375rem + .5vw), 0.5625rem) Consolas, monospace;
+      gap: 10px;
+      margin-top: 4px;
+      text-transform: uppercase;
+    }
+    .player-data strong { color: var(--text); }
+
+    .status-line {
+      align-items: center;
+      border-top: 1px solid #2a2e2e;
+      color: #a2a7a7;
+      display: flex;
+      justify-content: space-between;
+      margin-top: 7px;
+      padding-top: 6px;
+    }
+    .garbage-count { align-items: center; display: inline-flex; gap: 4px; }
+    .garbage-count span { font-size: 0.6875rem; line-height: 1; }
+    .garbage-count strong { color: #f0f2f2; font: 700 0.75rem Consolas, monospace; }
+    .garbage-flow { align-items: center; display: flex; gap: 8px; }
+    .garbage-flow-item { align-items: center; display: inline-flex; gap: 4px; }
+    .garbage-flow-item strong { color: #f0f2f2; font: 700 0.75rem Consolas, monospace; }
+    .garbage-separator { color: #626969; font: 0.625rem Consolas, monospace; }
+    .garbage-direction-icon { display: inline-block; height: 17px; position: relative; width: 19px; }
+    .garbage-direction-icon .trash { bottom: -1px; font-size: 0.75rem; line-height: 1; position: absolute; right: 0; }
+    .garbage-direction-icon .arrow { font: 900 0.75rem/1 Arial, sans-serif; left: 0; position: absolute; top: -1px; z-index: 1; }
+    .garbage-direction-icon.incoming .arrow { color: var(--opp); }
+    .garbage-direction-icon.outgoing .arrow { color: var(--mine); }
+    .permanent-effects { display: flex; gap: 4px; justify-content: flex-end; min-width: 0; }
+    .temporary-effects { align-items: center; display: flex; height: 22px; margin-top: 4px; min-width: 0; overflow-x: auto; overflow-y: hidden; }
+    .effect-pill {
+      align-items: center;
+      border: 1px solid #454c4c;
+      color: #d9dddd;
+      display: inline-flex;
+      font: 700 0.5rem Consolas, monospace;
+      gap: 3px;
+      max-width: 100%;
+      padding: 3px 5px;
+      white-space: nowrap;
+    }
+    .effect-pill.permanent { border-color: #78653f; color: #e5c176; }
+    .effect-pill.temporary { border-color: #58647d; color: #c3cbea; }
+    .opponent-effect-row { border-top: 1px solid #2a2e2e; height: 27px; padding-top: 4px; }
+    .screen[data-effects="none"] .effect-pill { visibility: hidden; }
+    .screen[data-effects="temporary"] .effect-pill.permanent { visibility: hidden; }
+
+    .board-box { display: flex; justify-content: center; min-height: 0; overflow: visible; padding: 0 8px; }
+    .board {
+      aspect-ratio: 10 / 18;
+      background-color: #0d0f0f;
+      background-image:
+        linear-gradient(#202424 1px, transparent 1px),
+        linear-gradient(90deg, #202424 1px, transparent 1px);
+      background-size: 10% 5.555%;
+      border: 1px solid #2d3232;
+      height: 100%;
+      max-width: 100%;
+      position: relative;
+    }
+    .board::after {
+      border-top: 2px dashed #d7dddd;
+      content: "";
+      left: 0;
+      position: absolute;
+      right: 0;
+      top: 55.5%;
+    }
+    .swap-label {
+      background: #080909;
+      color: #cfd3d3;
+      font: 0.4375rem Consolas, monospace;
+      padding: 2px 4px;
+      position: absolute;
+      right: 3px;
+      top: calc(55.5% - 8px);
+    }
+
+    .storage {
+      align-items: center;
+      display: flex;
+      justify-content: space-between;
+      min-height: 44px;
+      padding: 7px 9px;
+    }
+    .storage p { color: var(--muted); font-size: 0.5rem; line-height: 1.3; margin: 0; }
+    .storage strong { color: var(--mine); display: block; font-size: 0.5625rem; letter-spacing: .08em; }
+    .storage-slot { border: 1px solid #3a3f3f; color: #7c8383; font: 0.5rem Consolas, monospace; padding: 10px 5px; }
+
+    .utility {
+      display: grid;
+      gap: 8px;
+      grid-template-rows: auto minmax(0, 1fr);
+      min-height: 0;
+      overflow: visible;
+    }
+
+    .opponent-mini { min-height: 0; }
+    .opponent-mini .board-box { height: auto; overflow: visible; padding: 0 8px 8px; }
+    .opponent-mini .board { flex: 0 0 auto; height: 90px; width: 50px; }
+    .opponent-mini .storage { display: none; }
+    .opponent-mini .field-head { padding: 6px; }
+    .opponent-mini .field-title { font-size: 0.5rem; letter-spacing: .14em; }
+    .opponent-mini .status-line { margin-top: 5px; padding-top: 4px; }
+    .opponent-mini .effect-pill { font-size: 0.4375rem; padding: 2px 3px; }
+    .opponent-mini .temporary-effects { height: 18px; margin-top: 3px; }
+    .opponent-mini .status-line,
+    .opponent-mini .temporary-effects { display: none; }
+    .mini-effect-summary {
+      align-items: center;
+      display: flex;
+      gap: 3px;
+      height: 18px;
+      justify-content: flex-start;
+      overflow-x: auto;
+      overflow-y: hidden;
+    }
+
+    .shop { color: var(--text); overflow: auto; padding: 8px; }
+    .shop-top { align-items: baseline; border-bottom: 1px solid #303535; display: flex; justify-content: space-between; margin-bottom: 7px; padding-bottom: 6px; }
+    .shop-title { color: var(--shop); font-size: clamp(0.5rem, calc(0.375rem + 1vw), 0.625rem); font-weight: 900; letter-spacing: .12em; text-transform: uppercase; }
+    .wallet { color: var(--amber); font: 700 clamp(0.5rem, calc(0.4375rem + .5vw), 0.5625rem) Consolas, monospace; }
+    .shop-subtitle { color: var(--muted); font-size: clamp(0.4375rem, calc(0.375rem + .5vw), 0.5rem); margin: -2px 0 7px; }
+    .shop-list { display: grid; gap: 4px; }
+    .offer { align-items: center; background: #121414; border: 1px solid #292e2e; display: grid; gap: 4px; grid-template-columns: 14px minmax(0, 1fr) auto; min-height: 28px; padding: 4px 5px; }
+    .offer.selected { border-color: #5c777c; }
+    .offer-icon { color: #c3c9c9; font-size: 11px; }
+    .offer-name { font-size: clamp(0.4375rem, calc(0.375rem + .5vw), 0.5rem); font-weight: 800; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .offer-price { color: var(--amber); font: clamp(0.4375rem, calc(0.375rem + .5vw), 0.5rem) Consolas, monospace; }
+    .offer-meta { color: var(--muted); font: clamp(0.375rem, calc(0.3125rem + .5vw), 0.4375rem) Consolas, monospace; grid-column: 2 / -1; }
+    .shop-action { background: #343a3a; border: 1px solid #4a5151; color: #d2d6d6; font-size: clamp(0.4375rem, calc(0.375rem + .5vw), 0.5rem); font-weight: 900; margin-top: 7px; min-height: 36px; padding: 7px; text-transform: uppercase; width: 100%; }
+
+    .shop-variant { display: block; }
+
+    .detail { border-top: 1px solid #303535; margin-top: 7px; padding-top: 7px; }
+    .detail h3 { font-size: 0.625rem; margin: 0 0 4px; }
+    .detail p { color: var(--muted); font-size: 0.5rem; line-height: 1.35; margin: 0 0 6px; }
+    .facts { display: grid; gap: 4px; grid-template-columns: 1fr 1fr; }
+    .fact { background: #101212; border: 1px solid #292e2e; padding: 5px; }
+    .fact span { color: var(--muted); display: block; font-size: 0.4375rem; text-transform: uppercase; }
+    .fact strong { font: 0.5625rem Consolas, monospace; }
+    .tiers { display: flex; gap: 3px; overflow-x: auto; overflow-y: hidden; }
+    .tier { background: #101212; border: 1px solid #292e2e; flex: 1; min-width: 34px; padding: 5px 2px; text-align: center; }
+    .tier.active { border-color: #78939a; }
+    .tier span { color: var(--muted); display: block; font-size: 0.4375rem; }
+    .tier strong { color: var(--amber); font: 0.5rem Consolas, monospace; }
+
+    .touch-controls {
+      display: none;
+      min-height: 132px;
+      padding: 9px 3px 0;
+    }
+    .touch-controls-inner { align-items: end; display: flex; justify-content: space-between; margin: 0 auto; max-width: 460px; }
+    .move-pad { display: grid; gap: 5px; grid-template-columns: repeat(3, 46px); grid-template-rows: repeat(2, 46px); }
+    .action-pad { display: grid; gap: 5px; grid-template-columns: repeat(2, 52px); }
+    .game-button {
+      align-items: center;
+      background: #242828;
+      border: 1px solid #525959;
+      border-radius: 50%;
+      color: #e1e4e4;
+      display: flex;
+      font-size: clamp(1rem, 4vw, 1.125rem);
+      font-weight: 800;
+      height: 46px;
+      justify-content: center;
+      padding: 0;
+      width: 46px;
+    }
+    .game-button.action { border-radius: 50%; font-size: 0.5rem; height: 52px; width: 52px; }
+    .game-button.drop { border-color: #748e86; }
+    .game-button.rotate { border-color: #907b59; }
+    .game-button.shop-button { border-color: #557984; }
+    .game-button.storage-button { border-color: #745d7d; }
+
+    .keyboard-help {
+      align-self: end;
+      color: var(--muted);
+      display: grid;
+      font-size: 0.5rem;
+      gap: 5px;
+      padding-bottom: 6px;
+    }
+    .keyboard-help span { align-items: center; display: flex; gap: 6px; }
+    .keyboard-help kbd { background: #2a2d2d; border: 1px solid #373b3b; color: #aeb3b3; font: 0.5rem Consolas, monospace; min-width: 34px; padding: 4px; text-align: center; }
+
+    /* Phone: one board, compact utility rail, controls are a normal-flow bottom row. */
+    .screen[data-mode="phone"] .play-area { grid-template-columns: minmax(0, 1fr) 96px; }
+    .screen[data-mode="phone"] .player-field { grid-column: 1; }
+    .screen[data-mode="phone"] .utility { grid-column: 2; }
+    .screen[data-mode="phone"] .field-head { padding-left: 6px; padding-right: 6px; }
+    .screen[data-mode="phone"] .field-title { font-size: clamp(0.625rem, calc(0.5rem + 1vw), 0.75rem); }
+    .screen[data-mode="phone"] .player-data { display: grid; gap: 1px; }
+    .screen[data-mode="phone"] .shop { padding: 4px; }
+    .screen[data-mode="phone"] .shop-title { font-size: clamp(0.5rem, calc(0.375rem + 1vw), 0.625rem); }
+    .screen[data-mode="phone"] .wallet { font-size: clamp(0.4375rem, calc(0.375rem + .5vw), 0.5rem); }
+    .screen[data-mode="phone"] .offer { grid-template-columns: 14px minmax(0, 1fr); padding: 4px; }
+    .screen[data-mode="phone"] .offer-icon { display: inline; }
+    .screen[data-mode="phone"] .offer-name { display: none; }
+    .screen[data-mode="phone"] .offer-price { justify-self: end; }
+    .screen[data-mode="phone"] .offer-meta { display: none; }
+    .screen[data-mode="phone"] .detail p,
+    .screen[data-mode="phone"] .shop-subtitle { display: none; }
+    .screen[data-mode="phone"] .facts { grid-template-columns: 1fr; }
+    .screen[data-mode="phone"] .fact:nth-child(n+3) { display: none; }
+    .screen[data-mode="phone"] .tiers .tier:nth-child(n+4) { display: none; }
+    .screen[data-mode="phone"] .touch-controls { display: block; }
+    .screen[data-mode="phone"] .keyboard-help { display: none; }
+    .screen[data-mode="phone"] .effect-pill { font-size: 0.4375rem; padding: 3px; }
+    .screen[data-mode="phone"] .temporary-effects { height: 20px; }
+    .screen[data-mode="phone"] .opponent-mini .field-head { padding: 4px; }
+    .screen[data-mode="phone"] .opponent-mini .title-row { display: none; }
+    .screen[data-mode="phone"] .opponent-mini .status-line { border-top: 0; margin-top: 0; padding-top: 0; }
+    .screen[data-mode="phone"] .opponent-mini .board-box { padding: 0 4px 5px; }
+
+    /* Tablet: primary board remains dominant; wider utility rail and touch controls stay visible. */
+    .screen[data-mode="tablet"] .play-area { grid-template-columns: minmax(0, 1fr) 210px; }
+    .screen[data-mode="tablet"] .player-field { grid-column: 1; }
+    .screen[data-mode="tablet"] .utility { grid-column: 2; }
+    .screen[data-mode="tablet"] .opponent-mini .board { height: 162px; width: 90px; }
+    .screen[data-mode="tablet"] .touch-controls { display: block; min-height: 164px; padding: 14px 24px 0; }
+    .screen[data-mode="tablet"] .touch-controls-inner { max-width: 660px; }
+    .screen[data-mode="tablet"] .move-pad { gap: 10px; grid-template-columns: repeat(3, 56px); grid-template-rows: repeat(2, 56px); }
+    .screen[data-mode="tablet"] .game-button { height: 56px; width: 56px; }
+    .screen[data-mode="tablet"] .action-pad { column-gap: 16px; grid-template-columns: repeat(2, 62px); row-gap: 12px; }
+    .screen[data-mode="tablet"] .game-button.action { height: 62px; width: 62px; }
+    .screen[data-mode="tablet"] .keyboard-help { display: none; }
+
+    /* Desktop: shop + two full fields. No touch-control reservation. */
+    .screen[data-mode="desktop"] .play-area { grid-template-columns: 142px minmax(0, 1fr) minmax(0, 1fr); }
+    .screen[data-mode="desktop"] .desktop-left { display: grid; grid-column: 1; grid-template-rows: minmax(0, 1fr) auto; min-height: 0; }
+    .screen[data-mode="desktop"] .player-field { grid-column: 2; }
+    .screen[data-mode="desktop"] .desktop-opponent { display: grid; grid-column: 3; }
+    .screen[data-mode="desktop"] .utility { display: none; }
+    .screen[data-mode="desktop"] .touch-controls { display: none; }
+
+    .desktop-left,
+    .desktop-opponent { display: none; }
+
+    .prototype-bar {
+      align-items: center;
+      background: #e4e4e1;
+      border: 1px solid #ffffff;
+      bottom: 12px;
+      box-shadow: 0 6px 24px rgba(0,0,0,.45);
+      color: #151616;
+      display: flex;
+      gap: 14px;
+      left: 50%;
+      max-width: calc(100% - 20px);
+      padding: 8px 10px;
+      position: fixed;
+      transform: translateX(-50%);
+      z-index: 5;
+    }
+    .prototype-group { align-items: center; display: flex; gap: 4px; }
+    .prototype-label { color: #555; font-size: 0.5rem; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
+    .prototype-button { background: transparent; border: 1px solid #a7aaa8; color: #343535; cursor: pointer; font-size: 0.5625rem; min-height: 44px; padding: 5px 7px; }
+    .prototype-button[aria-pressed="true"] { background: #1d2020; border-color: #1d2020; color: white; }
+
+    @media (max-width: 660px) {
+      .page { min-height: 0; padding: 5px; }
+      .screen { height: min(820px, calc(100dvh - 94px)); min-height: 0; padding: 6px; }
+      .match-state { padding-bottom: 5px; }
+      .play-area { gap: 6px; }
+      .prototype-bar {
+        bottom: auto;
+        flex-wrap: wrap;
+        gap: 6px 12px;
+        justify-content: center;
+        margin: 8px auto;
+        position: static;
+        transform: none;
+        width: calc(100% - 10px);
+      }
+    }
+
+    @media (max-width: 350px) {
+      .screen[data-mode="phone"] .play-area { grid-template-columns: minmax(0, 1fr) 84px; }
+      .screen[data-mode="phone"] .field-head { padding-left: 4px; padding-right: 4px; }
+      .screen[data-mode="phone"] .effect-pill { max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
+      .screen[data-mode="phone"] .storage { padding-left: 4px; padding-right: 4px; }
+    }
+
+    /* Below 300 CSS px (for example, a 200% zoom-equivalent width), the
+       phone rail and 44px controls cannot coexist beside the board. Stack
+       the utility content into normal flow so zoom creates vertical scroll,
+       never horizontal clipping. */
+    @media (max-width: 300px) {
+      .page { align-items: flex-start; }
+      .screen { height: auto; }
+      .screen[data-mode="phone"] { max-width: 100%; }
+      .screen[data-mode="phone"] .play-area { display: block; }
+      .screen[data-mode="phone"] .utility { display: none; }
+      .screen[data-mode="phone"] .player-field {
+        min-height: 300px;
+        grid-template-rows: auto minmax(220px, 1fr) auto;
+      }
+      .screen[data-mode="phone"] .player-field .player-data,
+      .screen[data-mode="phone"] .player-field .status-line,
+      .screen[data-mode="phone"] .player-field .temporary-effects { display: none; }
+      .screen[data-mode="phone"] .player-field .board-box { min-height: 220px; }
+      .screen[data-mode="phone"] .player-field .board { height: 100%; width: auto; }
+      .screen[data-mode="phone"] .touch-controls {
+        min-height: 188px;
+        padding: 8px 0;
+      }
+      .screen[data-mode="phone"] .touch-controls-inner {
+        align-items: end;
+        flex-wrap: wrap;
+        gap: 8px;
+        max-width: 100%;
+      }
+      .screen[data-mode="phone"] .move-pad {
+        gap: 0;
+        grid-template-columns: repeat(3, 44px);
+        grid-template-rows: repeat(2, 44px);
+      }
+      .screen[data-mode="phone"] .game-button { height: 44px; width: 44px; }
+      .screen[data-mode="phone"] .action-pad {
+        column-gap: 0;
+        grid-template-columns: repeat(2, 44px);
+        row-gap: 4px;
+      }
+      .screen[data-mode="phone"] .game-button.action { height: 44px; width: 44px; }
+      .prototype-bar { align-items: stretch; flex-direction: column; }
+      .prototype-group { flex-wrap: wrap; justify-content: center; }
+    }
+
+    /* Short landscape phones need a compact touch row, otherwise its fixed
+       reservation can consume the board's entire minmax(0, 1fr) track. */
+    @media (min-width: 661px) and (max-height: 500px) {
+      .screen[data-mode="tablet"] {
+        grid-template-columns: minmax(0, 1fr) 174px;
+        grid-template-rows: auto minmax(0, 1fr);
+      }
+      .screen[data-mode="tablet"] .match-state { grid-column: 1 / -1; }
+      .screen[data-mode="tablet"] .play-area {
+        grid-column: 1;
+        grid-row: 2;
+        grid-template-columns: minmax(0, 1fr);
+      }
+      .screen[data-mode="tablet"] .utility { display: none; }
+      .screen[data-mode="tablet"] .touch-controls {
+        align-self: stretch;
+        grid-column: 2;
+        grid-row: 2;
+        min-height: 0;
+        padding: 8px 4px;
+      }
+      .screen[data-mode="tablet"] .touch-controls-inner {
+        align-items: center;
+        flex-direction: column;
+        gap: 12px;
+        height: 100%;
+        justify-content: center;
+      }
+      .screen[data-mode="tablet"] .player-field .field-head { padding: 4px 6px 3px; }
+      .screen[data-mode="tablet"] .player-field .player-data,
+      .screen[data-mode="tablet"] .player-field .temporary-effects { display: none; }
+      .screen[data-mode="tablet"] .player-field .status-line { margin-top: 2px; padding-top: 3px; }
+      .screen[data-mode="tablet"] .player-field .storage { min-height: 34px; padding: 4px 6px; }
+      .screen[data-mode="tablet"] .touch-controls { min-height: 90px; padding: 4px 12px 0; }
+      .screen[data-mode="tablet"] .touch-controls-inner { max-width: 560px; }
+      .screen[data-mode="tablet"] .move-pad { gap: 3px; grid-template-columns: repeat(3, 38px); grid-template-rows: repeat(2, 38px); }
+      .screen[data-mode="tablet"] .game-button { height: 38px; width: 38px; }
+      .screen[data-mode="tablet"] .action-pad { column-gap: 8px; grid-template-columns: repeat(2, 44px); row-gap: 4px; }
+      .screen[data-mode="tablet"] .game-button.action { height: 44px; width: 44px; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        scroll-behavior: auto !important;
+        transition-duration: 0.01ms !important;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <main class="screen" id="screen" data-mode="phone" data-effects="mixed">
+      <div class="match-state">Waiting for another player to join…</div>
+
+      <div class="play-area">
+        <div class="desktop-left">
+          <aside class="shop shop-host"></aside>
+          <div class="keyboard-help" aria-label="Keyboard controls">
+            <span><kbd>← →</kbd> Move</span><span><kbd>↓</kbd> Soft drop</span><span><kbd>↑</kbd> Hard drop</span>
+            <span><kbd>Z / X</kbd> Rotate</span><span><kbd>SHIFT</kbd> Storage</span><span><kbd>C</kbd> Shop</span>
+          </div>
+        </div>
+
+        <section class="field mine player-field">
+          <header class="field-head">
+            <div class="title-row"><span class="field-title">Your field</span><span class="clears">0 clears</span></div>
+            <div class="player-data"><span>Funds <strong>1,250</strong></span><span>Score <strong>0</strong></span></div>
+            <div class="status-line">
+              <div class="garbage-flow" aria-label="Incoming garbage: 3 lines. Outgoing garbage: 6 lines.">
+                <span class="garbage-flow-item" title="Incoming garbage · 3 lines">
+                  <span class="garbage-direction-icon incoming" aria-hidden="true"><span class="arrow">↓</span><span class="trash">🗑️</span></span><strong>3</strong>
+                </span>
+                <span class="garbage-separator" aria-hidden="true">|</span>
+                <span class="garbage-flow-item" title="Outgoing garbage · 6 lines">
+                  <span class="garbage-direction-icon outgoing" aria-hidden="true"><span class="arrow">↑</span><span class="trash">🗑️</span></span><strong>6</strong>
+                </span>
+              </div>
+            </div>
+            <div class="temporary-effects" aria-label="Field effects"><span class="effect-pill permanent">🧲 Magnet L2</span><span class="effect-pill temporary">❄ Curtain · 47t</span></div>
+          </header>
+          <div class="board-box"><div class="board"><span class="swap-label">SWAP LINE</span></div></div>
+          <footer class="storage"><p>STORAGE (SHIFT)<strong>READY</strong>Swap zone rows 0–9</p><span class="storage-slot">EMPTY</span></footer>
+        </section>
+
+        <aside class="utility">
+          <section class="field opponent opponent-mini">
+            <header class="field-head">
+              <div class="title-row"><span class="field-title">Opp</span></div>
+              <div class="mini-effect-summary" aria-label="Opponent effects: Magnet level 2; Curtain 47 ticks">
+                <span class="effect-pill permanent" title="Magnet level 2">🧲2</span>
+                <span class="effect-pill temporary" title="Curtain · 47 ticks">❄47t</span>
+              </div>
+            </header>
+            <div class="board-box"><div class="board"></div></div>
+          </section>
+          <aside class="shop shop-host"></aside>
+        </aside>
+
+        <section class="field opponent desktop-opponent">
+          <header class="field-head">
+            <div class="title-row"><span class="field-title">Opponent field</span></div>
+            <div class="temporary-effects opponent-effect-row" aria-label="Opponent field effects"><span class="effect-pill permanent">🧲 Magnet L2</span><span class="effect-pill temporary">❄ Curtain · 47t</span></div>
+          </header>
+          <div class="board-box"><div class="board"></div></div>
+          <footer class="storage"><p>OPPONENT STATUS<strong style="color:var(--opp)">WAITING</strong>No active effects</p></footer>
+        </section>
+      </div>
+
+      <section class="touch-controls" data-game-controls aria-label="On-screen game controls">
+        <div class="touch-controls-inner">
+          <div class="move-pad">
+            <span></span><button class="game-button drop" type="button" aria-label="Hard Drop">↑</button><span></span>
+            <button class="game-button" type="button" aria-label="Move Left">←</button>
+            <button class="game-button drop" type="button" aria-label="Soft Drop">↓</button>
+            <button class="game-button" type="button" aria-label="Move Right">→</button>
+          </div>
+          <div class="action-pad">
+            <button class="game-button action storage-button" type="button">STORAGE</button>
+            <button class="game-button action shop-button" type="button">SHOP</button>
+            <button class="game-button action rotate" type="button" aria-label="Rotate counter-clockwise">CCW</button>
+            <button class="game-button action rotate" type="button" aria-label="Rotate clockwise">CW</button>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <nav class="prototype-bar" aria-label="Prototype switcher">
+    <div class="prototype-group" data-control="mode">
+      <span class="prototype-label">Layout</span>
+      <button class="prototype-button" data-value="phone" aria-pressed="true">Phone</button>
+      <button class="prototype-button" data-value="tablet" aria-pressed="false">Tablet</button>
+      <button class="prototype-button" data-value="desktop" aria-pressed="false">Desktop</button>
+    </div>
+    <div class="prototype-group" data-control="effects">
+      <span class="prototype-label">Effects</span>
+      <button class="prototype-button" data-value="none" aria-pressed="false">None</button>
+      <button class="prototype-button" data-value="temporary" aria-pressed="false">Temporary</button>
+      <button class="prototype-button" data-value="mixed" aria-pressed="true">Mixed</button>
+    </div>
+  </nav>
+
+  <template id="shop-template">
+    <div class="shop-variant compact">
+      <div class="shop-top"><span class="shop-title">Shop · 5</span><span class="wallet">1,250</span></div>
+      <div class="shop-list">
+        <div class="offer selected" title="Fortify frame · 60"><span class="offer-icon">◆</span><span class="offer-name">Fortify frame</span><span class="offer-price">60</span><span class="offer-meta">L1 · 2 buys left</span></div>
+        <div class="offer" title="Nova charge · 290"><span class="offer-icon">✦</span><span class="offer-name">Nova charge</span><span class="offer-price">290</span><span class="offer-meta">L2 · affordable</span></div>
+        <div class="offer" title="Curtain · 475"><span class="offer-icon">◐</span><span class="offer-name">Curtain</span><span class="offer-price">475</span><span class="offer-meta">L3 · affordable</span></div>
+        <div class="offer" title="Quickstep · 310"><span class="offer-icon">↯</span><span class="offer-name">Quickstep</span><span class="offer-price">310</span><span class="offer-meta">L4 · affordable</span></div>
+        <div class="offer" title="Satellite · 220"><span class="offer-icon">◎</span><span class="offer-name">Satellite</span><span class="offer-price">220</span><span class="offer-meta">L2 · gated</span></div>
+      </div>
+      <button class="shop-action" type="button">Buy selected · 60</button>
+    </div>
+  </template>
+
+  <script>
+    const screen = document.getElementById('screen');
+    const shopTemplate = document.getElementById('shop-template');
+    const shopHosts = [...document.querySelectorAll('.shop-host')];
+    shopHosts.forEach((host) => host.append(shopTemplate.content.cloneNode(true)));
+
+    const params = new URLSearchParams(location.search);
+    const state = {
+      mode: ['phone', 'tablet', 'desktop'].includes(params.get('mode')) ? params.get('mode') : 'auto',
+      effects: ['none', 'temporary', 'mixed'].includes(params.get('effects')) ? params.get('effects') : 'mixed',
+    };
+
+    function getViewportMode() {
+      if (innerWidth < 661) return 'phone';
+      if (innerWidth < 901) return 'tablet';
+      return 'desktop';
+    }
+
+    function render() {
+      const effectiveMode = state.mode === 'auto' ? getViewportMode() : state.mode;
+      screen.dataset.mode = effectiveMode;
+      screen.dataset.effects = state.effects;
+      document.body.dataset.mode = effectiveMode;
+      document.querySelectorAll('[data-control]').forEach((group) => {
+        group.querySelectorAll('[data-value]').forEach((button) => {
+          button.setAttribute('aria-pressed', String(button.dataset.value === state[group.dataset.control]));
+        });
+      });
+      const url = new URL(location.href);
+      url.searchParams.set('mode', state.mode);
+      url.searchParams.delete('shop');
+      url.searchParams.set('effects', state.effects);
+      url.searchParams.delete('board');
+      history.replaceState({}, '', url);
+    }
+
+    document.querySelectorAll('[data-control]').forEach((group) => {
+      group.addEventListener('click', (event) => {
+        const button = event.target.closest('[data-value]');
+        if (!button) return;
+        state[group.dataset.control] = button.dataset.value;
+        render();
+      });
+    });
+
+    addEventListener('keydown', (event) => {
+      if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return;
+      const modes = ['phone', 'tablet', 'desktop'];
+      const direction = event.key === 'ArrowRight' ? 1 : -1;
+      const currentIndex = modes.indexOf(state.mode);
+      state.mode = modes[(currentIndex < 0 ? 0 : currentIndex + direction + modes.length) % modes.length];
+      render();
+    });
+
+    addEventListener('resize', render, { passive: true });
+    render();
+  </script>
+</body>
+</html>

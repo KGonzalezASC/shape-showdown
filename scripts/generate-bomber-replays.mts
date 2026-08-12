@@ -18,6 +18,7 @@ import { Scenario } from '../server/testHarness/scenario.js';
 import { computePlayerPressure } from '../server/testHarness/boardPressure.js';
 import type { DriverObservation, InputDriver, PlayerCommand } from '../server/testHarness/inputDriver.js';
 import { RulesBot } from '../server/testHarness/rulesBot.js';
+import { getPricingView, PRICING_POLICY_VERSION } from '../src/shop/shopPricing.js';
 
 type PowerupKey = 'bomber' | 'satellite' | 'magnet' | 'snag' | 'sticky' | 'curtain' | 'tectonic-shift' | 'bounty-tax';
 
@@ -310,7 +311,12 @@ function makeRecordingDriver(garbageEnabled: boolean): RecordingDriver {
 
 function purchasePowerupWhenAvailable(scenario: Scenario, playerId: string, powerup: PowerupConfig): void {
   const player = scenario.getPlayerState(playerId);
-  if (player.score < SHOP_ITEM_BY_ID.get(powerup.itemId)!.cost) return;
+  const currentPrice = getPricingView(
+    powerup.itemId,
+    player.shop.pricing[powerup.itemId],
+    scenario.tick,
+  ).currentPrice;
+  if (player.funds < currentPrice) return;
 
   if (player.shop.phase === 'ready') {
     scenario.openShop(playerId);
@@ -359,7 +365,7 @@ function shopFramesFromScenario(
         accepted: record.accepted ?? false,
       });
     } else if (record.kind === 'purchase') {
-      const detail = record.detail as { itemId?: string } | undefined;
+      const detail = record.detail as { itemId?: string; cost?: number } | undefined;
       if (!detail?.itemId) continue;
       frames.push({
         tick,
@@ -367,7 +373,7 @@ function shopFramesFromScenario(
         kind: 'shopPurchase',
         itemId: detail.itemId,
         accepted: record.accepted ?? false,
-        cost: detail.itemId === powerup.itemId ? SHOP_ITEM_BY_ID.get(powerup.itemId)!.cost : undefined,
+        cost: detail.cost,
       });
     }
   }
@@ -626,6 +632,7 @@ function runOne(
     version: 2,
     date: runDate,
     seed,
+    pricingPolicyVersion: PRICING_POLICY_VERSION,
     playerSlots: { p1: 0, p2: 1 },
     keyframeIntervalTicks,
     initialState,

@@ -18,6 +18,7 @@ import { Scenario } from '../server/testHarness/scenario.js';
 import { computePlayerPressure } from '../server/testHarness/boardPressure.js';
 import type { DriverObservation, InputDriver, PlayerCommand } from '../server/testHarness/inputDriver.js';
 import { RulesBot } from '../server/testHarness/rulesBot.js';
+import { getPricingView, PRICING_POLICY_VERSION } from '../src/shop/shopPricing.js';
 
 export type PairKey = 'retrim-curtain' | 'elixir-wild-purge' | 'elixir-wildcard-four';
 export type PairSequence = 'forward' | 'reverse' | 'valid' | 'reverse-negative';
@@ -256,16 +257,15 @@ function shopFramesFromScenario(
         accepted: record.accepted ?? false,
       });
     } else if (record.kind === 'purchase') {
-      const detail = record.detail as { itemId?: string } | undefined;
+      const detail = record.detail as { itemId?: string; cost?: number } | undefined;
       if (!detail?.itemId) continue;
-      const catalogCost = SHOP_ITEM_BY_ID.get(detail.itemId)?.cost;
       frames.push({
         tick,
         playerId: record.playerId,
         kind: 'shopPurchase',
         itemId: detail.itemId,
         accepted: record.accepted ?? false,
-        cost: catalogCost,
+        cost: detail.cost ?? SHOP_ITEM_BY_ID.get(detail.itemId)?.cost,
       });
     }
   }
@@ -372,8 +372,12 @@ function executePairShopLogic(
   // Handling reverse-negative control sequence for Elixir pairs
   if (sequence === 'reverse-negative') {
     if (!pState.attemptedReverseNegative) {
-      const payoffCost = SHOP_ITEM_BY_ID.get(pairConfig.payoffItemId)?.cost ?? 70;
-      if (player.score >= payoffCost) {
+      const payoffCost = getPricingView(
+        pairConfig.payoffItemId,
+        player.shop.pricing[pairConfig.payoffItemId],
+        scenario.tick,
+      ).currentPrice;
+      if (player.funds >= payoffCost) {
         if (player.shop.phase === 'ready') {
           scenario.openShop(playerId);
           return;
@@ -394,8 +398,8 @@ function executePairShopLogic(
 
   // Phase Machine for Pair Purchasing
   if (pState.phase === 'setup') {
-    const cost = SHOP_ITEM_BY_ID.get(firstItem)?.cost ?? 50;
-    if (player.score < cost) return;
+    const cost = getPricingView(firstItem, player.shop.pricing[firstItem], scenario.tick).currentPrice;
+    if (player.funds < cost) return;
     if (player.shop.phase === 'ready') {
       scenario.openShop(playerId);
       return;
@@ -425,8 +429,8 @@ function executePairShopLogic(
   }
 
   if (pState.phase === 'payoff') {
-    const cost = SHOP_ITEM_BY_ID.get(secondItem)?.cost ?? 50;
-    if (player.score < cost) return;
+    const cost = getPricingView(secondItem, player.shop.pricing[secondItem], scenario.tick).currentPrice;
+    if (player.funds < cost) return;
     if (player.shop.phase === 'ready') {
       scenario.openShop(playerId);
       return;
@@ -506,6 +510,7 @@ function runOne(
     version: 2,
     date: runDate,
     seed,
+    pricingPolicyVersion: PRICING_POLICY_VERSION,
     playerSlots: { p1: 0, p2: 1 },
     keyframeIntervalTicks,
     initialState,

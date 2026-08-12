@@ -240,6 +240,7 @@ describe('poison spread variations', () => {
     };
 
     buyer.score = 500;
+    buyer.funds = 500;
     buyer.shop.phase = 'cycling';
     buyer.shop.offerIds = ['wildcard-four'];
     buyer.shop.cycleIndex = 0;
@@ -256,7 +257,8 @@ describe('poison spread variations', () => {
 
     const purchaseResult2 = applyShopPurchase(game, buyer, opponent, 'wildcard-four', makeRng(1));
     assert.equal(purchaseResult2, true, 'Should successfully purchase wildcard-four if opponent has poisoned cells');
-    assert.equal(buyer.score, 500 - 60, 'Cost of wildcard-four (60) should be deducted');
+    assert.equal(buyer.funds, 500 - 60, 'Cost of wildcard-four (60) should be deducted');
+    assert.equal(buyer.score, 500, 'Score should not be deducted');
 
     assert.ok(opponent.customNextPieceOffsets, 'Opponent should have customNextPieceOffsets set');
     assert.deepEqual(
@@ -323,6 +325,7 @@ describe('poison spread variations', () => {
     };
 
     buyer.score = 1000;
+    buyer.funds = 1000;
     buyer.shop.phase = 'cycling';
     buyer.shop.offerIds = ['wildcard-four'];
     buyer.shop.cycleIndex = 0;
@@ -372,6 +375,7 @@ describe('poison spread variations', () => {
     };
 
     buyer.score = 500;
+    buyer.funds = 500;
     buyer.shop.phase = 'cycling';
     buyer.shop.offerIds = ['wildcard-four'];
     buyer.shop.cycleIndex = 0;
@@ -432,6 +436,7 @@ describe('poison spread variations', () => {
     };
 
     buyer.score = 500;
+    buyer.funds = 500;
     buyer.shop.phase = 'cycling';
     buyer.shop.offerIds = ['wildcard-four'];
     buyer.shop.cycleIndex = 0;
@@ -467,7 +472,7 @@ describe('poison spread variations', () => {
     // The only poisoned cell is now cleared. Purchase should fizzle.
     const purchaseResult = applyShopPurchase(game, buyer, opponent, 'wildcard-four', makeRng(1));
     assert.equal(purchaseResult, false, 'Purchase should fizzle since no poisoned cells remain');
-    assert.equal(buyer.score, 500, 'Score should NOT be deducted');
+    assert.equal(buyer.funds, 500, 'Funds should NOT be deducted');
   });
 
   it('Wildcard +4 mixed cells shape copy', () => {
@@ -485,6 +490,7 @@ describe('poison spread variations', () => {
     };
 
     buyer.score = 500;
+    buyer.funds = 500;
     buyer.shop.phase = 'cycling';
     buyer.shop.offerIds = ['wildcard-four'];
     buyer.shop.cycleIndex = 0;
@@ -533,6 +539,7 @@ describe('poison spread variations', () => {
     };
 
     buyer.score = 500;
+    buyer.funds = 500;
     buyer.shop.phase = 'cycling';
     buyer.shop.offerIds = ['wildcard-four'];
     buyer.shop.cycleIndex = 0;
@@ -574,6 +581,7 @@ describe('poison spread variations', () => {
     };
 
     buyer.score = 500;
+    buyer.funds = 500;
     buyer.shop.phase = 'cycling';
     buyer.shop.offerIds = ['wildcard-four'];
     buyer.shop.cycleIndex = 0;
@@ -645,6 +653,7 @@ describe('poison spread variations', () => {
     };
 
     buyer.score = 500;
+    buyer.funds = 500;
     buyer.shop.phase = 'cycling';
     buyer.shop.offerIds = ['wildcard-four'];
     buyer.shop.cycleIndex = 0;
@@ -687,6 +696,7 @@ describe('poison spread variations', () => {
     };
 
     buyer.score = 500;
+    buyer.funds = 500;
     buyer.shop.phase = 'cycling';
     buyer.shop.offerIds = ['wildcard-four'];
     buyer.shop.cycleIndex = 0;
@@ -725,6 +735,7 @@ describe('poison spread variations', () => {
     };
 
     buyer.score = 500;
+    buyer.funds = 500;
     buyer.shop.phase = 'cycling';
     buyer.shop.offerIds = ['wildcard-four'];
     buyer.shop.cycleIndex = 0;
@@ -770,6 +781,7 @@ describe('poison spread variations', () => {
     };
 
     buyer.score = 500;
+    buyer.funds = 500;
     buyer.shop.phase = 'cycling';
     buyer.shop.offerIds = ['wildcard-four'];
     buyer.shop.cycleIndex = 0;

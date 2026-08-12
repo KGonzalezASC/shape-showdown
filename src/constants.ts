@@ -63,7 +63,7 @@ export const MAGNET_PIECE_GRAVITY_STEP = 1;
 export const MAGNET_GRAVITY_TICK_REDUCTION = 5;
 export const MAGNET_MIN_GRAVITY_TICKS = 12;
 // Snag (fortify-frame id): opponent cannot hard-drop current/next piece until lock or hold.
-export const SNAG_COST = 48;
+export const SNAG_COST = 60;
 // Tectonic Shift: animated column gravity; cleared lines don't score, send garbage, or shop-roll.
 export const TECTONIC_SHIFT_COST = 140;
 /** Floor for the full cascade (start → silent clear / unpause). */

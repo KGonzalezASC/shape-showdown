@@ -1,5 +1,6 @@
 import type { GameState, MatchEvent } from '../../src/types.js';
 import { SHOP_ITEM_BY_ID } from '../../src/shop/shopCatalog.js';
+import { getPricingView } from '../../src/shop/shopPricing.js';
 import type { DriverObservation, InputDriver, PlayerObservation } from './inputDriver.js';
 import type { PlayerFixture } from './fixtures.js';
 import { RulesBot, type ObservationMode, type RulesBotTopologyMode } from './rulesBot.js';
@@ -74,17 +75,20 @@ export interface PairedRunnerReport {
   scenarioReport: ScenarioReport;
 }
 
-/** Pre-built shop policy: opens shop when score >= required score and buys targetItem when ready/cycling. */
+/** Pre-built shop policy: waits for the current wallet price before opening/buying the target item. */
 export function createSimpleShopPolicy(
   targetItem: string,
   requiredScore?: number,
   overrideCost?: number,
 ): BotShopPolicy {
   const catalogCost = SHOP_ITEM_BY_ID.get(targetItem)?.cost ?? 50;
-  const minScore = requiredScore !== undefined ? requiredScore : (overrideCost !== undefined ? overrideCost : catalogCost);
+  const minimumFunds = requiredScore !== undefined ? requiredScore : (overrideCost !== undefined ? overrideCost : catalogCost);
   return (obs: DriverObservation) => {
     const player = obs.player.player;
-    if (player.score < minScore) return null;
+    const currentPrice = overrideCost !== undefined
+      ? Math.max(0, overrideCost)
+      : getPricingView(targetItem, player.shop.pricing[targetItem], obs.tick).currentPrice;
+    if (player.funds < Math.max(minimumFunds, currentPrice)) return null;
     if (player.shop.phase === 'ready') {
       return { openShop: true };
     }
@@ -120,11 +124,14 @@ export function createPairShopPolicy(config: PairShopPolicyConfig): PairShopPoli
 
     const isSetup = phase === 'setup';
     const targetItemId = isSetup ? config.setupItemId : config.payoffItemId;
-    const requiredScore = isSetup ? setupRequiredScore : payoffRequiredScore;
+    const minimumFunds = isSetup ? setupRequiredScore : payoffRequiredScore;
     const overrideCost = isSetup ? config.setupOverrideCost : config.payoffOverrideCost;
     const player = observation.player.player;
 
-    if (player.score < requiredScore) return null;
+    const currentPrice = overrideCost !== undefined
+      ? Math.max(0, overrideCost)
+      : getPricingView(targetItemId, player.shop.pricing[targetItemId], observation.tick).currentPrice;
+    if (player.funds < Math.max(minimumFunds, currentPrice)) return null;
     if (player.shop.phase === 'ready') return { openShop: true };
     if (player.shop.phase !== 'cycling') return null;
 
@@ -190,7 +197,7 @@ export class PairedRunner {
       if (stateBefore.status !== 'playing') break;
 
       for (const id of this.playerIds) {
-        this.walletHistory[id].push(this.scenario.getPlayerState(id).score);
+        this.walletHistory[id].push(this.scenario.getPlayerState(id).funds);
       }
 
       // Evaluate shop policy before tick
@@ -217,15 +224,23 @@ export class PairedRunner {
           }
           if (decision?.purchaseItemId) {
             const options = decision.overrideCost !== undefined ? { overrideCost: decision.overrideCost } : undefined;
+            const catalogItem = SHOP_ITEM_BY_ID.get(decision.purchaseItemId);
+            const actualCost = decision.overrideCost !== undefined
+              ? Math.max(0, decision.overrideCost)
+              : catalogItem
+                ? getPricingView(
+                    decision.purchaseItemId,
+                    stateBefore.players[id]?.shop.pricing?.[decision.purchaseItemId],
+                    stateBefore.tick,
+                  ).currentPrice
+                : undefined;
             const accepted = this.scenario.purchase(id, decision.purchaseItemId, options);
-            const catalogCost = SHOP_ITEM_BY_ID.get(decision.purchaseItemId)?.cost ?? 0;
-            const actualCost = decision.overrideCost !== undefined ? decision.overrideCost : catalogCost;
             const purchaseRecord = {
               tick: stateBefore.tick,
               playerId: id,
               itemId: decision.purchaseItemId,
               accepted,
-              cost: actualCost,
+              cost: actualCost ?? 0,
             } satisfies PurchaseRecord;
             this.purchases.push(purchaseRecord);
             policy.onPurchaseResult?.(purchaseRecord);

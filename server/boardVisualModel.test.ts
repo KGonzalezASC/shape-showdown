@@ -179,7 +179,7 @@ describe('buildBoardVisualModel', () => {
       poisonVariant: 3,
       bomber: true,
     };
-    player.magnetPermanentStacks = 1;
+    player.magnetPieceBoost = 1;
 
     const model = buildBoardVisualModel(toPublicPlayerState(player), {
       hatchingEnabled: true,
@@ -329,7 +329,6 @@ test('canvas effect painter exercises hatching, bomber, magnet, and wildcard bra
     clearRect: () => operations.push('clear'),
     beginPath: () => operations.push('beginPath'),
     roundRect: () => operations.push('roundRect'),
-    fillRect: () => operations.push('fillRect'),
     moveTo: () => {},
     lineTo: () => {},
     stroke: () => operations.push('stroke'),
@@ -339,7 +338,11 @@ test('canvas effect painter exercises hatching, bomber, magnet, and wildcard bra
     arc: () => operations.push('arc'),
     rect: () => {},
     clip: () => {},
-    strokeRect: () => operations.push('magnet'),
+    fillRect: () => operations.push('magnet-field-rect'),
+    createLinearGradient: () => ({
+      addColorStop: () => {},
+    }),
+    strokeRect: () => operations.push('strokeRect'),
     fillText: (text: string) => operations.push(`text:${text}`),
     setLineDash: () => operations.push('wildcard-dash'),
     set fillStyle(value: string) {
@@ -361,7 +364,6 @@ test('canvas effect painter exercises hatching, bomber, magnet, and wildcard bra
   paintBoardCanvasOverlay(context, model, 20, 500);
 
   assert.equal(operations.includes('text:💣'), true);
-  assert.equal(operations.includes('magnet'), true);
   assert.equal(operations.includes('wildcard-dash'), true);
   assert.equal(
     operations.some((operation) => operation === 'stroke:rgba(255,255,255,0.38)'),
