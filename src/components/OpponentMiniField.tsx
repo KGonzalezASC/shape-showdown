@@ -7,8 +7,11 @@ import {
   type PublicPlayerState,
 } from '../state/publicSnapshots';
 import { BOARD_COLS, BOARD_VISIBLE_ROWS } from '../types';
+import { useThemePackage } from '../presentation/ThemeProvider';
+import { fieldFrameClass } from '../ui/shapeShowdownTheme';
 import { VoronoiFlowfieldCanvas } from './VoronoiFlowfieldCanvas';
 import { IncomingGarbageReadout } from './IncomingGarbageReadout';
+import { BoardGridLines } from './BoardGridLines';
 
 interface OpponentMiniFieldProps {
   player: PublicPlayerState | null;
@@ -23,9 +26,10 @@ const OpponentMiniField: React.FC<OpponentMiniFieldProps> = ({
   hatchingEnabled,
   viewportMode = 'phone',
 }) => {
+  const theme = useThemePackage();
   const shellClass = viewportMode === 'tablet'
-    ? 'w-full border border-rose-500/30 bg-[#171919]/95 p-2 shadow-xl'
-    : 'w-24 border border-rose-500/30 bg-[#171919]/95 p-1 shadow-xl';
+    ? `w-full overflow-visible border ${fieldFrameClass('opponent')} p-2 shadow-xl`
+    : `w-24 min-[661px]:w-full overflow-visible border ${fieldFrameClass('opponent')} p-1 min-[661px]:p-2 shadow-xl`;
   const visualModel = useMemo(
     () =>
       player
@@ -61,12 +65,12 @@ const OpponentMiniField: React.FC<OpponentMiniFieldProps> = ({
   if (!player || !visualModel) {
     return (
       <div className={shellClass}>
-        <p className="text-[8px] font-bold uppercase tracking-[0.18em] text-rose-300/80">
+        <p className="text-[8px] font-bold uppercase tracking-[0.18em] text-[var(--ss-opponent-muted)]">
           Opp
         </p>
         <IncomingGarbageReadout fieldTitle="Opponent Field" lines={0} compact />
-        <div className="mt-1 flex h-[100px] items-center justify-center border border-rose-500/15 bg-[#141414] px-1">
-          <p className="text-center text-[8px] uppercase tracking-widest text-zinc-500">
+        <div className="mt-1 flex h-[100px] items-center justify-center border border-[var(--ss-opponent-border)] bg-[var(--ss-panel-well)] px-1">
+          <p className="ss-opponent-waiting-text text-center text-[8px] font-bold uppercase tracking-widest">
             Waiting
           </p>
         </div>
@@ -78,10 +82,10 @@ const OpponentMiniField: React.FC<OpponentMiniFieldProps> = ({
     <div className={shellClass}>
       <div className="mb-1">
         <div className="flex items-center justify-between">
-          <p className="text-[8px] font-bold uppercase tracking-[0.18em] text-rose-300/80">
+          <p className="text-[8px] font-bold uppercase tracking-[0.18em] text-[var(--ss-opponent-muted)]">
             Opp
           </p>
-          <p className="font-mono text-[9px] font-bold text-rose-200">{player.funds}</p>
+          <p className="font-mono text-[9px] font-bold text-[var(--ss-opponent-strong)]">{player.funds}</p>
         </div>
         <IncomingGarbageReadout
           fieldTitle="Opponent Field"
@@ -90,14 +94,15 @@ const OpponentMiniField: React.FC<OpponentMiniFieldProps> = ({
           magnetLevel={player.magnetPermanentStacks ?? 0}
         />
       </div>
-      <div className="mx-auto w-fit overflow-hidden border border-rose-500/20">
+      <div className="mx-auto w-fit overflow-hidden border border-[var(--ss-opponent-border)]">
         <div
-          className="relative bg-[#141414]"
+          className="relative bg-[var(--ss-panel-well)]"
           style={{
             width: BOARD_COLS * MINI_CELL_SIZE,
             height: BOARD_VISIBLE_ROWS * MINI_CELL_SIZE,
           }}
         >
+          <BoardGridLines cellSize={MINI_CELL_SIZE} />
           <VoronoiFlowfieldCanvas
             visibleRows={visibleRows}
             visiblePoison={visiblePoison}
@@ -106,6 +111,8 @@ const OpponentMiniField: React.FC<OpponentMiniFieldProps> = ({
             cellSize={MINI_CELL_SIZE}
             poisonSpread={player.poisonSpread}
             performanceId="mobile-opponent-mini"
+            piecePalette={theme.piecePalette}
+            poisonPalette={theme.poisonPalette}
           />
           <BoardCanvasOverlay
             model={visualModel}
@@ -115,8 +122,8 @@ const OpponentMiniField: React.FC<OpponentMiniFieldProps> = ({
         </div>
       </div>
       <div className="mt-1 flex items-center justify-between text-[8px] font-semibold uppercase tracking-wider">
-        <span className="text-zinc-400">
-          Ln <span className="font-mono text-zinc-200">{player.linesCleared}</span>
+        <span className="text-[var(--ss-text-tertiary)]">
+          Ln <span className="font-mono text-[var(--ss-text-primary)]">{player.linesCleared}</span>
         </span>
       </div>
     </div>

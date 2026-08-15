@@ -1,4 +1,5 @@
 import React, { useLayoutEffect, useRef } from 'react';
+import { Archive, ArrowDown, ArrowLeft, ArrowRight, ArrowUp, RotateCcw, RotateCw, ShoppingBag } from 'lucide-react';
 
 interface MobileControlsProps {
   onInput: (input: { left: boolean; right: boolean; softDrop: boolean }) => void;
@@ -44,82 +45,91 @@ const MobileControls: React.FC<MobileControlsProps> = ({ onInput, onAction, onSh
     onShopPress?.();
   };
 
-  const movementButtonClass = 'h-[46px] w-[46px] select-none touch-none rounded-full border bg-[#1b1e1e] text-lg font-black text-zinc-200 [-webkit-touch-callout:none] [-webkit-tap-highlight-color:transparent] active:bg-[#2a2f2f] min-[661px]:h-[56px] min-[661px]:w-[56px] min-[661px]:text-2xl';
-  const actionButtonClass = 'h-[52px] w-[52px] select-none touch-none rounded-full border bg-[#1b1e1e] text-[8px] font-extrabold tracking-wide text-zinc-200 [-webkit-touch-callout:none] [-webkit-tap-highlight-color:transparent] active:bg-[#2a2f2f] min-[661px]:h-[62px] min-[661px]:w-[62px] min-[661px]:text-[10px]';
+  const controlButtonClass =
+    'mobile-touch-control-button inline-flex h-[52px] w-[52px] shrink-0 select-none touch-none items-center justify-center rounded-full border border-[var(--ss-control-border)] bg-[var(--ss-control-fill)] text-[var(--ss-control-text)] [-webkit-touch-callout:none] [-webkit-tap-highlight-color:transparent] active:bg-[var(--ss-control-fill-active)] min-[661px]:h-[58px] min-[661px]:w-[58px]';
+  const controlIconClass = 'h-5 w-5 min-[661px]:h-6 min-[661px]:w-6';
 
   return (
     <div
       ref={rootRef}
       onContextMenu={(e) => e.preventDefault()}
-      className="relative z-10 mt-auto shrink-0 select-none touch-none [-webkit-touch-callout:none] [-webkit-tap-highlight-color:transparent] min-[901px]:hidden"
+      className="mobile-touch-controls relative z-10 mt-auto shrink-0 select-none touch-none [-webkit-touch-callout:none] [-webkit-tap-highlight-color:transparent]"
     >
-      <div className="mx-auto flex min-h-[108px] w-full max-w-[460px] items-end justify-between gap-3 px-1.5 pt-2.5 pb-[max(0.5rem,env(safe-area-inset-bottom))] min-[661px]:min-h-[164px] min-[661px]:max-w-[660px] min-[661px]:gap-5 min-[661px]:px-6 min-[661px]:pt-3.5">
-        <div className="grid grid-cols-3 grid-rows-2 gap-[5px] min-[661px]:gap-[10px]">
+      <div className="mobile-touch-controls-inner mx-auto flex min-h-[108px] w-full max-w-[460px] items-end justify-between gap-3 px-1.5 pt-2.5 pb-[max(0.5rem,env(safe-area-inset-bottom))] min-[661px]:min-h-[164px] min-[661px]:max-w-[660px] min-[661px]:gap-5 min-[661px]:px-6 min-[661px]:pt-3.5">
+        <div className="mobile-touch-control-grid grid grid-cols-3 grid-rows-2 gap-[6px] min-[661px]:gap-[10px]">
           <div />
           <button
             type="button"
-            className={`${movementButtonClass} border-[#748e86] text-emerald-100`}
+            aria-label="Hard drop"
+            className={`${controlButtonClass} border-[#748e86] text-emerald-100`}
             onTouchStart={tapAction('hardDrop')}
           >
-            ↑
+            <ArrowUp className={controlIconClass} strokeWidth={2.5} />
           </button>
           <div />
           <button
             type="button"
-            className={`${movementButtonClass} border-[#6b7061]`}
+            aria-label="Move left"
+            className={controlButtonClass}
             onTouchStart={holdInput({ left: true, right: false, softDrop: false })}
             onTouchEnd={releaseInput}
             onTouchCancel={releaseInput}
           >
-            ←
+            <ArrowLeft className={controlIconClass} strokeWidth={2.5} />
           </button>
           <button
             type="button"
-            className={`${movementButtonClass} border-[#748e86] text-cyan-100`}
+            aria-label="Soft drop"
+            className={`${controlButtonClass} border-[#748e86] text-cyan-100`}
             onTouchStart={holdInput({ left: false, right: false, softDrop: true })}
             onTouchEnd={releaseInput}
             onTouchCancel={releaseInput}
           >
-            ↓
+            <ArrowDown className={controlIconClass} strokeWidth={2.5} />
           </button>
           <button
             type="button"
-            className={`${movementButtonClass} border-[#6b7061]`}
+            aria-label="Move right"
+            className={controlButtonClass}
             onTouchStart={holdInput({ left: false, right: true, softDrop: false })}
             onTouchEnd={releaseInput}
             onTouchCancel={releaseInput}
           >
-            →
+            <ArrowRight className={controlIconClass} strokeWidth={2.5} />
           </button>
         </div>
-        <div className="grid grid-cols-2 gap-[5px] min-[661px]:gap-x-4 min-[661px]:gap-y-3">
+        <div className="mobile-touch-control-grid grid grid-cols-2 gap-[6px] min-[661px]:gap-[10px]">
           <button
             type="button"
-            className={`${actionButtonClass} border-[#745d7d]`}
+            aria-label="Storage"
+            className={`${controlButtonClass} border-[#745d7d] text-fuchsia-100`}
             onTouchStart={tapAction('hold')}
           >
-            STORAGE
+            <Archive className={controlIconClass} strokeWidth={2.25} />
           </button>
           <button
             type="button"
-            className={`${actionButtonClass} border-[#557984]`}
+            aria-label="Shop"
+            className={`${controlButtonClass} border-[#557984] text-sky-100`}
             onTouchStart={tapShop}
           >
-            SHOP
+            <ShoppingBag className={controlIconClass} strokeWidth={2.25} />
           </button>
           <button
             type="button"
-            className={`${actionButtonClass} border-[#907b59]`}
+            aria-label="Rotate counter-clockwise"
+            className={`${controlButtonClass} border-[#907b59] text-amber-100`}
             onTouchStart={tapAction('rotateCCW')}
           >
-            CCW
+            <RotateCcw className={controlIconClass} strokeWidth={2.25} />
           </button>
           <button
             type="button"
-            className={`${actionButtonClass} border-[#907b59]`}
+            aria-label="Rotate clockwise"
+            className={`${controlButtonClass} border-[#907b59] text-amber-100`}
             onTouchStart={tapAction('rotateCW')}
           >
-            CW
+            <RotateCw className={controlIconClass} strokeWidth={2.25} />
           </button>
         </div>
       </div>

@@ -1,10 +1,9 @@
-import http from 'node:http';
-import { Server } from 'socket.io';
-import { io as ioClient, type Socket } from 'socket.io-client';
-import { GameManager } from '../server/GameManager.js';
+import { io as ioClient } from 'socket.io-client';
+import { startGameServer } from '../server/gameServer.js';
 
 interface WireState {
   status: string;
+  tick: number;
   players: Record<string, unknown>;
 }
 
@@ -27,30 +26,27 @@ function waitFor(check: () => boolean, label: string, timeoutMs = 2000): Promise
 }
 
 async function main() {
-  console.log('[Live Smoke] Starting local development server and Socket.IO transport verification...');
+  console.log('[Live Smoke] Starting the production game-server module...');
 
-  const server = http.createServer();
-  const ioServer = new Server(server, { cors: { origin: '*' } });
-  const gm = new GameManager(ioServer, 30);
-  const connectedSockets: Socket[] = [];
+  const server = await startGameServer({
+    mode: 'production',
+    config: {
+      port: 0,
+      host: '127.0.0.1',
+      serveClient: false,
+      replayKeyframeIntervalTicks: 30,
+    },
+  });
   let latestState: WireState | null = null;
   let gameStateMessages = 0;
   const receivedEvents: string[] = [];
+  const serverUrl = server.origin;
+  console.log(`[Live Smoke] Game server listening on ${serverUrl}`);
 
-  ioServer.on('connection', (socket) => {
-    connectedSockets.push(socket);
-    gm.handleConnection(socket);
-  });
-
-  await new Promise<void>((resolve, reject) => {
-    server.once('error', reject);
-    server.listen(0, '127.0.0.1', () => resolve());
-  });
-
-  const address = server.address();
-  const port = typeof address === 'object' && address ? address.port : 3000;
-  const serverUrl = `http://127.0.0.1:${port}`;
-  console.log(`[Live Smoke] Dev test server listening on ${serverUrl}`);
+  const health = await fetch(`${serverUrl}/health`);
+  if (!health.ok || await health.text() !== 'ok') {
+    throw new Error(`[Live Smoke] Health endpoint failed with status ${health.status}`);
+  }
 
   const socket1 = ioClient(serverUrl);
   const socket2 = ioClient(serverUrl);
@@ -68,15 +64,12 @@ async function main() {
       waitFor(() => socket2.connected, 'second client connection'),
     ]);
     await waitFor(() => latestState !== null && Object.keys(latestState.players).length === 2, 'two-player game state');
+    await waitFor(() => latestState?.status === 'playing', 'playing game state', 6000);
 
-    // Advance the authoritative manager, then require a real playing snapshot.
-    for (let i = 0; i < 200; i += 1) gm.tickOnceForTests();
-    await waitFor(() => latestState?.status === 'playing', 'playing game state');
-
+    const playingTick = latestState.tick;
     socket1.emit('shopOpen');
-    socket1.emit('action', 'rotateCW');
-    for (let i = 0; i < 10; i += 1) gm.tickOnceForTests();
-    await waitFor(() => gameStateMessages > 0, 'game state transport messages');
+    socket1.emit('action', 'hardDrop');
+    await waitFor(() => latestState !== null && latestState.tick > playingTick, 'authoritative tick after player action');
 
     if (latestState === null || Object.keys(latestState.players).length !== 2) {
       throw new Error('[Live Smoke] Final state did not contain exactly two players');
@@ -89,10 +82,7 @@ async function main() {
   } finally {
     socket1.disconnect();
     socket2.disconnect();
-    for (const socket of connectedSockets) socket.disconnect();
-    gm.stopLoop();
-    ioServer.close();
-    await new Promise<void>((resolve) => server.close(() => resolve()));
+    await server.stop();
   }
 }
 

@@ -1,65 +1,23 @@
 import 'dotenv/config';
-import express from 'express';
-import { createServer } from 'http';
-import { Server } from 'socket.io';
-import path from 'path';
-import { GameManager } from './server/GameManager.js';
-import { loadServerConfig } from './server/loadConfig.js';
+import { startGameServer } from './server/gameServer.js';
 
 async function startServer() {
-  const cfg = loadServerConfig();
-  const app = express();
-  const httpServer = createServer(app);
-  const io = new Server(httpServer, {
-    cors: {
-      origin: '*',
-      methods: ['GET', 'POST'],
-    },
-    // Compress large frames. The 30Hz full-board `gameState` snapshot is highly
-    // repetitive (mostly null/empty cells) and deflates to a fraction of its
-    // size — the single biggest lever for phones on slow radios. The threshold
-    // skips compression on tiny frames (input acks, lobby ticks) so they don't
-    // pay the per-message CPU/latency cost for no payload win.
-    perMessageDeflate: {
-      threshold: 1024,
-    },
-  });
-
-  const gameManager = new GameManager(io, cfg.replayKeyframeIntervalTicks);
-
-  app.get('/health', (_req, res) => {
-    res.status(200).type('text/plain').send('ok');
-  });
-
-  io.on('connection', (socket) => {
-    console.log(`Player connected: ${socket.id}`);
-    gameManager.handleConnection(socket);
-  });
-
-  const isDev = process.env.NODE_ENV !== 'production';
-
-  if (isDev) {
-    const { createServer: createViteServer } = await import('vite');
-    const vite = await createViteServer({
-      server: { middlewareMode: true },
-      appType: 'spa',
-    });
-    app.use(vite.middlewares);
-  } else if (cfg.serveClient) {
-    const distPath = path.join(process.cwd(), 'dist');
-    app.use(express.static(distPath));
-    app.get('*', (_req, res) => {
-      res.sendFile(path.join(distPath, 'index.html'));
-    });
+  const server = await startGameServer();
+  const modeLabel = server.mode === 'development' ? 'dev (Vite middleware)' : 'production';
+  console.log(`Shape Showdown server [${modeLabel}] on ${server.origin}`);
+  if (server.mode === 'production' && !server.config.serveClient) {
+    console.log('Static client not served (serveClient is false in config/server.json). Host dist/ separately.');
   }
 
-  httpServer.listen(cfg.port, cfg.host, () => {
-    const mode = isDev ? 'dev (Vite middleware)' : 'production';
-    console.log(`Shape Showdown server [${mode}] on http://${cfg.host}:${cfg.port}`);
-    if (!isDev && !cfg.serveClient) {
-      console.log('Static client not served (serveClient is false in config/server.json). Host dist/ separately.');
-    }
-  });
+  const stop = async (signal: NodeJS.Signals) => {
+    console.log(`Received ${signal}; stopping Shape Showdown server.`);
+    await server.stop();
+  };
+  process.once('SIGINT', () => void stop('SIGINT'));
+  process.once('SIGTERM', () => void stop('SIGTERM'));
 }
 
-startServer();
+startServer().catch((error: unknown) => {
+  console.error('Failed to start Shape Showdown server:', error);
+  process.exitCode = 1;
+});

@@ -1,6 +1,7 @@
 import React, { useEffect, useReducer, useRef } from 'react';
 import { AnimatePresence, m } from 'motion/react';
 import { PlayerState } from '../types';
+import { statusPillClass } from '../ui/shapeShowdownTheme';
 
 interface SRSKickOverlayProps {
   player: PlayerState;
@@ -43,7 +44,7 @@ export const SRSKickOverlay: React.FC<SRSKickOverlayProps> = ({ player }) => {
           animate={{ opacity: 1, scale: 1, y: 0 }}
           exit={{ opacity: 0, scale: 0.94, y: -4 }}
           transition={{ type: 'spring', stiffness: 520, damping: 28 }}
-          className="pointer-events-none absolute -top-2 right-3 z-10 rounded border border-amber-400/45 bg-amber-950/95 px-1.5 py-0.5 font-mono text-[10px] font-semibold uppercase tracking-tight text-amber-100 shadow-md shadow-amber-950/50"
+          className={`pointer-events-none absolute -top-2 right-3 z-10 ${statusPillClass('white')}`}
         >
           Kick {kickPopup.kx >= 0 ? '+' : ''}
           {kickPopup.kx},{kickPopup.ky >= 0 ? '+' : ''}

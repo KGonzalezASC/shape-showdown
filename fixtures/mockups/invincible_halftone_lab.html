@@ -1,0 +1,1111 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Shape Showdown — Invincible Halftone Background Studio</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Outfit:wght@400;600;700;800;900&family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
+  
+  <style>
+    :root {
+      --inv-bg-chrome: #0b1220;
+      --inv-bg-deep: #060911;
+      --inv-cyan: #7bafe9;
+      --inv-amber: #f1b467;
+      --inv-magenta: #ed5577;
+      --inv-stroke: #1e3a5f;
+      --font-pixel: 'Press Start 2P', monospace;
+
+      /* Live Tuner Controlled Variables */
+      --tune-dot-size: 22px;
+      --tune-opacity: 0.7;
+      --tune-blend: screen;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    
+    body {
+      font-family: 'Outfit', sans-serif;
+      background-color: var(--inv-bg-chrome);
+      color: #e0f2fe;
+      min-height: 100vh;
+      overflow-x: hidden;
+      user-select: none;
+    }
+
+    .font-pixel { font-family: var(--font-pixel); }
+    .font-mono { font-family: 'JetBrains Mono', monospace; }
+
+    /* Glassmorphic UI Cards */
+    .studio-panel {
+      background: rgba(11, 18, 32, 0.85);
+      border: 1px solid rgba(123, 175, 233, 0.25);
+      backdrop-filter: blur(12px);
+      box-shadow: 0 12px 32px rgba(0, 0, 0, 0.6);
+    }
+
+    .btn-preset {
+      transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .btn-preset.active {
+      background: linear-gradient(135deg, rgba(123, 175, 233, 0.35), rgba(237, 85, 119, 0.35));
+      border-color: #7bafe9;
+      box-shadow: 0 0 16px rgba(123, 175, 233, 0.4);
+      color: #ffffff;
+    }
+
+    /* -------------------------------------------------------------
+       HALFTONE PRESET STAGE & STYLING
+    ------------------------------------------------------------- */
+    .halftone-stage {
+      position: relative;
+      width: 100%;
+      height: 100%;
+      background-color: var(--inv-bg-chrome);
+      overflow: hidden;
+    }
+
+    /* --- Preset 1: Coreh's Contrast-Threshold CMYK Screen --- */
+    .ht-preset-1-wrap {
+      position: absolute;
+      inset: -20%;
+      pointer-events: none;
+      filter: contrast(1200%) blur(1px);
+      background: #000;
+      opacity: var(--tune-opacity);
+    }
+    .ht-preset-1-wrap .cmyk-layer {
+      position: absolute;
+      inset: 0;
+      mix-blend-mode: var(--tune-blend);
+    }
+    .ht-preset-1-wrap .cmyk-cyan {
+      background-image: radial-gradient(circle, var(--inv-cyan) 0%, transparent 60%);
+      background-size: var(--tune-dot-size) var(--tune-dot-size);
+      transform: rotate(15deg);
+    }
+    .ht-preset-1-wrap .cmyk-amber {
+      background-image: radial-gradient(circle, var(--inv-amber) 0%, transparent 60%);
+      background-size: calc(var(--tune-dot-size) * 1.15) calc(var(--tune-dot-size) * 1.15);
+      transform: rotate(75deg);
+    }
+    .ht-preset-1-wrap .cmyk-magenta {
+      background-image: radial-gradient(circle, var(--inv-magenta) 0%, transparent 60%);
+      background-size: calc(var(--tune-dot-size) * 0.9) calc(var(--tune-dot-size) * 0.9);
+      transform: rotate(45deg);
+    }
+
+    /* --- Preset 2: Radial Pop Sunburst Halftone --- */
+    .ht-preset-2 {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      isolation: isolate;
+      opacity: var(--tune-opacity);
+    }
+    .ht-preset-2 .sunburst-rays {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      width: 250vmax;
+      height: 250vmax;
+      transform: translate(-50%, -50%);
+      background: repeating-conic-gradient(
+        from 0deg,
+        rgba(123, 175, 233, 0.12) 0deg 12deg,
+        transparent 12deg 24deg,
+        rgba(241, 180, 103, 0.1) 24deg 36deg,
+        transparent 36deg 48deg
+      );
+      animation: spinSunburst 100s linear infinite;
+    }
+    .ht-preset-2 .radial-dot-field {
+      position: absolute;
+      inset: 0;
+      background-image: radial-gradient(circle, var(--inv-magenta) 0 2.8px, transparent 3.5px);
+      background-size: var(--tune-dot-size) var(--tune-dot-size);
+      mix-blend-mode: var(--tune-blend);
+      mask-image: radial-gradient(circle at 50% 50%, rgba(0,0,0,1) 20%, rgba(0,0,0,0.1) 85%);
+      -webkit-mask-image: radial-gradient(circle at 50% 50%, rgba(0,0,0,1) 20%, rgba(0,0,0,0.1) 85%);
+    }
+    @keyframes spinSunburst {
+      from { transform: translate(-50%, -50%) rotate(0deg); }
+      to { transform: translate(-50%, -50%) rotate(360deg); }
+    }
+
+    /* --- Preset 3: 2P Duotone Battle Duel --- */
+    .ht-preset-3 {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      display: flex;
+      opacity: var(--tune-opacity);
+    }
+    .ht-preset-3 .p1-halftone {
+      width: 50%;
+      height: 100%;
+      background-image: radial-gradient(circle, var(--inv-cyan) 0 3px, transparent 3.8px);
+      background-size: var(--tune-dot-size) var(--tune-dot-size);
+      mix-blend-mode: var(--tune-blend);
+      mask-image: linear-gradient(to right, rgba(0,0,0,0.95), rgba(0,0,0,0.05));
+      -webkit-mask-image: linear-gradient(to right, rgba(0,0,0,0.95), rgba(0,0,0,0.05));
+      transform: rotate(-4deg) scale(1.1);
+    }
+    .ht-preset-3 .p2-halftone {
+      width: 50%;
+      height: 100%;
+      background-image: radial-gradient(circle, var(--inv-amber) 0 3px, transparent 3.8px);
+      background-size: var(--tune-dot-size) var(--tune-dot-size);
+      mix-blend-mode: var(--tune-blend);
+      mask-image: linear-gradient(to left, rgba(0,0,0,0.95), rgba(0,0,0,0.05));
+      -webkit-mask-image: linear-gradient(to left, rgba(0,0,0,0.95), rgba(0,0,0,0.05));
+      transform: rotate(4deg) scale(1.1);
+    }
+    .ht-preset-3 .clash-seam {
+      position: absolute;
+      left: 50%;
+      top: 0;
+      bottom: 0;
+      width: 260px;
+      transform: translateX(-50%);
+      background-image: radial-gradient(circle, var(--inv-magenta) 0 3.8px, transparent 4.5px);
+      background-size: calc(var(--tune-dot-size) * 0.85) calc(var(--tune-dot-size) * 0.85);
+      mix-blend-mode: var(--tune-blend);
+      mask-image: radial-gradient(ellipse at center, rgba(0,0,0,1) 0%, rgba(0,0,0,0) 75%);
+      -webkit-mask-image: radial-gradient(ellipse at center, rgba(0,0,0,1) 0%, rgba(0,0,0,0) 75%);
+    }
+
+    /* --- Preset 4: Moiré Interference Matrix --- */
+    .ht-preset-4 {
+      position: absolute;
+      inset: -15%;
+      pointer-events: none;
+      opacity: var(--tune-opacity);
+    }
+    .ht-preset-4 .grid-layer-a {
+      position: absolute;
+      inset: 0;
+      background-image: radial-gradient(circle, var(--inv-cyan) 0 2.8px, transparent 3.5px);
+      background-size: var(--tune-dot-size) var(--tune-dot-size);
+      transform: rotate(18deg);
+      mix-blend-mode: var(--tune-blend);
+    }
+    .ht-preset-4 .grid-layer-b {
+      position: absolute;
+      inset: 0;
+      background-image: radial-gradient(circle, var(--inv-amber) 0 2.8px, transparent 3.5px);
+      background-size: calc(var(--tune-dot-size) + 1px) calc(var(--tune-dot-size) + 1px);
+      transform: rotate(48deg);
+      mix-blend-mode: var(--tune-blend);
+      animation: moireBreathing 12s ease-in-out infinite alternate;
+    }
+    @keyframes moireBreathing {
+      0% { transform: rotate(48deg) scale(1); }
+      100% { transform: rotate(52deg) scale(1.05); }
+    }
+
+    /* --- Preset 5: Ben-Day Contrast Press --- */
+    .ht-preset-5 {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      opacity: var(--tune-opacity);
+    }
+    .ht-preset-5 .benday-dots {
+      position: absolute;
+      inset: 0;
+      background-image: 
+        radial-gradient(circle at center, transparent 25%, rgba(123, 175, 233, 0.45) 90%),
+        radial-gradient(circle, var(--inv-cyan) 0 2.8px, transparent 3.5px);
+      background-size: 100% 100%, var(--tune-dot-size) var(--tune-dot-size);
+      mix-blend-mode: var(--tune-blend);
+    }
+
+    /* --- Canvas Halftone (Preset 6 - Roboshoes Liquid Physics) --- */
+    #roboshoes-canvas {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+    }
+
+    /* Board Visual Mockup Styles */
+    .board-frame {
+      border: 3px solid rgba(255, 255, 255, 0.88);
+      box-shadow: 0 0 28px rgba(0, 0, 0, 0.92), inset 0 0 18px rgba(0, 0, 0, 0.85);
+      background: rgba(10, 15, 26, 0.94);
+    }
+
+    .tetris-grid {
+      display: grid;
+      grid-template-columns: repeat(10, 1fr);
+      grid-template-rows: repeat(18, 1fr);
+      gap: 1px;
+      background: rgba(42, 174, 245, 0.32);
+      padding: 1px;
+      border: 1px solid rgba(42, 174, 245, 0.45);
+    }
+
+    .cell {
+      aspect-ratio: 1;
+      background: rgba(15, 23, 42, 0.65);
+      border-radius: 1px;
+    }
+    .cell-i { background: #38bdf8; box-shadow: inset 0 0 4px #0284c7; }
+    .cell-j { background: #6366f1; box-shadow: inset 0 0 4px #4338ca; }
+    .cell-l { background: #f97316; box-shadow: inset 0 0 4px #c2410c; }
+    .cell-o { background: #facc15; box-shadow: inset 0 0 4px #ca8a04; }
+    .cell-s { background: #22c55e; box-shadow: inset 0 0 4px #15803d; }
+    .cell-t { background: #a855f7; box-shadow: inset 0 0 4px #7e22ce; }
+    .cell-z { background: #ef4444; box-shadow: inset 0 0 4px #b91c1c; }
+    .cell-garbage { background: #52525b; box-shadow: inset 0 0 4px #27272a; border: 1px solid #71717a; }
+
+    /* Custom Scrollbar */
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: #060911; }
+    ::-webkit-scrollbar-thumb { background: #1e3a5f; border-radius: 3px; }
+  </style>
+</head>
+<body class="flex flex-col h-screen overflow-hidden">
+
+  <!-- TOP APP HEADER & CONTROL BAR -->
+  <header class="studio-panel border-b z-40 px-4 py-3 flex flex-wrap items-center justify-between gap-4">
+    <div class="flex items-center gap-3">
+      <div class="w-9 h-9 rounded-xl bg-gradient-to-tr from-cyan-500 via-amber-500 to-pink-500 p-0.5 shadow-lg shadow-cyan-500/20">
+        <div class="w-full h-full bg-slate-950 rounded-[10px] flex items-center justify-center font-pixel text-xs text-cyan-300">
+          HT
+        </div>
+      </div>
+      <div>
+        <div class="flex items-center gap-2">
+          <h1 class="text-base font-extrabold tracking-wide text-white">SHAPE SHOWDOWN</h1>
+          <span class="font-pixel text-[9px] bg-sky-950/80 text-sky-300 border border-sky-500/40 px-2 py-0.5 rounded">INVINCIBLE HALFTONE STUDIO</span>
+        </div>
+        <p class="text-xs text-sky-300/70 font-mono">Comic halftone background lab — inspired by Roboshoes & Coreh CodePens</p>
+      </div>
+    </div>
+
+    <!-- PRESET SELECTOR BUTTONS -->
+    <div class="flex items-center gap-1.5 bg-slate-950/80 p-1.5 rounded-xl border border-sky-900/40 overflow-x-auto">
+      <button onclick="selectPreset(6)" id="btn-p6" class="btn-preset active px-3.5 py-1.5 rounded-lg text-xs font-bold border border-transparent text-slate-300 hover:text-white flex items-center gap-1">
+        ⭐ 6. Roboshoes Liquid Canvas
+      </button>
+      <button onclick="selectPreset(1)" id="btn-p1" class="btn-preset px-3 py-1.5 rounded-lg text-xs font-semibold border border-transparent text-slate-300 hover:text-white">
+        1. Coreh CSS Threshold
+      </button>
+      <button onclick="selectPreset(2)" id="btn-p2" class="btn-preset px-3 py-1.5 rounded-lg text-xs font-semibold border border-transparent text-slate-300 hover:text-white">
+        2. Radial Sunburst
+      </button>
+      <button onclick="selectPreset(3)" id="btn-p3" class="btn-preset px-3 py-1.5 rounded-lg text-xs font-semibold border border-transparent text-slate-300 hover:text-white">
+        3. 2P Battle Duel
+      </button>
+      <button onclick="selectPreset(4)" id="btn-p4" class="btn-preset px-3 py-1.5 rounded-lg text-xs font-semibold border border-transparent text-slate-300 hover:text-white">
+        4. Moiré Matrix
+      </button>
+      <button onclick="selectPreset(5)" id="btn-p5" class="btn-preset px-3 py-1.5 rounded-lg text-xs font-semibold border border-transparent text-slate-300 hover:text-white">
+        5. Ben-Day Vignette
+      </button>
+    </div>
+
+    <!-- VIEW & TOOLBAR TOGGLES -->
+    <div class="flex items-center gap-3">
+      <button onclick="toggleGridMode()" id="grid-toggle-btn" class="bg-slate-900 hover:bg-slate-800 border border-sky-500/30 text-sky-200 text-xs font-medium px-3 py-1.5 rounded-lg transition flex items-center gap-1.5">
+        <svg class="w-4 h-4 text-sky-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"></path></svg>
+        Compare All (Grid View)
+      </button>
+
+      <button onclick="toggleUIOverlay()" id="ui-toggle-btn" class="bg-sky-950/80 hover:bg-sky-900 border border-sky-400/40 text-sky-200 text-xs font-medium px-3 py-1.5 rounded-lg transition flex items-center gap-1.5">
+        <svg class="w-4 h-4 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path></svg>
+        Toggle Game UI
+      </button>
+
+      <button onclick="openExportModal()" class="bg-gradient-to-r from-cyan-600 to-pink-600 hover:from-cyan-500 hover:to-pink-500 text-white font-semibold text-xs px-3.5 py-1.5 rounded-lg shadow-md transition flex items-center gap-1.5">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg>
+        Export Code
+      </button>
+    </div>
+  </header>
+
+  <!-- MAIN STAGE AREA -->
+  <div class="relative flex-1 w-full h-full overflow-hidden">
+
+    <!-- SINGLE STAGE DISPLAY -->
+    <div id="single-stage" class="absolute inset-0 w-full h-full">
+
+      <!-- HALFTONE BACKGROUND STAGE -->
+      <div id="halftone-container" class="halftone-stage">
+        
+        <!-- Preset 6: Roboshoes Canvas Liquid Physics (Hero) -->
+        <div id="stage-preset-6" class="absolute inset-0">
+          <canvas id="roboshoes-canvas"></canvas>
+        </div>
+
+        <!-- Preset 1: Coreh's Contrast-Threshold CMYK Screen -->
+        <div id="stage-preset-1" class="ht-preset-1-wrap hidden">
+          <div class="cmyk-layer cmyk-cyan"></div>
+          <div class="cmyk-layer cmyk-amber"></div>
+          <div class="cmyk-layer cmyk-magenta"></div>
+        </div>
+
+        <!-- Preset 2 DOM Structure -->
+        <div id="stage-preset-2" class="ht-preset-2 hidden">
+          <div class="sunburst-rays"></div>
+          <div class="radial-dot-field"></div>
+        </div>
+
+        <!-- Preset 3 DOM Structure -->
+        <div id="stage-preset-3" class="ht-preset-3 hidden">
+          <div class="p1-halftone"></div>
+          <div class="clash-seam"></div>
+          <div class="p2-halftone"></div>
+        </div>
+
+        <!-- Preset 4 DOM Structure -->
+        <div id="stage-preset-4" class="ht-preset-4 hidden">
+          <div class="grid-layer-a"></div>
+          <div class="grid-layer-b"></div>
+        </div>
+
+        <!-- Preset 5 DOM Structure -->
+        <div id="stage-preset-5" class="ht-preset-5 hidden">
+          <div class="benday-dots"></div>
+        </div>
+
+      </div>
+
+      <!-- GAME UI OVERLAY (AUTHENTIC SHAPE SHOWDOWN PRESENTATION) -->
+      <div id="game-ui-overlay" class="absolute inset-0 z-10 flex items-center justify-center p-4 transition-opacity duration-300">
+        
+        <div class="w-full max-w-5xl grid grid-cols-12 gap-4 items-center max-h-[90vh]">
+
+          <!-- PLAYER 1 (CYAN - SELF) -->
+          <div class="col-span-5 studio-panel rounded-2xl p-4 flex flex-col items-center border-sky-400/40 shadow-2xl relative overflow-hidden">
+            <div class="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-sky-400 to-blue-600"></div>
+            
+            <div class="w-full flex items-center justify-between mb-3 border-b border-sky-900/50 pb-2">
+              <div class="flex items-center gap-2">
+                <span class="w-3 h-3 rounded-full bg-sky-400 shadow-lg shadow-sky-400/80 animate-pulse"></span>
+                <span class="font-pixel text-xs text-sky-200 uppercase">P1_NEON_BLITZ</span>
+              </div>
+              <div class="font-pixel text-[10px] text-sky-300 bg-sky-950 border border-sky-500/30 px-2 py-1 rounded">
+                SCORE: 24,500
+              </div>
+            </div>
+
+            <div class="flex gap-4 items-start w-full justify-center">
+              <!-- HOLD & STATS -->
+              <div class="flex flex-col gap-3">
+                <div class="bg-slate-950/80 rounded-xl p-2 text-center w-16 border border-sky-900/40">
+                  <span class="text-[9px] font-pixel text-sky-400 block mb-1">HOLD</span>
+                  <div class="w-12 h-12 bg-slate-900 rounded border border-sky-500/20 flex items-center justify-center">
+                    <div class="grid grid-cols-4 gap-0.5 w-8 h-8">
+                      <div class="cell cell-i"></div><div class="cell cell-i"></div><div class="cell cell-i"></div><div class="cell cell-i"></div>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="bg-slate-950/80 rounded-xl p-2 text-center w-16 border border-sky-900/40 font-mono text-xs">
+                  <span class="text-[8px] font-pixel text-slate-400 block mb-0.5">CLEARS</span>
+                  <span class="font-bold text-sky-300">42</span>
+                </div>
+
+                <div class="bg-slate-950/80 rounded-xl p-2 text-center w-16 border border-sky-900/40 font-mono text-xs">
+                  <span class="text-[8px] font-pixel text-amber-400 block mb-0.5">COINS</span>
+                  <span class="font-bold text-amber-300">$180</span>
+                </div>
+              </div>
+
+              <!-- PLAYFIELD CANVAS / GRID -->
+              <div class="board-frame rounded-lg p-1">
+                <div class="tetris-grid w-[200px] h-[360px]">
+                  <!-- Empty top rows -->
+                  <div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div>
+                  <div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div>
+                  <div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div>
+                  <div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div>
+                  
+                  <!-- Active T-piece -->
+                  <div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell cell-t"></div><div class="cell cell-t"></div><div class="cell cell-t"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div>
+                  <div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell cell-t"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div>
+
+                  <!-- Locked Stack -->
+                  <div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div>
+                  <div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div>
+                  <div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div>
+                  <div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div>
+                  <div class="cell"></div><div class="cell"></div><div class="cell cell-z"></div><div class="cell cell-z"></div><div class="cell"></div><div class="cell"></div><div class="cell cell-s"></div><div class="cell cell-s"></div><div class="cell"></div><div class="cell"></div>
+                  <div class="cell"></div><div class="cell cell-z"></div><div class="cell cell-z"></div><div class="cell cell-o"></div><div class="cell cell-o"></div><div class="cell cell-s"></div><div class="cell cell-s"></div><div class="cell cell-j"></div><div class="cell"></div><div class="cell"></div>
+                  <div class="cell cell-i"></div><div class="cell cell-i"></div><div class="cell cell-i"></div><div class="cell cell-i"></div><div class="cell cell-o"></div><div class="cell cell-o"></div><div class="cell cell-j"></div><div class="cell cell-j"></div><div class="cell cell-j"></div><div class="cell"></div>
+                  <div class="cell cell-garbage"></div><div class="cell cell-garbage"></div><div class="cell cell-garbage"></div><div class="cell cell-garbage"></div><div class="cell cell-garbage"></div><div class="cell cell-garbage"></div><div class="cell cell-garbage"></div><div class="cell cell-garbage"></div><div class="cell cell-garbage"></div><div class="cell"></div>
+                  <div class="cell cell-garbage"></div><div class="cell cell-garbage"></div><div class="cell cell-garbage"></div><div class="cell cell-garbage"></div><div class="cell cell-garbage"></div><div class="cell cell-garbage"></div><div class="cell cell-garbage"></div><div class="cell cell-garbage"></div><div class="cell cell-garbage"></div><div class="cell"></div>
+                  <div class="cell cell-l"></div><div class="cell cell-l"></div><div class="cell cell-l"></div><div class="cell cell-l"></div><div class="cell cell-t"></div><div class="cell cell-t"></div><div class="cell cell-t"></div><div class="cell cell-garbage"></div><div class="cell cell-garbage"></div><div class="cell"></div>
+                  <div class="cell cell-garbage"></div><div class="cell cell-garbage"></div><div class="cell cell-garbage"></div><div class="cell cell-garbage"></div><div class="cell cell-garbage"></div><div class="cell cell-garbage"></div><div class="cell cell-garbage"></div><div class="cell cell-garbage"></div><div class="cell cell-garbage"></div><div class="cell"></div>
+                  <div class="cell cell-garbage"></div><div class="cell cell-garbage"></div><div class="cell cell-garbage"></div><div class="cell cell-garbage"></div><div class="cell cell-garbage"></div><div class="cell cell-garbage"></div><div class="cell cell-garbage"></div><div class="cell cell-garbage"></div><div class="cell cell-garbage"></div><div class="cell"></div>
+                </div>
+              </div>
+
+              <!-- NEXT QUEUE -->
+              <div class="flex flex-col gap-2">
+                <div class="bg-slate-950/80 rounded-xl p-2 text-center w-16 border border-sky-900/40">
+                  <span class="text-[9px] font-pixel text-sky-400 block mb-1">NEXT</span>
+                  <div class="flex flex-col gap-2 items-center">
+                    <div class="w-10 h-6 bg-slate-900 rounded border border-sky-500/20 flex items-center justify-center">
+                      <div class="grid grid-cols-3 gap-0.5 w-6 h-4">
+                        <div class="cell cell-l"></div><div class="cell cell-l"></div><div class="cell cell-l"></div>
+                      </div>
+                    </div>
+                    <div class="w-10 h-6 bg-slate-900 rounded border border-sky-500/20 flex items-center justify-center">
+                      <div class="grid grid-cols-2 gap-0.5 w-4 h-4">
+                        <div class="cell cell-o"></div><div class="cell cell-o"></div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- CENTER SHOP RAIL -->
+          <div class="col-span-2 studio-panel rounded-2xl p-3 flex flex-col items-center gap-3 border-amber-500/30">
+            <div class="font-pixel text-[10px] text-amber-300 tracking-wider">SHOP RAIL</div>
+
+            <div class="w-full flex flex-col gap-2">
+              <div class="bg-slate-950 border border-amber-500/40 rounded-xl p-2 text-center hover:scale-105 transition cursor-pointer">
+                <div class="text-[10px] font-bold text-amber-200">🧪 ELIXIR</div>
+                <div class="text-[8px] text-slate-400 font-mono mt-0.5">PURIFY POISON</div>
+                <div class="font-pixel text-[8px] text-amber-400 mt-1">$40</div>
+              </div>
+
+              <div class="bg-slate-950 border border-sky-500/40 rounded-xl p-2 text-center hover:scale-105 transition cursor-pointer">
+                <div class="text-[10px] font-bold text-sky-200">🧲 MAGNET</div>
+                <div class="text-[8px] text-slate-400 font-mono mt-0.5">COMPACT GAP</div>
+                <div class="font-pixel text-[8px] text-sky-400 mt-1">$65</div>
+              </div>
+
+              <div class="bg-slate-950 border border-pink-500/40 rounded-xl p-2 text-center hover:scale-105 transition cursor-pointer">
+                <div class="text-[10px] font-bold text-pink-300">💣 BOMBER</div>
+                <div class="text-[8px] text-slate-400 font-mono mt-0.5">BLAST ROW</div>
+                <div class="font-pixel text-[8px] text-pink-400 mt-1">$90</div>
+              </div>
+
+              <div class="bg-slate-950 border border-purple-500/40 rounded-xl p-2 text-center hover:scale-105 transition cursor-pointer">
+                <div class="text-[10px] font-bold text-purple-300">🌋 TECTONIC</div>
+                <div class="text-[8px] text-slate-400 font-mono mt-0.5">SHAKE BOARD</div>
+                <div class="font-pixel text-[8px] text-purple-400 mt-1">$120</div>
+              </div>
+            </div>
+
+            <div class="w-full bg-slate-950/90 rounded-xl p-2 border border-slate-800 text-center font-mono text-[9px]">
+              <span class="text-slate-400 block">MATCH TIME</span>
+              <span class="text-white font-bold text-sm">01:45</span>
+            </div>
+          </div>
+
+          <!-- PLAYER 2 (AMBER - OPPONENT) -->
+          <div class="col-span-5 studio-panel rounded-2xl p-4 flex flex-col items-center border-amber-400/40 shadow-2xl relative overflow-hidden">
+            <div class="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-amber-400 to-rose-500"></div>
+
+            <div class="w-full flex items-center justify-between mb-3 border-b border-amber-900/50 pb-2">
+              <div class="flex items-center gap-2">
+                <span class="w-3 h-3 rounded-full bg-amber-400 shadow-lg shadow-amber-400/80"></span>
+                <span class="font-pixel text-xs text-amber-200 uppercase">P2_SHADOW_KING</span>
+              </div>
+              <div class="font-pixel text-[10px] text-amber-300 bg-amber-950 border border-amber-500/30 px-2 py-1 rounded">
+                SCORE: 19,800
+              </div>
+            </div>
+
+            <div class="flex gap-4 items-start w-full justify-center">
+              <!-- HOLD & STATS -->
+              <div class="flex flex-col gap-3">
+                <div class="bg-slate-950/80 rounded-xl p-2 text-center w-16 border border-amber-900/40">
+                  <span class="text-[9px] font-pixel text-amber-400 block mb-1">HOLD</span>
+                  <div class="w-12 h-12 bg-slate-900 rounded border border-amber-500/20 flex items-center justify-center">
+                    <div class="grid grid-cols-2 gap-0.5 w-6 h-6">
+                      <div class="cell cell-o"></div><div class="cell cell-o"></div>
+                      <div class="cell cell-o"></div><div class="cell cell-o"></div>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="bg-slate-950/80 rounded-xl p-2 text-center w-16 border border-amber-900/40 font-mono text-xs">
+                  <span class="text-[8px] font-pixel text-slate-400 block mb-0.5">CLEARS</span>
+                  <span class="font-bold text-amber-300">35</span>
+                </div>
+
+                <div class="bg-slate-950/80 rounded-xl p-2 text-center w-16 border border-amber-900/40 font-mono text-xs">
+                  <span class="text-[8px] font-pixel text-amber-400 block mb-0.5">COINS</span>
+                  <span class="font-bold text-amber-300">$110</span>
+                </div>
+              </div>
+
+              <!-- PLAYFIELD CANVAS / GRID -->
+              <div class="board-frame rounded-lg p-1">
+                <div class="tetris-grid w-[200px] h-[360px]">
+                  <!-- Empty top rows -->
+                  <div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div>
+                  <div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div>
+                  <div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div>
+                  <div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div>
+                  
+                  <!-- Active J-piece -->
+                  <div class="cell"></div><div class="cell"></div><div class="cell cell-j"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div>
+                  <div class="cell"></div><div class="cell"></div><div class="cell cell-j"></div><div class="cell cell-j"></div><div class="cell cell-j"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div>
+
+                  <!-- Stack -->
+                  <div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div>
+                  <div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div>
+                  <div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div>
+                  <div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div>
+                  <div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div>
+                  <div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell cell-s"></div><div class="cell cell-s"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div>
+                  <div class="cell"></div><div class="cell cell-z"></div><div class="cell cell-z"></div><div class="cell cell-s"></div><div class="cell cell-s"></div><div class="cell cell-l"></div><div class="cell cell-l"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div>
+                  <div class="cell cell-i"></div><div class="cell cell-i"></div><div class="cell cell-i"></div><div class="cell cell-i"></div><div class="cell cell-t"></div><div class="cell cell-t"></div><div class="cell cell-l"></div><div class="cell cell-l"></div><div class="cell"></div><div class="cell"></div>
+                  <div class="cell cell-garbage"></div><div class="cell cell-garbage"></div><div class="cell cell-garbage"></div><div class="cell cell-garbage"></div><div class="cell cell-garbage"></div><div class="cell cell-garbage"></div><div class="cell cell-garbage"></div><div class="cell cell-garbage"></div><div class="cell cell-garbage"></div><div class="cell"></div>
+                  <div class="cell cell-garbage"></div><div class="cell cell-garbage"></div><div class="cell cell-garbage"></div><div class="cell cell-garbage"></div><div class="cell cell-garbage"></div><div class="cell cell-garbage"></div><div class="cell cell-garbage"></div><div class="cell cell-garbage"></div><div class="cell cell-garbage"></div><div class="cell"></div>
+                  <div class="cell cell-garbage"></div><div class="cell cell-garbage"></div><div class="cell cell-garbage"></div><div class="cell cell-garbage"></div><div class="cell cell-garbage"></div><div class="cell cell-garbage"></div><div class="cell cell-garbage"></div><div class="cell cell-garbage"></div><div class="cell cell-garbage"></div><div class="cell"></div>
+                  <div class="cell cell-garbage"></div><div class="cell cell-garbage"></div><div class="cell cell-garbage"></div><div class="cell cell-garbage"></div><div class="cell cell-garbage"></div><div class="cell cell-garbage"></div><div class="cell cell-garbage"></div><div class="cell cell-garbage"></div><div class="cell cell-garbage"></div><div class="cell"></div>
+                </div>
+              </div>
+
+              <!-- NEXT QUEUE -->
+              <div class="flex flex-col gap-2">
+                <div class="bg-slate-950/80 rounded-xl p-2 text-center w-16 border border-amber-900/40">
+                  <span class="text-[9px] font-pixel text-amber-400 block mb-1">NEXT</span>
+                  <div class="flex flex-col gap-2 items-center">
+                    <div class="w-10 h-6 bg-slate-900 rounded border border-amber-500/20 flex items-center justify-center">
+                      <div class="grid grid-cols-4 gap-0.5 w-8 h-2">
+                        <div class="cell cell-i"></div><div class="cell cell-i"></div><div class="cell cell-i"></div><div class="cell cell-i"></div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+            </div>
+          </div>
+
+        </div>
+
+      </div>
+
+    </div>
+
+    <!-- COMPARISON GRID VIEW -->
+    <div id="grid-stage" class="absolute inset-0 w-full h-full p-4 overflow-y-auto hidden">
+      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 pb-16">
+
+        <!-- Grid Item 6 (Roboshoes Hero) -->
+        <div onclick="selectPreset(6); toggleGridMode();" class="studio-panel rounded-2xl overflow-hidden cursor-pointer hover:border-cyan-400 transition group flex flex-col h-[280px]">
+          <div class="p-3 border-b border-sky-900/40 bg-slate-950/80 flex items-center justify-between">
+            <span class="font-bold text-sm text-white group-hover:text-cyan-300">6. Roboshoes Liquid Canvas</span>
+            <span class="text-[10px] font-pixel text-cyan-300 bg-sky-950 px-2 py-0.5 rounded border border-sky-500/30">60FPS CANVAS</span>
+          </div>
+          <div class="relative flex-1 halftone-stage bg-slate-950 flex items-center justify-center">
+            <div class="text-center p-4">
+              <div class="font-pixel text-xs text-cyan-400 mb-2">INTERACTIVE LIQUID DOT MATRIX</div>
+              <p class="text-xs text-slate-300">Dots ripple dynamically on mouse proximity with multi-colored CMYK liquid physics.</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Grid Item 1 (Coreh Threshold) -->
+        <div onclick="selectPreset(1); toggleGridMode();" class="studio-panel rounded-2xl overflow-hidden cursor-pointer hover:border-cyan-400 transition group flex flex-col h-[280px]">
+          <div class="p-3 border-b border-sky-900/40 bg-slate-950/80 flex items-center justify-between">
+            <span class="font-bold text-sm text-white group-hover:text-cyan-300">1. Coreh CSS Threshold</span>
+            <span class="text-[10px] font-pixel text-sky-400 bg-sky-950 px-2 py-0.5 rounded border border-sky-500/30">CSS FILTER</span>
+          </div>
+          <div class="relative flex-1 halftone-stage">
+            <div class="ht-preset-1-wrap scale-75 origin-center">
+              <div class="cmyk-layer cmyk-cyan"></div>
+              <div class="cmyk-layer cmyk-amber"></div>
+              <div class="cmyk-layer cmyk-magenta"></div>
+            </div>
+            <div class="absolute bottom-3 left-3 right-3 bg-slate-950/80 p-2 rounded-lg text-[11px] text-slate-300 border border-slate-800">
+              Coreh's contrast-threshold CSS halftone dots with smooth gradient dot scaling.
+            </div>
+          </div>
+        </div>
+
+        <!-- Grid Item 2 -->
+        <div onclick="selectPreset(2); toggleGridMode();" class="studio-panel rounded-2xl overflow-hidden cursor-pointer hover:border-amber-400 transition group flex flex-col h-[280px]">
+          <div class="p-3 border-b border-sky-900/40 bg-slate-950/80 flex items-center justify-between">
+            <span class="font-bold text-sm text-white group-hover:text-amber-300">2. Sunburst Radial</span>
+            <span class="text-[10px] font-pixel text-amber-400 bg-amber-950 px-2 py-0.5 rounded border border-amber-500/30">ACTION POP</span>
+          </div>
+          <div class="relative flex-1 halftone-stage">
+            <div class="ht-preset-2 scale-75 origin-center">
+              <div class="sunburst-rays"></div>
+              <div class="radial-dot-field"></div>
+            </div>
+            <div class="absolute bottom-3 left-3 right-3 bg-slate-950/80 p-2 rounded-lg text-[11px] text-slate-300 border border-slate-800">
+              Kinetic comic action sunburst rays paired with masked radial dot fields.
+            </div>
+          </div>
+        </div>
+
+        <!-- Grid Item 3 -->
+        <div onclick="selectPreset(3); toggleGridMode();" class="studio-panel rounded-2xl overflow-hidden cursor-pointer hover:border-pink-400 transition group flex flex-col h-[280px]">
+          <div class="p-3 border-b border-sky-900/40 bg-slate-950/80 flex items-center justify-between">
+            <span class="font-bold text-sm text-white group-hover:text-pink-300">3. 2P Battle Duel</span>
+            <span class="text-[10px] font-pixel text-pink-400 bg-pink-950 px-2 py-0.5 rounded border border-pink-500/30">DUOTONE CLASH</span>
+          </div>
+          <div class="relative flex-1 halftone-stage">
+            <div class="ht-preset-3 scale-75 origin-center">
+              <div class="p1-halftone"></div>
+              <div class="clash-seam"></div>
+              <div class="p2-halftone"></div>
+            </div>
+            <div class="absolute bottom-3 left-3 right-3 bg-slate-950/80 p-2 rounded-lg text-[11px] text-slate-300 border border-slate-800">
+              Asymmetric Cyan P1 vs Amber P2 screens with a central Magenta clash shockwave.
+            </div>
+          </div>
+        </div>
+
+        <!-- Grid Item 4 -->
+        <div onclick="selectPreset(4); toggleGridMode();" class="studio-panel rounded-2xl overflow-hidden cursor-pointer hover:border-purple-400 transition group flex flex-col h-[280px]">
+          <div class="p-3 border-b border-sky-900/40 bg-slate-950/80 flex items-center justify-between">
+            <span class="font-bold text-sm text-white group-hover:text-purple-300">4. Moiré Matrix</span>
+            <span class="text-[10px] font-pixel text-purple-400 bg-purple-950 px-2 py-0.5 rounded border border-purple-500/30">INTERFERENCE</span>
+          </div>
+          <div class="relative flex-1 halftone-stage">
+            <div class="ht-preset-4 scale-75 origin-center">
+              <div class="grid-layer-a"></div>
+              <div class="grid-layer-b"></div>
+            </div>
+            <div class="absolute bottom-3 left-3 right-3 bg-slate-950/80 p-2 rounded-lg text-[11px] text-slate-300 border border-slate-800">
+              Dual offset halftone grids (18° & 48°) creating subtle breathing moiré patterns.
+            </div>
+          </div>
+        </div>
+
+        <!-- Grid Item 5 -->
+        <div onclick="selectPreset(5); toggleGridMode();" class="studio-panel rounded-2xl overflow-hidden cursor-pointer hover:border-emerald-400 transition group flex flex-col h-[280px]">
+          <div class="p-3 border-b border-sky-900/40 bg-slate-950/80 flex items-center justify-between">
+            <span class="font-bold text-sm text-white group-hover:text-emerald-300">5. Ben-Day Vignette</span>
+            <span class="text-[10px] font-pixel text-emerald-400 bg-emerald-950 px-2 py-0.5 rounded border border-emerald-500/30">NEWS PRINT</span>
+          </div>
+          <div class="relative flex-1 halftone-stage">
+            <div class="ht-preset-5 scale-75 origin-center">
+              <div class="benday-dots"></div>
+            </div>
+            <div class="absolute bottom-3 left-3 right-3 bg-slate-950/80 p-2 rounded-lg text-[11px] text-slate-300 border border-slate-800">
+              Ben-Day dot screen with edge-concentrated color density for maximum playfield readability.
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+  </div>
+
+  <!-- FLOATING PRESET CONTROLLER & LIVE PARAMETER TUNER -->
+  <div id="tuner-drawer" class="studio-panel border-t z-40 px-6 py-3 flex flex-wrap items-center justify-between gap-4">
+    <div class="flex flex-wrap items-center gap-6">
+      
+      <!-- DOT SIZE SLIDER -->
+      <div class="flex items-center gap-2">
+        <span class="text-xs font-bold text-sky-200">DOT SPACING / SIZE:</span>
+        <input type="range" id="param-size" min="14" max="44" value="22" oninput="updateTunerParams()" class="w-28 accent-sky-400 cursor-pointer">
+        <span id="val-size" class="text-xs font-mono text-sky-300 w-8">22px</span>
+      </div>
+
+      <!-- OPACITY SLIDER -->
+      <div class="flex items-center gap-2">
+        <span class="text-xs font-bold text-sky-200">OPACITY:</span>
+        <input type="range" id="param-opacity" min="15" max="100" value="70" oninput="updateTunerParams()" class="w-28 accent-pink-400 cursor-pointer">
+        <span id="val-opacity" class="text-xs font-mono text-pink-300 w-8">70%</span>
+      </div>
+
+      <!-- BLEND MODE DROPDOWN -->
+      <div class="flex items-center gap-2">
+        <span class="text-xs font-bold text-sky-200">BLEND MODE:</span>
+        <select id="param-blend" onchange="updateTunerParams()" class="bg-slate-950 border border-sky-500/40 text-xs font-mono text-sky-200 rounded px-2 py-1 cursor-pointer">
+          <option value="screen">screen</option>
+          <option value="color-dodge">color-dodge</option>
+          <option value="lighter">lighter</option>
+          <option value="hard-light">hard-light</option>
+          <option value="source-over">normal</option>
+        </select>
+      </div>
+
+      <!-- KINETIC MOUSE SWELL FORCE (Preset 6 Special) -->
+      <div id="kinetic-tuner-group" class="flex items-center gap-2">
+        <span class="text-xs font-bold text-amber-300">MOUSE RIPPLE FORCE:</span>
+        <input type="range" id="param-force" min="0" max="100" value="65" oninput="updateTunerParams()" class="w-24 accent-amber-400 cursor-pointer">
+        <span id="val-force" class="text-xs font-mono text-amber-300 w-8">65%</span>
+      </div>
+
+    </div>
+
+    <div id="preset-description" class="text-xs text-sky-300/80 font-mono italic">
+      Preset 6: Roboshoes-inspired interactive 60fps canvas liquid halftone grid.
+    </div>
+  </div>
+
+  <!-- CODE EXPORT MODAL -->
+  <div id="export-modal" class="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4 hidden">
+    <div class="studio-panel w-full max-w-2xl rounded-2xl p-6 border-sky-400/50 flex flex-col gap-4 shadow-2xl">
+      <div class="flex items-center justify-between border-b border-sky-900/50 pb-3">
+        <div class="flex items-center gap-2">
+          <span class="w-3 h-3 rounded-full bg-cyan-400"></span>
+          <h3 class="font-bold text-lg text-white">EXPORT HALFTONE CODE</h3>
+        </div>
+        <button onclick="closeExportModal()" class="text-slate-400 hover:text-white text-xl font-bold">&times;</button>
+      </div>
+
+      <p class="text-xs text-slate-300">
+        Ready-to-use code for your selected halftone variation below:
+      </p>
+
+      <textarea id="export-code-box" readonly class="w-full h-64 bg-slate-950 border border-sky-900/60 rounded-xl p-4 font-mono text-xs text-cyan-300 resize-none focus:outline-none"></textarea>
+
+      <div class="flex justify-end gap-3 pt-2">
+        <button onclick="closeExportModal()" class="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-slate-300 text-xs font-semibold rounded-xl border border-slate-700">
+          Close
+        </button>
+        <button onclick="copyExportCode()" id="copy-btn" class="px-4 py-2 bg-gradient-to-r from-cyan-600 to-pink-600 hover:from-cyan-500 hover:to-pink-500 text-white text-xs font-semibold rounded-xl shadow-lg transition">
+          Copy Code to Clipboard
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- JAVASCRIPT STUDIO INTERACTION & ROBOSHOES CANVAS ENGINE -->
+  <script>
+    let currentPreset = 6;
+    let isGridMode = false;
+    let isUIOverlayVisible = true;
+    let animFrameId = null;
+
+    // Roboshoes Canvas Engine State
+    let canvasConfig = {
+      spacing: 22,
+      opacity: 0.7,
+      blendMode: 'screen',
+      rippleForce: 0.65
+    };
+
+    const presetNames = {
+      1: "1. Coreh CSS Threshold",
+      2: "2. Sunburst Radial",
+      3: "3. 2P Battle Duel",
+      4: "4. Moiré Matrix",
+      5: "5. Ben-Day Vignette",
+      6: "6. Roboshoes Liquid Canvas"
+    };
+
+    const presetDescriptions = {
+      1: "Preset 1: Coreh's contrast-threshold CSS technique with perfectly crisp, non-pixelated CMYK dots.",
+      2: "Preset 2: Kinetic comic action sunburst rays paired with masked radial dot fields.",
+      3: "Preset 3: Asymmetric Cyan P1 vs Amber P2 screens with a central Magenta clash shockwave.",
+      4: "Preset 4: Dual offset halftone grids (18° & 48°) creating subtle breathing moiré patterns.",
+      5: "Preset 5: Ben-Day dot screen with edge-concentrated color density for maximum playfield readability.",
+      6: "Preset 6: Roboshoes-inspired interactive 60fps canvas liquid halftone grid (reacts to mouse physics!)."
+    };
+
+    function selectPreset(num) {
+      currentPreset = num;
+      
+      // Update Tab UI
+      for (let i = 1; i <= 6; i++) {
+        const btn = document.getElementById(`btn-p${i}`);
+        const stage = document.getElementById(`stage-preset-${i}`);
+        if (btn) btn.classList.toggle('active', i === num);
+        if (stage) stage.classList.toggle('hidden', i !== num);
+      }
+
+      document.getElementById('preset-description').innerText = presetDescriptions[num];
+      document.getElementById('kinetic-tuner-group').style.display = (num === 6) ? 'flex' : 'none';
+
+      // Update Tuner params for active preset immediately
+      updateTunerParams();
+
+      if (num === 6) {
+        startRoboshoesCanvas();
+      } else if (animFrameId) {
+        cancelAnimationFrame(animFrameId);
+        animFrameId = null;
+      }
+    }
+
+    function toggleGridMode() {
+      isGridMode = !isGridMode;
+      document.getElementById('single-stage').classList.toggle('hidden', isGridMode);
+      document.getElementById('grid-stage').classList.toggle('hidden', !isGridMode);
+      document.getElementById('grid-toggle-btn').classList.toggle('bg-sky-700', isGridMode);
+    }
+
+    function toggleUIOverlay() {
+      isUIOverlayVisible = !isUIOverlayVisible;
+      const overlay = document.getElementById('game-ui-overlay');
+      overlay.style.opacity = isUIOverlayVisible ? '1' : '0';
+      overlay.style.pointerEvents = isUIOverlayVisible ? 'auto' : 'none';
+    }
+
+    /* REAL-TIME TUNER CONTROLLER - UPDATES ALL PRESETS IMMEDIATELY */
+    function updateTunerParams() {
+      const sizeVal = document.getElementById('param-size').value;
+      const opacityVal = document.getElementById('param-opacity').value;
+      const blendVal = document.getElementById('param-blend').value;
+      const forceVal = document.getElementById('param-force').value;
+
+      document.getElementById('val-size').innerText = `${sizeVal}px`;
+      document.getElementById('val-opacity').innerText = `${opacityVal}%`;
+      document.getElementById('val-force').innerText = `${forceVal}%`;
+
+      // Update Root CSS Custom Properties
+      document.documentElement.style.setProperty('--tune-dot-size', `${sizeVal}px`);
+      document.documentElement.style.setProperty('--tune-opacity', opacityVal / 100);
+      document.documentElement.style.setProperty('--tune-blend', blendVal);
+
+      // Update Canvas Config
+      canvasConfig.spacing = parseInt(sizeVal);
+      canvasConfig.opacity = opacityVal / 100;
+      canvasConfig.blendMode = blendVal === 'source-over' ? 'source-over' : (blendVal === 'lighter' ? 'lighter' : 'screen');
+      canvasConfig.rippleForce = forceVal / 100;
+    }
+
+    /* -------------------------------------------------------------
+       ROBOSHOES LIQUID CANVAS HALFTONE ENGINE (PRESET 6)
+    ------------------------------------------------------------- */
+    function startRoboshoesCanvas() {
+      const canvas = document.getElementById('roboshoes-canvas');
+      if (!canvas) return;
+      const ctx = canvas.getContext('2d');
+
+      let width = 0;
+      let height = 0;
+
+      function resize() {
+        if (!canvas.parentElement) return;
+        width = canvas.width = canvas.parentElement.clientWidth;
+        height = canvas.height = canvas.parentElement.clientHeight;
+      }
+      resize();
+      window.addEventListener('resize', resize);
+
+      let mouse = { x: -2000, y: -2000, active: false };
+
+      window.addEventListener('mousemove', (e) => {
+        const rect = canvas.getBoundingClientRect();
+        mouse.x = e.clientX - rect.left;
+        mouse.y = e.clientY - rect.top;
+        mouse.active = true;
+      });
+
+      window.addEventListener('mouseleave', () => {
+        mouse.active = false;
+      });
+
+      let time = 0;
+
+      function draw() {
+        ctx.fillStyle = '#0b1220';
+        ctx.fillRect(0, 0, width, height);
+
+        const spacing = canvasConfig.spacing;
+        const cols = Math.ceil(width / spacing) + 1;
+        const rows = Math.ceil(height / spacing) + 1;
+
+        time += 0.025;
+
+        ctx.globalCompositeOperation = canvasConfig.blendMode;
+
+        for (let r = 0; r < rows; r++) {
+          for (let c = 0; c < cols; c++) {
+            const baseX = c * spacing;
+            const baseY = r * spacing;
+
+            // Organic sine wave field
+            const wave1 = Math.sin(c * 0.2 + time) * 1.8;
+            const wave2 = Math.cos(r * 0.25 + time * 0.8) * 1.8;
+            let radius = 2.4 + wave1 + wave2;
+
+            // Mouse proximity liquid swell / displacement (Roboshoes style)
+            let drawX = baseX;
+            let drawY = baseY;
+
+            if (mouse.active) {
+              const dx = baseX - mouse.x;
+              const dy = baseY - mouse.y;
+              const dist = Math.hypot(dx, dy);
+              const maxDist = 220;
+
+              if (dist < maxDist) {
+                const norm = 1 - dist / maxDist;
+                const swell = Math.pow(norm, 2) * (14 * canvasConfig.rippleForce);
+                radius += swell;
+
+                // Subtle magnetic liquid displacement
+                const push = norm * (12 * canvasConfig.rippleForce);
+                drawX += (dx / (dist || 1)) * push;
+                drawY += (dy / (dist || 1)) * push;
+              }
+            }
+
+            radius = Math.max(0.8, Math.min(radius, spacing * 0.85));
+
+            // CMYK Invincible Palette mapping across grid columns
+            const colRatio = c / cols;
+            let colorStr = '';
+            
+            if (colRatio < 0.45) {
+              // Cyan P1 Zone
+              colorStr = `rgba(123, 175, 233, ${canvasConfig.opacity})`;
+            } else if (colRatio > 0.55) {
+              // Amber P2 Zone
+              colorStr = `rgba(241, 180, 103, ${canvasConfig.opacity})`;
+            } else {
+              // Magenta Clash Center
+              colorStr = `rgba(237, 85, 119, ${canvasConfig.opacity * 1.1})`;
+            }
+
+            ctx.fillStyle = colorStr;
+            ctx.beginPath();
+            ctx.arc(drawX, drawY, radius, 0, Math.PI * 2);
+            ctx.fill();
+          }
+        }
+
+        ctx.globalCompositeOperation = 'source-over';
+
+        if (currentPreset === 6 && !document.getElementById('stage-preset-6').classList.contains('hidden')) {
+          animFrameId = requestAnimationFrame(draw);
+        }
+      }
+
+      draw();
+    }
+
+    // --- CODE EXPORT GENERATOR ---
+    function openExportModal() {
+      const codeBox = document.getElementById('export-code-box');
+      const size = document.getElementById('param-size').value;
+      const opacity = document.getElementById('param-opacity').value;
+      const blend = document.getElementById('param-blend').value;
+      
+      let cssCode = '';
+      if (currentPreset === 6) {
+        cssCode = `/* Preset 6: Roboshoes Kinetic Canvas Component (React / TSX) */
+import React, { useEffect, useRef } from 'react';
+
+export const ComicHalftoneBackground = React.memo(function ComicHalftoneBackground() {
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    let animId: number;
+    let time = 0;
+    const spacing = ${size};
+    const opacity = ${opacity / 100};
+
+    function render() {
+      if (!canvas) return;
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+      ctx.fillStyle = '#0b1220';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      const cols = Math.ceil(canvas.width / spacing) + 1;
+      const rows = Math.ceil(canvas.height / spacing) + 1;
+      time += 0.025;
+
+      for (let r = 0; r < rows; r++) {
+        for (let c = 0; c < cols; c++) {
+          const x = c * spacing;
+          const y = r * spacing;
+          const radius = Math.max(1, 2.4 + Math.sin(c * 0.2 + time) * 1.8 + Math.cos(r * 0.25 + time * 0.8) * 1.8);
+          
+          const colRatio = c / cols;
+          ctx.fillStyle = colRatio < 0.45 ? \`rgba(123, 175, 233, \${opacity})\` :
+                          (colRatio > 0.55 ? \`rgba(241, 180, 103, \${opacity})\` : \`rgba(237, 85, 119, \${opacity * 1.1})\`);
+
+          ctx.beginPath();
+          ctx.arc(x, y, radius, 0, Math.PI * 2);
+          ctx.fill();
+        }
+      }
+      animId = requestAnimationFrame(render);
+    }
+    render();
+
+    return () => cancelAnimationFrame(animId);
+  }, []);
+
+  return (
+    <div class="pointer-events-none fixed inset-0 z-0 overflow-hidden bg-[#0b1220]">
+      <canvas ref={canvasRef} class="w-full h-full" />
+    </div>
+  );
+});`;
+      } else if (currentPreset === 1) {
+        cssCode = `/* Preset 1: Coreh's CSS Threshold Halftone in index.css [data-theme="invincible"] */
+.ss-comic-halftone-background {
+  position: fixed;
+  inset: -15%;
+  background-color: #000000;
+  filter: contrast(1200%) blur(1px);
+  pointer-events: none;
+}
+
+.ss-comic-halftone-background__layer {
+  position: absolute;
+  inset: 0;
+  mix-blend-mode: ${blend};
+  opacity: ${opacity / 100};
+}
+
+.ss-comic-halftone-background__cyan {
+  background-image: radial-gradient(circle, var(--ss-halftone-blue) 0%, transparent 60%);
+  background-size: ${size}px ${size}px;
+  transform: rotate(15deg);
+}
+
+.ss-comic-halftone-background__yellow {
+  background-image: radial-gradient(circle, var(--ss-halftone-yellow) 0%, transparent 60%);
+  background-size: ${parseInt(size) * 1.15}px ${parseInt(size) * 1.15}px;
+  transform: rotate(75deg);
+}
+
+.ss-comic-halftone-background__magenta {
+  background-image: radial-gradient(circle, var(--ss-halftone-magenta) 0%, transparent 60%);
+  background-size: ${parseInt(size) * 0.9}px ${parseInt(size) * 0.9}px;
+  transform: rotate(45deg);
+}`;
+      } else {
+        cssCode = `/* Preset ${currentPreset}: ${presetNames[currentPreset]} */
+/* See fixtures/mockups/invincible_halftone_lab.html for full DOM and CSS rules */`;
+      }
+
+      codeBox.value = cssCode;
+      document.getElementById('export-modal').classList.remove('hidden');
+    }
+
+    function closeExportModal() {
+      document.getElementById('export-modal').classList.add('hidden');
+    }
+
+    function copyExportCode() {
+      const codeBox = document.getElementById('export-code-box');
+      codeBox.select();
+      document.execCommand('copy');
+      const btn = document.getElementById('copy-btn');
+      btn.innerText = "Copied!";
+      setTimeout(() => { btn.innerText = "Copy Code to Clipboard"; }, 2000);
+    }
+
+    // Initialize Preset 6 (Hero Canvas) on load
+    selectPreset(6);
+  </script>
+</body>
+</html>

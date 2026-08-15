@@ -1,18 +1,18 @@
 {
   "$schema": "https://unpkg.com/knip@6/schema.json",
   "entry": [
-    "server.ts",
     "src/landing.tsx",
     "src/replay.tsx",
     "src/nameDrop/nameDrop.worker.ts",
     "src/nameDrop/nameDropRender.worker.ts",
-    "src/shop/mockPool.ts",
+    "scripts/**/*.{ts,mts,mjs,cjs}",
     "server/**/*.test.ts",
     "src/**/*.test.ts"
   ],
   "project": [
     "server/**/*.ts",
-    "src/**/*.{ts,tsx}"
+    "src/**/*.{ts,tsx}",
+    "scripts/**/*.{ts,mts,mjs,cjs}"
   ],
   "vite": {
     "config": ["vite.config.mjs", "vite.replay.config.mjs"]
@@ -26,10 +26,5 @@
     "server/loadConfig.ts": ["types"],
     "server/tetris/engine.ts": ["exports"]
   },
-  "ignoreDependencies": [
-    "autoprefixer",
-    "esbuild",
-    "react-doctor",
-    "tailwindcss"
-  ]
+  "ignoreDependencies": ["tailwindcss"]
 }

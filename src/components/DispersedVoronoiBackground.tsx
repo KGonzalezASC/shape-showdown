@@ -1,9 +1,12 @@
 import React, { memo, startTransition, useEffect, useRef, useState } from 'react';
 
+import { DEFAULT_VORONOI_TILE_PALETTE } from '../presentation/themePackage';
+import { createDecorationRandom } from '../presentation/decorationSeed';
+
 /** Lobby / idle: light dim so the Voronoi pattern reads clearly. */
-export const BG_SCRIM_IDLE = 0.35;
+const BG_SCRIM_IDLE = 0.35;
 /** Playing: stronger focus on the playfields. */
-export const BG_SCRIM_MATCH = 0.72;
+const BG_SCRIM_MATCH = 0.72;
 /** Match-start blur is disabled for now; idle and active play stay crisp. */
 export const BG_BLUR_IDLE = '0px';
 export const BG_BLUR_MATCH = '0px';
@@ -13,14 +16,6 @@ const BG_COLS = 54;
 const CELL_SIZE = 4;
 const GAP = 1;
 const TILE_PX = (CELL_SIZE + GAP) * BG_ROWS;
-
-const GRAYS: ReadonlyArray<readonly [number, number]> = [
-  [26, 29],
-  [32, 37],
-  [42, 50],
-  [46, 56],
-  [54, 66],
-];
 
 const POLYGON_BASE_ANGLES: Record<number, Array<{ cos: number; sin: number }>> = {};
 for (let sides = 5; sides <= 7; sides++) {
@@ -108,8 +103,8 @@ function getSharedTileCanvas(): HTMLCanvasElement | null {
   return sharedTileCanvas;
 }
 
-function randomRange(max: number, min = 0): number {
-  return Math.random() * (max - min) + min;
+function randomRange(random: () => number, max: number, min = 0): number {
+  return random() * (max - min) + min;
 }
 
 function traceVoronoiBgPolygon(
@@ -138,12 +133,16 @@ function traceVoronoiBgPolygon(
   ctx.closePath();
 }
 
-/** Jack Rugile–style tiled Voronoi mesh with ~4% dispersed tetromino clusters. Fresh Math.random seed each call. */
-function generateDispersedVoronoiTileDataUrl(): string {
+/** Jack Rugile–style tiled Voronoi mesh with ~4% dispersed tetromino clusters, driven by the presentation seed. */
+function generateDispersedVoronoiTileDataUrl(
+  decorationSeed: number,
+  palette: ReadonlyArray<readonly [number, number]> = DEFAULT_VORONOI_TILE_PALETTE,
+): string {
   const canvas = getSharedTileCanvas();
   if (!canvas) return '';
   const ctx = canvas.getContext('2d');
   if (!ctx) return '';
+  const random = createDecorationRandom(decorationSeed);
 
   const grid: Array<Array<PieceCell | null>> = Array.from({ length: BG_ROWS }, () =>
     Array.from({ length: BG_COLS }, () => null),
@@ -156,10 +155,10 @@ function generateDispersedVoronoiTileDataUrl(): string {
 
   while (piecesPlaced < targetPieces && attempts < 1000) {
     attempts++;
-    const pieceDef = TETROMINO_PIECES[Math.floor(Math.random() * TETROMINO_PIECES.length)];
-    const shape = pieceDef.shapes[Math.floor(Math.random() * pieceDef.shapes.length)];
-    const startR = Math.floor(Math.random() * (BG_ROWS - 4));
-    const startC = Math.floor(Math.random() * (BG_COLS - 4));
+    const pieceDef = TETROMINO_PIECES[Math.floor(random() * TETROMINO_PIECES.length)];
+    const shape = pieceDef.shapes[Math.floor(random() * pieceDef.shapes.length)];
+    const startR = Math.floor(random() * (BG_ROWS - 4));
+    const startC = Math.floor(random() * (BG_COLS - 4));
 
     let canPlace = true;
     for (const [dr, dc] of shape) {
@@ -215,8 +214,8 @@ function generateDispersedVoronoiTileDataUrl(): string {
         const radius = CELL_SIZE * 0.5 * pieceSizeVar;
         traceVoronoiBgPolygon(ctx, cx, cy, radius, sides, cellPiece.pieceId * 2.3 + (r + col) * 0.1);
       } else {
-        const grayIdx = Math.floor(randomRange(GRAYS.length));
-        const [fill, stroke] = GRAYS[grayIdx];
+        const grayIdx = Math.floor(randomRange(random, palette.length));
+        const [fill, stroke] = palette[grayIdx];
         ctx.fillStyle = `rgb(${fill}, ${fill}, ${fill})`;
         ctx.strokeStyle = `rgb(${stroke}, ${stroke}, ${stroke})`;
         ctx.lineWidth = 0.8;
@@ -238,34 +237,38 @@ interface DispersedVoronoiBackgroundProps {
   scrimOpacity?: number;
   /** Backdrop blur on the scrim (CSS length, e.g. `5px`). */
   blur?: string;
-  /** Bump to re-roll a fresh Voronoi tile (refresh, shop purchase, match-start 3-2-1 overlay). */
-  seedKey?: number;
+  /** Presentation seed shared with other seeded theme decoration. */
+  decorationSeed?: number;
+  palette?: ReadonlyArray<readonly [number, number]>;
 }
 
 /**
  * Full-viewport Jack Rugile Voronoi background with a focus scrim.
- * Lazy-inits the first tile; reseeds via `seedKey` under startTransition.
+ * Lazy-inits the first tile; regenerates when its presentation seed or palette changes.
  */
 export const DispersedVoronoiBackground = memo(function DispersedVoronoiBackground({
   scrimOpacity = BG_SCRIM_IDLE,
   blur = BG_BLUR_IDLE,
-  seedKey = 0,
+  decorationSeed = 0,
+  palette = DEFAULT_VORONOI_TILE_PALETTE,
 }: DispersedVoronoiBackgroundProps) {
-  const [tileUrl, setTileUrl] = useState(() => generateDispersedVoronoiTileDataUrl());
-  const appliedSeedRef = useRef(seedKey);
+  const [tileUrl, setTileUrl] = useState(() => generateDispersedVoronoiTileDataUrl(decorationSeed, palette));
+  const appliedSeedRef = useRef(decorationSeed);
+  const appliedPaletteRef = useRef(palette);
 
   useEffect(() => {
-    if (appliedSeedRef.current === seedKey) return;
-    appliedSeedRef.current = seedKey;
+    if (appliedSeedRef.current === decorationSeed && appliedPaletteRef.current === palette) return;
+    appliedSeedRef.current = decorationSeed;
+    appliedPaletteRef.current = palette;
     let cancelled = false;
     startTransition(() => {
-      const next = generateDispersedVoronoiTileDataUrl();
+      const next = generateDispersedVoronoiTileDataUrl(decorationSeed, palette);
       if (!cancelled) setTileUrl(next);
     });
     return () => {
       cancelled = true;
     };
-  }, [seedKey]);
+  }, [decorationSeed, palette]);
 
   const blurFilter = blur === '0px' || blur === '0' ? 'none' : `blur(${blur})`;
 

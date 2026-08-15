@@ -13,7 +13,13 @@ import {
   TetrisPiece,
 } from '../types';
 import { SHAPES } from '../tetris/shapes';
-import { SHAPE_COLORS } from '../presentation/shapePalette';
+import {
+  DEFAULT_POISON_PALETTE,
+  poisonColor,
+  SHAPE_COLORS,
+  type PoisonPalette,
+} from '../presentation/shapePalette';
+import type { PiecePalette } from '../presentation/themePackage';
 import {
   ACTIVE_PIECE_MOTION_MS,
   collectActivePieceStackHandoffs,
@@ -32,17 +38,6 @@ import {
   voronoiCellSides,
   voronoiCellWobblePhase,
 } from '../board/voronoiCellStyle';
-
-/**
- * Toxic poison color variants chosen to contrast distinctly against all piece colors,
- * specifically avoiding clashes with T-piece (#a3e635 lime) and O-piece (#a78bfa purple).
- */
-const POISON_COLORS: Record<number, string> = {
-  1: '#EF4444', // Bio-Toxin Crimson Red
-  2: '#EC4899', // Cyber-Glitch Neon Magenta
-  3: '#6D28D9', // EMP Dark Plasma Violet
-  4: '#059669', // Quantum Decay Slime Emerald
-};
 
 const REGULAR_PIECE_WOBBLE_SPEED = 0.3325 * 1.05;
 const ACTIVE_MORPH_VERTEX_COUNT = 24;
@@ -148,6 +143,8 @@ function buildCellMap(
   rows: CellValue[][],
   poison: number[][],
   activeCells: readonly ActiveVisualCell[],
+  piecePalette: PiecePalette,
+  poisonPalette: PoisonPalette,
 ): CellMap {
   const colorBuckets = new Map<string, CellEntry[]>();
   const poisonCells: CellEntry[] = [];
@@ -163,8 +160,8 @@ function buildCellMap(
 
       const isPoison = p > 0;
       const color = isPoison
-        ? POISON_COLORS[p] || '#EF4444'
-        : (cell ? SHAPE_COLORS[cell] || '#38bdf8' : '#38bdf8');
+        ? poisonColor(poisonPalette, p)
+        : (cell ? piecePalette[cell] || '#38bdf8' : '#38bdf8');
       const activeOffsetIndex = activeByKey.get(`${r},${c}`);
       const entry: CellEntry = {
         r,
@@ -507,6 +504,8 @@ interface VoronoiFlowfieldCanvasProps {
   /** Sparse replay snapshots cannot attribute every cleared cell to Bomber. */
   suppressBomberExplosionAnimation?: boolean;
   performanceId: string;
+  piecePalette?: PiecePalette;
+  poisonPalette?: PoisonPalette;
 }
 
 interface PoisonAnimationCell {
@@ -595,6 +594,7 @@ function drawPoisonBlob(
   cells: VisualPoisonCell[],
   cellSize: number,
   time: number,
+  poisonPalette: PoisonPalette,
 ): void {
   if (cells.length === 0) return;
 
@@ -609,7 +609,7 @@ function drawPoisonBlob(
   const threshold = 1.7;
   const edgeInset = Math.max(2, cellSize * 0.075);
   const cornerRadius = cellSize * 0.22;
-  const rgb = hexToRgb(POISON_COLORS[first.variant] || POISON_COLORS[1]);
+  const rgb = hexToRgb(poisonColor(poisonPalette, first.variant));
 
   const animatedCells = cells.map((cell, index) => ({
     ...cell,
@@ -745,6 +745,8 @@ export const VoronoiFlowfieldCanvas: React.FC<VoronoiFlowfieldCanvasProps> = Rea
   activePiece,
   suppressBomberExplosionAnimation = false,
   performanceId,
+  piecePalette = SHAPE_COLORS,
+  poisonPalette = DEFAULT_POISON_PALETTE,
 }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
@@ -760,6 +762,8 @@ export const VoronoiFlowfieldCanvas: React.FC<VoronoiFlowfieldCanvasProps> = Rea
   const previousBoardRef = useRef<CellValue[][] | null>(null);
   const previousActivePieceRef = useRef<TetrisPiece | null>(null);
   const explosionShardsRef = useRef<ExplosionShard[]>([]);
+  const piecePaletteRef = useRef(piecePalette);
+  const poisonPaletteRef = useRef(poisonPalette);
 
   // Cached cell map — rebuilt only when board occupancy changes
   const cellMapRef = useRef<CellMap | null>(null);
@@ -775,6 +779,14 @@ export const VoronoiFlowfieldCanvas: React.FC<VoronoiFlowfieldCanvasProps> = Rea
   const previousActivePieceKeyRef = useRef<string | null>(null);
 
   useEffect(() => {
+    if (
+      piecePaletteRef.current !== piecePalette ||
+      poisonPaletteRef.current !== poisonPalette
+    ) {
+      piecePaletteRef.current = piecePalette;
+      poisonPaletteRef.current = poisonPalette;
+      cellMapDirtyRef.current = true;
+    }
     const previousBoard = previousBoardRef.current;
     const previousActivePiece = previousActivePieceRef.current;
     const previousPoison = previousPoisonRef.current;
@@ -804,8 +816,8 @@ export const VoronoiFlowfieldCanvas: React.FC<VoronoiFlowfieldCanvasProps> = Rea
           if (previousValue === null || currentValue !== null) continue;
           const poisonVariant = previousPoison?.[row]?.[column] ?? 0;
           const color = poisonVariant > 0
-            ? POISON_COLORS[poisonVariant] || '#EF4444'
-            : SHAPE_COLORS[previousValue] || '#38bdf8';
+            ? poisonColor(poisonPalette, poisonVariant)
+            : piecePalette[previousValue] || '#38bdf8';
           explosionShardsRef.current.push(
             ...createExplosionShardsForCell(row, column, color, cellSize, timeRef.current),
           );
@@ -823,7 +835,7 @@ export const VoronoiFlowfieldCanvas: React.FC<VoronoiFlowfieldCanvasProps> = Rea
           column < 0 || column >= BOARD_COLS ||
           (board[boardRow]?.[column] ?? null) !== null
         ) continue;
-        const color = SHAPE_COLORS[previousActivePiece.type] || '#38bdf8';
+        const color = piecePalette[previousActivePiece.type] || '#38bdf8';
         explosionShardsRef.current.push(
           ...createExplosionShardsForCell(row, column, color, cellSize, timeRef.current),
         );
@@ -957,6 +969,8 @@ export const VoronoiFlowfieldCanvas: React.FC<VoronoiFlowfieldCanvasProps> = Rea
     board,
     activePiece,
     suppressBomberExplosionAnimation,
+    piecePalette,
+    poisonPalette,
   ]);
 
   useEffect(() => {
@@ -1017,6 +1031,8 @@ export const VoronoiFlowfieldCanvas: React.FC<VoronoiFlowfieldCanvasProps> = Rea
           visibleRowsRef.current,
           visiblePoisonRef.current,
           activeCellsRef.current,
+          piecePaletteRef.current,
+          poisonPaletteRef.current,
         );
         cellMapDirtyRef.current = false;
       }
@@ -1146,7 +1162,7 @@ export const VoronoiFlowfieldCanvas: React.FC<VoronoiFlowfieldCanvasProps> = Rea
                   (center.y - animated.sourceR * cs - halfCs) * growth,
               };
             });
-            drawPoisonBlob(ctx, blobCtx, visualCells, cs, time);
+            drawPoisonBlob(ctx, blobCtx, visualCells, cs, time, poisonPaletteRef.current);
           }
         }
         if (animation && progress >= 1) poisonAnimationRef.current = null;

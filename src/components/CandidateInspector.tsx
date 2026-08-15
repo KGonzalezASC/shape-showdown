@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import type { BotDecisionTrace, CandidateEvaluationTrace, CandidateSubScores, MisstepTag } from '../types';
 import { AlertTriangle, ChevronDown, ChevronUp, Layers, Target } from 'lucide-react';
 import { styleForFieldEffect } from '../shop/effectStyles';
+import { statusPillClass } from '../ui/shapeShowdownTheme';
 import type { PublicPlayerState } from '../state/publicSnapshots';
 import type { ReplayDecisionOutcome } from '../replayDecisionOutcome';
 
@@ -362,7 +363,7 @@ export const CandidateInspector: React.FC<CandidateInspectorProps> = ({
               return (
                 <span
                   key={effect.id}
-                  className={`inline-flex items-center gap-1 rounded-full border px-2 py-1 font-mono text-[9px] font-bold ${style.bgClass} ${style.borderClass} ${style.textClass}`}
+                  className={statusPillClass(style.variant)}
                 >
                   {effect.icon && <span>{effect.icon}</span>}
                   {effect.label}

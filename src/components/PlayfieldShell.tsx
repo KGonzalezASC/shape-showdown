@@ -11,20 +11,21 @@ import { useShopConfirm } from '../hooks/useShopConfirm';
 import { BoardProfiler } from '../performance/BoardProfiler';
 import { IncomingGarbageReadout } from './IncomingGarbageReadout';
 import DesktopKeyboardLegend from './DesktopKeyboardLegend';
+import { fieldFrameClass, fieldTitleClass } from '../ui/shapeShowdownTheme';
 
 function WaitingForOpponentBoard() {
   const cell = useContext(PlayfieldCellSizeContext);
   return (
     <div className="relative shrink-0">
       <div className="mb-2">
-        <h2 className="text-sm font-bold uppercase tracking-widest text-rose-400">Opponent Field</h2>
+        <h2 className={`text-[11px] font-bold uppercase tracking-[0.08em] ${fieldTitleClass('opponent')}`}>Opponent Field</h2>
         <IncomingGarbageReadout fieldTitle="Opponent Field" lines={0} />
       </div>
       <div
-        className="flex items-center justify-center rounded-xl border-2 border-rose-500/10 bg-[#141414]"
+        className="mx-auto flex items-center justify-center rounded-xl border-2 border-[var(--ss-opponent-border)] bg-[var(--ss-panel-well)]"
         style={{ width: BOARD_COLS * cell, height: BOARD_VISIBLE_ROWS * cell }}
       >
-        <p className="animate-pulse px-4 text-center text-sm font-medium text-zinc-500">Waiting for opponent…</p>
+          <p className="ss-opponent-waiting-text animate-pulse px-4 text-center text-[8px] font-bold">Waiting for opponent…</p>
       </div>
     </div>
   );
@@ -39,6 +40,9 @@ interface PlayfieldShellProps {
   myDesktopFieldRef: React.RefObject<GameFieldRef | null>;
   oppDesktopFieldRef: React.RefObject<GameFieldRef | null>;
   hatchingEnabled: boolean;
+  decorationSeed: number;
+  faceGrowthStartedAtMs: number | null;
+  isDesktopLayout: boolean;
   onToggleHatching?: () => void;
 }
 
@@ -51,6 +55,9 @@ export const PlayfieldShell: React.FC<PlayfieldShellProps> = ({
   myDesktopFieldRef,
   oppDesktopFieldRef,
   hatchingEnabled,
+  decorationSeed,
+  faceGrowthStartedAtMs,
+  isDesktopLayout,
   onToggleHatching,
 }) => {
   const [isTabletLayout, setIsTabletLayout] = useState(() => (
@@ -91,12 +98,13 @@ export const PlayfieldShell: React.FC<PlayfieldShellProps> = ({
 
   return (
     <>
-      <div className="relative min-h-0 w-full flex-1 min-[901px]:hidden">
+      {!isDesktopLayout && (
+      <div className="relative min-h-0 w-full flex-1">
         <div
           ref={mobilePlayfieldRef}
           className="mx-auto grid h-full w-full max-w-[430px] grid-cols-[minmax(0,1fr)_6rem] items-stretch gap-1.5 overflow-visible pb-2 min-[661px]:max-w-[820px] min-[661px]:grid-cols-[minmax(0,1fr)_13.125rem] min-[661px]:gap-3"
         >
-          <div className="h-full min-h-0 min-w-0 border border-emerald-500/25 bg-[#121414]/95 p-1.5 min-[661px]:p-2">
+          <div className={`h-full min-h-0 min-w-0 overflow-visible border ${fieldFrameClass('self')} p-1.5 min-[661px]:p-2`}>
             {myPlayer && (
               <BoardProfiler id="mobile-player-field" renderer="board-canvas">
                 <GameField
@@ -104,12 +112,13 @@ export const PlayfieldShell: React.FC<PlayfieldShellProps> = ({
                   player={myPlayer}
                   isMe={true}
                   title="Your Field"
-                  borderColorClass="border-emerald-500/20"
-                  shadowColorClass="shadow-none"
+                  fieldRole="self"
                   cellSize={mobileCellSize}
                   boardFitRef={mobileBoardFitRef}
                   status={playfield.status}
                   hatchingEnabled={hatchingEnabled}
+                  decorationSeed={decorationSeed}
+                  faceGrowthStartedAtMs={faceGrowthStartedAtMs}
                   performanceId="mobile-player-field"
                 />
               </BoardProfiler>
@@ -117,7 +126,7 @@ export const PlayfieldShell: React.FC<PlayfieldShellProps> = ({
           </div>
           <div
             ref={railRef}
-            className="flex max-h-full min-h-0 min-w-0 flex-col gap-2 overflow-y-auto"
+            className="shop-utility-rail flex max-h-full min-h-0 min-w-0 flex-col gap-2 overflow-y-auto"
           >
             <OpponentMiniField
               player={opponentPlayer}
@@ -143,8 +152,10 @@ export const PlayfieldShell: React.FC<PlayfieldShellProps> = ({
           </div>
         </div>
       </div>
+      )}
 
-      <div className="hidden min-h-0 w-full flex-1 min-[901px]:flex min-[901px]:flex-col">
+      {isDesktopLayout && (
+      <div className="min-h-0 w-full flex-1">
         <PlayfieldLayout>
           <div className="flex min-h-0 shrink-0 flex-col gap-2">
             <ShopRail
@@ -166,24 +177,25 @@ export const PlayfieldShell: React.FC<PlayfieldShellProps> = ({
             <DesktopKeyboardLegend />
           </div>
           {myPlayer && (
-            <div className="min-w-0 border border-emerald-500/25 bg-[#121414]/95 p-2">
+            <div className={`min-w-0 overflow-visible border ${fieldFrameClass('self')} p-2`}>
               <BoardProfiler id="desktop-player-field" renderer="board-canvas">
                 <GameField
                   ref={myDesktopFieldRef}
                   player={myPlayer}
                   isMe={true}
                   title="Your Field"
-                  borderColorClass="border-emerald-500/20"
-                  shadowColorClass="shadow-none"
+                  fieldRole="self"
                   status={playfield.status}
                   hatchingEnabled={hatchingEnabled}
+                  decorationSeed={decorationSeed}
+                  faceGrowthStartedAtMs={faceGrowthStartedAtMs}
                   performanceId="desktop-player-field"
                 />
               </BoardProfiler>
             </div>
           )}
 
-          <div className="relative min-w-0 border border-rose-500/25 bg-[#121414]/95 p-2">
+          <div className={`relative min-w-0 overflow-visible border ${fieldFrameClass('opponent')} p-2`}>
             {opponentPlayer ? (
               <BoardProfiler id="desktop-opponent-field" renderer="board-canvas">
                 <GameField
@@ -191,10 +203,11 @@ export const PlayfieldShell: React.FC<PlayfieldShellProps> = ({
                   player={opponentPlayer}
                   isMe={false}
                   title="Opponent Field"
-                  borderColorClass="border-rose-500/20"
-                  shadowColorClass="shadow-[0_0_30px_rgba(244,63,94,0.1)]"
+                  fieldRole="opponent"
                   status={playfield.status}
                   hatchingEnabled={hatchingEnabled}
+                  decorationSeed={decorationSeed}
+                  faceGrowthStartedAtMs={faceGrowthStartedAtMs}
                   performanceId="desktop-opponent-field"
                 />
               </BoardProfiler>
@@ -204,6 +217,7 @@ export const PlayfieldShell: React.FC<PlayfieldShellProps> = ({
           </div>
         </PlayfieldLayout>
       </div>
+      )}
     </>
   );
 };

@@ -1,7 +1,8 @@
 import React, { memo } from 'react';
-import { BOARD_COLS, BOARD_VISIBLE_ROWS, ItemPricingState, ShopItem } from '../types';
+import { ItemPricingState, ShopItem } from '../types';
 import { getPricingView } from '../shop/shopPricing';
 import { DEV_TOOLS_ENABLED } from '../devTools';
+import { ssShopClasses } from '../ui/shapeShowdownTheme';
 
 interface ShopRailProps {
   items: ShopItem[];
@@ -39,36 +40,50 @@ const ShopRail: React.FC<ShopRailProps> = ({
 }) => {
   const isExpanded = viewportMode !== 'phone';
   const railWidthClass = viewportMode === 'phone'
-    ? 'w-[5.75rem]'
+    ? 'w-[5.75rem] min-[661px]:w-full'
     : viewportMode === 'tablet'
       ? 'w-full'
       : 'w-[8.875rem]';
-  const iconRowClass = isExpanded ? 'min-h-11 px-2 py-1.5' : 'min-h-8 px-1.5 py-1';
+  const iconRowClass = isExpanded ? 'min-h-11 px-2 py-1.5' : 'min-h-9 px-1.5 py-1';
   const bodyTextClass = isExpanded ? 'text-[9px]' : 'text-[8px]';
-  const iconClass = isExpanded ? 'text-lg' : 'text-base';
+  const metaTextClass = isExpanded ? 'text-[8px]' : 'text-[7px]';
+  const iconClass = isExpanded ? 'text-base' : 'text-sm';
+  const offerListClass = viewportMode === 'desktop'
+    ? 'max-h-none overflow-visible'
+    : `${isExpanded ? 'max-h-[18rem]' : 'max-h-[14rem]'} overflow-y-auto`;
 
   const isWaiting = !isPlaying || shopPhase === 'waiting';
   const isReady = isPlaying && shopPhase === 'ready';
   const isCycling = isPlaying && shopPhase === 'cycling';
   const isExpired = isPlaying && shopPhase === 'expired';
+  const showConfirmAction = (isCycling || isReady) && canPurchase;
 
   return (
-    <div className={`${railWidthClass} select-none ${isWaiting ? 'opacity-70 saturate-50' : ''}`}>
-      <div className={`border border-[#303535] bg-[#171919]/95 shadow-xl ${isExpanded ? 'p-2' : 'p-1'}`}>
-        <div className="mb-2 flex items-center justify-between border-b border-[#303535] pb-1.5">
-          <p className={`${bodyTextClass} font-black uppercase tracking-[0.16em] text-[#8db2ba]`}>Shop · {items.length}</p>
+    <div className={`shop-rail shop-rail--${viewportMode} ${railWidthClass} select-none ${isWaiting ? 'shop-rail--waiting' : ''}`}>
+      <div className={`shop-rail-panel ${showConfirmAction ? 'shop-rail-panel--actionable' : ''} ${ssShopClasses.panel} shadow-xl ${isExpanded ? 'p-2' : 'p-1.5'}`}>
+        <div className="shop-rail-header mb-2 flex items-center justify-between border-b border-[var(--ss-shop-border)] pb-1.5">
+          <p className={`shop-rail-title ${bodyTextClass} ${ssShopClasses.headerTitle}`}>Shop · {items.length}</p>
           {isExpired && isPlaying ? (
-            <span className={`${bodyTextClass} border border-amber-500/30 bg-amber-950/30 px-1 py-0.5 font-mono text-amber-200`}>WAIT</span>
+            <span className={`${bodyTextClass} ${ssShopClasses.waitBadge} px-1 py-0.5`}>Wait</span>
           ) : (
-            <span className="flex items-center gap-1.5">
-              {purchasedItem && <span className="text-sm" title={`Last purchase: ${purchasedItem.name}`}>{purchasedItem.icon}</span>}
-              <span className={`${bodyTextClass} font-mono text-zinc-300`} title="Available funds">{availableFunds}</span>
+            <span className="shop-rail-balance flex items-center gap-1.5">
+              {purchasedItem && (
+                <span className={iconClass} title={`Last purchase: ${purchasedItem.name}`}>
+                  {purchasedItem.icon}
+                </span>
+              )}
+              <span
+                className={`${bodyTextClass} ${ssShopClasses.headerFunds}`}
+                title="Available funds"
+              >
+                {availableFunds.toLocaleString()}
+              </span>
             </span>
           )}
         </div>
 
-        <div className="relative">
-          <div className={`${isExpanded ? 'max-h-[18rem]' : 'max-h-[14rem]'} grid gap-1 overflow-y-auto`}>
+        <div className="shop-offers-region relative">
+          <div className={`shop-offer-list ${offerListClass} grid gap-1`}>
             {items.map((item, idx) => {
               const pricingView = getPricingView(item.id, pricing[item.id], currentTick);
               const canAfford = availableFunds >= pricingView.currentPrice;
@@ -78,22 +93,34 @@ const ShopRail: React.FC<ShopRailProps> = ({
               return (
                 <div
                   key={item.id}
-                  className={`relative grid w-full grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-x-1.5 border transition-colors duration-150 ${iconRowClass} ${
+                  className={`shop-offer-row relative grid w-full grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-x-1.5 transition-colors duration-150 ${iconRowClass} ${
                     isHighlighted
                       ? canAfford
-                        ? 'border-[#5c777c] bg-[#1a2020] text-zinc-100'
-                        : 'border-rose-400/60 bg-rose-950/25 text-zinc-300'
-                      : `border-[#292e2e] ${item.colorClass} ${disabled ? 'opacity-40 grayscale' : 'opacity-90'}`
+                        ? `${ssShopClasses.rowHighlighted} text-[var(--ss-text-primary)]`
+                        : ssShopClasses.rowUnaffordable
+                      : `${ssShopClasses.row} ${disabled ? 'shop-offer-row--disabled' : ''}`
                   }`}
                 >
-                  <span className={`${iconClass} leading-none text-zinc-200`} title={item.name}>{item.icon}</span>
-                  {isExpanded && <span className={`${bodyTextClass} truncate font-extrabold text-zinc-200`}>{item.name}</span>}
-                  <span className={`col-start-3 font-mono ${bodyTextClass} ${disabled ? 'text-zinc-400' : 'text-amber-200'}`}>
+                  <span
+                    className={`shop-offer-icon ${iconClass} ${isHighlighted ? ssShopClasses.rowIcon : ssShopClasses.rowIconMuted}`}
+                    title={item.name}
+                  >
+                    {item.icon}
+                  </span>
+                  {isExpanded && (
+                    <span className={`shop-offer-name ${bodyTextClass} ${ssShopClasses.rowName}`}>{item.name}</span>
+                  )}
+                  <span
+                    className={`shop-offer-price col-start-3 ${ssShopClasses.rowPrice} ${bodyTextClass} ${
+                      disabled ? 'text-[var(--ss-shop-disabled-text)]' : ''
+                    }`}
+                  >
                     {pricingView.currentPrice}
                   </span>
                   {isExpanded && (
-                    <span className={`col-start-2 col-end-4 font-mono text-[7px] leading-tight text-zinc-500`}>
-                      L{pricingView.level} · {pricingView.purchasesRemaining} left · {blocked ? 'gated' : pricingView.windowActive ? `${pricingView.secondsRemaining}s` : pricingView.windowClosedBy ?? 'fresh'}
+                    <span className={`shop-offer-meta col-start-2 col-end-4 ${metaTextClass} ${ssShopClasses.rowMeta}`}>
+                      L{pricingView.level} · {pricingView.purchasesRemaining} left ·{' '}
+                      {blocked ? 'gated' : pricingView.windowActive ? `${pricingView.secondsRemaining}s` : pricingView.windowClosedBy ?? 'fresh'}
                     </span>
                   )}
                 </div>
@@ -102,19 +129,19 @@ const ShopRail: React.FC<ShopRailProps> = ({
           </div>
 
           {isWaiting && (
-            <div className="pointer-events-none absolute inset-0 flex items-center justify-center border border-white/10 bg-black/55">
-              <span className={`border border-white/10 bg-zinc-900/90 px-1.5 py-0.5 font-mono ${bodyTextClass} uppercase tracking-wider text-zinc-300`}>
+            <div className="shop-wait-overlay pointer-events-none absolute inset-0 flex items-center justify-center border border-[var(--ss-stroke-secondary)] bg-transparent">
+              <span className={`px-1.5 py-0.5 ${ssShopClasses.waitBadge} ${bodyTextClass}`}>
                 {isPlaying ? 'Wait Line Clear' : 'Locked'}
               </span>
             </div>
           )}
         </div>
 
-        {(isCycling || isReady) && canPurchase && (
+        {showConfirmAction && (
           <button
             type="button"
             onClick={onConfirm}
-            className="mt-2 min-h-9 w-full border border-[#4a5151] bg-[#343a3a] px-2 py-1.5 text-center font-mono text-[9px] font-black uppercase tracking-wider text-zinc-200 transition hover:bg-[#414848] active:bg-[#282d2d]"
+            className={`shop-confirm-button mt-2 min-h-9 w-full px-2 py-1.5 text-center ${bodyTextClass} ${ssShopClasses.confirmButton}`}
           >
             {isReady ? 'Start' : 'Confirm'}
           </button>
@@ -125,10 +152,10 @@ const ShopRail: React.FC<ShopRailProps> = ({
           type="button"
           aria-pressed={hatchingEnabled}
           onClick={onToggleHatching}
-          className={`mt-1 w-full border px-2 py-1 text-center font-mono text-[9px] uppercase tracking-wider transition ${
+          className={`shop-hatch-button mt-1 w-full border px-2 py-1 text-center ss-mono text-[9px] uppercase tracking-wider transition ${
             hatchingEnabled
               ? 'border-emerald-400/60 bg-emerald-500/20 text-emerald-100 hover:bg-emerald-500/30'
-              : 'border-zinc-600/70 bg-zinc-900/70 text-zinc-400 hover:border-zinc-500 hover:text-zinc-200'
+              : 'border-[var(--ss-stroke-primary)] bg-[var(--ss-fill-primary)] text-[var(--ss-text-tertiary)] hover:text-[var(--ss-text-secondary)]'
           }`}
         >
           Hatch: {hatchingEnabled ? 'On' : 'Off'}

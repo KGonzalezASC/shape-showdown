@@ -84,8 +84,6 @@ export interface ShopItem {
   /** When false, item may exist for docs/UI stubs but never appears in rolls. */
   purchasable: boolean;
   target: ShopItemTarget;
-  colorClass: string;
-  borderColorClass: string;
   description: string;
   synergyTargetId?: string;
   synergyBoost?: number;

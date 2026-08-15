@@ -1,4 +1,5 @@
 import React from 'react';
+import { ssStatusPillClasses } from '../ui/shapeShowdownTheme';
 
 interface IncomingGarbageReadoutProps {
   fieldTitle: string;
@@ -14,29 +15,24 @@ export const IncomingGarbageReadout: React.FC<IncomingGarbageReadoutProps> = ({
   magnetLevel = 0,
 }) => (
   <div
-    className={compact
-      ? 'mt-0.5 flex items-baseline justify-between gap-1 border-t border-rose-400/30 pt-0.5 text-[8px] font-semibold uppercase tracking-[0.08em]'
-      : 'mt-1 flex items-baseline justify-between gap-2 border-t border-rose-400/25 pt-1 text-[10px] font-semibold uppercase tracking-[0.16em]'}
+    className={`incoming-garbage-readout ${compact
+      ? 'mt-0.5 flex items-center justify-between gap-1 border-t-2 border-[var(--ss-downwell-white)] pt-1'
+      : 'mt-1 flex items-center justify-between gap-2 border-t-2 border-[var(--ss-downwell-white)] pt-1.5'}`}
     aria-label={`${fieldTitle} incoming garbage`}
   >
-    <div className="flex items-baseline gap-1.5">
-      <span className="text-rose-300/95">Incoming</span>
-      <span className={compact
-        ? 'font-mono text-[11px] font-bold tabular-nums tracking-normal text-rose-50'
-        : 'font-mono text-sm font-bold tabular-nums tracking-normal text-rose-50'}>
-        {lines}
+    <div className="flex items-center gap-2">
+      <span className={`${ssStatusPillClasses.red} incoming-garbage-pill gap-1.5`}>
+        <span aria-hidden>↓</span>
+        <strong className="incoming-garbage-pill-value text-[8px]">{lines} IN</strong>
       </span>
-      {!compact && <span className="text-[9px] tracking-wider text-zinc-400">lines</span>}
     </div>
 
     {magnetLevel > 0 && (
       <span
-        className={compact
-          ? 'inline-flex shrink-0 items-center gap-0.5 border border-amber-500/50 bg-zinc-900 px-1 py-0.5 font-mono text-[8px] font-bold leading-none text-amber-300'
-          : 'inline-flex shrink-0 items-center gap-0.5 border border-amber-500/50 bg-zinc-900 px-1 py-0.5 font-mono text-[9px] font-bold leading-none text-amber-300'}
+        className={`${ssStatusPillClasses.white} incoming-garbage-pill`}
         title={`Magnet Level ${magnetLevel} active`}
       >
-        <span className="text-[10px] leading-none">🧲</span>
+        <span className="incoming-garbage-pill-icon text-[8px] leading-none" aria-hidden>🧲</span>
         <span>L{magnetLevel}</span>
       </span>
     )}

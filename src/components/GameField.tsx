@@ -8,11 +8,16 @@ import {
   MatchStatus,
 } from '../types';
 import { SHAPES } from '../tetris/shapes';
-import { SHAPE_COLORS } from '../presentation/shapePalette';
+import { poisonColor } from '../presentation/shapePalette';
+import { BoardGridLines } from './BoardGridLines';
 import { BoardCanvasOverlay } from '../board/BoardCanvasOverlay';
 import { buildBoardVisualModel } from '../board/boardVisualModel';
+import { ShrineFieldBoundary, ShrineFrameOverlay } from '../board/ShrineFrameOverlay';
+import { SHRINE_PAD_PX } from '../board/shrineLayout';
 import type { ReplayCandidateOverlay } from '../replayCandidateOverlay';
+import { useThemePackage } from '../presentation/ThemeProvider';
 import { styleForFieldEffect } from '../shop/effectStyles';
+import { fieldShellClass, statusPillClass, type FieldRole } from '../ui/shapeShowdownTheme';
 import {
   normalizeHeldPiece,
   pendingGarbageTotal,
@@ -27,8 +32,9 @@ interface GameFieldProps {
   player: PublicPlayerState;
   isMe: boolean;
   title: string;
-  borderColorClass: string;
-  shadowColorClass: string;
+  fieldRole?: FieldRole;
+  borderColorClass?: string;
+  shadowColorClass?: string;
   opacityClass?: string;
   /** When omitted, uses `PlayfieldCellSizeContext` (desktop layout). */
   cellSize?: number;
@@ -36,6 +42,8 @@ interface GameFieldProps {
   boardFitRef?: React.RefObject<HTMLDivElement | null>;
   status?: MatchStatus;
   hatchingEnabled: boolean;
+  decorationSeed?: number;
+  faceGrowthStartedAtMs?: number | null;
   performanceId?: string;
   /** Replay diagnostics can show effect pills for both players, not only the local player. */
   showEffectPills?: boolean;
@@ -139,6 +147,7 @@ const GameField = forwardRef<GameFieldRef, GameFieldProps>(({
   player,
   isMe,
   title,
+  fieldRole = isMe ? 'self' : 'opponent',
   borderColorClass,
   shadowColorClass,
   opacityClass = '',
@@ -146,11 +155,16 @@ const GameField = forwardRef<GameFieldRef, GameFieldProps>(({
   boardFitRef,
   status = 'playing',
   hatchingEnabled,
+  decorationSeed = 0,
+  faceGrowthStartedAtMs = null,
   performanceId = title,
   showEffectPills = false,
   effectTick,
   replayCandidateOverlay = null,
 }, ref) => {
+  const theme = useThemePackage();
+  const shrineEnabled = theme.shrine === 'watching-amalgam';
+  const effectiveFieldRole: FieldRole = fieldRole === 'self' ? 'self' : 'opponent';
   const activeEffects = player.activeEffects || [];
   const effectPills = useMemo(() => {
     const grouped = new Map<string, {
@@ -325,6 +339,7 @@ const GameField = forwardRef<GameFieldRef, GameFieldProps>(({
   const swapZoneText = `Swap rows 0-${cutoffRow - 1}`;
   const swapLineY = cutoffRow * cellSize;
   const showSwapLine = isMe && cutoffRow > 0 && cutoffRow < BOARD_VISIBLE_ROWS;
+  const desktopShrineMargin = shrineEnabled && !boardFitRef ? SHRINE_PAD_PX : 0;
 
   const storageFrozen = isMe && activeEffects.some((e) => e.kind === 'freeze');
   const snagged = isMe && !!player.snagHardDropBlocked;
@@ -361,15 +376,7 @@ const GameField = forwardRef<GameFieldRef, GameFieldProps>(({
               return (
                 <span
                   key={effect.id}
-                  className={[
-                    'inline-flex items-center gap-0.5 border px-1.5 py-0.5',
-                    'font-mono text-[9px] font-bold uppercase tracking-wider leading-none',
-                    'animate-pulse',
-                    style.bgClass,
-                    style.borderClass,
-                    style.textClass,
-                    style.glowClass ?? '',
-                  ].join(' ')}
+                  className={`inline-flex items-center gap-0.5 animate-pulse ${statusPillClass(style.variant)}`}
                 >
                   {effect.icon && <span className="text-[10px] leading-none">{effect.icon}</span>}
                   {effect.label}
@@ -404,11 +411,28 @@ const GameField = forwardRef<GameFieldRef, GameFieldProps>(({
         className={boardFitRef
           ? 'relative flex min-h-0 w-full flex-1 items-center justify-center'
           : 'relative self-center'}
+        style={desktopShrineMargin > 0 ? { marginBlock: desktopShrineMargin } : undefined}
       >
         <div
-          className={`relative overflow-hidden border ${borderColorClass} shadow-2xl ${shadowColorClass} ${shakeClass || ''}`}
+          className={`game-board-shell relative ${
+            shrineEnabled
+              ? 'overflow-visible border-0'
+              : `overflow-hidden border ${borderColorClass ?? fieldShellClass(effectiveFieldRole)}`
+          } shadow-2xl ${shadowColorClass ?? ''} ${shakeClass || ''}`}
           style={{ width: BOARD_COLS * cellSize, height: BOARD_VISIBLE_ROWS * cellSize }}
         >
+          {shrineEnabled && (
+            <>
+              <ShrineFieldBoundary />
+              <ShrineFrameOverlay
+                cellSize={cellSize}
+                seed={decorationSeed}
+                showFaces
+                faceGrowthStartedAtMs={faceGrowthStartedAtMs}
+                fieldRole={effectiveFieldRole}
+              />
+            </>
+          )}
           {showSwapLine && (
             <>
               <div
@@ -416,7 +440,7 @@ const GameField = forwardRef<GameFieldRef, GameFieldProps>(({
                 style={{ top: swapLineY }}
               />
               <div
-                className="pointer-events-none absolute right-1 z-20 -translate-y-1/2 border border-white/10 bg-black/80 px-1 py-0.5 font-mono text-[9px] uppercase tracking-wide text-white/80"
+                className="swap-line-label pointer-events-none absolute right-1 z-20 -translate-y-1/2 border border-white/10 bg-black/80 px-1 py-0.5 font-mono text-[9px] uppercase tracking-wide text-white/80"
                 style={{ top: swapLineY }}
               >
                 swap line
@@ -449,12 +473,10 @@ const GameField = forwardRef<GameFieldRef, GameFieldProps>(({
               gridTemplateColumns: `repeat(${BOARD_COLS}, ${cellSize}px)`,
               width: BOARD_COLS * cellSize,
               height: BOARD_VISIBLE_ROWS * cellSize,
-              backgroundColor: '#101112',
-              backgroundImage:
-                'linear-gradient(rgba(255,255,255,0.045) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.045) 1px, transparent 1px)',
-              backgroundSize: `${cellSize}px ${cellSize}px`,
+              backgroundColor: 'var(--ss-field-well)',
             }}
           >
+            <BoardGridLines cellSize={cellSize} />
             <VoronoiFlowfieldCanvas
               visibleRows={visibleRows}
               visiblePoison={visiblePoison}
@@ -465,6 +487,8 @@ const GameField = forwardRef<GameFieldRef, GameFieldProps>(({
               board={player.board}
               activePiece={player.activePiece}
               performanceId={performanceId}
+              piecePalette={theme.piecePalette}
+              poisonPalette={theme.poisonPalette}
             />
             <BoardCanvasOverlay
               model={visualModel}
@@ -598,7 +622,11 @@ const GameField = forwardRef<GameFieldRef, GameFieldProps>(({
                           <div
                             key={`hold-${x}-${y}`}
                             className={`poison-cell poison-cell-v${Math.min(poisonVariant, 4)}`}
-                            style={{ width: holdPreviewCell, height: holdPreviewCell }}
+                            style={{
+                              width: holdPreviewCell,
+                              height: holdPreviewCell,
+                              backgroundColor: poisonColor(theme.poisonPalette, poisonVariant),
+                            }}
                           />
                         );
                       }
@@ -611,7 +639,7 @@ const GameField = forwardRef<GameFieldRef, GameFieldProps>(({
                           {filled && heldPiece && (
                             <div
                               className="shape-token absolute inset-[7%]"
-                              style={{ backgroundColor: SHAPE_COLORS[heldPiece.type] }}
+                              style={{ backgroundColor: theme.piecePalette[heldPiece.type] }}
                             >
                               <div className="shape-token-highlight pointer-events-none absolute inset-0" aria-hidden />
                               {hatchingEnabled && !heldPiece.poisoned && !heldPiece.bomber && (
@@ -652,7 +680,10 @@ export default React.memo(GameField, (prev, next) => {
     prev.cellSize !== next.cellSize ||
     prev.boardFitRef !== next.boardFitRef ||
     prev.status !== next.status ||
-    prev.hatchingEnabled !== next.hatchingEnabled
+    prev.hatchingEnabled !== next.hatchingEnabled ||
+    prev.fieldRole !== next.fieldRole ||
+    prev.decorationSeed !== next.decorationSeed ||
+    prev.faceGrowthStartedAtMs !== next.faceGrowthStartedAtMs
   ) {
     return false;
   }
