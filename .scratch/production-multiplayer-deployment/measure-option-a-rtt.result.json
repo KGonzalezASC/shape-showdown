@@ -1,0 +1,219 @@
+{
+  "measuredAt": "2026-08-15T23:41:11.969Z",
+  "machine": "single-local-dev",
+  "note": "One-machine Option A connectivity proof. Direct tunnel RTT is local POP latency, not true multi-region. Discord proxy rows require URL mappings /region-east and /region-west.",
+  "hosts": {
+    "eastHost": "sterling-webster-rail-manager.trycloudflare.com",
+    "westHost": "bond-fuji-cigarettes-previous.trycloudflare.com",
+    "appId": "1538301343708618815",
+    "samples": 5
+  },
+  "summary": [
+    {
+      "label": "east-direct",
+      "url": "https://sterling-webster-rail-manager.trycloudflare.com/socket.io/?EIO=4&transport=polling",
+      "count": 5,
+      "ok": 5,
+      "min": 49.65750000000003,
+      "max": 395.6084,
+      "mean": 122.07726000000002,
+      "p50": 54.119500000000016,
+      "lastError": null
+    },
+    {
+      "label": "west-direct",
+      "url": "https://bond-fuji-cigarettes-previous.trycloudflare.com/socket.io/?EIO=4&transport=polling",
+      "count": 5,
+      "ok": 5,
+      "min": 49.67859999999996,
+      "max": 352.8361,
+      "mean": 113.66944000000005,
+      "p50": 56.24500000000012,
+      "lastError": null
+    },
+    {
+      "label": "east-via-discord-proxy",
+      "url": "https://1538301343708618815.discordsays.com/region-east/socket.io/?EIO=4&transport=polling",
+      "count": 5,
+      "ok": 5,
+      "min": 58.84080000000017,
+      "max": 208.7572,
+      "mean": 91.39812000000002,
+      "p50": 62.19380000000001,
+      "lastError": null
+    },
+    {
+      "label": "west-via-discord-proxy",
+      "url": "https://1538301343708618815.discordsays.com/region-west/socket.io/?EIO=4&transport=polling",
+      "count": 5,
+      "ok": 5,
+      "min": 55.19990000000007,
+      "max": 79.6603,
+      "mean": 64.69867999999997,
+      "p50": 64.04319999999984,
+      "lastError": null
+    }
+  ],
+  "samples": [
+    {
+      "label": "east-direct",
+      "url": "https://sterling-webster-rail-manager.trycloudflare.com/socket.io/?EIO=4&transport=polling",
+      "ok": true,
+      "status": 200,
+      "ms": 395.6084,
+      "bodyPreview": "0{\"sid\":\"7al_PiwvYrrKW4aPAAAG\",\"upgrades\":[\"websocket\"],\"pingInterval\":25000,\"pingTimeout\":20000,\"maxPayload\":1000000}"
+    },
+    {
+      "label": "east-direct",
+      "url": "https://sterling-webster-rail-manager.trycloudflare.com/socket.io/?EIO=4&transport=polling",
+      "ok": true,
+      "status": 200,
+      "ms": 54.119500000000016,
+      "bodyPreview": "0{\"sid\":\"TFR7Xa1irV8DkvMnAAAH\",\"upgrades\":[\"websocket\"],\"pingInterval\":25000,\"pingTimeout\":20000,\"maxPayload\":1000000}"
+    },
+    {
+      "label": "east-direct",
+      "url": "https://sterling-webster-rail-manager.trycloudflare.com/socket.io/?EIO=4&transport=polling",
+      "ok": true,
+      "status": 200,
+      "ms": 59.027900000000045,
+      "bodyPreview": "0{\"sid\":\"NwFqdW_At6ijtLQUAAAI\",\"upgrades\":[\"websocket\"],\"pingInterval\":25000,\"pingTimeout\":20000,\"maxPayload\":1000000}"
+    },
+    {
+      "label": "east-direct",
+      "url": "https://sterling-webster-rail-manager.trycloudflare.com/socket.io/?EIO=4&transport=polling",
+      "ok": true,
+      "status": 200,
+      "ms": 51.97300000000007,
+      "bodyPreview": "0{\"sid\":\"TltfsZTShp60iAM9AAAJ\",\"upgrades\":[\"websocket\"],\"pingInterval\":25000,\"pingTimeout\":20000,\"maxPayload\":1000000}"
+    },
+    {
+      "label": "east-direct",
+      "url": "https://sterling-webster-rail-manager.trycloudflare.com/socket.io/?EIO=4&transport=polling",
+      "ok": true,
+      "status": 200,
+      "ms": 49.65750000000003,
+      "bodyPreview": "0{\"sid\":\"L8755WaIbX1YI9DWAAAK\",\"upgrades\":[\"websocket\"],\"pingInterval\":25000,\"pingTimeout\":20000,\"maxPayload\":1000000}"
+    },
+    {
+      "label": "west-direct",
+      "url": "https://bond-fuji-cigarettes-previous.trycloudflare.com/socket.io/?EIO=4&transport=polling",
+      "ok": true,
+      "status": 200,
+      "ms": 352.8361,
+      "bodyPreview": "0{\"sid\":\"RcFd-GRBnC_7Kz9ZAAAG\",\"upgrades\":[\"websocket\"],\"pingInterval\":25000,\"pingTimeout\":20000,\"maxPayload\":1000000}"
+    },
+    {
+      "label": "west-direct",
+      "url": "https://bond-fuji-cigarettes-previous.trycloudflare.com/socket.io/?EIO=4&transport=polling",
+      "ok": true,
+      "status": 200,
+      "ms": 52.900800000000004,
+      "bodyPreview": "0{\"sid\":\"Rql3vrZv1hsLdOQdAAAH\",\"upgrades\":[\"websocket\"],\"pingInterval\":25000,\"pingTimeout\":20000,\"maxPayload\":1000000}"
+    },
+    {
+      "label": "west-direct",
+      "url": "https://bond-fuji-cigarettes-previous.trycloudflare.com/socket.io/?EIO=4&transport=polling",
+      "ok": true,
+      "status": 200,
+      "ms": 56.24500000000012,
+      "bodyPreview": "0{\"sid\":\"EE9dUV-moxDv3Sf6AAAI\",\"upgrades\":[\"websocket\"],\"pingInterval\":25000,\"pingTimeout\":20000,\"maxPayload\":1000000}"
+    },
+    {
+      "label": "west-direct",
+      "url": "https://bond-fuji-cigarettes-previous.trycloudflare.com/socket.io/?EIO=4&transport=polling",
+      "ok": true,
+      "status": 200,
+      "ms": 49.67859999999996,
+      "bodyPreview": "0{\"sid\":\"KIwb3SdT8y2JgBROAAAJ\",\"upgrades\":[\"websocket\"],\"pingInterval\":25000,\"pingTimeout\":20000,\"maxPayload\":1000000}"
+    },
+    {
+      "label": "west-direct",
+      "url": "https://bond-fuji-cigarettes-previous.trycloudflare.com/socket.io/?EIO=4&transport=polling",
+      "ok": true,
+      "status": 200,
+      "ms": 56.6867000000002,
+      "bodyPreview": "0{\"sid\":\"2ZATlouVLpd9cahEAAAK\",\"upgrades\":[\"websocket\"],\"pingInterval\":25000,\"pingTimeout\":20000,\"maxPayload\":1000000}"
+    },
+    {
+      "label": "east-via-discord-proxy",
+      "url": "https://1538301343708618815.discordsays.com/region-east/socket.io/?EIO=4&transport=polling",
+      "ok": true,
+      "status": 200,
+      "ms": 208.7572,
+      "bodyPreview": "0{\"sid\":\"nGWjWM7EVCWd1BwkAAAL\",\"upgrades\":[\"websocket\"],\"pingInterval\":25000,\"pingTimeout\":20000,\"maxPayload\":1000000}"
+    },
+    {
+      "label": "east-via-discord-proxy",
+      "url": "https://1538301343708618815.discordsays.com/region-east/socket.io/?EIO=4&transport=polling",
+      "ok": true,
+      "status": 200,
+      "ms": 61.72990000000004,
+      "bodyPreview": "0{\"sid\":\"hYC2zrOljup12CAWAAAM\",\"upgrades\":[\"websocket\"],\"pingInterval\":25000,\"pingTimeout\":20000,\"maxPayload\":1000000}"
+    },
+    {
+      "label": "east-via-discord-proxy",
+      "url": "https://1538301343708618815.discordsays.com/region-east/socket.io/?EIO=4&transport=polling",
+      "ok": true,
+      "status": 200,
+      "ms": 58.84080000000017,
+      "bodyPreview": "0{\"sid\":\"1LMHfoRi_O1pFwm0AAAN\",\"upgrades\":[\"websocket\"],\"pingInterval\":25000,\"pingTimeout\":20000,\"maxPayload\":1000000}"
+    },
+    {
+      "label": "east-via-discord-proxy",
+      "url": "https://1538301343708618815.discordsays.com/region-east/socket.io/?EIO=4&transport=polling",
+      "ok": true,
+      "status": 200,
+      "ms": 62.19380000000001,
+      "bodyPreview": "0{\"sid\":\"wDzvazl9_lbl1fa5AAAO\",\"upgrades\":[\"websocket\"],\"pingInterval\":25000,\"pingTimeout\":20000,\"maxPayload\":1000000}"
+    },
+    {
+      "label": "east-via-discord-proxy",
+      "url": "https://1538301343708618815.discordsays.com/region-east/socket.io/?EIO=4&transport=polling",
+      "ok": true,
+      "status": 200,
+      "ms": 65.46889999999985,
+      "bodyPreview": "0{\"sid\":\"LFDWssxKBjScT2qIAAAP\",\"upgrades\":[\"websocket\"],\"pingInterval\":25000,\"pingTimeout\":20000,\"maxPayload\":1000000}"
+    },
+    {
+      "label": "west-via-discord-proxy",
+      "url": "https://1538301343708618815.discordsays.com/region-west/socket.io/?EIO=4&transport=polling",
+      "ok": true,
+      "status": 200,
+      "ms": 79.6603,
+      "bodyPreview": "0{\"sid\":\"vSzyJkCZ4buT4F0hAAAL\",\"upgrades\":[\"websocket\"],\"pingInterval\":25000,\"pingTimeout\":20000,\"maxPayload\":1000000}"
+    },
+    {
+      "label": "west-via-discord-proxy",
+      "url": "https://1538301343708618815.discordsays.com/region-west/socket.io/?EIO=4&transport=polling",
+      "ok": true,
+      "status": 200,
+      "ms": 55.19990000000007,
+      "bodyPreview": "0{\"sid\":\"nEnd9jgydmA_pndpAAAM\",\"upgrades\":[\"websocket\"],\"pingInterval\":25000,\"pingTimeout\":20000,\"maxPayload\":1000000}"
+    },
+    {
+      "label": "west-via-discord-proxy",
+      "url": "https://1538301343708618815.discordsays.com/region-west/socket.io/?EIO=4&transport=polling",
+      "ok": true,
+      "status": 200,
+      "ms": 60.39249999999993,
+      "bodyPreview": "0{\"sid\":\"I58J4408hzCh4VZ0AAAN\",\"upgrades\":[\"websocket\"],\"pingInterval\":25000,\"pingTimeout\":20000,\"maxPayload\":1000000}"
+    },
+    {
+      "label": "west-via-discord-proxy",
+      "url": "https://1538301343708618815.discordsays.com/region-west/socket.io/?EIO=4&transport=polling",
+      "ok": true,
+      "status": 200,
+      "ms": 64.19749999999999,
+      "bodyPreview": "0{\"sid\":\"hHtVfEMSMXkRB2W4AAAO\",\"upgrades\":[\"websocket\"],\"pingInterval\":25000,\"pingTimeout\":20000,\"maxPayload\":1000000}"
+    },
+    {
+      "label": "west-via-discord-proxy",
+      "url": "https://1538301343708618815.discordsays.com/region-west/socket.io/?EIO=4&transport=polling",
+      "ok": true,
+      "status": 200,
+      "ms": 64.04319999999984,
+      "bodyPreview": "0{\"sid\":\"UB2n6EGTHTF9Kn3zAAAP\",\"upgrades\":[\"websocket\"],\"pingInterval\":25000,\"pingTimeout\":20000,\"maxPayload\":1000000}"
+    }
+  ]
+}

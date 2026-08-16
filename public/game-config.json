@@ -1,5 +1,5 @@
 {
-  "gameServerUrl": "http://localhost:3000",
+  "gameServerUrl": "",
   "gameServerHost": "",
   "gameServerPort": null
 }

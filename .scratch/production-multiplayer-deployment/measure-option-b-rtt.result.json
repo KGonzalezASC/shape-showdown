@@ -1,0 +1,269 @@
+{
+  "measuredAt": "2026-08-16T01:49:20.349Z",
+  "machine": "single-local-dev",
+  "note": "Option B: one Discord root origin; region selected by path (/region/east vs /region/west). One-machine RTT is not geo differentiation.",
+  "hosts": {
+    "rootHost": "applying-follow-surfaces-transmit.trycloudflare.com",
+    "appId": "1538301343708618815",
+    "samples": 5
+  },
+  "summary": [
+    {
+      "label": "root-ui-health-direct",
+      "url": "https://applying-follow-surfaces-transmit.trycloudflare.com/health",
+      "count": 5,
+      "ok": 5,
+      "min": 53.42139999999972,
+      "max": 2082.2772,
+      "mean": 468.00834,
+      "p50": 65.19500000000016,
+      "lastError": null
+    },
+    {
+      "label": "east-path-direct",
+      "url": "https://applying-follow-surfaces-transmit.trycloudflare.com/region/east/socket.io/?EIO=4&transport=polling",
+      "count": 5,
+      "ok": 5,
+      "min": 53.258200000000215,
+      "max": 91.89519999999993,
+      "mean": 68.48992000000007,
+      "p50": 68.25379999999996,
+      "lastError": null
+    },
+    {
+      "label": "west-path-direct",
+      "url": "https://applying-follow-surfaces-transmit.trycloudflare.com/region/west/socket.io/?EIO=4&transport=polling",
+      "count": 5,
+      "ok": 5,
+      "min": 53.01110000000017,
+      "max": 82.09299999999985,
+      "mean": 67.34730000000009,
+      "p50": 64.7143000000001,
+      "lastError": null
+    },
+    {
+      "label": "east-path-via-discord-proxy",
+      "url": "https://1538301343708618815.discordsays.com/region/east/socket.io/?EIO=4&transport=polling",
+      "count": 5,
+      "ok": 0,
+      "min": null,
+      "max": null,
+      "mean": null,
+      "p50": null,
+      "lastError": "<!doctype html>\n<!--[if lt IE 7]> <html class=\"no-js ie6 oldie\" lang=\"en-US\"> <![endif]-->\n<!--[if IE 7]>    <html class"
+    },
+    {
+      "label": "west-path-via-discord-proxy",
+      "url": "https://1538301343708618815.discordsays.com/region/west/socket.io/?EIO=4&transport=polling",
+      "count": 5,
+      "ok": 0,
+      "min": null,
+      "max": null,
+      "mean": null,
+      "p50": null,
+      "lastError": "<!doctype html>\n<!--[if lt IE 7]> <html class=\"no-js ie6 oldie\" lang=\"en-US\"> <![endif]-->\n<!--[if IE 7]>    <html class"
+    }
+  ],
+  "samples": [
+    {
+      "label": "root-ui-health-direct",
+      "url": "https://applying-follow-surfaces-transmit.trycloudflare.com/health",
+      "ok": true,
+      "status": 200,
+      "ms": 2082.2772,
+      "bodyPreview": "ok"
+    },
+    {
+      "label": "root-ui-health-direct",
+      "url": "https://applying-follow-surfaces-transmit.trycloudflare.com/health",
+      "ok": true,
+      "status": 200,
+      "ms": 78.23849999999993,
+      "bodyPreview": "ok"
+    },
+    {
+      "label": "root-ui-health-direct",
+      "url": "https://applying-follow-surfaces-transmit.trycloudflare.com/health",
+      "ok": true,
+      "status": 200,
+      "ms": 53.42139999999972,
+      "bodyPreview": "ok"
+    },
+    {
+      "label": "root-ui-health-direct",
+      "url": "https://applying-follow-surfaces-transmit.trycloudflare.com/health",
+      "ok": true,
+      "status": 200,
+      "ms": 60.909599999999955,
+      "bodyPreview": "ok"
+    },
+    {
+      "label": "root-ui-health-direct",
+      "url": "https://applying-follow-surfaces-transmit.trycloudflare.com/health",
+      "ok": true,
+      "status": 200,
+      "ms": 65.19500000000016,
+      "bodyPreview": "ok"
+    },
+    {
+      "label": "east-path-direct",
+      "url": "https://applying-follow-surfaces-transmit.trycloudflare.com/region/east/socket.io/?EIO=4&transport=polling",
+      "ok": true,
+      "status": 200,
+      "ms": 91.89519999999993,
+      "bodyPreview": "0{\"sid\":\"8Q8umKyQ1BJ_GoA1AAAC\",\"upgrades\":[\"websocket\"],\"pingInterval\":25000,\"pingTimeout\":20000,\"maxPayload\":1000000}"
+    },
+    {
+      "label": "east-path-direct",
+      "url": "https://applying-follow-surfaces-transmit.trycloudflare.com/region/east/socket.io/?EIO=4&transport=polling",
+      "ok": true,
+      "status": 200,
+      "ms": 53.258200000000215,
+      "bodyPreview": "0{\"sid\":\"J3In337xH-pqjwUUAAAD\",\"upgrades\":[\"websocket\"],\"pingInterval\":25000,\"pingTimeout\":20000,\"maxPayload\":1000000}"
+    },
+    {
+      "label": "east-path-direct",
+      "url": "https://applying-follow-surfaces-transmit.trycloudflare.com/region/east/socket.io/?EIO=4&transport=polling",
+      "ok": true,
+      "status": 200,
+      "ms": 68.25379999999996,
+      "bodyPreview": "0{\"sid\":\"G7VhktwtpWBRRxw6AAAE\",\"upgrades\":[\"websocket\"],\"pingInterval\":25000,\"pingTimeout\":20000,\"maxPayload\":1000000}"
+    },
+    {
+      "label": "east-path-direct",
+      "url": "https://applying-follow-surfaces-transmit.trycloudflare.com/region/east/socket.io/?EIO=4&transport=polling",
+      "ok": true,
+      "status": 200,
+      "ms": 72.48090000000002,
+      "bodyPreview": "0{\"sid\":\"Yr_BBW7cfFMaBMacAAAF\",\"upgrades\":[\"websocket\"],\"pingInterval\":25000,\"pingTimeout\":20000,\"maxPayload\":1000000}"
+    },
+    {
+      "label": "east-path-direct",
+      "url": "https://applying-follow-surfaces-transmit.trycloudflare.com/region/east/socket.io/?EIO=4&transport=polling",
+      "ok": true,
+      "status": 200,
+      "ms": 56.56150000000025,
+      "bodyPreview": "0{\"sid\":\"1nIrZaYpUNH5yUT8AAAG\",\"upgrades\":[\"websocket\"],\"pingInterval\":25000,\"pingTimeout\":20000,\"maxPayload\":1000000}"
+    },
+    {
+      "label": "west-path-direct",
+      "url": "https://applying-follow-surfaces-transmit.trycloudflare.com/region/west/socket.io/?EIO=4&transport=polling",
+      "ok": true,
+      "status": 200,
+      "ms": 64.7143000000001,
+      "bodyPreview": "0{\"sid\":\"e4DQ4mu6TEvT04-qAAAC\",\"upgrades\":[\"websocket\"],\"pingInterval\":25000,\"pingTimeout\":20000,\"maxPayload\":1000000}"
+    },
+    {
+      "label": "west-path-direct",
+      "url": "https://applying-follow-surfaces-transmit.trycloudflare.com/region/west/socket.io/?EIO=4&transport=polling",
+      "ok": true,
+      "status": 200,
+      "ms": 53.01110000000017,
+      "bodyPreview": "0{\"sid\":\"0_ZN7n5zm0oen0zxAAAD\",\"upgrades\":[\"websocket\"],\"pingInterval\":25000,\"pingTimeout\":20000,\"maxPayload\":1000000}"
+    },
+    {
+      "label": "west-path-direct",
+      "url": "https://applying-follow-surfaces-transmit.trycloudflare.com/region/west/socket.io/?EIO=4&transport=polling",
+      "ok": true,
+      "status": 200,
+      "ms": 57.56740000000036,
+      "bodyPreview": "0{\"sid\":\"-gYAAHfyN6CniTn9AAAE\",\"upgrades\":[\"websocket\"],\"pingInterval\":25000,\"pingTimeout\":20000,\"maxPayload\":1000000}"
+    },
+    {
+      "label": "west-path-direct",
+      "url": "https://applying-follow-surfaces-transmit.trycloudflare.com/region/west/socket.io/?EIO=4&transport=polling",
+      "ok": true,
+      "status": 200,
+      "ms": 79.35069999999996,
+      "bodyPreview": "0{\"sid\":\"3exXtxTSX3Jeg6-5AAAF\",\"upgrades\":[\"websocket\"],\"pingInterval\":25000,\"pingTimeout\":20000,\"maxPayload\":1000000}"
+    },
+    {
+      "label": "west-path-direct",
+      "url": "https://applying-follow-surfaces-transmit.trycloudflare.com/region/west/socket.io/?EIO=4&transport=polling",
+      "ok": true,
+      "status": 200,
+      "ms": 82.09299999999985,
+      "bodyPreview": "0{\"sid\":\"NCBXB3xE0610nrgPAAAG\",\"upgrades\":[\"websocket\"],\"pingInterval\":25000,\"pingTimeout\":20000,\"maxPayload\":1000000}"
+    },
+    {
+      "label": "east-path-via-discord-proxy",
+      "url": "https://1538301343708618815.discordsays.com/region/east/socket.io/?EIO=4&transport=polling",
+      "ok": false,
+      "status": 530,
+      "ms": 472.6428000000001,
+      "bodyPreview": "<!doctype html>\n<!--[if lt IE 7]> <html class=\"no-js ie6 oldie\" lang=\"en-US\"> <![endif]-->\n<!--[if IE 7]>    <html class"
+    },
+    {
+      "label": "east-path-via-discord-proxy",
+      "url": "https://1538301343708618815.discordsays.com/region/east/socket.io/?EIO=4&transport=polling",
+      "ok": false,
+      "status": 530,
+      "ms": 49.9982,
+      "bodyPreview": "<!doctype html>\n<!--[if lt IE 7]> <html class=\"no-js ie6 oldie\" lang=\"en-US\"> <![endif]-->\n<!--[if IE 7]>    <html class"
+    },
+    {
+      "label": "east-path-via-discord-proxy",
+      "url": "https://1538301343708618815.discordsays.com/region/east/socket.io/?EIO=4&transport=polling",
+      "ok": false,
+      "status": 530,
+      "ms": 36.55169999999998,
+      "bodyPreview": "<!doctype html>\n<!--[if lt IE 7]> <html class=\"no-js ie6 oldie\" lang=\"en-US\"> <![endif]-->\n<!--[if IE 7]>    <html class"
+    },
+    {
+      "label": "east-path-via-discord-proxy",
+      "url": "https://1538301343708618815.discordsays.com/region/east/socket.io/?EIO=4&transport=polling",
+      "ok": false,
+      "status": 530,
+      "ms": 38.34659999999985,
+      "bodyPreview": "<!doctype html>\n<!--[if lt IE 7]> <html class=\"no-js ie6 oldie\" lang=\"en-US\"> <![endif]-->\n<!--[if IE 7]>    <html class"
+    },
+    {
+      "label": "east-path-via-discord-proxy",
+      "url": "https://1538301343708618815.discordsays.com/region/east/socket.io/?EIO=4&transport=polling",
+      "ok": false,
+      "status": 530,
+      "ms": 40.62039999999979,
+      "bodyPreview": "<!doctype html>\n<!--[if lt IE 7]> <html class=\"no-js ie6 oldie\" lang=\"en-US\"> <![endif]-->\n<!--[if IE 7]>    <html class"
+    },
+    {
+      "label": "west-path-via-discord-proxy",
+      "url": "https://1538301343708618815.discordsays.com/region/west/socket.io/?EIO=4&transport=polling",
+      "ok": false,
+      "status": 530,
+      "ms": 154.3204999999998,
+      "bodyPreview": "<!doctype html>\n<!--[if lt IE 7]> <html class=\"no-js ie6 oldie\" lang=\"en-US\"> <![endif]-->\n<!--[if IE 7]>    <html class"
+    },
+    {
+      "label": "west-path-via-discord-proxy",
+      "url": "https://1538301343708618815.discordsays.com/region/west/socket.io/?EIO=4&transport=polling",
+      "ok": false,
+      "status": 530,
+      "ms": 43.52719999999999,
+      "bodyPreview": "<!doctype html>\n<!--[if lt IE 7]> <html class=\"no-js ie6 oldie\" lang=\"en-US\"> <![endif]-->\n<!--[if IE 7]>    <html class"
+    },
+    {
+      "label": "west-path-via-discord-proxy",
+      "url": "https://1538301343708618815.discordsays.com/region/west/socket.io/?EIO=4&transport=polling",
+      "ok": false,
+      "status": 530,
+      "ms": 43.53789999999981,
+      "bodyPreview": "<!doctype html>\n<!--[if lt IE 7]> <html class=\"no-js ie6 oldie\" lang=\"en-US\"> <![endif]-->\n<!--[if IE 7]>    <html class"
+    },
+    {
+      "label": "west-path-via-discord-proxy",
+      "url": "https://1538301343708618815.discordsays.com/region/west/socket.io/?EIO=4&transport=polling",
+      "ok": false,
+      "status": 530,
+      "ms": 40.472099999999955,
+      "bodyPreview": "<!doctype html>\n<!--[if lt IE 7]> <html class=\"no-js ie6 oldie\" lang=\"en-US\"> <![endif]-->\n<!--[if IE 7]>    <html class"
+    },
+    {
+      "label": "west-path-via-discord-proxy",
+      "url": "https://1538301343708618815.discordsays.com/region/west/socket.io/?EIO=4&transport=polling",
+      "ok": false,
+      "status": 530,
+      "ms": 39.300500000000284,
+      "bodyPreview": "<!doctype html>\n<!--[if lt IE 7]> <html class=\"no-js ie6 oldie\" lang=\"en-US\"> <![endif]-->\n<!--[if IE 7]>    <html class"
+    }
+  ]
+}

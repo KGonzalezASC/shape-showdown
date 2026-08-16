@@ -1,0 +1,240 @@
+{
+  "measuredAt": "2026-08-16T01:57:51.930Z",
+  "machine": "single-local-dev",
+  "verdict": "DENY_FOR_DISCORD_ACTIVITY",
+  "note": "Option D: dynamic host is a fresh Cloudflare quick-tunnel hostname never added to Discord URL Mappings. Direct reachability proves the endpoint exists; discordsays failures prove the Activity proxy cannot use unknown hosts without a portal mapping/pattern.",
+  "hosts": {
+    "dynamicHost": "container-expires-latitude-looking.trycloudflare.com",
+    "mappedRootHost": "ray-cruise-officially-rhode.trycloudflare.com",
+    "appId": "1538301343708618815",
+    "samples": 5
+  },
+  "summary": [
+    {
+      "label": "dynamic-host-direct-socket",
+      "url": "https://container-expires-latitude-looking.trycloudflare.com/socket.io/?EIO=4&transport=polling",
+      "expectOk": true,
+      "count": 5,
+      "expectationMatched": 5,
+      "socketHandshakePass": 5,
+      "socketP50": 65.66160000000002,
+      "lastStatus": 200,
+      "lastError": null
+    },
+    {
+      "label": "mapped-gateway-control-socket",
+      "url": "https://ray-cruise-officially-rhode.trycloudflare.com/socket.io/?EIO=4&transport=polling&region=east",
+      "expectOk": true,
+      "count": 5,
+      "expectationMatched": 5,
+      "socketHandshakePass": 5,
+      "socketP50": 66.45989999999983,
+      "lastStatus": 200,
+      "lastError": null
+    },
+    {
+      "label": "discordsays-unmapped-dynamic-path",
+      "url": "https://1538301343708618815.discordsays.com/provider-dynamic/socket.io/?EIO=4&transport=polling",
+      "expectOk": false,
+      "count": 5,
+      "expectationMatched": 5,
+      "socketHandshakePass": 0,
+      "socketP50": null,
+      "lastStatus": 200,
+      "lastError": "<!doctype html>\r\n<html lang=\"en\">\r\n  <head>\n    \n<script type=\"text/javascript\" nonce=\"MzEsNjQsOTIsMjA0LDEzMywxNywzNiwyOQ==\">\nRTCPeerConnection = null;\nWebTrans"
+    },
+    {
+      "label": "discordsays-cannot-alias-external-host",
+      "url": "https://1538301343708618815.discordsays.com/.proxy/container-expires-latitude-looking.trycloudflare.com/socket.io/?EIO=4&transport=polling",
+      "expectOk": false,
+      "count": 5,
+      "expectationMatched": 5,
+      "socketHandshakePass": 0,
+      "socketP50": null,
+      "lastStatus": 200,
+      "lastError": "<!doctype html>\r\n<html lang=\"en\">\r\n  <head>\n    \n<script type=\"text/javascript\" nonce=\"MjM4LDEzOSwxNDUsNTEsODMsMTY4LDExMCwyNDU=\">\nRTCPeerConnection = null;\nWebT"
+    }
+  ],
+  "samples": [
+    {
+      "label": "dynamic-host-direct-socket",
+      "url": "https://container-expires-latitude-looking.trycloudflare.com/socket.io/?EIO=4&transport=polling",
+      "expectOk": true,
+      "ok": true,
+      "status": 200,
+      "ms": 394.7822,
+      "bodyPreview": "0{\"sid\":\"inn6QqKG3_0loWWWAAAX\",\"upgrades\":[\"websocket\"],\"pingInterval\":25000,\"pingTimeout\":20000,\"maxPayload\":1000000}"
+    },
+    {
+      "label": "dynamic-host-direct-socket",
+      "url": "https://container-expires-latitude-looking.trycloudflare.com/socket.io/?EIO=4&transport=polling",
+      "expectOk": true,
+      "ok": true,
+      "status": 200,
+      "ms": 59.06809999999996,
+      "bodyPreview": "0{\"sid\":\"POR-Zob1HcLI2IGtAAAY\",\"upgrades\":[\"websocket\"],\"pingInterval\":25000,\"pingTimeout\":20000,\"maxPayload\":1000000}"
+    },
+    {
+      "label": "dynamic-host-direct-socket",
+      "url": "https://container-expires-latitude-looking.trycloudflare.com/socket.io/?EIO=4&transport=polling",
+      "expectOk": true,
+      "ok": true,
+      "status": 200,
+      "ms": 60.157399999999996,
+      "bodyPreview": "0{\"sid\":\"Ln-SvJSLQeHpxEuSAAAZ\",\"upgrades\":[\"websocket\"],\"pingInterval\":25000,\"pingTimeout\":20000,\"maxPayload\":1000000}"
+    },
+    {
+      "label": "dynamic-host-direct-socket",
+      "url": "https://container-expires-latitude-looking.trycloudflare.com/socket.io/?EIO=4&transport=polling",
+      "expectOk": true,
+      "ok": true,
+      "status": 200,
+      "ms": 65.66160000000002,
+      "bodyPreview": "0{\"sid\":\"xSebY9VoK9aBKSI3AAAa\",\"upgrades\":[\"websocket\"],\"pingInterval\":25000,\"pingTimeout\":20000,\"maxPayload\":1000000}"
+    },
+    {
+      "label": "dynamic-host-direct-socket",
+      "url": "https://container-expires-latitude-looking.trycloudflare.com/socket.io/?EIO=4&transport=polling",
+      "expectOk": true,
+      "ok": true,
+      "status": 200,
+      "ms": 73.79250000000002,
+      "bodyPreview": "0{\"sid\":\"WGgW-3D-_r765zSfAAAb\",\"upgrades\":[\"websocket\"],\"pingInterval\":25000,\"pingTimeout\":20000,\"maxPayload\":1000000}"
+    },
+    {
+      "label": "mapped-gateway-control-socket",
+      "url": "https://ray-cruise-officially-rhode.trycloudflare.com/socket.io/?EIO=4&transport=polling&region=east",
+      "expectOk": true,
+      "ok": true,
+      "status": 200,
+      "ms": 401.66550000000007,
+      "bodyPreview": "0{\"sid\":\"FSqyyrVWXdAPMgkqAAAc\",\"upgrades\":[\"websocket\"],\"pingInterval\":25000,\"pingTimeout\":20000,\"maxPayload\":1000000}"
+    },
+    {
+      "label": "mapped-gateway-control-socket",
+      "url": "https://ray-cruise-officially-rhode.trycloudflare.com/socket.io/?EIO=4&transport=polling&region=east",
+      "expectOk": true,
+      "ok": true,
+      "status": 200,
+      "ms": 73.87020000000007,
+      "bodyPreview": "0{\"sid\":\"uci2f0kr6co3103wAAAd\",\"upgrades\":[\"websocket\"],\"pingInterval\":25000,\"pingTimeout\":20000,\"maxPayload\":1000000}"
+    },
+    {
+      "label": "mapped-gateway-control-socket",
+      "url": "https://ray-cruise-officially-rhode.trycloudflare.com/socket.io/?EIO=4&transport=polling&region=east",
+      "expectOk": true,
+      "ok": true,
+      "status": 200,
+      "ms": 58.89019999999982,
+      "bodyPreview": "0{\"sid\":\"tGnqZOATIPELu6VYAAAe\",\"upgrades\":[\"websocket\"],\"pingInterval\":25000,\"pingTimeout\":20000,\"maxPayload\":1000000}"
+    },
+    {
+      "label": "mapped-gateway-control-socket",
+      "url": "https://ray-cruise-officially-rhode.trycloudflare.com/socket.io/?EIO=4&transport=polling&region=east",
+      "expectOk": true,
+      "ok": true,
+      "status": 200,
+      "ms": 63.25739999999996,
+      "bodyPreview": "0{\"sid\":\"kXWpCQYRkRoal-CoAAAf\",\"upgrades\":[\"websocket\"],\"pingInterval\":25000,\"pingTimeout\":20000,\"maxPayload\":1000000}"
+    },
+    {
+      "label": "mapped-gateway-control-socket",
+      "url": "https://ray-cruise-officially-rhode.trycloudflare.com/socket.io/?EIO=4&transport=polling&region=east",
+      "expectOk": true,
+      "ok": true,
+      "status": 200,
+      "ms": 66.45989999999983,
+      "bodyPreview": "0{\"sid\":\"4-QdDVg6RDMcEazNAAAg\",\"upgrades\":[\"websocket\"],\"pingInterval\":25000,\"pingTimeout\":20000,\"maxPayload\":1000000}"
+    },
+    {
+      "label": "discordsays-unmapped-dynamic-path",
+      "url": "https://1538301343708618815.discordsays.com/provider-dynamic/socket.io/?EIO=4&transport=polling",
+      "expectOk": false,
+      "ok": true,
+      "status": 200,
+      "ms": 446.73199999999997,
+      "bodyPreview": "<!doctype html>\r\n<html lang=\"en\">\r\n  <head>\n    \n<script type=\"text/javascript\" nonce=\"MzEsNjQsOTIsMjA0LDEzMywxNywzNiwyOQ==\">\nRTCPeerConnection = null;\nWebTrans"
+    },
+    {
+      "label": "discordsays-unmapped-dynamic-path",
+      "url": "https://1538301343708618815.discordsays.com/provider-dynamic/socket.io/?EIO=4&transport=polling",
+      "expectOk": false,
+      "ok": true,
+      "status": 200,
+      "ms": 80.79520000000002,
+      "bodyPreview": "<!doctype html>\r\n<html lang=\"en\">\r\n  <head>\n    \n<script type=\"text/javascript\" nonce=\"MywyNCwxMDQsMjksMTIwLDEyNSwxMjUsNTM=\">\nRTCPeerConnection = null;\nWebTrans"
+    },
+    {
+      "label": "discordsays-unmapped-dynamic-path",
+      "url": "https://1538301343708618815.discordsays.com/provider-dynamic/socket.io/?EIO=4&transport=polling",
+      "expectOk": false,
+      "ok": true,
+      "status": 200,
+      "ms": 495.14589999999976,
+      "bodyPreview": "<!doctype html>\r\n<html lang=\"en\">\r\n  <head>\n    \n<script type=\"text/javascript\" nonce=\"OTMsNDQsMTUwLDIyMSw2NiwyMCwyMDIsODg=\">\nRTCPeerConnection = null;\nWebTrans"
+    },
+    {
+      "label": "discordsays-unmapped-dynamic-path",
+      "url": "https://1538301343708618815.discordsays.com/provider-dynamic/socket.io/?EIO=4&transport=polling",
+      "expectOk": false,
+      "ok": true,
+      "status": 200,
+      "ms": 190.1331,
+      "bodyPreview": "<!doctype html>\r\n<html lang=\"en\">\r\n  <head>\n    \n<script type=\"text/javascript\" nonce=\"ODIsNjEsMTU4LDIwLDI0MywxNDUsMjA5LDIyNA==\">\nRTCPeerConnection = null;\nWebT"
+    },
+    {
+      "label": "discordsays-unmapped-dynamic-path",
+      "url": "https://1538301343708618815.discordsays.com/provider-dynamic/socket.io/?EIO=4&transport=polling",
+      "expectOk": false,
+      "ok": true,
+      "status": 200,
+      "ms": 158.4018000000001,
+      "bodyPreview": "<!doctype html>\r\n<html lang=\"en\">\r\n  <head>\n    \n<script type=\"text/javascript\" nonce=\"MTcsMTc1LDE2MiwxNTUsMTE4LDE0NiwxNTMsMTM5\">\nRTCPeerConnection = null;\nWebT"
+    },
+    {
+      "label": "discordsays-cannot-alias-external-host",
+      "url": "https://1538301343708618815.discordsays.com/.proxy/container-expires-latitude-looking.trycloudflare.com/socket.io/?EIO=4&transport=polling",
+      "expectOk": false,
+      "ok": true,
+      "status": 200,
+      "ms": 173.61540000000014,
+      "bodyPreview": "<!doctype html>\r\n<html lang=\"en\">\r\n  <head>\n    \n<script type=\"text/javascript\" nonce=\"MjM4LDEzOSwxNDUsNTEsODMsMTY4LDExMCwyNDU=\">\nRTCPeerConnection = null;\nWebT"
+    },
+    {
+      "label": "discordsays-cannot-alias-external-host",
+      "url": "https://1538301343708618815.discordsays.com/.proxy/container-expires-latitude-looking.trycloudflare.com/socket.io/?EIO=4&transport=polling",
+      "expectOk": false,
+      "ok": true,
+      "status": 200,
+      "ms": 72.4041000000002,
+      "bodyPreview": "<!doctype html>\r\n<html lang=\"en\">\r\n  <head>\n    \n<script type=\"text/javascript\" nonce=\"MjUwLDIxMywyMDMsMTcxLDQ2LDIzNiwxMzYsMTU2\">\nRTCPeerConnection = null;\nWebT"
+    },
+    {
+      "label": "discordsays-cannot-alias-external-host",
+      "url": "https://1538301343708618815.discordsays.com/.proxy/container-expires-latitude-looking.trycloudflare.com/socket.io/?EIO=4&transport=polling",
+      "expectOk": false,
+      "ok": true,
+      "status": 200,
+      "ms": 67.95600000000013,
+      "bodyPreview": "<!doctype html>\r\n<html lang=\"en\">\r\n  <head>\n    \n<script type=\"text/javascript\" nonce=\"MjM0LDE4OSwxOTIsMTIsNDYsOTEsMjI5LDE3Mw==\">\nRTCPeerConnection = null;\nWebT"
+    },
+    {
+      "label": "discordsays-cannot-alias-external-host",
+      "url": "https://1538301343708618815.discordsays.com/.proxy/container-expires-latitude-looking.trycloudflare.com/socket.io/?EIO=4&transport=polling",
+      "expectOk": false,
+      "ok": true,
+      "status": 200,
+      "ms": 64.15930000000026,
+      "bodyPreview": "<!doctype html>\r\n<html lang=\"en\">\r\n  <head>\n    \n<script type=\"text/javascript\" nonce=\"MTYxLDEzOCwxNzAsMTExLDEwOSwyMiwxODEsMjAw\">\nRTCPeerConnection = null;\nWebT"
+    },
+    {
+      "label": "discordsays-cannot-alias-external-host",
+      "url": "https://1538301343708618815.discordsays.com/.proxy/container-expires-latitude-looking.trycloudflare.com/socket.io/?EIO=4&transport=polling",
+      "expectOk": false,
+      "ok": true,
+      "status": 200,
+      "ms": 76.35359999999991,
+      "bodyPreview": "<!doctype html>\r\n<html lang=\"en\">\r\n  <head>\n    \n<script type=\"text/javascript\" nonce=\"MjQ0LDU5LDE3LDEzNyw4NywxNjgsNTgsMjEy\">\nRTCPeerConnection = null;\nWebTrans"
+    }
+  ]
+}

@@ -14,3 +14,6 @@ coverage/
 
 # Generated RulesBot replay suites (regenerate via scripts/generate-*-replays.mts)
 fixtures/replays/
+
+# Local hosting incident log. Keep operational failures out of version control.
+.scratch/production-multiplayer-deployment/hosting-issues.local.md

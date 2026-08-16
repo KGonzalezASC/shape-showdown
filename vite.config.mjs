@@ -35,6 +35,10 @@ export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, projectRoot, '');
   const fromFile = readClientBaseUrl();
   const fromEnv = env.VITE_BASE_URL?.trim();
+  const allowedHosts = (env.DEV_ALLOWED_HOSTS ?? '')
+    .split(',')
+    .map((host) => host.trim())
+    .filter((host) => host.length > 0);
   // Config file first; VITE_BASE_URL overrides when set (e.g. CI).
   const rawBase =
     fromEnv && fromEnv.length > 0 ? fromEnv : fromFile;
@@ -53,6 +57,7 @@ export default defineConfig(({ mode }) => {
     },
     server: {
       hmr: process.env.DISABLE_HMR !== 'true',
+      allowedHosts,
     },
     build: {
       outDir: path.resolve(projectRoot, 'dist/client'),

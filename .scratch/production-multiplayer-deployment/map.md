@@ -25,16 +25,19 @@ A decision-complete architecture and phased delivery plan for launching Shape Sh
 
 - [Define the player and match reliability contract](issues/01-define-reliability-contract.md) — Connection + process recovery with limits: ≤1–2s checkpoint rewind, 15s restore or void, 60s seat lease + pause modal, 3/90s disconnect budget → forfeit, identity+resume ticket, full snapshot reclaim, alloc retry-once then cancel, immediate result finalization, replay/analytics discontinuity markers.
 - [Measure the runtime and network budget](issues/02-measure-runtime-and-network-budget.md) — Local Bun 1v1: ~10 MB RSS delta/match, ~10 ms CPU/wall-sec, ~8.2 KB gameState JSON, ~150 KB/s/player UTF-8 planning bound; Discord Activity RTT and production reconnect rate still unmeasured.
+- [Prove Discord regional connectivity](issues/03-prove-discord-regional-connectivity.md) — **Closed.** A/B/C allowed (one-machine connectivity). D **denied** for Discord Activities (unmapped dynamic host cannot Socket.IO via `discordsays.com`). Prefer C (or A) for later regional alloc; do not use raw provider host:port join URLs inside Activities. Geo RTT still needs real multi-region hosts.
+- [Choose the launch host and database](issues/04-choose-launch-host-and-database.md) — **Provisional:** Cloudflare Pages + Railway Virginia (US East Metal) + Railway Postgres (private network). Staging Hobby / prod assume Pro $20 floor. Discord maps `/`→Pages, `/socket.io` (+`/api`)→Railway. Keep open for Railway staging soak (Linux RSS, egress, 30–60m Socket.IO, deploy/SIGTERM/reconnect, rollback, backup restore). Bandwidth is first cost pressure (~ticket 02 fanout ceiling).
 
 ## Not yet specified
 
 - Checkpoint payload shape and write cadence needed to hit the ≤1–2s rewind and 15s restore budgets under real host measurements (feeds ticket 06; cost order suggested by ticket 02 netcast-sized snapshots).
-- Discord Activity client RTT and reconnect rate under real players (ticket 03 + post-reliability instrumentation).
-- Whether regional capacity should use per-match allocation, warm regional pools, or a hybrid. This depends on startup latency, match traffic, provider behavior, and measured demand.
+- Production Discord Activity RTT on stable non-tunnel hosts and reconnect rate under real players (ticket 04 staging evidence + post-reliability instrumentation). Geo differentiation across regions still unmeasured.
+- Whether regional capacity should use per-match allocation, warm regional pools, or a hybrid. This depends on startup latency, match traffic, provider behavior, and measured demand (ticket 08; Fly Machines retained as a candidate).
 - Whether analytics remain in the product Postgres database or export to an analytical store. This depends on event volume, query load, retention, and privacy decisions.
 - The scale threshold for extracting matchmaking coordination into Redis or another dedicated system. Start with database-backed leases unless measurement proves otherwise.
-- The scale threshold for more than one control-service replica. Regional match workers do not by themselves require a replicated control plane.
-- Linux-container RSS floor on the eventual launch host (re-measure; Windows Bun ~270 MB floor is not portable).
+- The scale threshold for more than one control-service replica. Regional match workers do not by themselves require a replicated control plane. Launch requires one Railway replica while matches stay in-process.
+- Linux-container RSS floor on Railway (ticket 04 staging checklist; Windows Bun ~270 MB floor is not portable).
+- Whether measured Railway gameplay egress makes a fixed-transfer VPS cheaper after labor (revisit Railway vs Lightsail/DO).
 
 ## Out of scope
 

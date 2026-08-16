@@ -1,0 +1,455 @@
+{
+  "measuredAt": "2026-08-16T01:51:54.150Z",
+  "machine": "single-local-dev",
+  "note": "Option C: client uses one gateway origin only. Region comes from allocation query (region/matchId), not Discord multi-host mappings or client path prefixes. Gateway hop RTT included.",
+  "hosts": {
+    "rootHost": "ray-cruise-officially-rhode.trycloudflare.com",
+    "appId": "1538301343708618815",
+    "samples": 5
+  },
+  "summary": [
+    {
+      "label": "gateway-health-direct",
+      "url": "https://ray-cruise-officially-rhode.trycloudflare.com/health",
+      "count": 5,
+      "ok": 5,
+      "min": 45.00970000000001,
+      "max": 352.0865,
+      "mean": 110.06984,
+      "p50": 50.947900000000004,
+      "regionHeader": null,
+      "backendHeader": null,
+      "lastError": null
+    },
+    {
+      "label": "socket-east-alloc-direct",
+      "url": "https://ray-cruise-officially-rhode.trycloudflare.com/socket.io/?EIO=4&transport=polling&region=east",
+      "count": 5,
+      "ok": 5,
+      "min": 47.21269999999993,
+      "max": 144.15880000000004,
+      "mean": 73.05756000000001,
+      "p50": 56.732900000000086,
+      "regionHeader": "east",
+      "backendHeader": "http://127.0.0.1:3000",
+      "lastError": null
+    },
+    {
+      "label": "socket-west-alloc-direct",
+      "url": "https://ray-cruise-officially-rhode.trycloudflare.com/socket.io/?EIO=4&transport=polling&region=west",
+      "count": 5,
+      "ok": 5,
+      "min": 47.18669999999997,
+      "max": 163.5718999999999,
+      "mean": 84.00369999999998,
+      "p50": 60.284400000000005,
+      "regionHeader": "west",
+      "backendHeader": "http://127.0.0.1:3001",
+      "lastError": null
+    },
+    {
+      "label": "socket-matchId-sticky-a-direct",
+      "url": "https://ray-cruise-officially-rhode.trycloudflare.com/socket.io/?EIO=4&transport=polling&matchId=match-option-c-alpha",
+      "count": 5,
+      "ok": 5,
+      "min": 44.54689999999982,
+      "max": 149.8028999999999,
+      "mean": 74.08187999999996,
+      "p50": 59.21089999999981,
+      "regionHeader": "east",
+      "backendHeader": "http://127.0.0.1:3000",
+      "lastError": null
+    },
+    {
+      "label": "socket-matchId-sticky-b-direct",
+      "url": "https://ray-cruise-officially-rhode.trycloudflare.com/socket.io/?EIO=4&transport=polling&matchId=match-option-c-beta",
+      "count": 5,
+      "ok": 5,
+      "min": 44.76209999999992,
+      "max": 116.45060000000012,
+      "mean": 66.66729999999998,
+      "p50": 62.6724999999999,
+      "regionHeader": "east",
+      "backendHeader": "http://127.0.0.1:3000",
+      "lastError": null
+    },
+    {
+      "label": "socket-east-alloc-via-discord-proxy",
+      "url": "https://1538301343708618815.discordsays.com/socket.io/?EIO=4&transport=polling&region=east",
+      "count": 5,
+      "ok": 0,
+      "min": null,
+      "max": null,
+      "mean": null,
+      "p50": null,
+      "regionHeader": null,
+      "backendHeader": null,
+      "lastError": "<!DOCTYPE html>\n\n\n\n <html class=\"no-js\" lang=\"en-US\"> \n<head>\n<title>Cloudflare Tunnel error | applying-follow-surfaces-"
+    },
+    {
+      "label": "socket-west-alloc-via-discord-proxy",
+      "url": "https://1538301343708618815.discordsays.com/socket.io/?EIO=4&transport=polling&region=west",
+      "count": 5,
+      "ok": 0,
+      "min": null,
+      "max": null,
+      "mean": null,
+      "p50": null,
+      "regionHeader": null,
+      "backendHeader": null,
+      "lastError": "<!DOCTYPE html>\n\n\n\n <html class=\"no-js\" lang=\"en-US\"> \n<head>\n<title>Cloudflare Tunnel error | applying-follow-surfaces-"
+    }
+  ],
+  "samples": [
+    {
+      "label": "gateway-health-direct",
+      "url": "https://ray-cruise-officially-rhode.trycloudflare.com/health",
+      "ok": true,
+      "status": 200,
+      "ms": 352.0865,
+      "regionHeader": null,
+      "backendHeader": null,
+      "bodyPreview": "{\"ok\":true,\"role\":\"option-c-gateway\",\"stickySids\":2,\"stickyMatches\":0,\"eastOrigin\":\"http://127.0.0.1:3000\",\"westOrigin\":"
+    },
+    {
+      "label": "gateway-health-direct",
+      "url": "https://ray-cruise-officially-rhode.trycloudflare.com/health",
+      "ok": true,
+      "status": 200,
+      "ms": 54.75509999999997,
+      "regionHeader": null,
+      "backendHeader": null,
+      "bodyPreview": "{\"ok\":true,\"role\":\"option-c-gateway\",\"stickySids\":2,\"stickyMatches\":0,\"eastOrigin\":\"http://127.0.0.1:3000\",\"westOrigin\":"
+    },
+    {
+      "label": "gateway-health-direct",
+      "url": "https://ray-cruise-officially-rhode.trycloudflare.com/health",
+      "ok": true,
+      "status": 200,
+      "ms": 45.00970000000001,
+      "regionHeader": null,
+      "backendHeader": null,
+      "bodyPreview": "{\"ok\":true,\"role\":\"option-c-gateway\",\"stickySids\":2,\"stickyMatches\":0,\"eastOrigin\":\"http://127.0.0.1:3000\",\"westOrigin\":"
+    },
+    {
+      "label": "gateway-health-direct",
+      "url": "https://ray-cruise-officially-rhode.trycloudflare.com/health",
+      "ok": true,
+      "status": 200,
+      "ms": 47.55000000000001,
+      "regionHeader": null,
+      "backendHeader": null,
+      "bodyPreview": "{\"ok\":true,\"role\":\"option-c-gateway\",\"stickySids\":2,\"stickyMatches\":0,\"eastOrigin\":\"http://127.0.0.1:3000\",\"westOrigin\":"
+    },
+    {
+      "label": "gateway-health-direct",
+      "url": "https://ray-cruise-officially-rhode.trycloudflare.com/health",
+      "ok": true,
+      "status": 200,
+      "ms": 50.947900000000004,
+      "regionHeader": null,
+      "backendHeader": null,
+      "bodyPreview": "{\"ok\":true,\"role\":\"option-c-gateway\",\"stickySids\":2,\"stickyMatches\":0,\"eastOrigin\":\"http://127.0.0.1:3000\",\"westOrigin\":"
+    },
+    {
+      "label": "socket-east-alloc-direct",
+      "url": "https://ray-cruise-officially-rhode.trycloudflare.com/socket.io/?EIO=4&transport=polling&region=east",
+      "ok": true,
+      "status": 200,
+      "ms": 144.15880000000004,
+      "regionHeader": "east",
+      "backendHeader": "http://127.0.0.1:3000",
+      "bodyPreview": "0{\"sid\":\"VXNXXGbVUCiziVTcAAAI\",\"upgrades\":[\"websocket\"],\"pingInterval\":25000,\"pingTimeout\":20000,\"maxPayload\":1000000}"
+    },
+    {
+      "label": "socket-east-alloc-direct",
+      "url": "https://ray-cruise-officially-rhode.trycloudflare.com/socket.io/?EIO=4&transport=polling&region=east",
+      "ok": true,
+      "status": 200,
+      "ms": 47.21269999999993,
+      "regionHeader": "east",
+      "backendHeader": "http://127.0.0.1:3000",
+      "bodyPreview": "0{\"sid\":\"mAwFuWG2hJMc0aNeAAAJ\",\"upgrades\":[\"websocket\"],\"pingInterval\":25000,\"pingTimeout\":20000,\"maxPayload\":1000000}"
+    },
+    {
+      "label": "socket-east-alloc-direct",
+      "url": "https://ray-cruise-officially-rhode.trycloudflare.com/socket.io/?EIO=4&transport=polling&region=east",
+      "ok": true,
+      "status": 200,
+      "ms": 56.732900000000086,
+      "regionHeader": "east",
+      "backendHeader": "http://127.0.0.1:3000",
+      "bodyPreview": "0{\"sid\":\"GgJGsClnAN9Af7O0AAAK\",\"upgrades\":[\"websocket\"],\"pingInterval\":25000,\"pingTimeout\":20000,\"maxPayload\":1000000}"
+    },
+    {
+      "label": "socket-east-alloc-direct",
+      "url": "https://ray-cruise-officially-rhode.trycloudflare.com/socket.io/?EIO=4&transport=polling&region=east",
+      "ok": true,
+      "status": 200,
+      "ms": 65.9724,
+      "regionHeader": "east",
+      "backendHeader": "http://127.0.0.1:3000",
+      "bodyPreview": "0{\"sid\":\"nSKMc5AVU2L2U3YwAAAL\",\"upgrades\":[\"websocket\"],\"pingInterval\":25000,\"pingTimeout\":20000,\"maxPayload\":1000000}"
+    },
+    {
+      "label": "socket-east-alloc-direct",
+      "url": "https://ray-cruise-officially-rhode.trycloudflare.com/socket.io/?EIO=4&transport=polling&region=east",
+      "ok": true,
+      "status": 200,
+      "ms": 51.21100000000001,
+      "regionHeader": "east",
+      "backendHeader": "http://127.0.0.1:3000",
+      "bodyPreview": "0{\"sid\":\"f_mV5gFYfYBQ3F7-AAAM\",\"upgrades\":[\"websocket\"],\"pingInterval\":25000,\"pingTimeout\":20000,\"maxPayload\":1000000}"
+    },
+    {
+      "label": "socket-west-alloc-direct",
+      "url": "https://ray-cruise-officially-rhode.trycloudflare.com/socket.io/?EIO=4&transport=polling&region=west",
+      "ok": true,
+      "status": 200,
+      "ms": 163.5718999999999,
+      "regionHeader": "west",
+      "backendHeader": "http://127.0.0.1:3001",
+      "bodyPreview": "0{\"sid\":\"t7BVIvUEDXjHZtuWAAAI\",\"upgrades\":[\"websocket\"],\"pingInterval\":25000,\"pingTimeout\":20000,\"maxPayload\":1000000}"
+    },
+    {
+      "label": "socket-west-alloc-direct",
+      "url": "https://ray-cruise-officially-rhode.trycloudflare.com/socket.io/?EIO=4&transport=polling&region=west",
+      "ok": true,
+      "status": 200,
+      "ms": 47.18669999999997,
+      "regionHeader": "west",
+      "backendHeader": "http://127.0.0.1:3001",
+      "bodyPreview": "0{\"sid\":\"fmIDQnTJ79mC6ih0AAAJ\",\"upgrades\":[\"websocket\"],\"pingInterval\":25000,\"pingTimeout\":20000,\"maxPayload\":1000000}"
+    },
+    {
+      "label": "socket-west-alloc-direct",
+      "url": "https://ray-cruise-officially-rhode.trycloudflare.com/socket.io/?EIO=4&transport=polling&region=west",
+      "ok": true,
+      "status": 200,
+      "ms": 60.284400000000005,
+      "regionHeader": "west",
+      "backendHeader": "http://127.0.0.1:3001",
+      "bodyPreview": "0{\"sid\":\"gRvOOQfNwxbWHpncAAAK\",\"upgrades\":[\"websocket\"],\"pingInterval\":25000,\"pingTimeout\":20000,\"maxPayload\":1000000}"
+    },
+    {
+      "label": "socket-west-alloc-direct",
+      "url": "https://ray-cruise-officially-rhode.trycloudflare.com/socket.io/?EIO=4&transport=polling&region=west",
+      "ok": true,
+      "status": 200,
+      "ms": 58.665500000000065,
+      "regionHeader": "west",
+      "backendHeader": "http://127.0.0.1:3001",
+      "bodyPreview": "0{\"sid\":\"5QDYhi7y2tJuYTmsAAAL\",\"upgrades\":[\"websocket\"],\"pingInterval\":25000,\"pingTimeout\":20000,\"maxPayload\":1000000}"
+    },
+    {
+      "label": "socket-west-alloc-direct",
+      "url": "https://ray-cruise-officially-rhode.trycloudflare.com/socket.io/?EIO=4&transport=polling&region=west",
+      "ok": true,
+      "status": 200,
+      "ms": 90.30999999999995,
+      "regionHeader": "west",
+      "backendHeader": "http://127.0.0.1:3001",
+      "bodyPreview": "0{\"sid\":\"jdlP_rmM82H5_q_fAAAM\",\"upgrades\":[\"websocket\"],\"pingInterval\":25000,\"pingTimeout\":20000,\"maxPayload\":1000000}"
+    },
+    {
+      "label": "socket-matchId-sticky-a-direct",
+      "url": "https://ray-cruise-officially-rhode.trycloudflare.com/socket.io/?EIO=4&transport=polling&matchId=match-option-c-alpha",
+      "ok": true,
+      "status": 200,
+      "ms": 149.8028999999999,
+      "regionHeader": "east",
+      "backendHeader": "http://127.0.0.1:3000",
+      "bodyPreview": "0{\"sid\":\"xdAQQ9-AQTDWxTbsAAAN\",\"upgrades\":[\"websocket\"],\"pingInterval\":25000,\"pingTimeout\":20000,\"maxPayload\":1000000}"
+    },
+    {
+      "label": "socket-matchId-sticky-a-direct",
+      "url": "https://ray-cruise-officially-rhode.trycloudflare.com/socket.io/?EIO=4&transport=polling&matchId=match-option-c-alpha",
+      "ok": true,
+      "status": 200,
+      "ms": 59.21089999999981,
+      "regionHeader": "east",
+      "backendHeader": "http://127.0.0.1:3000",
+      "bodyPreview": "0{\"sid\":\"pdB2ORzCBUo5_0gdAAAO\",\"upgrades\":[\"websocket\"],\"pingInterval\":25000,\"pingTimeout\":20000,\"maxPayload\":1000000}"
+    },
+    {
+      "label": "socket-matchId-sticky-a-direct",
+      "url": "https://ray-cruise-officially-rhode.trycloudflare.com/socket.io/?EIO=4&transport=polling&matchId=match-option-c-alpha",
+      "ok": true,
+      "status": 200,
+      "ms": 44.54689999999982,
+      "regionHeader": "east",
+      "backendHeader": "http://127.0.0.1:3000",
+      "bodyPreview": "0{\"sid\":\"aGAF1__UmI-BD6WKAAAP\",\"upgrades\":[\"websocket\"],\"pingInterval\":25000,\"pingTimeout\":20000,\"maxPayload\":1000000}"
+    },
+    {
+      "label": "socket-matchId-sticky-a-direct",
+      "url": "https://ray-cruise-officially-rhode.trycloudflare.com/socket.io/?EIO=4&transport=polling&matchId=match-option-c-alpha",
+      "ok": true,
+      "status": 200,
+      "ms": 60.0617000000002,
+      "regionHeader": "east",
+      "backendHeader": "http://127.0.0.1:3000",
+      "bodyPreview": "0{\"sid\":\"0_FNJeeCZEgZ7E6aAAAQ\",\"upgrades\":[\"websocket\"],\"pingInterval\":25000,\"pingTimeout\":20000,\"maxPayload\":1000000}"
+    },
+    {
+      "label": "socket-matchId-sticky-a-direct",
+      "url": "https://ray-cruise-officially-rhode.trycloudflare.com/socket.io/?EIO=4&transport=polling&matchId=match-option-c-alpha",
+      "ok": true,
+      "status": 200,
+      "ms": 56.787000000000035,
+      "regionHeader": "east",
+      "backendHeader": "http://127.0.0.1:3000",
+      "bodyPreview": "0{\"sid\":\"BKk5mqqZ6aGTAyikAAAR\",\"upgrades\":[\"websocket\"],\"pingInterval\":25000,\"pingTimeout\":20000,\"maxPayload\":1000000}"
+    },
+    {
+      "label": "socket-matchId-sticky-b-direct",
+      "url": "https://ray-cruise-officially-rhode.trycloudflare.com/socket.io/?EIO=4&transport=polling&matchId=match-option-c-beta",
+      "ok": true,
+      "status": 200,
+      "ms": 116.45060000000012,
+      "regionHeader": "east",
+      "backendHeader": "http://127.0.0.1:3000",
+      "bodyPreview": "0{\"sid\":\"DQBQCI0CannSrONSAAAS\",\"upgrades\":[\"websocket\"],\"pingInterval\":25000,\"pingTimeout\":20000,\"maxPayload\":1000000}"
+    },
+    {
+      "label": "socket-matchId-sticky-b-direct",
+      "url": "https://ray-cruise-officially-rhode.trycloudflare.com/socket.io/?EIO=4&transport=polling&matchId=match-option-c-beta",
+      "ok": true,
+      "status": 200,
+      "ms": 46.51819999999998,
+      "regionHeader": "east",
+      "backendHeader": "http://127.0.0.1:3000",
+      "bodyPreview": "0{\"sid\":\"7yYDBpfeH9YpnYqOAAAT\",\"upgrades\":[\"websocket\"],\"pingInterval\":25000,\"pingTimeout\":20000,\"maxPayload\":1000000}"
+    },
+    {
+      "label": "socket-matchId-sticky-b-direct",
+      "url": "https://ray-cruise-officially-rhode.trycloudflare.com/socket.io/?EIO=4&transport=polling&matchId=match-option-c-beta",
+      "ok": true,
+      "status": 200,
+      "ms": 62.6724999999999,
+      "regionHeader": "east",
+      "backendHeader": "http://127.0.0.1:3000",
+      "bodyPreview": "0{\"sid\":\"Wqhu4dQBJEpXsDxdAAAU\",\"upgrades\":[\"websocket\"],\"pingInterval\":25000,\"pingTimeout\":20000,\"maxPayload\":1000000}"
+    },
+    {
+      "label": "socket-matchId-sticky-b-direct",
+      "url": "https://ray-cruise-officially-rhode.trycloudflare.com/socket.io/?EIO=4&transport=polling&matchId=match-option-c-beta",
+      "ok": true,
+      "status": 200,
+      "ms": 62.93309999999997,
+      "regionHeader": "east",
+      "backendHeader": "http://127.0.0.1:3000",
+      "bodyPreview": "0{\"sid\":\"d0fD48hKXeQv6at7AAAV\",\"upgrades\":[\"websocket\"],\"pingInterval\":25000,\"pingTimeout\":20000,\"maxPayload\":1000000}"
+    },
+    {
+      "label": "socket-matchId-sticky-b-direct",
+      "url": "https://ray-cruise-officially-rhode.trycloudflare.com/socket.io/?EIO=4&transport=polling&matchId=match-option-c-beta",
+      "ok": true,
+      "status": 200,
+      "ms": 44.76209999999992,
+      "regionHeader": "east",
+      "backendHeader": "http://127.0.0.1:3000",
+      "bodyPreview": "0{\"sid\":\"er_1Cg-0yygLOTwWAAAW\",\"upgrades\":[\"websocket\"],\"pingInterval\":25000,\"pingTimeout\":20000,\"maxPayload\":1000000}"
+    },
+    {
+      "label": "socket-east-alloc-via-discord-proxy",
+      "url": "https://1538301343708618815.discordsays.com/socket.io/?EIO=4&transport=polling&region=east",
+      "ok": false,
+      "status": 530,
+      "ms": 544.7610999999997,
+      "regionHeader": null,
+      "backendHeader": null,
+      "bodyPreview": "<!DOCTYPE html>\n\n\n\n <html class=\"no-js\" lang=\"en-US\"> \n<head>\n<title>Cloudflare Tunnel error | applying-follow-surfaces-"
+    },
+    {
+      "label": "socket-east-alloc-via-discord-proxy",
+      "url": "https://1538301343708618815.discordsays.com/socket.io/?EIO=4&transport=polling&region=east",
+      "ok": false,
+      "status": 530,
+      "ms": 54.22870000000012,
+      "regionHeader": null,
+      "backendHeader": null,
+      "bodyPreview": "<!DOCTYPE html>\n\n\n\n <html class=\"no-js\" lang=\"en-US\"> \n<head>\n<title>Cloudflare Tunnel error | applying-follow-surfaces-"
+    },
+    {
+      "label": "socket-east-alloc-via-discord-proxy",
+      "url": "https://1538301343708618815.discordsays.com/socket.io/?EIO=4&transport=polling&region=east",
+      "ok": false,
+      "status": 530,
+      "ms": 76.26299999999992,
+      "regionHeader": null,
+      "backendHeader": null,
+      "bodyPreview": "<!DOCTYPE html>\n\n\n\n <html class=\"no-js\" lang=\"en-US\"> \n<head>\n<title>Cloudflare Tunnel error | applying-follow-surfaces-"
+    },
+    {
+      "label": "socket-east-alloc-via-discord-proxy",
+      "url": "https://1538301343708618815.discordsays.com/socket.io/?EIO=4&transport=polling&region=east",
+      "ok": false,
+      "status": 530,
+      "ms": 50.75879999999961,
+      "regionHeader": null,
+      "backendHeader": null,
+      "bodyPreview": "<!DOCTYPE html>\n\n\n\n <html class=\"no-js\" lang=\"en-US\"> \n<head>\n<title>Cloudflare Tunnel error | applying-follow-surfaces-"
+    },
+    {
+      "label": "socket-east-alloc-via-discord-proxy",
+      "url": "https://1538301343708618815.discordsays.com/socket.io/?EIO=4&transport=polling&region=east",
+      "ok": false,
+      "status": 530,
+      "ms": 48.95610000000033,
+      "regionHeader": null,
+      "backendHeader": null,
+      "bodyPreview": "<!DOCTYPE html>\n\n\n\n <html class=\"no-js\" lang=\"en-US\"> \n<head>\n<title>Cloudflare Tunnel error | applying-follow-surfaces-"
+    },
+    {
+      "label": "socket-west-alloc-via-discord-proxy",
+      "url": "https://1538301343708618815.discordsays.com/socket.io/?EIO=4&transport=polling&region=west",
+      "ok": false,
+      "status": 530,
+      "ms": 111.26339999999982,
+      "regionHeader": null,
+      "backendHeader": null,
+      "bodyPreview": "<!DOCTYPE html>\n\n\n\n <html class=\"no-js\" lang=\"en-US\"> \n<head>\n<title>Cloudflare Tunnel error | applying-follow-surfaces-"
+    },
+    {
+      "label": "socket-west-alloc-via-discord-proxy",
+      "url": "https://1538301343708618815.discordsays.com/socket.io/?EIO=4&transport=polling&region=west",
+      "ok": false,
+      "status": 530,
+      "ms": 49.82920000000013,
+      "regionHeader": null,
+      "backendHeader": null,
+      "bodyPreview": "<!DOCTYPE html>\n\n\n\n <html class=\"no-js\" lang=\"en-US\"> \n<head>\n<title>Cloudflare Tunnel error | applying-follow-surfaces-"
+    },
+    {
+      "label": "socket-west-alloc-via-discord-proxy",
+      "url": "https://1538301343708618815.discordsays.com/socket.io/?EIO=4&transport=polling&region=west",
+      "ok": false,
+      "status": 530,
+      "ms": 48.2479000000003,
+      "regionHeader": null,
+      "backendHeader": null,
+      "bodyPreview": "<!DOCTYPE html>\n\n\n\n <html class=\"no-js\" lang=\"en-US\"> \n<head>\n<title>Cloudflare Tunnel error | applying-follow-surfaces-"
+    },
+    {
+      "label": "socket-west-alloc-via-discord-proxy",
+      "url": "https://1538301343708618815.discordsays.com/socket.io/?EIO=4&transport=polling&region=west",
+      "ok": false,
+      "status": 530,
+      "ms": 48.62260000000015,
+      "regionHeader": null,
+      "backendHeader": null,
+      "bodyPreview": "<!DOCTYPE html>\n\n\n\n <html class=\"no-js\" lang=\"en-US\"> \n<head>\n<title>Cloudflare Tunnel error | applying-follow-surfaces-"
+    },
+    {
+      "label": "socket-west-alloc-via-discord-proxy",
+      "url": "https://1538301343708618815.discordsays.com/socket.io/?EIO=4&transport=polling&region=west",
+      "ok": false,
+      "status": 530,
+      "ms": 58.19679999999971,
+      "regionHeader": null,
+      "backendHeader": null,
+      "bodyPreview": "<!DOCTYPE html>\n\n\n\n <html class=\"no-js\" lang=\"en-US\"> \n<head>\n<title>Cloudflare Tunnel error | applying-follow-surfaces-"
+    }
+  ]
+}
