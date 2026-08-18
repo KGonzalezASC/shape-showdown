@@ -1,5 +1,5 @@
-import React, { createContext, useContext, useMemo, useSyncExternalStore } from 'react';
-import { ActionType, InputState } from '../types';
+import React, { createContext, useContext, useMemo, useState, useSyncExternalStore } from 'react';
+import { ActionType, InputState, ServerHealthSnapshot } from '../types';
 import { useGameSocket } from '../hooks/useGameSocket';
 import {
   getChromeSnapshot,
@@ -34,8 +34,15 @@ export interface GameActions {
 }
 
 const GameActionsContext = createContext<GameActions | null>(null);
+const initialServerHealth: ServerHealthSnapshot = {
+  databaseMode: 'unknown',
+  databaseHealth: 'unknown',
+  migrationsReady: false,
+};
+const ServerHealthContext = createContext<ServerHealthSnapshot>(initialServerHealth);
 
 export function GameStateProvider({ children }: { children: React.ReactNode }) {
+  const [serverHealth, setServerHealth] = useState<ServerHealthSnapshot>(initialServerHealth);
   const {
     sendInputState,
     sendAction,
@@ -45,6 +52,7 @@ export function GameStateProvider({ children }: { children: React.ReactNode }) {
     onGameState: publishGameState,
     onMyId: publishMyId,
     onMatchEvent: publishMatchEvent,
+    onServerHealth: setServerHealth,
   });
 
   const actions = useMemo(
@@ -52,7 +60,13 @@ export function GameStateProvider({ children }: { children: React.ReactNode }) {
     [sendInputState, sendAction, sendShopOpen, sendShopPurchase],
   );
 
-  return <GameActionsContext.Provider value={actions}>{children}</GameActionsContext.Provider>;
+  return (
+    <GameActionsContext.Provider value={actions}>
+      <ServerHealthContext.Provider value={serverHealth}>
+        {children}
+      </ServerHealthContext.Provider>
+    </GameActionsContext.Provider>
+  );
 }
 
 export function useGameActions(): GameActions {
@@ -71,6 +85,10 @@ export function usePlayfieldSnapshot() {
 
 export function useIsConnected() {
   return useSyncExternalStore(subscribeConnection, getIsConnected, getIsConnected);
+}
+
+export function useServerHealth(): ServerHealthSnapshot {
+  return useContext(ServerHealthContext);
 }
 
 export function useMyId() {

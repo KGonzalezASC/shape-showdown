@@ -22,7 +22,7 @@ Primary keys and unique constraints already create their own indexes. The migrat
 ```sql
 -- Existing unique constraints, shown here as requirements rather than
 -- duplicate CREATE INDEX statements.
-players (discord_user_id) WHERE discord_user_id IS NOT NULL
+players (discord_user_id)
 sessions (token_hash)
 lobbies (code)
 lobby_members (lobby_id, player_id)

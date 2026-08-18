@@ -8,6 +8,11 @@ import { GameManager } from './GameManager.js';
 import { BOARD_COLS, BOARD_ROWS } from '../src/constants.js';
 import type { PlayerState, ReplayDataV2 } from '../src/types.js';
 import type { Server, Socket } from 'socket.io';
+import type { JoinTicket, MatchRecord } from './controlPlane/matchStore.js';
+import type {
+  MatchPersistence,
+  StartDurableMatchInput,
+} from './controlPlane/matchPersistence.js';
 
 class FakeSocket extends EventEmitter {
   id: string;
@@ -34,6 +39,63 @@ function createFakeIo(emitted: unknown[][] = []) {
   } as unknown as Server;
 }
 
+class RecordingMatchPersistence implements MatchPersistence {
+  readonly starts: StartDurableMatchInput[] = [];
+  readonly statuses: Array<{ matchId: string; expectedStatus: string; nextStatus: string }> = [];
+  readonly finalizations: Array<{
+    matchId: string;
+    winnerId: string | null;
+    outcomeReason: string;
+  }> = [];
+
+  async startMatch(input: StartDurableMatchInput): Promise<{
+    match: MatchRecord;
+    tickets: { A: JoinTicket; B: JoinTicket };
+  }> {
+    this.starts.push(input);
+    const matchId = `match-${this.starts.length}`;
+    const match: MatchRecord = {
+      id: matchId,
+      correlationId: `correlation-${this.starts.length}`,
+      matchSeed: input.matchSeed,
+      playerAId: input.participants.A,
+      playerBId: input.participants.B,
+      gameServerUrl: 'http://localhost:3000',
+      protocolVersion: 1,
+      status: 'allocating',
+    };
+    const ticket = (seat: 'A' | 'B'): JoinTicket => ({
+      id: `${matchId}-${seat}`,
+      matchId,
+      playerId: seat === 'A' ? input.participants.A : input.participants.B,
+      seat,
+      expiresAt: new Date(),
+      ticket: `${matchId}-${seat}-ticket`,
+    });
+    return { match, tickets: { A: ticket('A'), B: ticket('B') } };
+  }
+
+  async advanceStatus(input: {
+    matchId: string;
+    expectedStatus: string;
+    nextStatus: string;
+  }): Promise<void> {
+    this.statuses.push(input);
+  }
+
+  async finalizeMatch(input: {
+    matchId: string;
+    winnerId: string | null;
+    outcomeReason: string;
+  }): Promise<void> {
+    this.finalizations.push(input);
+  }
+}
+
+async function flushPromises(): Promise<void> {
+  await new Promise<void>((resolve) => setTimeout(resolve, 0));
+}
+
 const managers: GameManager[] = [];
 
 afterEach(() => {
@@ -43,6 +105,82 @@ afterEach(() => {
 });
 
 describe('GameManager lifecycle harness', () => {
+  it('creates a new durable match for a rematch and finalizes the prior result', async () => {
+    const persistence = new RecordingMatchPersistence();
+    const gm = new GameManager(createFakeIo(), 60, persistence);
+    managers.push(gm);
+    const p1 = new FakeSocket('p1');
+    const p2 = new FakeSocket('p2');
+    gm.handleConnection(p1 as unknown as Socket, 'durable-p1');
+    gm.handleConnection(p2 as unknown as Socket, 'durable-p2');
+
+    for (let i = 0; i < 5; i += 1) gm.tickOnceForTests();
+    await flushPromises();
+
+    const internal = gm as unknown as {
+      gameState: {
+        status: string;
+        winnerId: string | null;
+        restartTimer?: number;
+        players: Record<string, PlayerState>;
+      };
+      lastHandledStatus: string;
+    };
+    assert.equal(internal.gameState.status, 'countdown');
+    assert.equal(persistence.starts.length, 1);
+
+    internal.gameState.status = 'playing';
+    internal.lastHandledStatus = 'playing';
+    internal.gameState.players.p1.topOut = true;
+    gm.tickOnceForTests();
+    gm.tickOnceForTests();
+    await flushPromises();
+
+    assert.equal(internal.gameState.status, 'ended');
+    assert.equal(persistence.finalizations.length, 1);
+    assert.equal(persistence.finalizations[0].winnerId, 'durable-p2');
+
+    internal.gameState.restartTimer = 0;
+    gm.tickOnceForTests();
+    gm.tickOnceForTests();
+    await flushPromises();
+
+    assert.equal(persistence.starts.length, 2);
+    assert.notEqual(persistence.starts[0].matchSeed, persistence.starts[1].matchSeed);
+    assert.deepEqual(persistence.starts[1].participants, {
+      A: 'durable-p1',
+      B: 'durable-p2',
+    });
+  });
+
+  it('finalizes a disconnect as a durable forfeit with the disconnected seat retained', async () => {
+    const persistence = new RecordingMatchPersistence();
+    const gm = new GameManager(createFakeIo(), 60, persistence);
+    managers.push(gm);
+    const p1 = new FakeSocket('p1');
+    const p2 = new FakeSocket('p2');
+    gm.handleConnection(p1 as unknown as Socket, 'durable-p1');
+    gm.handleConnection(p2 as unknown as Socket, 'durable-p2');
+
+    for (let i = 0; i < 5; i += 1) gm.tickOnceForTests();
+    await flushPromises();
+
+    const internal = gm as unknown as {
+      gameState: { status: string };
+      lastHandledStatus: string;
+    };
+    internal.gameState.status = 'playing';
+    internal.lastHandledStatus = 'playing';
+    p1.emit('disconnect');
+    gm.tickOnceForTests();
+    await flushPromises();
+
+    assert.equal(persistence.finalizations.length, 1);
+    assert.equal(persistence.finalizations[0].matchId, 'match-1');
+    assert.equal(persistence.finalizations[0].winnerId, 'durable-p2');
+    assert.equal(persistence.finalizations[0].outcomeReason, 'forfeit_disconnect');
+  });
+
   it('transitions waiting → countdown when two players connect', () => {
     const gm = new GameManager(createFakeIo(), 60);
     managers.push(gm);

@@ -1,6 +1,12 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { io, Socket } from 'socket.io-client';
-import { ActionType, GameState, InputState, MatchEvent } from '../types';
+import {
+  ActionType,
+  GameState,
+  InputState,
+  MatchEvent,
+  ServerHealthSnapshot,
+} from '../types';
 import { localDevelopmentGameServerUrl } from '../network/localGameServer';
 
 type GameRuntimeConfig = {
@@ -103,31 +109,69 @@ interface GameSocketCallbacks {
   onGameState?: (state: GameState | null) => void;
   onMyId?: (id: string | null) => void;
   onMatchEvent?: (event: MatchEvent | null) => void;
+  onServerHealth?: (snapshot: ServerHealthSnapshot) => void;
 }
 
 export const useGameSocket = ({
   onGameState,
   onMyId,
   onMatchEvent,
+  onServerHealth,
 }: GameSocketCallbacks = {}) => {
   const [socket, setSocket] = useState<Socket | null>(null);
   const callbacksRef = useRef<GameSocketCallbacks>({});
 
   useEffect(() => {
-    callbacksRef.current = { onGameState, onMyId, onMatchEvent };
-  }, [onGameState, onMatchEvent, onMyId]);
+    callbacksRef.current = { onGameState, onMyId, onMatchEvent, onServerHealth };
+  }, [onGameState, onMatchEvent, onMyId, onServerHealth]);
 
   useEffect(() => {
     let cancelled = false;
     let sock: Socket | null = null;
+    let healthAbortController: AbortController | null = null;
+    let healthInterval: number | null = null;
 
     callbacksRef.current.onGameState?.(null);
     callbacksRef.current.onMyId?.(null);
     callbacksRef.current.onMatchEvent?.(null);
+    callbacksRef.current.onServerHealth?.({
+      databaseMode: 'unknown',
+      databaseHealth: 'unknown',
+      migrationsReady: false,
+    });
 
     (async () => {
       const url = await resolveGameServerUrl();
       if (cancelled) return;
+      healthAbortController = new AbortController();
+      const checkServerHealth = async () => {
+        try {
+          const response = await fetch(`${stripTrailingSlash(url)}/health/details`, {
+            cache: 'no-store',
+            signal: healthAbortController?.signal,
+          });
+          const body: unknown = await response.json();
+          if (isServerHealthSnapshot(body)) {
+            callbacksRef.current.onServerHealth?.(body);
+          } else {
+            callbacksRef.current.onServerHealth?.({
+              databaseMode: 'unknown',
+              databaseHealth: response.ok ? 'unknown' : 'unavailable',
+              migrationsReady: false,
+            });
+          }
+        } catch {
+          if (healthAbortController?.signal.aborted !== true) {
+            callbacksRef.current.onServerHealth?.({
+              databaseMode: 'unknown',
+              databaseHealth: 'unavailable',
+              migrationsReady: false,
+            });
+          }
+        }
+      };
+      void checkServerHealth();
+      healthInterval = window.setInterval(checkServerHealth, 5000);
       console.log(`[Socket] Initializing connection to resolved URL: ${url}`);
       sock = io(url, {
         transports: ['websocket', 'polling'],
@@ -158,6 +202,8 @@ export const useGameSocket = ({
     return () => {
       cancelled = true;
       sock?.close();
+      if (healthInterval !== null) window.clearInterval(healthInterval);
+      healthAbortController?.abort();
     };
   }, []);
 
@@ -185,3 +231,21 @@ export const useGameSocket = ({
     sendShopPurchase,
   };
 };
+
+function isServerHealthSnapshot(value: unknown): value is ServerHealthSnapshot {
+  if (!isRecord(value)) return false;
+  return (
+    (value.databaseMode === 'unknown' ||
+      value.databaseMode === 'postgres' ||
+      value.databaseMode === 'in-memory') &&
+    (value.databaseHealth === 'unknown' ||
+      value.databaseHealth === 'healthy' ||
+      value.databaseHealth === 'unavailable' ||
+      value.databaseHealth === 'not-configured') &&
+    typeof value.migrationsReady === 'boolean'
+  );
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}

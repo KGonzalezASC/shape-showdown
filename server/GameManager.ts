@@ -26,6 +26,11 @@ import {
   openPlayerShop,
   resetPlayerShop,
 } from './shop.js';
+import type { MatchPersistence } from './controlPlane/matchPersistence.js';
+import type {
+  MatchOutcomeReason,
+  MatchResultStats,
+} from './controlPlane/matchResultStore.js';
 
 export class GameManager {
   private io: Server;
@@ -38,9 +43,19 @@ export class GameManager {
   private readonly netcastEveryNTicks: number;
   private readonly lobbyNetcastEveryNTicks: number;
   private lastHandledStatus: GameState['status'] = 'waiting';
+  private readonly persistence?: MatchPersistence;
+  private readonly durablePlayerIds = new Map<string, string>();
+  private readonly terminalPlayerStats = new Map<string, MatchResultStats>();
+  private durableMatchId: string | null = null;
+  private persistenceTail: Promise<void> = Promise.resolve();
 
-  constructor(io: Server, replayKeyframeIntervalTicks = REPLAY_KEYFRAME_INTERVAL_TICKS) {
+  constructor(
+    io: Server,
+    replayKeyframeIntervalTicks = REPLAY_KEYFRAME_INTERVAL_TICKS,
+    persistence?: MatchPersistence,
+  ) {
     this.io = io;
+    this.persistence = persistence;
     this.replayKeyframeIntervalTicks = Math.max(1, Math.floor(replayKeyframeIntervalTicks));
 
     // Decouple the network broadcast rate from the 60Hz simulation. Emitting
@@ -72,12 +87,15 @@ export class GameManager {
 
   private loopHandle: ReturnType<typeof setInterval> | null = null;
 
-  public handleConnection(socket: Socket) {
+  public handleConnection(socket: Socket, durablePlayerId?: string) {
     if (Object.keys(this.gameState.players).length < 2) {
       const slot = this.assignPlayerSlot(socket.id);
       const channels = createPlayerRngChannels(this.gameState.seed, slot);
       this.rngChannelsByPlayer.set(socket.id, channels);
       this.gameState.players[socket.id] = makePlayer(socket.id, channels);
+      if (durablePlayerId !== undefined) {
+        this.durablePlayerIds.set(socket.id, durablePlayerId);
+      }
       this.io.emit("gameState", this.gameState);
     } else {
       socket.emit("error", "Game is full");
@@ -158,6 +176,14 @@ export class GameManager {
     });
 
     socket.on("disconnect", () => {
+      const disconnectedPlayer = this.gameState.players[socket.id];
+      if (disconnectedPlayer) {
+        this.terminalPlayerStats.set(socket.id, {
+          score: disconnectedPlayer.score,
+          linesCleared: disconnectedPlayer.linesCleared,
+          topOut: disconnectedPlayer.topOut,
+        });
+      }
       if (this.gameState.status === 'playing') {
         const remainingIds = Object.keys(this.gameState.players).filter(id => id !== socket.id);
         if (remainingIds.length === 1) {
@@ -174,8 +200,11 @@ export class GameManager {
         this.gameState.restartTimer = undefined;
       }
       delete this.gameState.players[socket.id];
-      this.playerSlots.delete(socket.id);
       this.rngChannelsByPlayer.delete(socket.id);
+      if (this.gameState.status !== 'ended') {
+        this.playerSlots.delete(socket.id);
+        this.durablePlayerIds.delete(socket.id);
+      }
       this.io.emit("gameState", this.gameState);
     });
   }
@@ -260,13 +289,167 @@ export class GameManager {
     if (status === this.lastHandledStatus) return;
 
     this.lastHandledStatus = status;
+    this.enqueueDurableStatusTransition(status);
 
     if (status === 'waiting' || status === 'countdown') {
+      if (status === 'waiting') {
+        for (const [runtimeId] of this.playerSlots) {
+          if (this.gameState.players[runtimeId] === undefined) {
+            this.playerSlots.delete(runtimeId);
+            this.durablePlayerIds.delete(runtimeId);
+            this.terminalPlayerStats.delete(runtimeId);
+          }
+        }
+      }
       for (const id in this.gameState.players) {
         resetPlayerShop(this.gameState.players[id], this.playerRng(id).shop);
       }
     }
 
+  }
+
+  private enqueueDurableStatusTransition(status: GameState['status']): void {
+    if (!this.persistence) return;
+
+    if (status === 'countdown') {
+      const participants = this.captureDurableParticipants();
+      if (participants === null) return;
+      const matchSeed = this.gameState.seed;
+
+      this.enqueuePersistence(async () => {
+        this.durableMatchId = null;
+        const allocation = await this.persistence!.startMatch({
+          matchSeed,
+          participants: {
+            A: participants.A.playerId,
+            B: participants.B.playerId,
+          },
+        });
+        this.durableMatchId = allocation.match.id;
+        await this.persistence!.advanceStatus({
+          matchId: allocation.match.id,
+          expectedStatus: 'allocating',
+          nextStatus: 'countdown',
+        });
+      });
+      return;
+    }
+
+    if (status === 'playing') {
+      this.enqueuePersistence(async () => {
+        if (this.durableMatchId === null) return;
+        await this.persistence!.advanceStatus({
+          matchId: this.durableMatchId,
+          expectedStatus: 'countdown',
+          nextStatus: 'playing',
+        });
+      });
+      return;
+    }
+
+    if (status === 'ended') {
+      const finalization = this.captureDurableFinalization();
+      if (finalization === null) return;
+
+      this.enqueuePersistence(async () => {
+        if (this.durableMatchId === null) return;
+        await this.persistence!.finalizeMatch({
+          matchId: this.durableMatchId,
+          ...finalization,
+        });
+      });
+    }
+  }
+
+  private enqueuePersistence(operation: () => Promise<void>): void {
+    this.persistenceTail = this.persistenceTail
+      .then(operation)
+      .catch((error: unknown) => {
+        console.error('Durable match persistence failed', {
+          event: 'durable_match_persistence_failed',
+          error,
+        });
+      });
+  }
+
+  private captureDurableParticipants(): {
+    A: { runtimeId: string; playerId: string };
+    B: { runtimeId: string; playerId: string };
+  } | null {
+    if (Object.keys(this.gameState.players).length !== 2) return null;
+
+    const participants: {
+      A?: { runtimeId: string; playerId: string };
+      B?: { runtimeId: string; playerId: string };
+    } = {};
+
+    for (const [runtimeId, slot] of this.playerSlots) {
+      const playerId = this.durablePlayerIds.get(runtimeId);
+      if (playerId === undefined || this.gameState.players[runtimeId] === undefined) continue;
+      if (slot === 0) participants.A = { runtimeId, playerId };
+      if (slot === 1) participants.B = { runtimeId, playerId };
+    }
+
+    if (participants.A === undefined || participants.B === undefined) return null;
+    return { A: participants.A, B: participants.B };
+  }
+
+  private captureDurableFinalization(): {
+    winnerId: string | null;
+    loserId: string | null;
+    outcomeReason: MatchOutcomeReason;
+    durationSeconds: number;
+    playerAStats: MatchResultStats;
+    playerBStats: MatchResultStats;
+  } | null {
+    const participants = this.captureDurableParticipantsForResult();
+    if (participants === null) return null;
+
+    const winnerRuntimeId = this.gameState.winnerId;
+    const winner = winnerRuntimeId === null
+      ? null
+      : participants.find((participant) => participant.runtimeId === winnerRuntimeId) ?? null;
+    const loser = winner === null
+      ? null
+      : participants.find((participant) => participant.runtimeId !== winner.runtimeId) ?? null;
+
+    return {
+      winnerId: winner?.playerId ?? null,
+      loserId: loser?.playerId ?? null,
+      outcomeReason: this.gameState.technicalVictory
+        ? 'forfeit_disconnect'
+        : 'top_out',
+      durationSeconds: Math.floor(this.gameState.tick * tickSeconds()),
+      playerAStats: this.capturePlayerStats(participants[0].runtimeId),
+      playerBStats: this.capturePlayerStats(participants[1].runtimeId),
+    };
+  }
+
+  private captureDurableParticipantsForResult(): Array<{
+    runtimeId: string;
+    playerId: string;
+    slot: number;
+  }> | null {
+    const participants: Array<{ runtimeId: string; playerId: string; slot: number }> = [];
+    for (const [runtimeId, slot] of this.playerSlots) {
+      const playerId = this.durablePlayerIds.get(runtimeId);
+      if (playerId !== undefined && slot < 2) {
+        participants.push({ runtimeId, playerId, slot });
+      }
+    }
+    participants.sort((left, right) => left.slot - right.slot);
+    return participants.length === 2 ? participants : null;
+  }
+
+  private capturePlayerStats(runtimeId: string): MatchResultStats {
+    const player = this.gameState.players[runtimeId];
+    const terminalStats = this.terminalPlayerStats.get(runtimeId);
+    if (player === undefined && terminalStats !== undefined) return terminalStats;
+    return {
+      score: player?.score ?? 0,
+      linesCleared: player?.linesCleared ?? 0,
+      topOut: player?.topOut ?? false,
+    };
   }
 
   private update() {
@@ -330,13 +513,17 @@ export class GameManager {
         if (this.gameState.restartTimer <= 0) {
           this.gameState.restartTimer = undefined;
           this.gameState.technicalVictory = false;
-          this.gameState.seed = initialSeed();
-          this.resetMatchRngChannels();
-          for (const id in this.gameState.players) {
-            this.gameState.players[id] = makePlayer(id, this.playerRng(id));
+          if (Object.keys(this.gameState.players).length === 2) {
+            this.gameState.seed = initialSeed();
+            this.resetMatchRngChannels();
+            for (const id in this.gameState.players) {
+              this.gameState.players[id] = makePlayer(id, this.playerRng(id));
+            }
+            this.gameState.status = 'countdown';
+            this.gameState.countdown = COUNTDOWN_SECONDS;
+          } else {
+            this.gameState.status = 'waiting';
           }
-          this.gameState.status = 'countdown';
-          this.gameState.countdown = COUNTDOWN_SECONDS;
         }
       }
     }

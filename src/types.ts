@@ -65,6 +65,14 @@ import {
 } from './constants';
 
 export type MatchStatus = 'waiting' | 'countdown' | 'playing' | 'ended';
+export type ServerHealthStatus = 'unknown' | 'healthy' | 'unavailable';
+export type ServerDatabaseMode = 'unknown' | 'postgres' | 'in-memory';
+export type ServerDatabaseHealth = 'unknown' | 'healthy' | 'unavailable' | 'not-configured';
+export type ServerHealthSnapshot = {
+  databaseMode: ServerDatabaseMode;
+  databaseHealth: ServerDatabaseHealth;
+  migrationsReady: boolean;
+};
 export type TetrominoType = 'I' | 'J' | 'L' | 'O' | 'S' | 'T' | 'Z';
 export type RotationState = 0 | 1 | 2 | 3;
 export type CellValue = TetrominoType | 'G' | 'W' | null;

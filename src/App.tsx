@@ -5,6 +5,7 @@ import { DrillConsole, DrillResult } from './components/DrillConsole';
 import { MatchChrome } from './components/MatchChrome';
 import { PlayfieldShell } from './components/PlayfieldShell';
 import { fitMobilePlayfieldCellSize } from './components/PlayfieldCellSizer';
+import { ServerDiagnosticsPanel } from './components/ServerDiagnosticsPanel';
 import { ShopRailVariations } from './components/ShopRailVariations';
 import MobileControls from './components/MobileControls';
 import { GameFieldRef } from './components/GameField';
@@ -23,6 +24,7 @@ import {
   useMatchChromeSnapshot,
   useMyId,
   usePlayfieldSnapshot,
+  useServerHealth,
 } from './state/GameStateProvider';
 import { ActionType, COUNTDOWN_SECONDS } from './types';
 import { isShopViewportUnplayable } from './responsive/shopViewportWarning';
@@ -143,6 +145,7 @@ function appShellReducer(state: AppShellState, action: AppShellAction): AppShell
 
 const AppShell: React.FC = () => {
   const connected = useIsConnected();
+  const serverHealth = useServerHealth();
   const gameState = useGameState();
   const myId = useMyId();
   const playfield = usePlayfieldSnapshot();
@@ -518,6 +521,14 @@ const AppShell: React.FC = () => {
   return (
     <div className="relative flex h-dvh max-h-dvh min-h-0 flex-col items-center justify-center overflow-hidden p-[5px] text-[var(--ss-text-primary)] min-[661px]:p-3">
       <ThemeBackground isPlaying={isPlaying} decorationSeed={backgroundDecorationSeed} />
+      {DEV_TOOLS_ENABLED && (
+        <ServerDiagnosticsPanel
+          connected={connected}
+          database={serverHealth}
+          tick={gameState?.tick ?? null}
+          matchSeed={gameState?.seed ?? null}
+        />
+      )}
 
       {!connected ? (
         <div className="relative z-10 flex flex-1 flex-col items-center justify-center gap-4">
