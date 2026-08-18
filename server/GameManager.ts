@@ -4,7 +4,6 @@ import path from 'path';
 import {
   ActionType,
   COUNTDOWN_SECONDS,
-  GAME_DURATION,
   GameState,
   InputState,
   REPLAY_KEYFRAME_INTERVAL_TICKS,
@@ -55,7 +54,6 @@ export class GameManager {
       players: {},
       status: 'waiting',
       countdown: COUNTDOWN_SECONDS,
-      remainingTime: GAME_DURATION,
       winnerId: null,
       tick: 0,
       seed: this.matchSeed,
@@ -169,12 +167,10 @@ export class GameManager {
           this.gameState.restartTimer = RESTART_DELAY_SECONDS;
         } else {
           this.gameState.status = 'waiting';
-          this.gameState.remainingTime = GAME_DURATION;
           this.gameState.restartTimer = undefined;
         }
       } else {
         this.gameState.status = 'waiting';
-        this.gameState.remainingTime = GAME_DURATION;
         this.gameState.restartTimer = undefined;
       }
       delete this.gameState.players[socket.id];
@@ -286,7 +282,6 @@ export class GameManager {
       this.gameState.countdown -= tickSeconds();
       if (this.gameState.countdown <= 0) {
         this.gameState.status = 'playing';
-        this.gameState.remainingTime = GAME_DURATION;
         this.gameState.tick = 0;
         this.resetMatchRngChannels();
         this.activeReplay = {

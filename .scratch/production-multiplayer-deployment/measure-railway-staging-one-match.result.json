@@ -1,0 +1,81 @@
+{
+  "measuredAt": "2026-08-17T14:19:31.448Z",
+  "host": "shape-showdown-staging.up.railway.app",
+  "url": "https://shape-showdown-staging.up.railway.app",
+  "matchSeconds": 300,
+  "wallSec": 300.269,
+  "startedAt": "2026-08-17T14:14:31.179Z",
+  "endedAt": "2026-08-17T14:19:31.448Z",
+  "clients": {
+    "a": {
+      "status": "playing",
+      "messages": 8466,
+      "utf8Bytes": 69971309,
+      "maxUtf8": 8328
+    },
+    "b": {
+      "status": "playing",
+      "messages": 8464,
+      "utf8Bytes": 69963033,
+      "maxUtf8": 8328
+    }
+  },
+  "utf8": {
+    "note": "JSON.stringify(gameState) byteLength — pre-WebSocket-frame / pre-deflate planning bound",
+    "fanoutBytesPerSec": 466029.93315993325,
+    "perPlayerBytesPerSec": 233014.96657996663,
+    "fanoutKbPerSec": 455.1073566014973,
+    "perPlayerKbPerSec": 227.55367830074866
+  },
+  "railwayMetrics": {
+    "note": "Platform public network = on-wire bytes (perMessageDeflate threshold 1024 enabled in gameServer.ts). N=1 match only; small-N>1 blocked until multi-match boundary (ticket 06).",
+    "since": "6m",
+    "cpu": {
+      "average": 0.04385334871794871,
+      "current": 0,
+      "limit": 2,
+      "max": 0.073779,
+      "unit": "vCPU",
+      "utilization_pct": 0
+    },
+    "environment": "staging",
+    "memory": {
+      "average_mb": 224.74113276061536,
+      "current_mb": 350.438293504,
+      "limit_mb": 1023.99737856,
+      "max_mb": 350.438293504,
+      "utilization_pct": 34.2
+    },
+    "public_network_traffic": {
+      "egress": {
+        "average_mb": 10.401804996923078,
+        "current_mb": 0,
+        "max_mb": 18.231308288
+      },
+      "ingress": {
+        "average_mb": 0.14680536615384618,
+        "current_mb": 0,
+        "max_mb": 0.2573312
+      }
+    },
+    "service": "shape-showdown",
+    "window": {
+      "since": "2026-08-17T14:13:31.535591500+00:00",
+      "until": "2026-08-17T14:19:32.380834+00:00"
+    },
+    "derived": {
+      "egressMaxMb": 18.231308288,
+      "egressAvgMb": 10.401804996923078,
+      "egressMaxKbPerSecApprox": 62.17378313083269,
+      "note": "Prefer raw NETWORK_TX_GB 30s buckets below for on-wire rate; summary max_mb/wallSec understates.",
+      "networkTxDuringMatch": {
+        "meanKbPerSec": 512.8,
+        "maxKbPerSec": 622.3,
+        "method": "Sum of NETWORK_TX_GB samples in match window as GB per 30s bucket → KB/s"
+      }
+    }
+  },
+  "idleComparisonMb": {
+    "note": "Compare memory_current during match vs prior cold-idle ~157 MB (and today's quiet ~56 MB)."
+  }
+}

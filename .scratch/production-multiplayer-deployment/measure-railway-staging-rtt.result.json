@@ -1,0 +1,354 @@
+{
+  "measuredAt": "2026-08-17T03:06:06.125Z",
+  "host": "shape-showdown-staging.up.railway.app",
+  "samplesPerTarget": 20,
+  "note": "CLI/fetch RTT from this workstation to Railway public hostname (not Discord-mapped).",
+  "summary": [
+    {
+      "label": "health-direct",
+      "url": "https://shape-showdown-staging.up.railway.app/health",
+      "count": 20,
+      "ok": 20,
+      "min": 21.776399999999967,
+      "max": 112.3858,
+      "mean": 30.006239999999984,
+      "p50": 24.865299999999934,
+      "p95": 30.074099999999987,
+      "lastError": null
+    },
+    {
+      "label": "socketio-polling-direct",
+      "url": "https://shape-showdown-staging.up.railway.app/socket.io/?EIO=4&transport=polling",
+      "count": 20,
+      "ok": 20,
+      "min": 22.58719999999994,
+      "max": 34.35480000000007,
+      "mean": 25.336959999999983,
+      "p50": 24.83770000000004,
+      "p95": 28.371399999999994,
+      "lastError": null
+    }
+  ],
+  "samples": [
+    {
+      "label": "health-direct",
+      "url": "https://shape-showdown-staging.up.railway.app/health",
+      "ok": true,
+      "status": 200,
+      "ms": 112.3858,
+      "bodyPreview": "ok"
+    },
+    {
+      "label": "health-direct",
+      "url": "https://shape-showdown-staging.up.railway.app/health",
+      "ok": true,
+      "status": 200,
+      "ms": 27.37899999999999,
+      "bodyPreview": "ok"
+    },
+    {
+      "label": "health-direct",
+      "url": "https://shape-showdown-staging.up.railway.app/health",
+      "ok": true,
+      "status": 200,
+      "ms": 27.5265,
+      "bodyPreview": "ok"
+    },
+    {
+      "label": "health-direct",
+      "url": "https://shape-showdown-staging.up.railway.app/health",
+      "ok": true,
+      "status": 200,
+      "ms": 27.002100000000013,
+      "bodyPreview": "ok"
+    },
+    {
+      "label": "health-direct",
+      "url": "https://shape-showdown-staging.up.railway.app/health",
+      "ok": true,
+      "status": 200,
+      "ms": 24.31960000000001,
+      "bodyPreview": "ok"
+    },
+    {
+      "label": "health-direct",
+      "url": "https://shape-showdown-staging.up.railway.app/health",
+      "ok": true,
+      "status": 200,
+      "ms": 24.851000000000028,
+      "bodyPreview": "ok"
+    },
+    {
+      "label": "health-direct",
+      "url": "https://shape-showdown-staging.up.railway.app/health",
+      "ok": true,
+      "status": 200,
+      "ms": 24.783299999999997,
+      "bodyPreview": "ok"
+    },
+    {
+      "label": "health-direct",
+      "url": "https://shape-showdown-staging.up.railway.app/health",
+      "ok": true,
+      "status": 200,
+      "ms": 30.074099999999987,
+      "bodyPreview": "ok"
+    },
+    {
+      "label": "health-direct",
+      "url": "https://shape-showdown-staging.up.railway.app/health",
+      "ok": true,
+      "status": 200,
+      "ms": 24.643399999999986,
+      "bodyPreview": "ok"
+    },
+    {
+      "label": "health-direct",
+      "url": "https://shape-showdown-staging.up.railway.app/health",
+      "ok": true,
+      "status": 200,
+      "ms": 28.616799999999955,
+      "bodyPreview": "ok"
+    },
+    {
+      "label": "health-direct",
+      "url": "https://shape-showdown-staging.up.railway.app/health",
+      "ok": true,
+      "status": 200,
+      "ms": 27.88689999999997,
+      "bodyPreview": "ok"
+    },
+    {
+      "label": "health-direct",
+      "url": "https://shape-showdown-staging.up.railway.app/health",
+      "ok": true,
+      "status": 200,
+      "ms": 25.422399999999982,
+      "bodyPreview": "ok"
+    },
+    {
+      "label": "health-direct",
+      "url": "https://shape-showdown-staging.up.railway.app/health",
+      "ok": true,
+      "status": 200,
+      "ms": 24.167299999999955,
+      "bodyPreview": "ok"
+    },
+    {
+      "label": "health-direct",
+      "url": "https://shape-showdown-staging.up.railway.app/health",
+      "ok": true,
+      "status": 200,
+      "ms": 24.86759999999998,
+      "bodyPreview": "ok"
+    },
+    {
+      "label": "health-direct",
+      "url": "https://shape-showdown-staging.up.railway.app/health",
+      "ok": true,
+      "status": 200,
+      "ms": 24.865299999999934,
+      "bodyPreview": "ok"
+    },
+    {
+      "label": "health-direct",
+      "url": "https://shape-showdown-staging.up.railway.app/health",
+      "ok": true,
+      "status": 200,
+      "ms": 28.07929999999999,
+      "bodyPreview": "ok"
+    },
+    {
+      "label": "health-direct",
+      "url": "https://shape-showdown-staging.up.railway.app/health",
+      "ok": true,
+      "status": 200,
+      "ms": 21.776399999999967,
+      "bodyPreview": "ok"
+    },
+    {
+      "label": "health-direct",
+      "url": "https://shape-showdown-staging.up.railway.app/health",
+      "ok": true,
+      "status": 200,
+      "ms": 23.691599999999994,
+      "bodyPreview": "ok"
+    },
+    {
+      "label": "health-direct",
+      "url": "https://shape-showdown-staging.up.railway.app/health",
+      "ok": true,
+      "status": 200,
+      "ms": 23.77819999999997,
+      "bodyPreview": "ok"
+    },
+    {
+      "label": "health-direct",
+      "url": "https://shape-showdown-staging.up.railway.app/health",
+      "ok": true,
+      "status": 200,
+      "ms": 24.008199999999988,
+      "bodyPreview": "ok"
+    },
+    {
+      "label": "socketio-polling-direct",
+      "url": "https://shape-showdown-staging.up.railway.app/socket.io/?EIO=4&transport=polling",
+      "ok": true,
+      "status": 200,
+      "ms": 34.35480000000007,
+      "bodyPreview": "0{\"sid\":\"M_M0axJMMrj7mzDsAAA1\",\"upgrades\":[\"websocket\"],\"pingInterval\":25000,\"pingTimeout\":20000,\"maxPayload\":1000000}"
+    },
+    {
+      "label": "socketio-polling-direct",
+      "url": "https://shape-showdown-staging.up.railway.app/socket.io/?EIO=4&transport=polling",
+      "ok": true,
+      "status": 200,
+      "ms": 24.0068,
+      "bodyPreview": "0{\"sid\":\"3uX0T3wkvGwQDNzGAAA2\",\"upgrades\":[\"websocket\"],\"pingInterval\":25000,\"pingTimeout\":20000,\"maxPayload\":1000000}"
+    },
+    {
+      "label": "socketio-polling-direct",
+      "url": "https://shape-showdown-staging.up.railway.app/socket.io/?EIO=4&transport=polling",
+      "ok": true,
+      "status": 200,
+      "ms": 23.963799999999992,
+      "bodyPreview": "0{\"sid\":\"YP1KYzU0U3sJnu_uAAA3\",\"upgrades\":[\"websocket\"],\"pingInterval\":25000,\"pingTimeout\":20000,\"maxPayload\":1000000}"
+    },
+    {
+      "label": "socketio-polling-direct",
+      "url": "https://shape-showdown-staging.up.railway.app/socket.io/?EIO=4&transport=polling",
+      "ok": true,
+      "status": 200,
+      "ms": 25.6561999999999,
+      "bodyPreview": "0{\"sid\":\"0Bcjwy4Gt1h3uzg1AAA4\",\"upgrades\":[\"websocket\"],\"pingInterval\":25000,\"pingTimeout\":20000,\"maxPayload\":1000000}"
+    },
+    {
+      "label": "socketio-polling-direct",
+      "url": "https://shape-showdown-staging.up.railway.app/socket.io/?EIO=4&transport=polling",
+      "ok": true,
+      "status": 200,
+      "ms": 24.187999999999988,
+      "bodyPreview": "0{\"sid\":\"KlpTS5A2C0nsyd6XAAA5\",\"upgrades\":[\"websocket\"],\"pingInterval\":25000,\"pingTimeout\":20000,\"maxPayload\":1000000}"
+    },
+    {
+      "label": "socketio-polling-direct",
+      "url": "https://shape-showdown-staging.up.railway.app/socket.io/?EIO=4&transport=polling",
+      "ok": true,
+      "status": 200,
+      "ms": 25.123899999999935,
+      "bodyPreview": "0{\"sid\":\"jS6fSq-TF5u1UaI-AAA6\",\"upgrades\":[\"websocket\"],\"pingInterval\":25000,\"pingTimeout\":20000,\"maxPayload\":1000000}"
+    },
+    {
+      "label": "socketio-polling-direct",
+      "url": "https://shape-showdown-staging.up.railway.app/socket.io/?EIO=4&transport=polling",
+      "ok": true,
+      "status": 200,
+      "ms": 24.689499999999953,
+      "bodyPreview": "0{\"sid\":\"LAb2WgvGLMEpABN3AAA7\",\"upgrades\":[\"websocket\"],\"pingInterval\":25000,\"pingTimeout\":20000,\"maxPayload\":1000000}"
+    },
+    {
+      "label": "socketio-polling-direct",
+      "url": "https://shape-showdown-staging.up.railway.app/socket.io/?EIO=4&transport=polling",
+      "ok": true,
+      "status": 200,
+      "ms": 25.330600000000004,
+      "bodyPreview": "0{\"sid\":\"dd8OIHUIJODhVK3iAAA8\",\"upgrades\":[\"websocket\"],\"pingInterval\":25000,\"pingTimeout\":20000,\"maxPayload\":1000000}"
+    },
+    {
+      "label": "socketio-polling-direct",
+      "url": "https://shape-showdown-staging.up.railway.app/socket.io/?EIO=4&transport=polling",
+      "ok": true,
+      "status": 200,
+      "ms": 28.371399999999994,
+      "bodyPreview": "0{\"sid\":\"uuDA_NTS5URP6fXhAAA-\",\"upgrades\":[\"websocket\"],\"pingInterval\":25000,\"pingTimeout\":20000,\"maxPayload\":1000000}"
+    },
+    {
+      "label": "socketio-polling-direct",
+      "url": "https://shape-showdown-staging.up.railway.app/socket.io/?EIO=4&transport=polling",
+      "ok": true,
+      "status": 200,
+      "ms": 22.761799999999994,
+      "bodyPreview": "0{\"sid\":\"TXdonOnC8d3sYyLrAABB\",\"upgrades\":[\"websocket\"],\"pingInterval\":25000,\"pingTimeout\":20000,\"maxPayload\":1000000}"
+    },
+    {
+      "label": "socketio-polling-direct",
+      "url": "https://shape-showdown-staging.up.railway.app/socket.io/?EIO=4&transport=polling",
+      "ok": true,
+      "status": 200,
+      "ms": 24.83770000000004,
+      "bodyPreview": "0{\"sid\":\"YJkye1kgPOvQlytGAABD\",\"upgrades\":[\"websocket\"],\"pingInterval\":25000,\"pingTimeout\":20000,\"maxPayload\":1000000}"
+    },
+    {
+      "label": "socketio-polling-direct",
+      "url": "https://shape-showdown-staging.up.railway.app/socket.io/?EIO=4&transport=polling",
+      "ok": true,
+      "status": 200,
+      "ms": 23.40790000000004,
+      "bodyPreview": "0{\"sid\":\"rweq9QmL9hPFz0pIAABE\",\"upgrades\":[\"websocket\"],\"pingInterval\":25000,\"pingTimeout\":20000,\"maxPayload\":1000000}"
+    },
+    {
+      "label": "socketio-polling-direct",
+      "url": "https://shape-showdown-staging.up.railway.app/socket.io/?EIO=4&transport=polling",
+      "ok": true,
+      "status": 200,
+      "ms": 26.47479999999996,
+      "bodyPreview": "0{\"sid\":\"XUhfsZaNXB05jwS_AABF\",\"upgrades\":[\"websocket\"],\"pingInterval\":25000,\"pingTimeout\":20000,\"maxPayload\":1000000}"
+    },
+    {
+      "label": "socketio-polling-direct",
+      "url": "https://shape-showdown-staging.up.railway.app/socket.io/?EIO=4&transport=polling",
+      "ok": true,
+      "status": 200,
+      "ms": 25.27800000000002,
+      "bodyPreview": "0{\"sid\":\"N1pdocYJ7lSdF4czAABG\",\"upgrades\":[\"websocket\"],\"pingInterval\":25000,\"pingTimeout\":20000,\"maxPayload\":1000000}"
+    },
+    {
+      "label": "socketio-polling-direct",
+      "url": "https://shape-showdown-staging.up.railway.app/socket.io/?EIO=4&transport=polling",
+      "ok": true,
+      "status": 200,
+      "ms": 26.634500000000003,
+      "bodyPreview": "0{\"sid\":\"9nGJZxSwOG8kwC86AABH\",\"upgrades\":[\"websocket\"],\"pingInterval\":25000,\"pingTimeout\":20000,\"maxPayload\":1000000}"
+    },
+    {
+      "label": "socketio-polling-direct",
+      "url": "https://shape-showdown-staging.up.railway.app/socket.io/?EIO=4&transport=polling",
+      "ok": true,
+      "status": 200,
+      "ms": 25.0933,
+      "bodyPreview": "0{\"sid\":\"dMLVJGdsD833X3_BAABI\",\"upgrades\":[\"websocket\"],\"pingInterval\":25000,\"pingTimeout\":20000,\"maxPayload\":1000000}"
+    },
+    {
+      "label": "socketio-polling-direct",
+      "url": "https://shape-showdown-staging.up.railway.app/socket.io/?EIO=4&transport=polling",
+      "ok": true,
+      "status": 200,
+      "ms": 23.216499999999996,
+      "bodyPreview": "0{\"sid\":\"DpSCZBV1WSudNLpOAABJ\",\"upgrades\":[\"websocket\"],\"pingInterval\":25000,\"pingTimeout\":20000,\"maxPayload\":1000000}"
+    },
+    {
+      "label": "socketio-polling-direct",
+      "url": "https://shape-showdown-staging.up.railway.app/socket.io/?EIO=4&transport=polling",
+      "ok": true,
+      "status": 200,
+      "ms": 23.77279999999996,
+      "bodyPreview": "0{\"sid\":\"fZDijeJOFMeAZqqTAABK\",\"upgrades\":[\"websocket\"],\"pingInterval\":25000,\"pingTimeout\":20000,\"maxPayload\":1000000}"
+    },
+    {
+      "label": "socketio-polling-direct",
+      "url": "https://shape-showdown-staging.up.railway.app/socket.io/?EIO=4&transport=polling",
+      "ok": true,
+      "status": 200,
+      "ms": 26.989699999999857,
+      "bodyPreview": "0{\"sid\":\"P8KVkPXPYV2XtrjbAABL\",\"upgrades\":[\"websocket\"],\"pingInterval\":25000,\"pingTimeout\":20000,\"maxPayload\":1000000}"
+    },
+    {
+      "label": "socketio-polling-direct",
+      "url": "https://shape-showdown-staging.up.railway.app/socket.io/?EIO=4&transport=polling",
+      "ok": true,
+      "status": 200,
+      "ms": 22.58719999999994,
+      "bodyPreview": "0{\"sid\":\"_TuchAzVPFqeSOg1AABM\",\"upgrades\":[\"websocket\"],\"pingInterval\":25000,\"pingTimeout\":20000,\"maxPayload\":1000000}"
+    }
+  ]
+}

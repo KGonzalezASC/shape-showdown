@@ -308,4 +308,48 @@ describe('GameManager lifecycle harness', () => {
     const events2 = emitted2.filter((args) => args[0] === 'matchEvent').map((args) => args[1]);
     assert.deepEqual(events1, events2);
   });
+
+  it('changes replay checkpoint density without changing authoritative match state', () => {
+    const emittedEveryTick: unknown[][] = [];
+    const emittedSparse: unknown[][] = [];
+    const gmEveryTick = new GameManager(createFakeIo(emittedEveryTick), 1);
+    const gmSparse = new GameManager(createFakeIo(emittedSparse), 30);
+    managers.push(gmEveryTick, gmSparse);
+
+    (gmEveryTick as unknown as { gameState: { seed: number } }).gameState.seed = 4242;
+    (gmSparse as unknown as { gameState: { seed: number } }).gameState.seed = 4242;
+
+    for (const gm of [gmEveryTick, gmSparse]) {
+      gm.handleConnection(new FakeSocket('p1') as unknown as Socket);
+      gm.handleConnection(new FakeSocket('p2') as unknown as Socket);
+    }
+
+    for (let i = 0; i < 240; i += 1) {
+      gmEveryTick.tickOnceForTests();
+      gmSparse.tickOnceForTests();
+    }
+
+    const everyTick = (gmEveryTick as unknown as {
+      gameState: { players: Record<string, PlayerState>; tick: number };
+      activeReplay: ReplayDataV2 | null;
+    });
+    const sparse = (gmSparse as unknown as {
+      gameState: { players: Record<string, PlayerState>; tick: number };
+      activeReplay: ReplayDataV2 | null;
+    });
+    assert.equal(everyTick.gameState.tick, sparse.gameState.tick);
+    assert.deepEqual(everyTick.gameState.players, sparse.gameState.players);
+    assert.deepEqual(
+      emittedEveryTick
+        .filter((args) => args[0] === 'matchEvent')
+        .map((args) => args[1]),
+      emittedSparse
+        .filter((args) => args[0] === 'matchEvent')
+        .map((args) => args[1]),
+    );
+    assert.ok(everyTick.activeReplay);
+    assert.ok(sparse.activeReplay);
+    assert.ok((everyTick.activeReplay?.keyframes.length ?? 0) > (sparse.activeReplay?.keyframes.length ?? 0));
+    assert.equal(sparse.activeReplay?.keyframeIntervalTicks, 30);
+  });
 });

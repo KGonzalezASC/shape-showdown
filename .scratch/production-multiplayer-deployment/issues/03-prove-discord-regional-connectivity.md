@@ -158,7 +158,7 @@ Required Discord URL Mapping (only row):
 
 **DENY for Discord Activities (without pre-registration).** A fresh provider-style hostname can accept Socket.IO directly, but the Discord Activity proxy cannot reach that host when it was unknown at URL-mapping config time. Unmapped `discordsays.com` paths return the Activity HTML shell, not an Engine.IO handshake. Inventing `/.proxy/<external-host>/...` does not create an allowlisted route.
 
-**Implication:** Edgegap/Fly-style join tickets that embed a brand-new `host:port` cannot be used as the Activity's Socket.IO URL unless that host is already covered by a Discord URL Mapping (finite list like A, path on one origin like B, or gateway like C). True dynamic D is rejected by Discord's sandbox.
+**Implication:** Join tickets that embed a brand-new `host:port` cannot be used as the Activity's Socket.IO URL unless that host is already covered by a Discord URL Mapping (finite list like A, path on one origin like B, or gateway like C). True dynamic D is rejected by Discord's sandbox.
 
 **Untested variant:** Discord parameter matching such as `/dyn/{sub}` → `{sub}.provider.example` might allow a *constrained* hostname pattern. That is still pre-registered policy, not open-ended D. Not probed in this ticket.
 

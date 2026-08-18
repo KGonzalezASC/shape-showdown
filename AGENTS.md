@@ -130,7 +130,7 @@ For pre-merge or release verification, run `bun run lint` and the full `bun run 
 - **Movement / actions:** Client sends `inputState` and discrete `action`; server applies DAS/ARR, gravity, locks, and garbage in **`engine.ts`**.
 - **Shop:** Line clears roll offers; client opens/purchases; server validates phase, highlight index, cost, and gates.
 - **Poison / specials:** Elixir, Wild Purge, Magnet, Snag, Sticky, Satellite, Bomber, Curtain, Retrim, Bounty Tax, Wildcard +4, Tectonic Shift — owned by shop handlers + engine tick.
-- **Match states:** `waiting` → `countdown` → `playing` → `ended` (top-out or timer). First top-out ends the match immediately.
+- **Match states:** `waiting` → `countdown` → `playing` → `ended` (top-out, disconnect, or restart flow). Matches have no wall-clock timeout; the first top-out ends the match immediately.
 
 ## UI conventions
 
@@ -148,6 +148,35 @@ For pre-merge or release verification, run `bun run lint` and the full `bun run 
 - **Subtle Red Sparks:** Red spark accents must be subtle with reduced opacity (0.55–0.7 with soft glow) placed across 3 perimeter gap positions.
 - **Clean Boundary Lines:** Bottom frame lines must use clean, crisp white line segments with pixel gap breaks (no dripping teeth, spikes, or tentacles).
 - **Voronoi Tetromino Cells:** Cells must remain smooth, clean, glowing filled polygons without interior hatching lines or striping overlays.
+
+## Hosting / ticket jargon (plain language)
+
+When explaining Wayfinder / production-deployment tickets (especially ticket 04 staging evidence), agents must use **communicate-clearly** (and **teach** if the owner asks to really understand). Do not dump cloud acronyms. Say what to click or measure on Railway/Pages in everyday words first, then the formal name.
+
+Active plan docs live under `.scratch/production-multiplayer-deployment/` (map + issues). Launch pick is provisional: **Cloudflare Pages** (UI) + **Railway Virginia** (game) + **Railway Postgres**.
+
+### Ticket 04 evidence terms
+
+| Formal name | Plain meaning |
+| --- | --- |
+| **Idle Linux RSS** | How much **RAM** the Bun game process uses on Railway when **nobody is playing**. RSS ≈ “resident memory” the OS sees. We want the quiet baseline on Railway’s Linux box (not your Windows PC). Check Railway **Metrics → Memory** with no connected clients. |
+| **One-match / small-N CPU, memory, egress** | While **1 match** (2 players) is running, and optionally a few matches if we ever allow more processes: how hard the CPU works, how much RAM it uses, and how much **network data leaves** Railway (egress = outbound traffic you pay for). “Compressed” means after Socket.IO compression, closer to real bills. |
+| **Socket.IO soak** | Leave players (or a soak script) **connected for 30–60 minutes** and log disconnects/reconnects/errors. Proves the connection doesn’t silently die (Railway docs disagree on WebSocket lifetime). |
+| **Direct-browser RTT** | Ping time from a normal browser to Railway (e.g. from Pages). RTT = round trip; lower is snappier. |
+| **Discord-mapped RTT** | Same measurement **inside a Discord Activity**, traffic going through Discord’s allowlisted proxy. Often deferred until ticket 09 mappings exist. |
+| **24h idle cost** | Leave staging up overnight with little/no play; read Railway usage/billing for app + Postgres. “What does it cost to exist?” |
+| **Deploy while connected** | Click/redeploy while someone is in a match. New version must pass **`/health`**, old process gets shut down (**SIGTERM** = polite kill), clients **reconnect**, public URL stays the same. |
+| **Application rollback** | In Railway Deployments, roll back to a **previous successful build** (undo a bad deploy without waiting on a new git push). |
+| **Postgres backup restore** | Save a DB snapshot, restore it into a **non-prod** database copy, prove we can recover data. |
+
+### Related hosting nouns
+
+| Noun | Plain meaning |
+| --- | --- |
+| **Pages** | Where the static website (React UI) is hosted. |
+| **Railway service** | The always-on Bun game server process. |
+| **Environment (staging vs production)** | Separate Railway “lanes” with their own vars/DB. Staging is for experiments; production is for real players (once wired). |
+| **Feature Flags** | Railway runtime switches / % rollouts (not the same as PR preview environments). |
 
 ## Copying this knowledge elsewhere
 

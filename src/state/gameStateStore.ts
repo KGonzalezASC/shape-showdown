@@ -8,7 +8,6 @@ import {
 export interface MatchChromeSnapshot {
   status: MatchStatus;
   countdown: number;
-  remainingTime: number;
   tick: number;
   myId: string | null;
   myScore: number;
@@ -52,7 +51,6 @@ function emptyChromeSnapshot(): MatchChromeSnapshot {
   return {
     status: 'waiting',
     countdown: 0,
-    remainingTime: 0,
     tick: 0,
     myId: null,
     myScore: 0,
@@ -91,7 +89,6 @@ function buildChromeSnapshot(): MatchChromeSnapshot {
   return {
     status: gameState.status,
     countdown: gameState.countdown,
-    remainingTime: gameState.remainingTime,
     tick: gameState.tick,
     myId,
     myScore: me?.score ?? 0,
@@ -130,7 +127,6 @@ function buildPlayfieldSnapshot(): PlayfieldSnapshot {
 function chromeSnapshotsEqual(a: MatchChromeSnapshot, b: MatchChromeSnapshot): boolean {
   if (a.status !== b.status) return false;
   if (a.countdown !== b.countdown) return false;
-  if (a.remainingTime !== b.remainingTime) return false;
   if (a.tick !== b.tick) return false;
   if (a.myId !== b.myId) return false;
   if (a.myScore !== b.myScore) return false;

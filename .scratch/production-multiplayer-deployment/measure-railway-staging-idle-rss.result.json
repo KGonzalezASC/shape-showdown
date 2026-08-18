@@ -1,0 +1,40 @@
+{
+  "measuredAt": "2026-08-17T03:51:41.039Z",
+  "host": "shape-showdown-staging.up.railway.app",
+  "service": "shape-showdown",
+  "environment": "staging",
+  "deploymentId": "7311d276-05c8-4f4d-9469-018542635583",
+  "region": "us-east4-eqdc4a",
+  "method": "railway metrics --memory (platform container memory; SSH unavailable without local key)",
+  "samples": [
+    {
+      "label": "post-soak-settle",
+      "note": "Soak ended ~03:45Z; waited ~2m with CPU/network current ~0 before sample.",
+      "sampledAt": "2026-08-17T03:49:46.710Z",
+      "windowMinutes": 3,
+      "memory_current_mb": 284.113764352,
+      "memory_average_mb": 334.801403904,
+      "memory_max_mb": 380.188491776,
+      "cpu_current_vcpu": 0.0,
+      "network_current_egress_mb": 0.0
+    },
+    {
+      "label": "cold-idle-after-restart",
+      "note": "railway restart -y; /health ok within ~2s; waited 90s with no intentional clients; treat current_mb as idle Linux RSS floor for ticket 04.",
+      "restartAt": "2026-08-17T03:50:08.424Z",
+      "healthOkAt": "2026-08-17T03:50:10.261Z",
+      "sampledAt": "2026-08-17T03:51:41.039Z",
+      "windowMinutes": 2,
+      "memory_current_mb": 156.560785408,
+      "memory_average_mb": 112.490394419,
+      "memory_max_mb": 156.74114048,
+      "cpu_current_vcpu": 0.005207433,
+      "network_current_egress_mb": 0.0
+    }
+  ],
+  "verdict": {
+    "idleLinuxRssMb": 157,
+    "roundedCurrentMb": 157,
+    "sourceSample": "cold-idle-after-restart"
+  }
+}

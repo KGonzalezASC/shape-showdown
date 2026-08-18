@@ -1,0 +1,268 @@
+{
+  "measuredAt": "2026-08-17T03:45:19.151Z",
+  "startedAt": "2026-08-17T03:10:19.140Z",
+  "endedAt": "2026-08-17T03:45:19.151Z",
+  "host": "shape-showdown-staging.up.railway.app",
+  "url": "https://shape-showdown-staging.up.railway.app",
+  "minutes": 35,
+  "clientCount": 2,
+  "transports": [
+    "websocket"
+  ],
+  "totals": {
+    "events": 41,
+    "disconnects": 2,
+    "connectErrors": 0,
+    "reconnects": 1,
+    "reconnectFailed": 0,
+    "stillConnected": 1
+  },
+  "events": [
+    {
+      "at": "2026-08-17T03:10:19.289Z",
+      "client": 1,
+      "type": "connect",
+      "detail": "id=EG77kCH659lAdaZuAABV"
+    },
+    {
+      "at": "2026-08-17T03:10:19.289Z",
+      "client": 0,
+      "type": "connect",
+      "detail": "id=jPjl5um4OjnA3ib2AABW"
+    },
+    {
+      "at": "2026-08-17T03:10:19.290Z",
+      "client": 0,
+      "type": "disconnect",
+      "detail": "io server disconnect"
+    },
+    {
+      "at": "2026-08-17T03:11:19.162Z",
+      "client": -1,
+      "type": "heartbeat",
+      "detail": "connected=1/2"
+    },
+    {
+      "at": "2026-08-17T03:12:19.178Z",
+      "client": -1,
+      "type": "heartbeat",
+      "detail": "connected=1/2"
+    },
+    {
+      "at": "2026-08-17T03:13:16.201Z",
+      "client": 1,
+      "type": "disconnect",
+      "detail": "transport close"
+    },
+    {
+      "at": "2026-08-17T03:13:16.697Z",
+      "client": 1,
+      "type": "reconnect_attempt",
+      "detail": "1"
+    },
+    {
+      "at": "2026-08-17T03:13:16.811Z",
+      "client": 1,
+      "type": "reconnect",
+      "detail": "1"
+    },
+    {
+      "at": "2026-08-17T03:13:16.842Z",
+      "client": 1,
+      "type": "connect",
+      "detail": "id=FdOH22ObhBEpCuXlAAAB"
+    },
+    {
+      "at": "2026-08-17T03:13:19.201Z",
+      "client": -1,
+      "type": "heartbeat",
+      "detail": "connected=1/2"
+    },
+    {
+      "at": "2026-08-17T03:14:19.209Z",
+      "client": -1,
+      "type": "heartbeat",
+      "detail": "connected=1/2"
+    },
+    {
+      "at": "2026-08-17T03:15:19.223Z",
+      "client": -1,
+      "type": "heartbeat",
+      "detail": "connected=1/2"
+    },
+    {
+      "at": "2026-08-17T03:16:19.217Z",
+      "client": -1,
+      "type": "heartbeat",
+      "detail": "connected=1/2"
+    },
+    {
+      "at": "2026-08-17T03:17:19.223Z",
+      "client": -1,
+      "type": "heartbeat",
+      "detail": "connected=1/2"
+    },
+    {
+      "at": "2026-08-17T03:18:19.228Z",
+      "client": -1,
+      "type": "heartbeat",
+      "detail": "connected=1/2"
+    },
+    {
+      "at": "2026-08-17T03:19:19.227Z",
+      "client": -1,
+      "type": "heartbeat",
+      "detail": "connected=1/2"
+    },
+    {
+      "at": "2026-08-17T03:20:19.235Z",
+      "client": -1,
+      "type": "heartbeat",
+      "detail": "connected=1/2"
+    },
+    {
+      "at": "2026-08-17T03:21:19.233Z",
+      "client": -1,
+      "type": "heartbeat",
+      "detail": "connected=1/2"
+    },
+    {
+      "at": "2026-08-17T03:22:19.227Z",
+      "client": -1,
+      "type": "heartbeat",
+      "detail": "connected=1/2"
+    },
+    {
+      "at": "2026-08-17T03:23:19.240Z",
+      "client": -1,
+      "type": "heartbeat",
+      "detail": "connected=1/2"
+    },
+    {
+      "at": "2026-08-17T03:24:19.235Z",
+      "client": -1,
+      "type": "heartbeat",
+      "detail": "connected=1/2"
+    },
+    {
+      "at": "2026-08-17T03:25:19.252Z",
+      "client": -1,
+      "type": "heartbeat",
+      "detail": "connected=1/2"
+    },
+    {
+      "at": "2026-08-17T03:26:19.253Z",
+      "client": -1,
+      "type": "heartbeat",
+      "detail": "connected=1/2"
+    },
+    {
+      "at": "2026-08-17T03:27:19.253Z",
+      "client": -1,
+      "type": "heartbeat",
+      "detail": "connected=1/2"
+    },
+    {
+      "at": "2026-08-17T03:28:19.262Z",
+      "client": -1,
+      "type": "heartbeat",
+      "detail": "connected=1/2"
+    },
+    {
+      "at": "2026-08-17T03:29:19.259Z",
+      "client": -1,
+      "type": "heartbeat",
+      "detail": "connected=1/2"
+    },
+    {
+      "at": "2026-08-17T03:30:19.264Z",
+      "client": -1,
+      "type": "heartbeat",
+      "detail": "connected=1/2"
+    },
+    {
+      "at": "2026-08-17T03:31:19.268Z",
+      "client": -1,
+      "type": "heartbeat",
+      "detail": "connected=1/2"
+    },
+    {
+      "at": "2026-08-17T03:32:19.268Z",
+      "client": -1,
+      "type": "heartbeat",
+      "detail": "connected=1/2"
+    },
+    {
+      "at": "2026-08-17T03:33:19.271Z",
+      "client": -1,
+      "type": "heartbeat",
+      "detail": "connected=1/2"
+    },
+    {
+      "at": "2026-08-17T03:34:19.281Z",
+      "client": -1,
+      "type": "heartbeat",
+      "detail": "connected=1/2"
+    },
+    {
+      "at": "2026-08-17T03:35:19.274Z",
+      "client": -1,
+      "type": "heartbeat",
+      "detail": "connected=1/2"
+    },
+    {
+      "at": "2026-08-17T03:36:19.295Z",
+      "client": -1,
+      "type": "heartbeat",
+      "detail": "connected=1/2"
+    },
+    {
+      "at": "2026-08-17T03:37:19.301Z",
+      "client": -1,
+      "type": "heartbeat",
+      "detail": "connected=1/2"
+    },
+    {
+      "at": "2026-08-17T03:38:19.288Z",
+      "client": -1,
+      "type": "heartbeat",
+      "detail": "connected=1/2"
+    },
+    {
+      "at": "2026-08-17T03:39:19.307Z",
+      "client": -1,
+      "type": "heartbeat",
+      "detail": "connected=1/2"
+    },
+    {
+      "at": "2026-08-17T03:40:19.315Z",
+      "client": -1,
+      "type": "heartbeat",
+      "detail": "connected=1/2"
+    },
+    {
+      "at": "2026-08-17T03:41:19.322Z",
+      "client": -1,
+      "type": "heartbeat",
+      "detail": "connected=1/2"
+    },
+    {
+      "at": "2026-08-17T03:42:19.332Z",
+      "client": -1,
+      "type": "heartbeat",
+      "detail": "connected=1/2"
+    },
+    {
+      "at": "2026-08-17T03:43:19.333Z",
+      "client": -1,
+      "type": "heartbeat",
+      "detail": "connected=1/2"
+    },
+    {
+      "at": "2026-08-17T03:44:19.353Z",
+      "client": -1,
+      "type": "heartbeat",
+      "detail": "connected=1/2"
+    }
+  ]
+}

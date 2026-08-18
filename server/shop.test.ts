@@ -27,7 +27,6 @@ function blankGame(seed = 42): { game: GameState; rng: ReturnType<typeof makeRng
     players: { buyer, opponent },
     status: 'playing',
     countdown: 0,
-    remainingTime: 120,
     winnerId: null,
     tick: 10,
     seed,

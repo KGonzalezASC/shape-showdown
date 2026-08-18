@@ -9,7 +9,6 @@ import type { MatchStepOptions, StepResult } from './stepTypes.js';
 import {
   enqueueGarbage,
   stepPlayer,
-  tickSeconds,
 } from './engine.js';
 
 const MATCH_EVENT_ORDER: Record<MatchEvent['type'], number> = {
@@ -71,7 +70,6 @@ export function matchStep(
   }
 
   gameState.tick += 1;
-  gameState.remainingTime = Math.max(0, gameState.remainingTime - tickSeconds());
 
   const matchEvents: MatchEvent[] = [];
   const pids = Object.keys(gameState.players);

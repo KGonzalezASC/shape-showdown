@@ -18,7 +18,6 @@ describe('matchStep authoritative match seam', () => {
       players: { p1, p2 },
       status: 'playing',
       countdown: 0,
-      remainingTime: 180,
       winnerId: null,
       tick: 0,
       seed,
@@ -32,6 +31,25 @@ describe('matchStep authoritative match seam', () => {
     assert.equal(result.matchEnded, false);
     assert.ok(result.stepResults.p1);
     assert.ok(result.stepResults.p2);
+  });
+
+  it('keeps a live match running past the legacy 120-second duration', () => {
+    const gameState: GameState = {
+      players: {},
+      status: 'playing',
+      countdown: 0,
+      winnerId: null,
+      tick: 0,
+      seed: 1,
+    };
+
+    for (let i = 0; i < 7_201; i += 1) {
+      const result = matchStep(gameState, {});
+      assert.equal(result.matchEnded, false);
+    }
+
+    assert.equal(gameState.tick, 7_201);
+    assert.equal(gameState.status, 'playing');
   });
 
   it('commits attacks to opponent in pass 2 after independent simulation pass', () => {
@@ -50,7 +68,6 @@ describe('matchStep authoritative match seam', () => {
       players: { p1, p2 },
       status: 'playing',
       countdown: 0,
-      remainingTime: 180,
       winnerId: null,
       tick: 0,
       seed,
@@ -83,7 +100,6 @@ describe('matchStep authoritative match seam', () => {
       players: { p1, p2 },
       status: 'playing',
       countdown: 0,
-      remainingTime: 180,
       winnerId: null,
       tick: 10,
       seed,
@@ -129,7 +145,6 @@ describe('matchStep authoritative match seam', () => {
       players: { p1, p2 },
       status: 'playing',
       countdown: 0,
-      remainingTime: 180,
       winnerId: null,
       tick: 0,
       seed,
@@ -159,7 +174,6 @@ describe('matchStep authoritative match seam', () => {
       players: { p1, p2 },
       status: 'playing',
       countdown: 0,
-      remainingTime: 180,
       winnerId: null,
       tick: 10,
       seed,

@@ -10,7 +10,6 @@ export const CELL_SIZE = 28;
 export const GAME_WIDTH = BOARD_COLS * CELL_SIZE;
 export const GAME_HEIGHT = BOARD_VISIBLE_ROWS * CELL_SIZE;
 
-export const GAME_DURATION = 120;
 export const GAME_TICK_RATE = 60;
 export const COUNTDOWN_SECONDS = 3;
 export const RESTART_DELAY_SECONDS = 5;

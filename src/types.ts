@@ -8,7 +8,6 @@ import {
   COMBO_BONUS_TABLE,
   COUNTDOWN_SECONDS,
   DAS_TICKS,
-  GAME_DURATION,
   GAME_HEIGHT,
   GAME_TICK_RATE,
   GAME_WIDTH,
@@ -334,7 +333,6 @@ export interface GameState {
   players: Record<string, PlayerState>;
   status: MatchStatus;
   countdown: number;
-  remainingTime: number;
   winnerId: string | null;
   restartTimer?: number;
   technicalVictory?: boolean;
@@ -499,7 +497,6 @@ export {
   COMBO_BONUS_TABLE,
   COUNTDOWN_SECONDS,
   DAS_TICKS,
-  GAME_DURATION,
   GAME_HEIGHT,
   GAME_TICK_RATE,
   GAME_WIDTH,

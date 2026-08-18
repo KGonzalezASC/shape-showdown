@@ -30,7 +30,6 @@ import {
   HOLD_SWAP_CUTOFF_VISIBLE_ROW,
   HOLD_SWAP_CUTOFF_MIN_ROW,
   COUNTDOWN_SECONDS,
-  GAME_DURATION,
   LANDING_FORECAST_TICKS,
 } from '../../src/constants.js';
 import { GameState, PlayerState } from '../../src/types.js';
@@ -42,7 +41,6 @@ function makeGame(players: PlayerState[]): GameState {
     players: playerMap,
     status: 'playing',
     countdown: COUNTDOWN_SECONDS,
-    remainingTime: GAME_DURATION,
     winnerId: null,
     tick: 0,
     seed: 1,

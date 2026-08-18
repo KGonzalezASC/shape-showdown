@@ -44,7 +44,7 @@ The match moves through four states inside `update()`:
 flowchart LR
   waiting -->|2 players join| countdown
   countdown -->|countdown <= 0| playing
-  playing -->|timer ends OR a player tops out| ended
+  playing -->|a player tops out| ended
   ended -->|restartTimer elapses| countdown
   playing -.->|a player disconnects| waiting
 ```

@@ -78,7 +78,6 @@ export class Scenario {
       players,
       status: 'playing',
       countdown: 0,
-      remainingTime: 120,
       winnerId: null,
       tick: 0,
       seed: config.seed,

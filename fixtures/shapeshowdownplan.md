@@ -10,7 +10,7 @@
 
 * **Simulation Rate:** 60 Hz fixed server tick loop (`server/GameManager.ts`).
 * **Identity:** Socket ID (`socket.id`), up to 2 players per server instance.
-* **Match States:** `waiting` → `countdown` → `playing` → `ended`. First top-out ends the match immediately.
+* **Match States:** `waiting` → `countdown` → `playing` → `ended`. Matches continue until a player tops out or disconnects; there is no wall-clock timeout. First top-out ends the match immediately.
 
 ---
 

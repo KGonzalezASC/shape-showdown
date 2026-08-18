@@ -57,7 +57,6 @@ export interface PublicGameState {
   players: Record<string, PublicPlayerState>;
   status: MatchStatus;
   countdown: number;
-  remainingTime: number;
   winnerId: string | null;
   restartTimer?: number;
   technicalVictory?: boolean;
@@ -140,7 +139,6 @@ function toPublicGameState(state: GameState): PublicGameState {
     players,
     status: state.status,
     countdown: state.countdown,
-    remainingTime: state.remainingTime,
     winnerId: state.winnerId,
     restartTimer: state.restartTimer,
     technicalVictory: state.technicalVictory,
