@@ -7,6 +7,8 @@ interface ImportMetaEnv {
   readonly VITE_GAME_SERVER_PORT?: string;
   /** Optional hostname override for VITE_GAME_SERVER_PORT (default: page hostname). */
   readonly VITE_GAME_SERVER_HOST?: string;
+  /** Public Discord application ID used only by the Embedded App SDK Activity client. */
+  readonly VITE_DISCORD_CLIENT_ID?: string;
   /** Public base path for assets (set in vite.config via VITE_BASE_URL). */
   readonly BASE_URL: string;
   /** Opt-in dev/QA UI for non-local builds (e.g. internal staging). */

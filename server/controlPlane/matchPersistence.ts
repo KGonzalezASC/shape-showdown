@@ -121,11 +121,7 @@ export class PostgresMatchPersistence implements MatchPersistence {
   public async finalizeMatch(input: DurableMatchFinalization): Promise<void> {
     await this.database.begin(async (transaction) => {
       const matches = new MatchStore(transaction);
-      await matches.updateMatchStatus({
-        matchId: input.matchId,
-        expectedStatus: 'playing',
-        nextStatus: 'ended',
-      });
+      await matches.finalizeActiveMatchStatus(input.matchId, 'ended');
       await new MatchResultStore(transaction).insertMatchResult(input);
       await matches.deleteMatchTickets(input.matchId);
     });

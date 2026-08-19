@@ -1,6 +1,7 @@
 import type { Server, Socket } from 'socket.io';
 import type { MatchPersistence } from '../controlPlane/matchPersistence.js';
 import type { SocketSeatBinding } from '../GameManager.js';
+import type { SocketAuthErrorPayload } from '../../src/types.js';
 import { MatchRunner } from './MatchRunner.js';
 
 const LEGACY_RUNTIME_KEY = '__legacy_runtime__';
@@ -13,6 +14,7 @@ export class MatchRegistry {
     private readonly io: Server,
     private readonly replayKeyframeIntervalTicks: number,
     private readonly persistence: MatchPersistence | undefined,
+    private readonly recoveryVoidTimeoutMs: number = 15_000,
   ) {}
 
   public handleConnection(
@@ -21,7 +23,10 @@ export class MatchRegistry {
     seatBinding?: SocketSeatBinding,
   ): void {
     if (this.draining) {
-      socket.emit('error', 'Server is draining');
+      emitSocketError(socket, {
+        code: 'MATCH_RUNTIME_UNAVAILABLE',
+        message: 'The match runtime is draining. Try again shortly.',
+      });
       socket.disconnect(true);
       return;
     }
@@ -30,7 +35,10 @@ export class MatchRegistry {
     void this.getOrCreate(key)
       .handleConnection(socket, durablePlayerId, seatBinding)
       .catch(() => {
-        socket.emit('error', 'Match checkpoint could not be restored');
+        emitSocketError(socket, {
+          code: 'MATCH_RUNTIME_UNAVAILABLE',
+          message: 'The match runtime is restoring. Try again shortly.',
+        });
         socket.disconnect(true);
       });
   }
@@ -59,8 +67,13 @@ export class MatchRegistry {
         this.runners.set(createdMatchId, runner);
       },
       matchId,
+      this.recoveryVoidTimeoutMs,
     );
     this.runners.set(matchId, runner);
     return runner;
   }
+}
+
+function emitSocketError(socket: Socket, payload: SocketAuthErrorPayload): void {
+  socket.emit('error', payload);
 }

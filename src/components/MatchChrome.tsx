@@ -8,6 +8,10 @@ export const MatchChrome: React.FC = () => {
 
   const statusText = isWaitingForPlayer
     ? 'Waiting for another player to join…'
+    : chrome.status === 'ended' && chrome.endReason === 'server-void'
+      ? 'Match voided — no winner'
+      : chrome.pausePlayerId !== null
+        ? 'Match paused — reclaiming seat'
     : chrome.status === 'countdown'
       ? 'Match starting…'
       : chrome.status === 'playing'

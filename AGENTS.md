@@ -10,7 +10,7 @@ Use this file as shared context when working in this repo on any machine or with
 
 ## What this is
 
-**Shape Showdown** is a **two-player, server-authoritative** browser game: parallel falling-piece fields (each player has their own 10×18 visible board, 10×20 simulation board with two hidden spawn rows, active piece, garbage queue, and shop). Real-time sync via **Socket.IO**. Max **2** players per server instance; identity is **socket.id** (no accounts).
+**Shape Showdown** is a **two-player, server-authoritative** browser game: parallel falling-piece fields (each player has their own 10×18 visible board, 10×20 simulation board with two hidden spawn rows, active piece, garbage queue, and shop). Real-time sync via **Socket.IO**. Max **2** players per server instance; durable guest/session identity owns a seat, while `socket.id` is only an ephemeral connection handle.
 
 ## Stack
 
@@ -125,12 +125,20 @@ For pre-merge or release verification, run `bun run lint` and the full `bun run 
 
 **Socket URL resolution** (client): in localhost Vite development, use the page origin; otherwise `game-config.json` (`gameServerUrl`, then port/host), then `VITE_GAME_SERVER_URL` (then port/host), then `window.location.origin`.
 
+**Discord Activity identity**: the client uses the official Embedded App SDK
+authorization-code flow only when `VITE_DISCORD_CLIENT_ID` is present and the
+page is running on a Discord Activity origin. The server exchanges that
+short-lived code using `DISCORD_CLIENT_ID`, `DISCORD_CLIENT_SECRET`, and the
+optional `DISCORD_REDIRECT_URI`, then fetches `/users/@me` before upserting the
+provider identity. The browser never supplies `discordUserId`; direct web
+guests continue using the guest bootstrap.
+
 ## Game design rules (server truth)
 
 - **Movement / actions:** Client sends `inputState` and discrete `action`; server applies DAS/ARR, gravity, locks, and garbage in **`engine.ts`**.
 - **Shop:** Line clears roll offers; client opens/purchases; server validates phase, highlight index, cost, and gates.
 - **Poison / specials:** Elixir, Wild Purge, Magnet, Snag, Sticky, Satellite, Bomber, Curtain, Retrim, Bounty Tax, Wildcard +4, Tectonic Shift — owned by shop handlers + engine tick.
-- **Match states:** `waiting` → `countdown` → `playing` → `ended` (top-out, disconnect, or restart flow). Matches have no wall-clock timeout; the first top-out ends the match immediately.
+- **Match states:** `waiting` → `countdown` → `playing` → `ended` (top-out, disconnect, server void, or restart flow). Matches have no wall-clock timeout; the first top-out ends the match immediately.
 
 ## UI conventions
 

@@ -6,6 +6,7 @@ export type ServerConfig = {
   host: string;
   serveClient: boolean;
   replayKeyframeIntervalTicks: number;
+  recoveryVoidTimeoutMs?: number;
 };
 
 const defaults: ServerConfig = {
@@ -13,6 +14,7 @@ const defaults: ServerConfig = {
   host: "0.0.0.0",
   serveClient: false,
   replayKeyframeIntervalTicks: 30,
+  recoveryVoidTimeoutMs: 15_000,
 };
 
 /**
@@ -41,6 +43,12 @@ export function loadServerConfig(cwd: string = process.cwd()): ServerConfig {
       fromFile.replayKeyframeIntervalTicks > 0
         ? Math.floor(fromFile.replayKeyframeIntervalTicks)
         : defaults.replayKeyframeIntervalTicks,
+    recoveryVoidTimeoutMs:
+      typeof fromFile.recoveryVoidTimeoutMs === "number" &&
+      Number.isFinite(fromFile.recoveryVoidTimeoutMs) &&
+      fromFile.recoveryVoidTimeoutMs > 0
+        ? Math.floor(fromFile.recoveryVoidTimeoutMs)
+        : defaults.recoveryVoidTimeoutMs,
   };
 
   let port = merged.port;
@@ -59,5 +67,11 @@ export function loadServerConfig(cwd: string = process.cwd()): ServerConfig {
     if (Number.isFinite(n) && n > 0) replayKeyframeIntervalTicks = Math.max(1, Math.floor(n));
   }
 
-  return { ...merged, port, serveClient, replayKeyframeIntervalTicks };
+  let recoveryVoidTimeoutMs = merged.recoveryVoidTimeoutMs;
+  if (process.env.RECOVERY_VOID_TIMEOUT_MS !== undefined && process.env.RECOVERY_VOID_TIMEOUT_MS !== "") {
+    const n = Number(process.env.RECOVERY_VOID_TIMEOUT_MS);
+    if (Number.isFinite(n) && n > 0) recoveryVoidTimeoutMs = Math.max(1, Math.floor(n));
+  }
+
+  return { ...merged, port, serveClient, replayKeyframeIntervalTicks, recoveryVoidTimeoutMs };
 }

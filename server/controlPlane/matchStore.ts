@@ -1,5 +1,6 @@
 import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import type { SqlExecutor } from './database.js';
+import type { MatchOutcomeReason } from './matchResultStore.js';
 
 export type MatchStatus =
   | 'allocating'
@@ -53,6 +54,8 @@ export type ConsumedJoinTicket = {
   playerId: string;
   seat: MatchSeat;
 };
+
+export type JoinTicketRejection = 'consumed' | 'rejected';
 
 export type MatchStatusChange = {
   id: string;
@@ -188,6 +191,21 @@ export class MatchStore {
       : null;
   }
 
+  public async findFinalizedOutcome(
+    matchId: string,
+    playerId: string,
+  ): Promise<MatchOutcomeReason | null> {
+    const rows = await this.database<{ outcome_reason: MatchOutcomeReason }[]>`
+      SELECT r.outcome_reason
+      FROM match_results r
+      JOIN matches m ON m.id = r.match_id
+      WHERE r.match_id = ${matchId}
+        AND ${playerId} IN (m.player_a_id, m.player_b_id)
+      LIMIT 1
+    `;
+    return rows[0]?.outcome_reason ?? null;
+  }
+
   public async issueJoinTicket(input: {
     matchId: string;
     playerId: string;
@@ -288,8 +306,11 @@ export class MatchStore {
 
   public async consumeJoinTicket(rawTicket: string): Promise<ConsumedJoinTicket | null> {
     const rows = await this.database<ConsumedJoinTicketRow[]>`
-      DELETE FROM match_tickets t
-      USING matches m
+      UPDATE match_tickets t
+      SET
+        revoked = TRUE,
+        consumed_at = CURRENT_TIMESTAMP
+      FROM matches m
       WHERE t.match_id = m.id
         AND t.ticket_hash = ${hashTicket(rawTicket)}
         AND t.revoked = FALSE
@@ -305,6 +326,47 @@ export class MatchStore {
           matchId: row.match_id,
           playerId: row.player_id,
           seat: row.seat,
+        }
+      : null;
+  }
+
+  public async classifyJoinTicketRejection(rawTicket: string): Promise<JoinTicketRejection> {
+    const rows = await this.database<{ consumed_at: Date | null }[]>`
+      SELECT consumed_at
+      FROM match_tickets
+      WHERE ticket_hash = ${hashTicket(rawTicket)}
+      LIMIT 1
+    `;
+    return rows[0]?.consumed_at !== null && rows[0]?.consumed_at !== undefined
+      ? 'consumed'
+      : 'rejected';
+  }
+
+  public async finalizeActiveMatchStatus(
+    matchId: string,
+    nextStatus: MatchStatus = 'ended',
+  ): Promise<MatchStatusChange | null> {
+    const rows = await this.database<MatchStatusChangeRow[]>`
+      UPDATE matches
+      SET
+        status = ${nextStatus},
+        ended_at = CASE
+          WHEN ${nextStatus} IN ('ended', 'voided', 'cancelled')
+          THEN COALESCE(ended_at, CURRENT_TIMESTAMP)
+          ELSE ended_at
+        END
+      WHERE id = ${matchId}
+        AND status IN ('allocating', 'countdown', 'playing')
+      RETURNING id, status, started_at, ended_at
+    `;
+
+    const row = rows[0];
+    return row
+      ? {
+          id: row.id,
+          status: row.status,
+          startedAt: row.started_at,
+          endedAt: row.ended_at,
         }
       : null;
   }

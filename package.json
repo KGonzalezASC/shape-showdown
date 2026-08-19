@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "bun server.ts",
-    "dev:server": "cross-env NODE_ENV=production ALLOW_IN_MEMORY_DATABASE=true bun server.ts",
+    "dev:server": "cross-env NODE_ENV=development ALLOW_IN_MEMORY_DATABASE=true bun server.ts",
     "dev:client": "bunx vite",
     "dev:local": "cross-env VITE_GAME_SERVER_URL=http://localhost:3000 bunx vite",
     "build:client": "bunx vite build",
@@ -18,14 +18,14 @@
     "preview": "bunx vite preview",
     "clean": "rimraf dist dist-server .dev-server.mjs",
     "lint": "tsc --noEmit",
-    "test": "bun test server/**/*.test.ts server/tetris/**/*.test.ts",
+    "test": "bun test --max-concurrency=1 server/**/*.test.ts server/tetris/**/*.test.ts",
     "test:all": "bun run test",
     "test:board": "bun test server/boardVisualModel.test.ts",
     "test:engine": "bun test server/tetris/engine.test.ts",
     "test:poison": "bun test server/tetris/poison_variations.test.ts",
     "test:shop": "bun test server/shop.test.ts",
     "test:manager": "bun test server/GameManager.test.ts",
-    "test:control-plane": "bun test server/controlPlane/**/*.test.ts",
+    "test:control-plane": "bun test server/controlPlane/",
     "test:name-drop": "bun test server/nameDrop.test.ts",
     "test:harness": "bun test server/testHarness/**/*.test.ts",
     "test:pricing": "bun scripts/pricing-lab.mts",
@@ -38,6 +38,7 @@
     "start:serve-client": "cross-env NODE_ENV=production SERVE_CLIENT=true bun dist-server/server.mjs"
   },
   "dependencies": {
+    "@discord/embedded-app-sdk": "^2.5.0",
     "dotenv": "^17.2.3",
     "express": "^4.21.2",
     "postgres": "^3.4.9",

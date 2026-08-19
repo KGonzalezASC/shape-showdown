@@ -109,6 +109,14 @@ function matchPhaseLabel(phase: MatchConnectionDiagnostics['phase']): string {
       return 'Ticket connecting';
     case 'connected':
       return 'Ticket connected';
+    case 'session-invalid':
+      return 'Session invalid';
+    case 'service-unavailable':
+      return 'Service unavailable';
+    case 'protocol-mismatch':
+      return 'Protocol mismatch';
+    case 'server-void':
+      return 'Match void';
     case 'error':
       return 'Error';
     default: {

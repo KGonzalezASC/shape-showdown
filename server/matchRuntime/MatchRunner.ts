@@ -1,11 +1,13 @@
 import type { Server, Socket } from 'socket.io';
 import { GameManager, type SocketSeatBinding } from '../GameManager.js';
 import type { MatchPersistence } from '../controlPlane/matchPersistence.js';
+import { logError, logInfo } from '../observability/logger.js';
 
 export class MatchRunner {
   private readonly manager: GameManager;
   private readonly ready: Promise<void>;
   private recoveryVoidTimer: ReturnType<typeof setTimeout> | null = null;
+  private readonly recoveryVoidTimeoutMs: number;
 
   public constructor(
     io: Server,
@@ -13,7 +15,9 @@ export class MatchRunner {
     persistence: MatchPersistence | undefined,
     onMatchCreated: (matchId: string) => void,
     matchId: string,
+    recoveryVoidTimeoutMs = 15_000,
   ) {
+    this.recoveryVoidTimeoutMs = recoveryVoidTimeoutMs;
     this.manager = new GameManager(
       io,
       replayKeyframeIntervalTicks,
@@ -53,16 +57,37 @@ export class MatchRunner {
     if (persistence?.getLatestCheckpoint === undefined || matchId === '__legacy_runtime__') {
       return;
     }
+    logInfo('restore_start', { matchId });
     const checkpoint = await persistence.getLatestCheckpoint(matchId);
     if (checkpoint !== null) {
-      this.manager.restoreCheckpoint({
-        matchId,
-        stateBlob: checkpoint.stateBlob,
-      });
+      try {
+        this.manager.restoreCheckpoint({
+          matchId,
+          stateBlob: checkpoint.stateBlob,
+        });
+        logInfo('restore_ok', {
+          matchId,
+          simTick: checkpoint.simTick,
+        });
+      } catch (error) {
+        logError('match_checkpoint_restore_failed', error, { matchId });
+        if (persistence.finalizeMatch !== undefined) {
+          await persistence.finalizeMatch({
+            matchId,
+            winnerId: null,
+            loserId: null,
+            outcomeReason: 'void_server_crash',
+            durationSeconds: 0,
+            playerAStats: { score: 0, linesCleared: 0, topOut: false },
+            playerBStats: { score: 0, linesCleared: 0, topOut: false },
+          });
+        }
+        throw error;
+      }
       this.recoveryVoidTimer = setTimeout(() => {
         this.recoveryVoidTimer = null;
         this.manager.voidForRecovery();
-      }, 15_000);
+      }, this.recoveryVoidTimeoutMs);
     }
   }
 }

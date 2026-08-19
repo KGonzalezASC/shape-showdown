@@ -8,9 +8,11 @@ import {
   InputState,
   MatchAssignment,
   REPLAY_KEYFRAME_INTERVAL_TICKS,
+  ReplayDiscontinuity,
   ReplayDataV2,
   ReplayInputFrame,
   RESTART_DELAY_SECONDS,
+  SocketAuthErrorPayload,
 } from '../src/types.js';
 import {
   initialSeed,
@@ -41,6 +43,7 @@ export class GameManager {
   private io: Server;
   private gameState: GameState;
   private activeReplay: ReplayDataV2 | null = null;
+  private pendingReplayDiscontinuities: ReplayDiscontinuity[] = [];
   private readonly matchSeed = initialSeed();
   private readonly playerSlots = new Map<string, number>();
   private rngChannelsByPlayer = new Map<string, RngChannels>();
@@ -58,7 +61,8 @@ export class GameManager {
   private durableMatchId: string | null = null;
   private durableMatchPreallocated = false;
   private restoredAwaitingReconnect = false;
-  private disconnectTimer: ReturnType<typeof setTimeout> | null = null;
+  private readonly disconnectTimers = new Map<string, ReturnType<typeof setTimeout>>();
+  private readonly disconnectedAtByRuntimeId = new Map<string, number>();
   private readonly disconnectBudgets = new Map<string, {
     episodes: number;
     totalPausedMs: number;
@@ -99,10 +103,7 @@ export class GameManager {
 
   /** Test / shutdown hook — stops the 60Hz interval. */
   public stopLoop() {
-    if (this.disconnectTimer !== null) {
-      clearTimeout(this.disconnectTimer);
-      this.disconnectTimer = null;
-    }
+    this.clearAllDisconnectForfeitures();
     this.enqueueCheckpoint();
     if (this.loopHandle !== null) {
       clearInterval(this.loopHandle);
@@ -144,6 +145,10 @@ export class GameManager {
         totalPausedMs: budget.totalPausedMs,
       });
     }
+    this.recordReplayDiscontinuity({
+      tick: this.gameState.tick,
+      kind: 'restore_ok',
+    });
   }
 
   public voidForRecovery(): void {
@@ -156,7 +161,20 @@ export class GameManager {
     this.durableMatchPreallocated = false;
     this.gameState.status = 'ended';
     this.gameState.winnerId = null;
+    this.gameState.endReason = 'server-void';
     this.gameState.technicalVictory = false;
+    this.lastHandledStatus = 'ended';
+    this.recordReplayDiscontinuity({
+      tick: this.gameState.tick,
+      kind: 'match_voided_runtime',
+      reason: 'restore_timeout',
+    });
+    this.emitToMatch('error', {
+      code: 'MATCH_VOIDED',
+      message: 'The server voided this match. No player won.',
+    } satisfies SocketAuthErrorPayload);
+    this.emitToMatch('gameState', this.gameState);
+    logInfo('match_voided_runtime', { matchId });
     logInfo('match_voided_after_restore_timeout', { matchId });
     this.enqueuePersistence(async () => {
       await this.persistence!.finalizeMatch({
@@ -184,13 +202,13 @@ export class GameManager {
     }
 
     if (Object.keys(this.gameState.players).length >= 2) {
-      this.rejectSocket(socket, 'Game is full');
+      this.rejectSocket(socket, 'MATCH_THIRD_SOCKET', 'This match already has two active seats.');
       return;
     }
 
     const runtimeId = durablePlayerId ?? socket.id;
     if (this.gameState.players[runtimeId] !== undefined) {
-      this.rejectSocket(socket, 'Player is already connected');
+      this.rejectSocket(socket, 'MATCH_SEAT_REJECTED', 'This player already has an active seat.');
       return;
     }
 
@@ -209,13 +227,27 @@ export class GameManager {
 
   private bindTicketSocket(socket: Socket, binding: SocketSeatBinding): void {
     if (binding.protocolVersion !== 1) {
-      this.rejectSocket(socket, 'Match ticket does not belong to the active match');
+      this.recordReplayDiscontinuity({
+        tick: this.gameState.tick,
+        kind: 'protocol_mismatch',
+        playerId: binding.playerId,
+        reason: 'unsupported_version',
+      });
+      this.rejectSocket(
+        socket,
+        'PROTOCOL_VERSION_MISMATCH',
+        'Match protocol version is not supported.',
+      );
       return;
     }
 
     if (this.durableMatchId === null) {
       if (this.gameState.status !== 'waiting' || Object.keys(this.gameState.players).length !== 0) {
-        this.rejectSocket(socket, 'Runtime is not ready for a new assigned match');
+        this.rejectSocket(
+          socket,
+          'MATCH_RUNTIME_UNAVAILABLE',
+          'The match runtime is not ready for this assignment.',
+        );
         return;
       }
       this.durableMatchId = binding.matchId;
@@ -223,10 +255,15 @@ export class GameManager {
       this.gameState.seed = binding.matchSeed;
       this.gameState.tick = 0;
       this.gameState.winnerId = null;
+      this.gameState.endReason = undefined;
       this.gameState.technicalVictory = false;
       this.gameState.restartTimer = undefined;
     } else if (this.durableMatchId !== binding.matchId) {
-      this.rejectSocket(socket, 'Match ticket does not belong to the active match');
+      this.rejectSocket(
+        socket,
+        'MATCH_TICKET_REJECTED',
+        'The match ticket does not belong to this runtime.',
+      );
       return;
     }
 
@@ -235,13 +272,13 @@ export class GameManager {
     let runtimeId = participant?.[0];
     if (runtimeId === undefined) {
       if (Object.keys(this.gameState.players).length >= 2) {
-        this.rejectSocket(socket, 'Runtime already has two assigned seats');
+        this.rejectSocket(socket, 'MATCH_THIRD_SOCKET', 'This match already has two active seats.');
         return;
       }
       runtimeId = binding.playerId;
       const slot = binding.seat === 'A' ? 0 : 1;
       if (!this.isSlotAvailable(slot)) {
-        this.rejectSocket(socket, 'Match ticket seat is already occupied');
+        this.rejectSocket(socket, 'MATCH_SEAT_REJECTED', 'The requested match seat is occupied.');
         return;
       }
       const channels = createPlayerRngChannels(this.gameState.seed, slot);
@@ -253,7 +290,11 @@ export class GameManager {
 
     const expectedSlot = binding.seat === 'A' ? 0 : 1;
     if (this.playerSlots.get(runtimeId) !== expectedSlot) {
-      this.rejectSocket(socket, 'Match ticket seat does not match the runtime seat');
+      this.rejectSocket(
+        socket,
+        'MATCH_SEAT_REJECTED',
+        'The match ticket does not belong to this seat.',
+      );
       return;
     }
 
@@ -276,22 +317,43 @@ export class GameManager {
       const budget = this.disconnectBudgets.get(runtimeId) ?? { episodes: 0, totalPausedMs: 0 };
       budget.totalPausedMs += pausedForMs;
       this.disconnectBudgets.set(runtimeId, budget);
-      this.gameState.pause = undefined;
-      if (this.disconnectTimer !== null) {
-        clearTimeout(this.disconnectTimer);
-        this.disconnectTimer = null;
-      }
+      this.clearDisconnectForfeiture(runtimeId);
       if (budget.episodes >= 3 || budget.totalPausedMs >= 90_000) {
         this.forfeitDisconnectedPlayer(runtimeId);
         return;
       }
+      const nextPausedRuntimeId = this.findDisconnectedRuntimeId();
+      this.gameState.pause = nextPausedRuntimeId === null
+        ? undefined
+        : {
+            playerId: nextPausedRuntimeId,
+            startedAt: this.disconnectedAtByRuntimeId.get(nextPausedRuntimeId) ?? Date.now(),
+          };
       logInfo('socket_reconnected', {
         matchId: this.durableMatchId,
         playerId: runtimeId,
         pauseEpisodes: budget.episodes,
         pausedMs: pausedForMs,
       });
+      logInfo('reconnect_success', {
+        matchId: this.durableMatchId,
+        playerId: binding.playerId,
+      });
+      this.recordReplayDiscontinuity({
+        tick: this.gameState.tick,
+        kind: 'reconnect_success',
+        playerId: binding.playerId,
+      });
       this.emitToMatch('gameState', this.gameState);
+    } else {
+      this.clearDisconnectForfeiture(runtimeId);
+      if (previousSocket !== undefined && previousSocket !== socket) {
+        this.recordReplayDiscontinuity({
+          tick: this.gameState.tick,
+          kind: 'reconnect_success',
+          playerId: binding.playerId,
+        });
+      }
     }
     if (
       this.restoredAwaitingReconnect
@@ -397,6 +459,7 @@ export class GameManager {
     socket.on('disconnect', () => {
       const runtimeId = this.runtimeIdBySocketId.get(socket.id);
       if (runtimeId === undefined || this.activeSocketByRuntimeId.get(runtimeId) !== socket) return;
+      if (this.loopHandle === null) return;
 
       const disconnectedPlayer = this.gameState.players[runtimeId];
       if (disconnectedPlayer) {
@@ -415,18 +478,28 @@ export class GameManager {
         };
         budget.episodes += 1;
         this.disconnectBudgets.set(runtimeId, budget);
-        this.gameState.pause = {
-          playerId: runtimeId,
-          startedAt: Date.now(),
-        };
-        this.disconnectTimer = setTimeout(() => {
-          this.disconnectTimer = null;
-          this.forfeitDisconnectedPlayer(runtimeId);
-        }, 60_000);
+        const disconnectedAt = Date.now();
+        this.disconnectedAtByRuntimeId.set(runtimeId, disconnectedAt);
+        this.scheduleDisconnectForfeiture(runtimeId);
+        if (this.gameState.pause === undefined) {
+          this.gameState.pause = {
+            playerId: runtimeId,
+            startedAt: disconnectedAt,
+          };
+        }
         logInfo('socket_disconnected_paused', {
           matchId: this.durableMatchId,
           playerId: runtimeId,
           pauseEpisodes: budget.episodes,
+        });
+        logInfo('disconnect_start', {
+          matchId: this.durableMatchId,
+          playerId: this.durablePlayerIds.get(runtimeId) ?? runtimeId,
+        });
+        this.recordReplayDiscontinuity({
+          tick: this.gameState.tick,
+          kind: 'disconnect_start',
+          playerId: this.durablePlayerIds.get(runtimeId) ?? runtimeId,
         });
         this.enqueueCheckpoint();
       } else {
@@ -436,14 +509,19 @@ export class GameManager {
     });
   }
 
-  private rejectSocket(socket: Socket, message: string): void {
-    socket.emit('error', message);
+  private rejectSocket(
+    socket: Socket,
+    code: SocketAuthErrorPayload['code'],
+    message: string,
+  ): void {
+    socket.emit('error', { code, message } satisfies SocketAuthErrorPayload);
     socket.disconnect(true);
   }
 
   private forfeitDisconnectedPlayer(runtimeId: string): void {
     const disconnectedPlayer = this.gameState.players[runtimeId];
     if (disconnectedPlayer === undefined) return;
+    this.clearDisconnectForfeiture(runtimeId);
     const remainingIds = Object.keys(this.gameState.players).filter(id => id !== runtimeId);
     if (remainingIds.length !== 1) {
       this.gameState.status = 'waiting';
@@ -451,21 +529,76 @@ export class GameManager {
     } else {
       this.gameState.status = 'ended';
       this.gameState.winnerId = remainingIds[0];
+      this.gameState.endReason = 'disconnect-forfeit';
       this.gameState.technicalVictory = true;
       this.gameState.restartTimer = RESTART_DELAY_SECONDS;
     }
-    this.gameState.pause = undefined;
     delete this.gameState.players[runtimeId];
     this.rngChannelsByPlayer.delete(runtimeId);
     if (this.gameState.status !== 'ended') {
       this.playerSlots.delete(runtimeId);
       this.durablePlayerIds.delete(runtimeId);
+      const nextPausedRuntimeId = this.findDisconnectedRuntimeId();
+      this.gameState.pause = nextPausedRuntimeId === null
+        ? undefined
+        : {
+            playerId: nextPausedRuntimeId,
+            startedAt: this.disconnectedAtByRuntimeId.get(nextPausedRuntimeId) ?? Date.now(),
+          };
+    } else {
+      this.gameState.pause = undefined;
+      this.clearAllDisconnectForfeitures();
     }
     this.enqueueCheckpoint();
     logInfo('match_disconnect_forfeit', {
       matchId: this.durableMatchId,
       playerId: runtimeId,
     });
+    logInfo('forfeit_abandon', {
+      matchId: this.durableMatchId,
+      playerId: this.durablePlayerIds.get(runtimeId) ?? runtimeId,
+    });
+    this.recordReplayDiscontinuity({
+      tick: this.gameState.tick,
+      kind: 'forfeit_abandon',
+      playerId: this.durablePlayerIds.get(runtimeId) ?? runtimeId,
+      reason: 'disconnect_budget_exhausted',
+    });
+  }
+
+  private scheduleDisconnectForfeiture(runtimeId: string): void {
+    const previousTimer = this.disconnectTimers.get(runtimeId);
+    if (previousTimer !== undefined) clearTimeout(previousTimer);
+    const timer = setTimeout(() => {
+      this.disconnectTimers.delete(runtimeId);
+      this.forfeitDisconnectedPlayer(runtimeId);
+    }, 60_000);
+    this.disconnectTimers.set(runtimeId, timer);
+  }
+
+  private clearDisconnectForfeiture(runtimeId: string): void {
+    const timer = this.disconnectTimers.get(runtimeId);
+    if (timer !== undefined) clearTimeout(timer);
+    this.disconnectTimers.delete(runtimeId);
+    this.disconnectedAtByRuntimeId.delete(runtimeId);
+  }
+
+  private clearAllDisconnectForfeitures(): void {
+    for (const timer of this.disconnectTimers.values()) clearTimeout(timer);
+    this.disconnectTimers.clear();
+    this.disconnectedAtByRuntimeId.clear();
+  }
+
+  private findDisconnectedRuntimeId(): string | null {
+    for (const runtimeId of this.disconnectedAtByRuntimeId.keys()) {
+      if (
+        this.gameState.players[runtimeId] !== undefined
+        && !this.activeSocketByRuntimeId.has(runtimeId)
+      ) {
+        return runtimeId;
+      }
+    }
+    return null;
   }
 
   private startLoop() {
@@ -547,16 +680,32 @@ export class GameManager {
     const status = this.gameState.status;
     if (status === this.lastHandledStatus) return;
 
+    const previousStatus = this.lastHandledStatus;
     this.lastHandledStatus = status;
     this.enqueueDurableStatusTransition(status);
 
     if (status === 'waiting' || status === 'countdown') {
       if (status === 'waiting') {
+        if (previousStatus === 'ended') {
+          this.gameState.endReason = undefined;
+        }
         for (const [runtimeId] of this.playerSlots) {
           if (this.gameState.players[runtimeId] === undefined) {
             this.playerSlots.delete(runtimeId);
             this.durablePlayerIds.delete(runtimeId);
             this.terminalPlayerStats.delete(runtimeId);
+          }
+        }
+        if (previousStatus === 'ended' && Object.keys(this.gameState.players).length === 1) {
+          this.gameState.seed = initialSeed();
+          this.gameState.tick = 0;
+          this.gameState.winnerId = null;
+          this.gameState.endReason = undefined;
+          this.gameState.technicalVictory = false;
+          this.activeReplay = null;
+          this.resetMatchRngChannels();
+          for (const id in this.gameState.players) {
+            this.gameState.players[id] = makePlayer(id, this.playerRng(id));
           }
         }
       }
@@ -779,6 +928,7 @@ export class GameManager {
           pricingPolicyVersion: PRICING_POLICY_VERSION,
           playerSlots: Object.fromEntries(this.playerSlots.entries()),
           keyframeIntervalTicks: this.replayKeyframeIntervalTicks,
+          discontinuities: [...this.pendingReplayDiscontinuities],
           initialState: JSON.parse(JSON.stringify(this.gameState)),
           inputs: [],
           keyframes: [
@@ -789,6 +939,7 @@ export class GameManager {
           ],
           events: []
         };
+        this.pendingReplayDiscontinuities = [];
       }
     } else if (this.gameState.status === 'playing') {
       const stepResult = matchStep(this.gameState, (id) => this.playerRng(id));
@@ -813,13 +964,17 @@ export class GameManager {
       if (this.gameState.tick > 0 && this.gameState.tick % 60 === 0) {
         this.enqueueCheckpoint();
       }
-      if (stepResult.matchEnded) this.saveReplay();
+      if (stepResult.matchEnded) {
+        this.gameState.endReason = 'top-out';
+        this.saveReplay();
+      }
     } else if (this.gameState.status === 'ended') {
       this.clearInputs();
       if (this.gameState.restartTimer !== undefined) {
         this.gameState.restartTimer -= tickSeconds();
         if (this.gameState.restartTimer <= 0) {
           this.gameState.restartTimer = undefined;
+          this.gameState.endReason = undefined;
           this.gameState.technicalVictory = false;
           if (Object.keys(this.gameState.players).length === 2) {
             this.gameState.seed = initialSeed();
@@ -853,6 +1008,15 @@ export class GameManager {
       console.error("Failed to save replay:", e);
     }
     this.activeReplay = null;
+  }
+
+  private recordReplayDiscontinuity(marker: ReplayDiscontinuity): void {
+    if (this.activeReplay === null) {
+      this.pendingReplayDiscontinuities.push(marker);
+      return;
+    }
+    this.activeReplay.discontinuities ??= [];
+    this.activeReplay.discontinuities.push(marker);
   }
 
   private enqueueCheckpoint(): void {

@@ -1,11 +1,7 @@
-import { randomUUID } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import type { Database } from './database.js';
-
-export type DiscordPlayerProfile = {
-  discordUserId: string;
-  displayName: string;
-  avatarUrl: string | null;
-};
+import type { DiscordPlayerProfile } from './discordIdentity.js';
+export type { DiscordPlayerProfile } from './discordIdentity.js';
 
 export type PlayerRecord = {
   id: string;
@@ -57,9 +53,10 @@ export class PlayerStore {
   public async upsertDiscordPlayer(profile: DiscordPlayerProfile): Promise<PlayerRecord> {
     const rows = await this.database<PlayerRow[]>`
       INSERT INTO players (
-        discord_user_id, display_name, avatar_url, auth_provider, status
+        id, discord_user_id, display_name, avatar_url, auth_provider, status
       )
       VALUES (
+        ${randomUUID()},
         ${profile.discordUserId},
         ${profile.displayName},
         ${profile.avatarUrl},
@@ -78,10 +75,17 @@ export class PlayerStore {
     return toPlayerRecord(row);
   }
 
-  public async createGuestPlayer(displayName: string): Promise<PlayerRecord> {
+  public async createGuestPlayer(
+    displayName: string,
+    playerId: string = randomUUID(),
+  ): Promise<PlayerRecord> {
     const rows = await this.database<PlayerRow[]>`
       INSERT INTO players (id, display_name, auth_provider, status)
-      VALUES (${randomUUID()}, ${displayName}, 'guest', 'active')
+      VALUES (${playerId}, ${displayName}, 'guest', 'active')
+      ON CONFLICT (id) DO UPDATE SET
+        display_name = players.display_name,
+        updated_at = players.updated_at
+      WHERE players.auth_provider = 'guest'
       RETURNING id, display_name, avatar_url, discord_user_id, status, created_at
     `;
 
@@ -142,6 +146,20 @@ export class PlayerStore {
       discordUserId: row.discord_user_id,
     };
   }
+}
+
+export function deriveGuestPlayerId(idempotencyKey: string): string {
+  const digest = createHash('sha256').update(idempotencyKey, 'utf8').digest();
+  digest[6] = (digest[6] & 0x0f) | 0x40;
+  digest[8] = (digest[8] & 0x3f) | 0x80;
+
+  return [
+    digest.subarray(0, 4).toString('hex'),
+    digest.subarray(4, 6).toString('hex'),
+    digest.subarray(6, 8).toString('hex'),
+    digest.subarray(8, 10).toString('hex'),
+    digest.subarray(10, 16).toString('hex'),
+  ].join('-');
 }
 
 function toPlayerRecord(row: PlayerRow): PlayerRecord {

@@ -11,7 +11,13 @@ async function startServer() {
 
   const stop = async (signal: NodeJS.Signals) => {
     console.log(`Received ${signal}; stopping Shape Showdown server.`);
-    await server.stop();
+    try {
+      await server.stop();
+      process.exit(0);
+    } catch (error) {
+      console.error(`Error during graceful shutdown on ${signal}:`, error);
+      process.exit(1);
+    }
   };
   process.once('SIGINT', () => void stop('SIGINT'));
   process.once('SIGTERM', () => void stop('SIGTERM'));

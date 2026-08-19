@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useLayoutEffect, useReducer, useRef } from 'react';
-import { RefreshCw, Trophy, WifiOff } from 'lucide-react';
+import { AlertTriangle, RefreshCw, Trophy, WifiOff } from 'lucide-react';
 import { AnimatePresence, LazyMotion, domAnimation, m } from 'motion/react';
 import { DrillConsole, DrillResult } from './components/DrillConsole';
 import { MatchChrome } from './components/MatchChrome';
@@ -183,7 +183,7 @@ const AppShell: React.FC = () => {
   }, []);
 
   const chrome = useMatchChromeSnapshot();
-  const { sendAction, sendInputState } = useGameActions();
+  const { sendAction, sendInputState, resetClientSession } = useGameActions();
   const handleShopConfirm = useShopConfirm();
 
   const stateRef = useRef({ playfield, myId });
@@ -414,8 +414,20 @@ const AppShell: React.FC = () => {
   }, [chrome.lastMatchEvent, myId, triggerShake]);
 
   const isPlaying = chrome.status === 'playing';
+  const isTerminalOutcome = chrome.status === 'ended';
+  const isAuthoritativelyPaused = gameState?.pause !== undefined
+    && !isTerminalOutcome;
   const isConnectionInterrupted = connected
-    && chrome.status !== 'ended'
+    && !isTerminalOutcome
+    && !isAuthoritativelyPaused
+    && (
+      matchDiagnostics.phase === 'reconnecting'
+      || matchDiagnostics.phase === 'error'
+      || matchDiagnostics.phase === 'session-invalid'
+      || matchDiagnostics.phase === 'service-unavailable'
+      || matchDiagnostics.phase === 'server-void'
+    );
+  const showDeveloperReconnectHint = DEV_TOOLS_ENABLED
     && (
       matchDiagnostics.phase === 'reconnecting'
       || matchDiagnostics.phase === 'error'
@@ -486,16 +498,82 @@ const AppShell: React.FC = () => {
           match={matchDiagnostics}
         />
       )}
+      {!connected
+        && (
+          matchDiagnostics.phase === 'session-invalid'
+          || matchDiagnostics.phase === 'protocol-mismatch'
+          || matchDiagnostics.phase === 'server-void'
+          || matchDiagnostics.phase === 'service-unavailable'
+          || matchDiagnostics.phase === 'error'
+        )
+        && (
+          <div
+            role="alertdialog"
+            aria-modal="true"
+            className="fixed inset-0 z-[90] flex items-center justify-center bg-[#0a0a0f]/85 p-4 backdrop-blur-md sm:p-8"
+          >
+            <div className="w-full max-w-[min(calc(100vw-2rem),28rem)] rounded-[1.5rem] border border-white/10 bg-[#1a1a1a] p-6 text-center shadow-2xl sm:rounded-[2rem] sm:p-10">
+              <h2 className="mb-3 text-[18px] font-bold uppercase tracking-[0.08em] sm:text-[22px]">
+                {matchDiagnostics.phase === 'session-invalid'
+                  ? 'Guest session expired'
+                  : matchDiagnostics.phase === 'protocol-mismatch'
+                    ? 'Update required'
+                    : matchDiagnostics.phase === 'server-void'
+                      ? 'Match voided'
+                      : matchDiagnostics.phase === 'service-unavailable'
+                        ? 'Service unavailable'
+                      : 'Unable to connect'}
+              </h2>
+              <p className="text-[9px] leading-5 text-zinc-400">
+                {matchDiagnostics.phase === 'session-invalid'
+                  ? 'This guest session cannot reclaim a match. Start a new guest session to continue.'
+                  : matchDiagnostics.phase === 'protocol-mismatch'
+                    ? matchDiagnostics.error ?? 'Reload the page to receive the current game protocol.'
+                    : matchDiagnostics.phase === 'server-void'
+                      ? 'The server voided this match. No player won.'
+                      : matchDiagnostics.phase === 'service-unavailable'
+                        ? 'The game service is unavailable. Retry when it is back online.'
+                      : matchDiagnostics.error ?? 'The game server is unavailable.'}
+              </p>
+              {matchDiagnostics.phase === 'session-invalid' && (
+                <button
+                  type="button"
+                  onClick={resetClientSession}
+                  className="mt-6 rounded border border-emerald-300/60 px-4 py-2 text-[9px] uppercase tracking-[0.12em] text-emerald-200 transition hover:bg-emerald-300/10"
+                >
+                  Start new guest session
+                </button>
+              )}
+              {matchDiagnostics.phase !== 'session-invalid' && (
+                <button
+                  type="button"
+                  onClick={() => window.location.reload()}
+                  className="mt-6 rounded border border-amber-300/60 px-4 py-2 text-[9px] uppercase tracking-[0.12em] text-amber-200 transition hover:bg-amber-300/10"
+                >
+                  {matchDiagnostics.phase === 'protocol-mismatch' ? 'Reload to update' : 'Retry connection'}
+                </button>
+              )}
+            </div>
+          </div>
+        )}
 
       {!connected ? (
         <div className="relative z-10 flex flex-1 flex-col items-center justify-center gap-4">
           <div className="w-12 h-12 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin" />
-          <p className="text-[8px] tracking-[0.08em] uppercase animate-pulse">Connecting to Game Server...</p>
+          <p className="text-[8px] tracking-[0.08em] uppercase animate-pulse">
+            {matchDiagnostics.phase === 'queued'
+              ? 'Searching for an opponent...'
+              : matchDiagnostics.phase === 'assigned' || matchDiagnostics.phase === 'connecting'
+                ? 'Match assigned — connecting...'
+                : matchDiagnostics.phase === 'reconnecting'
+                  ? 'Reconnecting to the match...'
+                  : 'Connecting to Game Server...'}
+          </p>
         </div>
       ) : (
         <>
           <main
-            inert={showViewportWarning || isConnectionInterrupted}
+            inert={showViewportWarning || isConnectionInterrupted || isAuthoritativelyPaused || isTerminalOutcome}
             className={playfieldScreenClass(layoutMode)}
           >
             <MatchChrome />
@@ -585,14 +663,35 @@ const AppShell: React.FC = () => {
             <m.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
+              role="alertdialog"
+              aria-modal="true"
+              aria-labelledby="match-outcome-title"
+              aria-describedby="match-outcome-description"
               className="fixed inset-0 bg-[#0a0a0f]/80 backdrop-blur-md flex items-center justify-center z-50 p-4 sm:p-8"
             >
               <div className="bg-[#1a1a1a] p-6 sm:p-10 md:p-12 rounded-[1.5rem] sm:rounded-[2rem] border border-white/10 shadow-2xl text-center max-w-[min(calc(100vw-2rem),28rem)] w-full">
-                <Trophy className="w-12 h-12 sm:w-16 sm:h-16 md:w-20 md:h-20 text-yellow-400 mx-auto mb-4 sm:mb-6" />
-                <h2 className="text-[18px] sm:text-[22px] md:text-[26px] font-bold uppercase tracking-[0.08em] mb-2">Game Over</h2>
-                <p className="text-[8px] sm:text-[9px] text-zinc-400 mb-5 sm:mb-8">
-                  {chrome.technicalVictory && chrome.winnerId === myId
-                    ? 'Opponent disconnected. Technical Victory!'
+                {chrome.endReason === 'server-void' ? (
+                  <AlertTriangle className="mx-auto mb-4 h-12 w-12 text-amber-300 sm:mb-6 sm:h-16 sm:w-16 md:h-20 md:w-20" />
+                ) : (
+                  <Trophy className="w-12 h-12 sm:w-16 sm:h-16 md:w-20 md:h-20 text-yellow-400 mx-auto mb-4 sm:mb-6" />
+                )}
+                <h2
+                  id="match-outcome-title"
+                  className="text-[18px] sm:text-[22px] md:text-[26px] font-bold uppercase tracking-[0.08em] mb-2"
+                >
+                  {chrome.endReason === 'server-void' ? 'Match voided' : 'Game Over'}
+                </h2>
+                <p
+                  id="match-outcome-description"
+                  aria-live="assertive"
+                  className="text-[8px] sm:text-[9px] text-zinc-400 mb-5 sm:mb-8"
+                >
+                  {chrome.endReason === 'server-void'
+                    ? 'Match voided — no winner.'
+                    : chrome.technicalVictory && chrome.winnerId === myId
+                    ? 'Opponent disconnected. Technical victory!'
+                    : chrome.technicalVictory && chrome.winnerId !== myId
+                    ? 'You were disconnected. Your opponent received a technical victory.'
                     : chrome.winnerId === myId
                       ? 'You won the match!'
                       : chrome.winnerId === 'draw'
@@ -618,6 +717,30 @@ const AppShell: React.FC = () => {
             </m.div>
           )}
 
+          {isAuthoritativelyPaused && (
+            <m.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              className="fixed inset-0 z-[85] flex items-center justify-center bg-[#0a0a0f]/70 p-4 backdrop-blur-sm sm:p-8"
+            >
+              <div
+                role="status"
+                aria-live="polite"
+                className="w-full max-w-[min(calc(100vw-2rem),28rem)] rounded-[1.5rem] border border-amber-200/20 bg-[#1a1a1a] p-6 text-center shadow-2xl sm:rounded-[2rem] sm:p-10"
+              >
+                <RefreshCw className="mx-auto mb-4 h-12 w-12 animate-spin text-amber-300 sm:mb-6 sm:h-16 sm:w-16" />
+                <h2 className="mb-2 text-[18px] font-bold uppercase tracking-[0.08em] sm:text-[22px]">
+                  Match paused
+                </h2>
+                <p className="text-[8px] leading-5 text-zinc-400 sm:text-[9px]">
+                  {gameState?.pause?.playerId === myId
+                    ? 'Your seat is being reclaimed. The match will resume from the server snapshot.'
+                    : 'Your opponent is reconnecting. The server is holding both boards safely.'}
+                </p>
+              </div>
+            </m.div>
+          )}
+
           {isConnectionInterrupted && (
             <m.div
               initial={{ opacity: 0 }}
@@ -631,7 +754,9 @@ const AppShell: React.FC = () => {
                 aria-describedby="connection-status-description"
                 className="w-full max-w-[min(calc(100vw-2rem),28rem)] rounded-[1.5rem] border border-white/10 bg-[#1a1a1a] p-6 text-center shadow-2xl sm:rounded-[2rem] sm:p-10 md:p-12"
               >
-                {matchDiagnostics.phase === 'reconnecting' ? (
+                {matchDiagnostics.phase === 'server-void' ? (
+                  <AlertTriangle className="mx-auto mb-4 h-12 w-12 text-amber-300 sm:mb-6 sm:h-16 sm:w-16 md:h-20 md:w-20" />
+                ) : matchDiagnostics.phase === 'reconnecting' ? (
                   <RefreshCw className="mx-auto mb-4 h-12 w-12 animate-spin text-amber-300 sm:mb-6 sm:h-16 sm:w-16 md:h-20 md:w-20" />
                 ) : (
                   <WifiOff className="mx-auto mb-4 h-12 w-12 text-rose-300 sm:mb-6 sm:h-16 sm:w-16 md:h-20 md:w-20" />
@@ -640,7 +765,15 @@ const AppShell: React.FC = () => {
                   id="connection-status-title"
                   className="mb-2 text-[18px] font-bold uppercase tracking-[0.08em] sm:text-[22px] md:text-[26px]"
                 >
-                  {matchDiagnostics.phase === 'reconnecting'
+                  {matchDiagnostics.phase === 'session-invalid'
+                    ? 'Guest session expired'
+                    : matchDiagnostics.phase === 'protocol-mismatch'
+                    ? 'Update required'
+                    : matchDiagnostics.phase === 'server-void'
+                    ? 'Match voided'
+                    : matchDiagnostics.phase === 'service-unavailable'
+                    ? 'Service unavailable'
+                    : matchDiagnostics.phase === 'reconnecting'
                     ? 'Connection Interrupted'
                     : 'Connection Lost'}
                 </h2>
@@ -648,10 +781,47 @@ const AppShell: React.FC = () => {
                   id="connection-status-description"
                   className="text-[8px] text-zinc-400 sm:text-[9px]"
                 >
-                  {matchDiagnostics.phase === 'reconnecting'
+                  {matchDiagnostics.phase === 'session-invalid'
+                    ? 'This guest session cannot reclaim the match. Start a new guest session to continue.'
+                    : matchDiagnostics.phase === 'protocol-mismatch'
+                    ? 'Reload to receive the current game protocol before reconnecting.'
+                    : matchDiagnostics.phase === 'server-void'
+                    ? 'The server voided this match. No player won.'
+                    : matchDiagnostics.phase === 'service-unavailable'
+                    ? 'The game service is unavailable. Retry when it is back online.'
+                    : matchDiagnostics.phase === 'reconnecting'
                     ? 'Reconnecting to the match...'
                     : 'Unable to reach the game server. Waiting for the connection to return.'}
                 </p>
+                {showDeveloperReconnectHint && (
+                  <p className="mt-4 border-t border-emerald-300/20 pt-3 text-left text-[8px] leading-4 text-emerald-100/75 sm:text-[9px]">
+                    Developer note: to reclaim this seat after closing the client,
+                    reopen this same origin in the same browser profile.
+                    <span className="block text-emerald-100/50">
+                      `localhost:3000` and `127.0.0.1:3000` use separate browser storage.
+                      Reclaim uses the durable session, not a saved match ID.
+                    </span>
+                  </p>
+                )}
+                {matchDiagnostics.phase === 'session-invalid' && (
+                  <button
+                    type="button"
+                    onClick={resetClientSession}
+                    className="mt-6 rounded border border-emerald-300/60 px-4 py-2 text-[9px] uppercase tracking-[0.12em] text-emerald-200 transition hover:bg-emerald-300/10"
+                  >
+                    Start new guest session
+                  </button>
+                )}
+                {(matchDiagnostics.phase === 'protocol-mismatch'
+                  || matchDiagnostics.phase === 'service-unavailable') && (
+                  <button
+                    type="button"
+                    onClick={() => window.location.reload()}
+                    className="mt-6 rounded border border-amber-300/60 px-4 py-2 text-[9px] uppercase tracking-[0.12em] text-amber-200 transition hover:bg-amber-300/10"
+                  >
+                    {matchDiagnostics.phase === 'protocol-mismatch' ? 'Reload to update' : 'Retry connection'}
+                  </button>
+                )}
               </div>
             </m.div>
           )}

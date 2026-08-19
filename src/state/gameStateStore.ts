@@ -1,4 +1,11 @@
-import { GameState, MatchEvent, MatchStatus, PlayerShopState, ShopPhase } from '../types';
+import {
+  GameState,
+  MatchEndReason,
+  MatchEvent,
+  MatchStatus,
+  PlayerShopState,
+  ShopPhase,
+} from '../types';
 import {
   PublicPlayerState,
   publicPlayersEqual,
@@ -23,6 +30,9 @@ export interface MatchChromeSnapshot {
   playerCount: number;
   lastMatchEvent: MatchEvent | null;
   winnerId: string | null;
+  endReason?: MatchEndReason;
+  pausePlayerId: string | null;
+  pauseStartedAt: number | null;
   technicalVictory?: boolean;
   restartTimer?: number;
 }
@@ -66,6 +76,8 @@ function emptyChromeSnapshot(): MatchChromeSnapshot {
     playerCount: 0,
     lastMatchEvent: null,
     winnerId: null,
+    pausePlayerId: null,
+    pauseStartedAt: null,
   };
 }
 
@@ -104,6 +116,9 @@ function buildChromeSnapshot(): MatchChromeSnapshot {
     playerCount: Object.keys(gameState.players).length,
     lastMatchEvent,
     winnerId: gameState.winnerId,
+    endReason: gameState.endReason,
+    pausePlayerId: gameState.pause?.playerId ?? null,
+    pauseStartedAt: gameState.pause?.startedAt ?? null,
     technicalVictory: gameState.technicalVictory,
     restartTimer: gameState.restartTimer,
   };
@@ -153,6 +168,9 @@ function chromeSnapshotsEqual(a: MatchChromeSnapshot, b: MatchChromeSnapshot): b
   }
   if (a.playerCount !== b.playerCount) return false;
   if (a.winnerId !== b.winnerId) return false;
+  if (a.endReason !== b.endReason) return false;
+  if (a.pausePlayerId !== b.pausePlayerId) return false;
+  if (a.pauseStartedAt !== b.pauseStartedAt) return false;
   if (a.technicalVictory !== b.technicalVictory) return false;
   if (a.restartTimer !== b.restartTimer) return false;
   if (a.shopOfferIds.length !== b.shopOfferIds.length) return false;

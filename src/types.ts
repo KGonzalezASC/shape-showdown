@@ -66,6 +66,11 @@ import {
 
 export type MatchStatus = 'waiting' | 'countdown' | 'playing' | 'ended';
 export type MatchSeat = 'A' | 'B';
+export type MatchEndReason =
+  | 'top-out'
+  | 'disconnect-forfeit'
+  | 'server-void'
+  | 'allocation-cancelled';
 export type MatchAssignment = {
   matchId: string;
   playerId: string;
@@ -82,6 +87,10 @@ export type MatchConnectionPhase =
   | 'reconnecting'
   | 'connecting'
   | 'connected'
+  | 'session-invalid'
+  | 'service-unavailable'
+  | 'protocol-mismatch'
+  | 'server-void'
   | 'error';
 export type MatchTicketState = 'none' | 'received' | 'presented' | 'consumed';
 export type MatchConnectionDiagnostics = {
@@ -93,6 +102,19 @@ export type MatchConnectionDiagnostics = {
   ticketState: MatchTicketState;
   ticketLength: number | null;
   error: string | null;
+};
+export type SocketAuthErrorCode =
+  | 'MATCH_TICKET_REQUIRED'
+  | 'MATCH_TICKET_REJECTED'
+  | 'MATCH_TICKET_CONSUMED'
+  | 'MATCH_SEAT_REJECTED'
+  | 'MATCH_THIRD_SOCKET'
+  | 'PROTOCOL_VERSION_MISMATCH'
+  | 'MATCH_RUNTIME_UNAVAILABLE'
+  | 'MATCH_VOIDED';
+export type SocketAuthErrorPayload = {
+  code: SocketAuthErrorCode;
+  message: string;
 };
 export type ServerHealthStatus = 'unknown' | 'healthy' | 'unavailable';
 export type ServerDatabaseMode = 'unknown' | 'postgres' | 'in-memory';
@@ -371,6 +393,7 @@ export interface GameState {
   status: MatchStatus;
   countdown: number;
   winnerId: string | null;
+  endReason?: MatchEndReason;
   pause?: {
     playerId: string;
     startedAt: number;
@@ -392,6 +415,21 @@ export type MatchEvent =
   | { tick: number; type: 'shopRoll'; playerId: string; offerIds: string[] }
   | { tick: number; type: 'tectonicStep'; playerId: string; advanced: boolean }
   | { tick: number; type: 'tectonicComplete'; playerId: string; rowsCleared: number };
+
+export type ReplayDiscontinuityKind =
+  | 'disconnect_start'
+  | 'reconnect_success'
+  | 'restore_ok'
+  | 'match_voided_runtime'
+  | 'forfeit_abandon'
+  | 'protocol_mismatch';
+
+export interface ReplayDiscontinuity {
+  tick: number;
+  kind: ReplayDiscontinuityKind;
+  playerId?: string;
+  reason?: string;
+}
 
 export type ReplayInputFrame =
   | {
@@ -505,6 +543,8 @@ export interface ReplayDataV2 {
   playerSlots?: Record<string, number>;
   /** Optional snapshot cadence in ticks for frame-by-frame or sparse replays. */
   keyframeIntervalTicks?: number;
+  /** Non-authoritative lifecycle markers; absent in legacy replay files. */
+  discontinuities?: ReplayDiscontinuity[];
   initialState: GameState;
   inputs: ReplayInputFrame[];
   keyframes: ReplayKeyframe[];

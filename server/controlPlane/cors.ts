@@ -1,4 +1,4 @@
-import type { RequestHandler } from 'express';
+import type { RequestHandler, Response } from 'express';
 
 export type CorsOrigin = '*' | Array<string | RegExp>;
 
@@ -39,9 +39,12 @@ export function createHttpCorsMiddleware(mode: 'development' | 'production'): Re
     }
 
     response.setHeader('Access-Control-Allow-Origin', origins === '*' ? '*' : requestOrigin);
-    response.setHeader('Vary', 'Origin');
+    appendVaryHeaders(response, 'Origin');
     response.setHeader('Access-Control-Allow-Methods', 'GET, POST, DELETE, OPTIONS');
-    response.setHeader('Access-Control-Allow-Headers', 'Authorization, Content-Type');
+    response.setHeader(
+      'Access-Control-Allow-Headers',
+      'Authorization, Content-Type, Idempotency-Key',
+    );
 
     if (request.method === 'OPTIONS') {
       response.status(204).end();
@@ -50,6 +53,31 @@ export function createHttpCorsMiddleware(mode: 'development' | 'production'): Re
 
     next();
   };
+}
+
+export function createNoStoreMiddleware(): RequestHandler {
+  return (_request, response, next) => {
+    response.setHeader('Cache-Control', 'no-store');
+    response.setHeader('Pragma', 'no-cache');
+    response.setHeader('Expires', '0');
+    next();
+  };
+}
+
+export function appendVaryHeaders(response: Response, ...headers: string[]): void {
+  const current = response.getHeader('Vary');
+  const values = current === undefined ? [] : String(current).split(',');
+  const seen = new Set<string>();
+  const merged: string[] = [];
+
+  for (const value of [...values, ...headers]) {
+    const trimmed = value.trim();
+    if (trimmed.length === 0 || seen.has(trimmed.toLowerCase())) continue;
+    seen.add(trimmed.toLowerCase());
+    merged.push(trimmed);
+  }
+
+  response.setHeader('Vary', merged.join(', '));
 }
 
 function parseExplicitOrigins(value: string | undefined): string[] {

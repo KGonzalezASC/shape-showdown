@@ -4,9 +4,14 @@ import { randomUUID } from 'node:crypto';
 import path from 'node:path';
 import { Server, type Socket } from 'socket.io';
 import { createControlPlaneRouter } from './controlPlane/routes.js';
-import { createHttpCorsMiddleware, resolveCorsOrigins } from './controlPlane/cors.js';
+import {
+  createHttpCorsMiddleware,
+  createNoStoreMiddleware,
+  resolveCorsOrigins,
+} from './controlPlane/cors.js';
 import { createDatabase, healthPing } from './controlPlane/database.js';
 import { MatchAllocationService } from './controlPlane/matchAllocation.js';
+import { AnalyticsStore } from './controlPlane/analyticsStore.js';
 import { MatchStore } from './controlPlane/matchStore.js';
 import { PostgresMatchPersistence } from './controlPlane/matchPersistence.js';
 import { runMigrations } from './controlPlane/migrations.js';
@@ -17,8 +22,15 @@ import { loadServerConfig, type ServerConfig } from './loadConfig.js';
 import { MatchRegistry } from './matchRuntime/MatchRegistry.js';
 import { logError, logInfo } from './observability/logger.js';
 import { initialSeed } from './tetris/engine.js';
-
-type ServerMode = 'development' | 'production';
+import type {
+  SocketAuthErrorCode,
+  SocketAuthErrorPayload,
+} from '../src/types.js';
+import {
+  resolveRuntimePolicy,
+  type RuntimePolicy,
+  type ServerMode,
+} from './runtimePolicy.js';
 
 type StartGameServerOptions = {
   config?: ServerConfig;
@@ -40,16 +52,26 @@ export async function startGameServer(
   const config = options.config ?? loadServerConfig(cwd);
   const mode = options.mode ?? (process.env.NODE_ENV === 'production' ? 'production' : 'development');
   const database = createDatabase();
+  let policy: RuntimePolicy;
+  try {
+    policy = resolveRuntimePolicy({
+      mode,
+      hasDatabase: database !== null,
+      env: process.env,
+    });
+    if (policy.requirePostgres && database === null) {
+      throw new Error('DATABASE_URL is required in production');
+    }
+  } catch (error) {
+    await database?.end({ timeout: 1 });
+    throw error;
+  }
+
   const playerStore = database === null ? null : new PlayerStore(database);
   const allocator = database === null ? null : new MatchAllocationService(database);
   const queueJanitor = database === null ? null : new QueueStore(database);
+  const analyticsJanitor = database === null ? null : new AnalyticsStore(database);
   const gameServerUrl = process.env.GAME_SERVER_URL?.trim() || `http://localhost:${config.port}`;
-  const databaseRequired =
-    mode === 'production' && process.env.ALLOW_IN_MEMORY_DATABASE !== 'true';
-
-  if (database === null && databaseRequired) {
-    throw new Error('DATABASE_URL is required in production');
-  }
 
   if (database !== null) {
     try {
@@ -68,6 +90,7 @@ export async function startGameServer(
   const httpServer = createServer(app);
   const corsOrigins = resolveCorsOrigins(mode);
   app.use(express.json({ limit: '32kb' }));
+  app.use(['/health', '/health/details'], createNoStoreMiddleware());
   app.use(createHttpCorsMiddleware(mode));
   if (database !== null) {
     app.use('/api', createControlPlaneRouter(database));
@@ -88,11 +111,18 @@ export async function startGameServer(
 
   if (database !== null) {
     const matchStore = new MatchStore(database);
-    const requireMatchTickets =
-      process.env.REQUIRE_MATCH_TICKETS === 'true'
-      || process.env.ALLOW_LEGACY_SOCKET_BOOTSTRAP !== 'true';
     io.use((socket, next) => {
-      void authorizeSocket(socket, matchStore, requireMatchTickets).then(() => next()).catch(next);
+      void authorizeSocket(socket, matchStore, policy.requireMatchTickets)
+        .then(() => next())
+        .catch((error: unknown) => {
+          if (
+            error instanceof SocketAuthorizationError
+            && error.data.code === 'PROTOCOL_VERSION_MISMATCH'
+          ) {
+            logInfo('protocol_mismatch', { reason: error.data.code });
+          }
+          next(error instanceof Error ? error : new Error(String(error)));
+        });
     });
   }
 
@@ -169,6 +199,7 @@ export async function startGameServer(
     io,
     config.replayKeyframeIntervalTicks,
     persistence,
+    config.recoveryVoidTimeoutMs,
   );
   io.on('connection', (socket) => {
     void resolveDurablePlayerId(socket, playerStore)
@@ -223,6 +254,8 @@ export async function startGameServer(
   });
 
   let allocationInFlight = false;
+  let analyticsPruneInFlight = false;
+  let lastAnalyticsPruneDate: string | null = null;
   const allocationHandle = allocator === null
     ? null
     : setInterval(() => {
@@ -244,6 +277,23 @@ export async function startGameServer(
             });
           }
           await queueJanitor?.purgeExpiredEntries();
+          const analyticsDate = new Date().toISOString().slice(0, 10);
+          if (
+            analyticsJanitor !== null
+            && !analyticsPruneInFlight
+            && lastAnalyticsPruneDate !== analyticsDate
+          ) {
+            analyticsPruneInFlight = true;
+            lastAnalyticsPruneDate = analyticsDate;
+            void analyticsJanitor.purgeExpiredEvents()
+              .catch((error: unknown) => {
+                lastAnalyticsPruneDate = null;
+                logError('analytics_prune_failed', error);
+              })
+              .finally(() => {
+                analyticsPruneInFlight = false;
+              });
+          }
         })
         .catch((error: unknown) => {
           logError('match_allocation_cycle_failed', error, {
@@ -267,6 +317,10 @@ export async function startGameServer(
       if (allocationHandle !== null) clearInterval(allocationHandle);
       await matchRegistry.stop();
       await closeDevelopmentServer?.();
+      io.disconnectSockets(true);
+      if (typeof httpServer.closeAllConnections === 'function') {
+        httpServer.closeAllConnections();
+      }
       await new Promise<void>((resolve) => io.close(() => resolve()));
       await database?.end({ timeout: 1 });
     },
@@ -281,31 +335,73 @@ async function authorizeSocket(
   const ticket = readAuthString(socket.handshake.auth, 'ticket');
   if (ticket === null) {
     if (requireMatchTickets) {
-      throw new Error('match ticket required');
+      throw new SocketAuthorizationError(
+        'MATCH_TICKET_REQUIRED',
+        'A match ticket is required',
+      );
     }
     return;
   }
 
   const matchId = readAuthString(socket.handshake.auth, 'matchId');
   const playerId = readAuthString(socket.handshake.auth, 'playerId');
+  const seat = readAuthSeat(socket.handshake.auth);
   const protocolVersion = readAuthNumber(socket.handshake.auth, 'protocolVersion');
-  if (matchId === null || playerId === null || protocolVersion === null) {
-    throw new Error('match ticket identity is incomplete');
+  if (seat === 'invalid') {
+    throw new SocketAuthorizationError(
+      'MATCH_SEAT_REJECTED',
+      'The requested match seat is invalid',
+    );
+  }
+  if (
+    matchId === null
+    || playerId === null
+    || protocolVersion === null
+  ) {
+    throw new SocketAuthorizationError(
+      'MATCH_TICKET_REJECTED',
+      'The match ticket could not be accepted',
+    );
   }
 
   const validated = await matches.validateJoinTicket(ticket);
-  if (
-    validated === null ||
-    validated.matchId !== matchId ||
-    validated.playerId !== playerId ||
-    validated.protocolVersion !== protocolVersion
-  ) {
-    throw new Error('match ticket rejected');
+  if (validated === null) {
+    const rejection = await matches.classifyJoinTicketRejection(ticket);
+    throw new SocketAuthorizationError(
+      rejection === 'consumed' ? 'MATCH_TICKET_CONSUMED' : 'MATCH_TICKET_REJECTED',
+      rejection === 'consumed'
+        ? 'The match ticket was already used. Request a fresh ticket.'
+        : 'The match ticket is expired or no longer valid',
+    );
+  }
+  if (validated.matchId !== matchId || validated.playerId !== playerId) {
+    throw new SocketAuthorizationError(
+      'MATCH_TICKET_REJECTED',
+      'The match ticket does not belong to this player or match',
+    );
+  }
+  if (seat !== null && validated.seat !== seat) {
+    throw new SocketAuthorizationError(
+      'MATCH_SEAT_REJECTED',
+      'The match ticket does not belong to this seat',
+    );
+  }
+  if (validated.protocolVersion !== protocolVersion) {
+    throw new SocketAuthorizationError(
+      'PROTOCOL_VERSION_MISMATCH',
+      'Match protocol version is not supported',
+    );
   }
 
   const consumed = await matches.consumeJoinTicket(ticket);
   if (consumed === null) {
-    throw new Error('match ticket already consumed');
+    const rejection = await matches.classifyJoinTicketRejection(ticket);
+    throw new SocketAuthorizationError(
+      rejection === 'consumed' ? 'MATCH_TICKET_CONSUMED' : 'MATCH_TICKET_REJECTED',
+      rejection === 'consumed'
+        ? 'The match ticket was already used. Request a fresh ticket.'
+        : 'The match ticket is expired or no longer valid',
+    );
   }
   logInfo('join_ticket_consumed', {
     matchId: consumed.matchId,
@@ -320,6 +416,16 @@ async function authorizeSocket(
     matchSeed: validated.matchSeed,
     protocolVersion: validated.protocolVersion,
   };
+}
+
+class SocketAuthorizationError extends Error {
+  public readonly data: SocketAuthErrorPayload;
+
+  public constructor(code: SocketAuthErrorCode, message: string) {
+    super(message);
+    this.name = 'SocketAuthorizationError';
+    this.data = { code, message };
+  }
 }
 
 async function resolveDurablePlayerId(
@@ -367,6 +473,13 @@ function readAuthNumber(auth: unknown, key: string): number | null {
   if (!isRecord(auth)) return null;
   const value = auth[key];
   return typeof value === 'number' && Number.isInteger(value) ? value : null;
+}
+
+function readAuthSeat(auth: unknown): 'A' | 'B' | 'invalid' | null {
+  if (!isRecord(auth)) return null;
+  const value = auth.seat;
+  if (value === undefined) return null;
+  return value === 'A' || value === 'B' ? value : 'invalid';
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

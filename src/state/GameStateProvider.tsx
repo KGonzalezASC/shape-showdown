@@ -36,6 +36,7 @@ export interface GameActions {
   sendAction: (action: ActionType) => void;
   sendShopOpen: () => void;
   sendShopPurchase: (itemId: string) => void;
+  resetClientSession: () => void;
 }
 
 const GameActionsContext = createContext<GameActions | null>(null);
@@ -67,6 +68,7 @@ export function GameStateProvider({ children }: { children: React.ReactNode }) {
     sendAction,
     sendShopOpen,
     sendShopPurchase,
+    resetClientSession,
   } = useGameSocket({
     onGameState: publishGameState,
     onMyId: publishMyId,
@@ -76,8 +78,14 @@ export function GameStateProvider({ children }: { children: React.ReactNode }) {
   });
 
   const actions = useMemo(
-    () => ({ sendInputState, sendAction, sendShopOpen, sendShopPurchase }),
-    [sendInputState, sendAction, sendShopOpen, sendShopPurchase],
+    () => ({
+      sendInputState,
+      sendAction,
+      sendShopOpen,
+      sendShopPurchase,
+      resetClientSession,
+    }),
+    [sendInputState, sendAction, sendShopOpen, sendShopPurchase, resetClientSession],
   );
 
   return (

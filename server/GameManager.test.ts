@@ -221,6 +221,131 @@ describe('GameManager lifecycle harness', () => {
     assert.equal(internal.gameState.players['durable-p1'] !== undefined, true);
   });
 
+  it('keeps an opponent pause when the other player refreshes', async () => {
+    const persistence = new RecordingMatchPersistence();
+    const gm = new GameManager(createFakeIo(), 60, persistence);
+    managers.push(gm);
+    const p1 = new FakeSocket('p1');
+    const p2 = new FakeSocket('p2');
+    const ticket = (playerId: string, seat: 'A' | 'B') => ({
+      matchId: 'match-1',
+      playerId,
+      seat,
+      matchSeed: 123,
+      protocolVersion: 1,
+    } as const);
+
+    gm.handleConnection(p1 as unknown as Socket, 'durable-p1', ticket('durable-p1', 'A'));
+    gm.handleConnection(p2 as unknown as Socket, 'durable-p2', ticket('durable-p2', 'B'));
+
+    for (let i = 0; i < 5; i += 1) gm.tickOnceForTests();
+    await flushPromises();
+
+    const internal = gm as unknown as {
+      gameState: {
+        status: string;
+        pause?: { playerId: string };
+        tick: number;
+        players: Record<string, PlayerState>;
+      };
+      lastHandledStatus: string;
+    };
+    internal.gameState.status = 'playing';
+    internal.lastHandledStatus = 'playing';
+
+    p2.emit('disconnect');
+    p1.emit('disconnect');
+    assert.equal(internal.gameState.pause?.playerId, 'durable-p2');
+
+    const refreshedP1 = new FakeSocket('p1-refreshed');
+    gm.handleConnection(
+      refreshedP1 as unknown as Socket,
+      'durable-p1',
+      ticket('durable-p1', 'A'),
+    );
+
+    const tickBeforePausedUpdate = internal.gameState.tick;
+    gm.tickOnceForTests();
+
+    assert.equal(internal.gameState.pause?.playerId, 'durable-p2');
+    assert.equal(internal.gameState.tick, tickBeforePausedUpdate);
+    assert.ok(internal.gameState.players['durable-p2']);
+  });
+
+  it('keeps the remaining disconnect protected when the first player reconnects', () => {
+    const gm = new GameManager(createFakeIo(), 60);
+    managers.push(gm);
+    const p1 = new FakeSocket('p1');
+    const p2 = new FakeSocket('p2');
+    const ticket = (playerId: string, seat: 'A' | 'B') => ({
+      matchId: 'match-1',
+      playerId,
+      seat,
+      matchSeed: 123,
+      protocolVersion: 1,
+    } as const);
+
+    gm.handleConnection(p1 as unknown as Socket, 'durable-p1', ticket('durable-p1', 'A'));
+    gm.handleConnection(p2 as unknown as Socket, 'durable-p2', ticket('durable-p2', 'B'));
+
+    const internal = gm as unknown as {
+      gameState: {
+        status: string;
+        pause?: { playerId: string };
+        players: Record<string, PlayerState>;
+      };
+      lastHandledStatus: string;
+    };
+    internal.gameState.status = 'playing';
+    internal.lastHandledStatus = 'playing';
+
+    p2.emit('disconnect');
+    p1.emit('disconnect');
+
+    const refreshedP2 = new FakeSocket('p2-refreshed');
+    gm.handleConnection(
+      refreshedP2 as unknown as Socket,
+      'durable-p2',
+      ticket('durable-p2', 'B'),
+    );
+
+    assert.equal(internal.gameState.pause?.playerId, 'durable-p1');
+    assert.ok(internal.gameState.players['durable-p1']);
+  });
+
+  it('clears the surviving winner board before waiting for a new opponent', () => {
+    const gm = new GameManager(createFakeIo(), 60);
+    managers.push(gm);
+    gm.handleConnection(new FakeSocket('p1') as unknown as Socket, 'durable-p1');
+    gm.handleConnection(new FakeSocket('p2') as unknown as Socket, 'durable-p2');
+
+    const internal = gm as unknown as {
+      gameState: {
+        status: string;
+        restartTimer?: number;
+        players: Record<string, PlayerState>;
+      };
+      lastHandledStatus: string;
+    };
+    const winner = internal.gameState.players['durable-p1'];
+    winner.board[BOARD_ROWS - 1][0] = 'I';
+    winner.activePiece = null;
+    internal.gameState.status = 'ended';
+    internal.lastHandledStatus = 'ended';
+    internal.gameState.restartTimer = 0;
+    delete internal.gameState.players['durable-p2'];
+
+    gm.tickOnceForTests();
+    gm.tickOnceForTests();
+
+    assert.equal(internal.gameState.status, 'waiting');
+    assert.equal(
+      internal.gameState.players['durable-p1'].board.some((row) => row.some((cell) => cell !== null)),
+      false,
+    );
+    assert.notEqual(internal.gameState.players['durable-p1'].activePiece, null);
+  });
+
   it('replaces a seat socket through a valid ticket without changing the runtime player identity', async () => {
     const persistence = new RecordingMatchPersistence();
     const gm = new GameManager(createFakeIo(), 60, persistence);
@@ -234,6 +359,8 @@ describe('GameManager lifecycle harness', () => {
     await flushPromises();
 
     const replacement = new FakeSocket('p1-replacement');
+    const replacementSnapshots: unknown[] = [];
+    replacement.on('gameState', (state) => replacementSnapshots.push(state));
     gm.handleConnection(
       replacement as unknown as Socket,
       'durable-p1',
@@ -258,6 +385,131 @@ describe('GameManager lifecycle harness', () => {
     assert.equal(internal.gameState.status, 'countdown');
     assert.ok(internal.gameState.players['durable-p1']);
     assert.equal(internal.gameState.players['durable-p1'].inputState.left, true);
+    assert.equal(replacementSnapshots.length, 1);
+    assert.equal((replacementSnapshots[0] as { players: Record<string, unknown> }).players['durable-p2'] !== undefined, true);
+  });
+
+  it('rejects a third assigned socket without displacing either active seat', () => {
+    const gm = new GameManager(createFakeIo(), 60);
+    managers.push(gm);
+    const ticket = (playerId: string, seat: 'A' | 'B') => ({
+      matchId: 'match-1',
+      playerId,
+      seat,
+      matchSeed: 123,
+      protocolVersion: 1,
+    } as const);
+    const first = new FakeSocket('first');
+    const second = new FakeSocket('second');
+    const third = new FakeSocket('third');
+
+    gm.handleConnection(first as unknown as Socket, 'durable-p1', ticket('durable-p1', 'A'));
+    gm.handleConnection(second as unknown as Socket, 'durable-p2', ticket('durable-p2', 'B'));
+    const errors: unknown[] = [];
+    third.on('error', (error) => errors.push(error));
+    gm.handleConnection(third as unknown as Socket, 'durable-p3', ticket('durable-p3', 'A'));
+
+    assert.deepEqual(errors, [{
+      code: 'MATCH_THIRD_SOCKET',
+      message: 'This match already has two active seats.',
+    }]);
+    assert.equal(first.disconnected, false);
+    assert.equal(second.disconnected, false);
+  });
+
+  it('rejects a wrong seat and protocol before sending a snapshot', () => {
+    const gm = new GameManager(createFakeIo(), 60);
+    managers.push(gm);
+    const player = new FakeSocket('player');
+    gm.handleConnection(player as unknown as Socket, 'durable-p1', {
+      matchId: 'match-1',
+      playerId: 'durable-p1',
+      seat: 'A',
+      matchSeed: 123,
+      protocolVersion: 1,
+    });
+
+    const wrongSeat = new FakeSocket('wrong-seat');
+    const wrongSeatErrors: unknown[] = [];
+    const wrongSeatSnapshots: unknown[] = [];
+    wrongSeat.on('error', (error) => wrongSeatErrors.push(error));
+    wrongSeat.on('gameState', (state) => wrongSeatSnapshots.push(state));
+    gm.handleConnection(wrongSeat as unknown as Socket, 'durable-p1', {
+      matchId: 'match-1',
+      playerId: 'durable-p1',
+      seat: 'B',
+      matchSeed: 123,
+      protocolVersion: 1,
+    });
+
+    assert.deepEqual(wrongSeatErrors, [{
+      code: 'MATCH_SEAT_REJECTED',
+      message: 'The match ticket does not belong to this seat.',
+    }]);
+    assert.equal(wrongSeatSnapshots.length, 0);
+
+    const wrongProtocol = new FakeSocket('wrong-protocol');
+    const wrongProtocolErrors: unknown[] = [];
+    wrongProtocol.on('error', (error) => wrongProtocolErrors.push(error));
+    gm.handleConnection(wrongProtocol as unknown as Socket, 'durable-p1', {
+      matchId: 'match-1',
+      playerId: 'durable-p1',
+      seat: 'A',
+      matchSeed: 123,
+      protocolVersion: 2,
+    });
+
+    assert.deepEqual(wrongProtocolErrors, [{
+      code: 'PROTOCOL_VERSION_MISMATCH',
+      message: 'Match protocol version is not supported.',
+    }]);
+    assert.equal(
+      (gm as unknown as {
+        pendingReplayDiscontinuities: Array<{ kind: string }>;
+      }).pendingReplayDiscontinuities.some((marker) => marker.kind === 'protocol_mismatch'),
+      true,
+    );
+  });
+
+  it('records disconnect and reconnect replay markers in chronological order', () => {
+    const gm = new GameManager(createFakeIo(), 60);
+    managers.push(gm);
+    const ticket = (playerId: string, seat: 'A' | 'B') => ({
+      matchId: 'match-1',
+      playerId,
+      seat,
+      matchSeed: 123,
+      protocolVersion: 1,
+    } as const);
+    const first = new FakeSocket('first');
+    const opponent = new FakeSocket('opponent');
+    gm.handleConnection(first as unknown as Socket, 'durable-p1', ticket('durable-p1', 'A'));
+    gm.handleConnection(opponent as unknown as Socket, 'durable-p2', ticket('durable-p2', 'B'));
+
+    const internal = gm as unknown as {
+      gameState: { status: string };
+      lastHandledStatus: string;
+      pendingReplayDiscontinuities: Array<{ kind: string; tick: number }>;
+    };
+    internal.gameState.status = 'playing';
+    internal.lastHandledStatus = 'playing';
+    first.emit('disconnect');
+
+    const replacement = new FakeSocket('replacement');
+    gm.handleConnection(
+      replacement as unknown as Socket,
+      'durable-p1',
+      ticket('durable-p1', 'A'),
+    );
+
+    assert.deepEqual(
+      internal.pendingReplayDiscontinuities.map((marker) => marker.kind),
+      ['disconnect_start', 'reconnect_success'],
+    );
+    assert.ok(
+      internal.pendingReplayDiscontinuities[0].tick
+      <= internal.pendingReplayDiscontinuities[1].tick,
+    );
   });
 
   it('transitions waiting → countdown when two players connect', () => {

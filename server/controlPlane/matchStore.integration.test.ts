@@ -44,6 +44,17 @@ describe('MatchStore ticket refresh integration', () => {
       matchId = match.id;
       await matches.issueJoinTicket({ matchId, playerId: playerAId, seat: 'A' });
       await matches.issueJoinTicket({ matchId, playerId: playerBId, seat: 'B' });
+      const consumedTicket = await matches.issueJoinTicket({
+        matchId,
+        playerId: playerAId,
+        seat: 'A',
+      });
+      assert.equal((await matches.consumeJoinTicket(consumedTicket.ticket))?.playerId, playerAId);
+      assert.equal(await matches.validateJoinTicket(consumedTicket.ticket), null);
+      assert.equal(
+        await matches.classifyJoinTicketRejection(consumedTicket.ticket),
+        'consumed',
+      );
 
       const replacements = await Promise.all(
         Array.from({ length: 40 }, () =>

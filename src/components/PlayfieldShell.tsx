@@ -70,6 +70,7 @@ export const PlayfieldShell: React.FC<PlayfieldShellProps> = ({
   const handleShopConfirm = useShopConfirm();
   const { myPlayer, opponentPlayer } = playfield;
   const isDesktop = layoutMode === 'desktop';
+  const hasLocalPlayer = myPlayer !== null;
 
   const shopOffers = useMemo(() => resolveShopOffers(chrome.shopOfferIds), [chrome.shopOfferIds]);
   const purchasedItem = useMemo(() => {
@@ -91,11 +92,10 @@ export const PlayfieldShell: React.FC<PlayfieldShellProps> = ({
 
   useLayoutEffect(() => {
     const playfieldLayout = playfieldRef.current;
-    if (!playfieldLayout) return;
+    const slot = boardFitRef.current;
+    if (!playfieldLayout || !slot) return;
 
     const measure = () => {
-      const slot = boardFitRef.current;
-      if (!slot) return;
       const box = slot.getBoundingClientRect();
       if (box.width < 8 || box.height < 8) return;
       const next = fitMobilePlayfieldCellSize(
@@ -109,7 +109,7 @@ export const PlayfieldShell: React.FC<PlayfieldShellProps> = ({
     const observer = new ResizeObserver(measure);
     observer.observe(playfieldLayout);
     return () => observer.disconnect();
-  }, [layoutMode, myPlayer, shrinePadPx]);
+  }, [hasLocalPlayer, layoutMode, shrinePadPx]);
 
   const boardFramePadding = layoutMode === 'phone' ? 'p-1.5' : 'p-2';
 
