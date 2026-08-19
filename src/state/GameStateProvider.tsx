@@ -1,5 +1,10 @@
 import React, { createContext, useContext, useMemo, useState, useSyncExternalStore } from 'react';
-import { ActionType, InputState, ServerHealthSnapshot } from '../types';
+import {
+  ActionType,
+  InputState,
+  MatchConnectionDiagnostics,
+  ServerHealthSnapshot,
+} from '../types';
 import { useGameSocket } from '../hooks/useGameSocket';
 import {
   getChromeSnapshot,
@@ -40,9 +45,23 @@ const initialServerHealth: ServerHealthSnapshot = {
   migrationsReady: false,
 };
 const ServerHealthContext = createContext<ServerHealthSnapshot>(initialServerHealth);
+const initialMatchDiagnostics: MatchConnectionDiagnostics = {
+  phase: 'idle',
+  playerId: null,
+  matchId: null,
+  seat: null,
+  protocolVersion: null,
+  ticketState: 'none',
+  ticketLength: null,
+  error: null,
+};
+const MatchDiagnosticsContext = createContext<MatchConnectionDiagnostics>(initialMatchDiagnostics);
 
 export function GameStateProvider({ children }: { children: React.ReactNode }) {
   const [serverHealth, setServerHealth] = useState<ServerHealthSnapshot>(initialServerHealth);
+  const [matchDiagnostics, setMatchDiagnostics] = useState<MatchConnectionDiagnostics>(
+    initialMatchDiagnostics,
+  );
   const {
     sendInputState,
     sendAction,
@@ -53,6 +72,7 @@ export function GameStateProvider({ children }: { children: React.ReactNode }) {
     onMyId: publishMyId,
     onMatchEvent: publishMatchEvent,
     onServerHealth: setServerHealth,
+    onMatchDiagnostics: setMatchDiagnostics,
   });
 
   const actions = useMemo(
@@ -63,7 +83,9 @@ export function GameStateProvider({ children }: { children: React.ReactNode }) {
   return (
     <GameActionsContext.Provider value={actions}>
       <ServerHealthContext.Provider value={serverHealth}>
-        {children}
+        <MatchDiagnosticsContext.Provider value={matchDiagnostics}>
+          {children}
+        </MatchDiagnosticsContext.Provider>
       </ServerHealthContext.Provider>
     </GameActionsContext.Provider>
   );
@@ -89,6 +111,10 @@ export function useIsConnected() {
 
 export function useServerHealth(): ServerHealthSnapshot {
   return useContext(ServerHealthContext);
+}
+
+export function useMatchDiagnostics(): MatchConnectionDiagnostics {
+  return useContext(MatchDiagnosticsContext);
 }
 
 export function useMyId() {

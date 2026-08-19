@@ -6,6 +6,7 @@ import {
   COUNTDOWN_SECONDS,
   GameState,
   InputState,
+  MatchAssignment,
   REPLAY_KEYFRAME_INTERVAL_TICKS,
   ReplayDataV2,
   ReplayInputFrame,
@@ -27,10 +28,14 @@ import {
   resetPlayerShop,
 } from './shop.js';
 import type { MatchPersistence } from './controlPlane/matchPersistence.js';
+import type { JoinTicket } from './controlPlane/matchStore.js';
+import { logError, logInfo } from './observability/logger.js';
 import type {
   MatchOutcomeReason,
   MatchResultStats,
 } from './controlPlane/matchResultStore.js';
+
+export type SocketSeatBinding = Omit<MatchAssignment, 'ticket'>;
 
 export class GameManager {
   private io: Server;
@@ -44,18 +49,33 @@ export class GameManager {
   private readonly lobbyNetcastEveryNTicks: number;
   private lastHandledStatus: GameState['status'] = 'waiting';
   private readonly persistence?: MatchPersistence;
+  private readonly onMatchCreated?: (matchId: string) => void;
+  private readonly onRecoveryReady?: () => void;
   private readonly durablePlayerIds = new Map<string, string>();
+  private readonly runtimeIdBySocketId = new Map<string, string>();
+  private readonly activeSocketByRuntimeId = new Map<string, Socket>();
   private readonly terminalPlayerStats = new Map<string, MatchResultStats>();
   private durableMatchId: string | null = null;
+  private durableMatchPreallocated = false;
+  private restoredAwaitingReconnect = false;
+  private disconnectTimer: ReturnType<typeof setTimeout> | null = null;
+  private readonly disconnectBudgets = new Map<string, {
+    episodes: number;
+    totalPausedMs: number;
+  }>();
   private persistenceTail: Promise<void> = Promise.resolve();
 
   constructor(
     io: Server,
     replayKeyframeIntervalTicks = REPLAY_KEYFRAME_INTERVAL_TICKS,
     persistence?: MatchPersistence,
+    onMatchCreated?: (matchId: string) => void,
+    onRecoveryReady?: () => void,
   ) {
     this.io = io;
     this.persistence = persistence;
+    this.onMatchCreated = onMatchCreated;
+    this.onRecoveryReady = onRecoveryReady;
     this.replayKeyframeIntervalTicks = Math.max(1, Math.floor(replayKeyframeIntervalTicks));
 
     // Decouple the network broadcast rate from the 60Hz simulation. Emitting
@@ -79,32 +99,227 @@ export class GameManager {
 
   /** Test / shutdown hook — stops the 60Hz interval. */
   public stopLoop() {
+    if (this.disconnectTimer !== null) {
+      clearTimeout(this.disconnectTimer);
+      this.disconnectTimer = null;
+    }
+    this.enqueueCheckpoint();
     if (this.loopHandle !== null) {
       clearInterval(this.loopHandle);
       this.loopHandle = null;
     }
   }
 
+  public async stopAndFlush(): Promise<void> {
+    this.stopLoop();
+    await this.persistenceTail;
+  }
+
+  public restoreCheckpoint(input: {
+    matchId: string;
+    stateBlob: Uint8Array;
+  }): void {
+    const envelope: unknown = JSON.parse(Buffer.from(input.stateBlob).toString('utf8'));
+    if (!isCheckpointEnvelope(envelope) || envelope.matchId !== input.matchId) {
+      throw new Error('Checkpoint envelope is incompatible');
+    }
+
+    this.gameState = envelope.state;
+    this.durableMatchId = input.matchId;
+    this.durableMatchPreallocated = true;
+    this.restoredAwaitingReconnect = true;
+    this.lastHandledStatus = this.gameState.status;
+    this.playerSlots.clear();
+    this.durablePlayerIds.clear();
+    this.rngChannelsByPlayer.clear();
+    for (const participant of envelope.participants) {
+      this.playerSlots.set(participant.runtimeId, participant.slot);
+      this.durablePlayerIds.set(participant.runtimeId, participant.playerId);
+      this.rngChannelsByPlayer.set(participant.runtimeId, participant.rng);
+    }
+    this.disconnectBudgets.clear();
+    for (const budget of envelope.disconnectBudgets) {
+      this.disconnectBudgets.set(budget.runtimeId, {
+        episodes: budget.episodes,
+        totalPausedMs: budget.totalPausedMs,
+      });
+    }
+  }
+
+  public voidForRecovery(): void {
+    if (!this.restoredAwaitingReconnect || this.durableMatchId === null) return;
+    const participants = this.captureDurableParticipantsForResult();
+    if (participants === null || this.persistence?.finalizeMatch === undefined) return;
+
+    const matchId = this.durableMatchId;
+    this.restoredAwaitingReconnect = false;
+    this.durableMatchPreallocated = false;
+    this.gameState.status = 'ended';
+    this.gameState.winnerId = null;
+    this.gameState.technicalVictory = false;
+    logInfo('match_voided_after_restore_timeout', { matchId });
+    this.enqueuePersistence(async () => {
+      await this.persistence!.finalizeMatch({
+        matchId,
+        winnerId: null,
+        loserId: null,
+        outcomeReason: 'void_server_crash',
+        durationSeconds: Math.floor(this.gameState.tick * tickSeconds()),
+        playerAStats: this.capturePlayerStats(participants[0].runtimeId),
+        playerBStats: this.capturePlayerStats(participants[1].runtimeId),
+      });
+    });
+  }
+
   private loopHandle: ReturnType<typeof setInterval> | null = null;
 
-  public handleConnection(socket: Socket, durablePlayerId?: string) {
-    if (Object.keys(this.gameState.players).length < 2) {
-      const slot = this.assignPlayerSlot(socket.id);
-      const channels = createPlayerRngChannels(this.gameState.seed, slot);
-      this.rngChannelsByPlayer.set(socket.id, channels);
-      this.gameState.players[socket.id] = makePlayer(socket.id, channels);
-      if (durablePlayerId !== undefined) {
-        this.durablePlayerIds.set(socket.id, durablePlayerId);
-      }
-      this.io.emit("gameState", this.gameState);
-    } else {
-      socket.emit("error", "Game is full");
-      socket.disconnect();
+  public handleConnection(
+    socket: Socket,
+    durablePlayerId?: string,
+    seatBinding?: SocketSeatBinding,
+  ) {
+    if (seatBinding !== undefined) {
+      this.bindTicketSocket(socket, seatBinding);
       return;
     }
 
+    if (Object.keys(this.gameState.players).length >= 2) {
+      this.rejectSocket(socket, 'Game is full');
+      return;
+    }
+
+    const runtimeId = durablePlayerId ?? socket.id;
+    if (this.gameState.players[runtimeId] !== undefined) {
+      this.rejectSocket(socket, 'Player is already connected');
+      return;
+    }
+
+    const slot = this.assignPlayerSlot(runtimeId);
+    const channels = createPlayerRngChannels(this.gameState.seed, slot);
+    this.rngChannelsByPlayer.set(runtimeId, channels);
+    this.gameState.players[runtimeId] = makePlayer(runtimeId, channels);
+    if (durablePlayerId !== undefined) {
+      this.durablePlayerIds.set(runtimeId, durablePlayerId);
+    }
+
+    this.bindSocket(socket, runtimeId);
+    socket.emit('playerIdentity', runtimeId);
+    this.emitToMatch('gameState', this.gameState);
+  }
+
+  private bindTicketSocket(socket: Socket, binding: SocketSeatBinding): void {
+    if (binding.protocolVersion !== 1) {
+      this.rejectSocket(socket, 'Match ticket does not belong to the active match');
+      return;
+    }
+
+    if (this.durableMatchId === null) {
+      if (this.gameState.status !== 'waiting' || Object.keys(this.gameState.players).length !== 0) {
+        this.rejectSocket(socket, 'Runtime is not ready for a new assigned match');
+        return;
+      }
+      this.durableMatchId = binding.matchId;
+      this.durableMatchPreallocated = true;
+      this.gameState.seed = binding.matchSeed;
+      this.gameState.tick = 0;
+      this.gameState.winnerId = null;
+      this.gameState.technicalVictory = false;
+      this.gameState.restartTimer = undefined;
+    } else if (this.durableMatchId !== binding.matchId) {
+      this.rejectSocket(socket, 'Match ticket does not belong to the active match');
+      return;
+    }
+
+    const participant = [...this.durablePlayerIds.entries()]
+      .find(([, playerId]) => playerId === binding.playerId);
+    let runtimeId = participant?.[0];
+    if (runtimeId === undefined) {
+      if (Object.keys(this.gameState.players).length >= 2) {
+        this.rejectSocket(socket, 'Runtime already has two assigned seats');
+        return;
+      }
+      runtimeId = binding.playerId;
+      const slot = binding.seat === 'A' ? 0 : 1;
+      if (!this.isSlotAvailable(slot)) {
+        this.rejectSocket(socket, 'Match ticket seat is already occupied');
+        return;
+      }
+      const channels = createPlayerRngChannels(this.gameState.seed, slot);
+      this.playerSlots.set(runtimeId, slot);
+      this.rngChannelsByPlayer.set(runtimeId, channels);
+      this.durablePlayerIds.set(runtimeId, binding.playerId);
+      this.gameState.players[runtimeId] = makePlayer(runtimeId, channels);
+    }
+
+    const expectedSlot = binding.seat === 'A' ? 0 : 1;
+    if (this.playerSlots.get(runtimeId) !== expectedSlot) {
+      this.rejectSocket(socket, 'Match ticket seat does not match the runtime seat');
+      return;
+    }
+
+    const previousSocket = this.activeSocketByRuntimeId.get(runtimeId);
+    if (previousSocket !== undefined && previousSocket !== socket) {
+      this.runtimeIdBySocketId.delete(previousSocket.id);
+      previousSocket.disconnect(true);
+      logInfo('socket_rebound', {
+        matchId: binding.matchId,
+        playerId: binding.playerId,
+        seat: binding.seat,
+      });
+    }
+
+    this.bindSocket(socket, runtimeId);
+    socket.emit('playerIdentity', runtimeId);
+    socket.emit('gameState', this.gameState);
+    if (this.gameState.pause?.playerId === runtimeId) {
+      const pausedForMs = Math.max(0, Date.now() - this.gameState.pause.startedAt);
+      const budget = this.disconnectBudgets.get(runtimeId) ?? { episodes: 0, totalPausedMs: 0 };
+      budget.totalPausedMs += pausedForMs;
+      this.disconnectBudgets.set(runtimeId, budget);
+      this.gameState.pause = undefined;
+      if (this.disconnectTimer !== null) {
+        clearTimeout(this.disconnectTimer);
+        this.disconnectTimer = null;
+      }
+      if (budget.episodes >= 3 || budget.totalPausedMs >= 90_000) {
+        this.forfeitDisconnectedPlayer(runtimeId);
+        return;
+      }
+      logInfo('socket_reconnected', {
+        matchId: this.durableMatchId,
+        playerId: runtimeId,
+        pauseEpisodes: budget.episodes,
+        pausedMs: pausedForMs,
+      });
+      this.emitToMatch('gameState', this.gameState);
+    }
+    if (
+      this.restoredAwaitingReconnect
+      && this.activeSocketByRuntimeId.size >= Object.keys(this.gameState.players).length
+    ) {
+      this.restoredAwaitingReconnect = false;
+      this.onRecoveryReady?.();
+    }
+  }
+
+  private isSlotAvailable(slot: number): boolean {
+    return ![...this.playerSlots.values()].includes(slot);
+  }
+
+  private bindSocket(socket: Socket, runtimeId: string): void {
+    if (this.durableMatchId !== null && typeof socket.join === 'function') {
+      void socket.join(`match:${this.durableMatchId}`);
+    }
+    this.runtimeIdBySocketId.set(socket.id, runtimeId);
+    this.activeSocketByRuntimeId.set(runtimeId, socket);
+    this.registerSocketHandlers(socket);
+  }
+
+  private registerSocketHandlers(socket: Socket): void {
     socket.on('inputState', (input: InputState) => {
-      const player = this.gameState.players[socket.id];
+      const runtimeId = this.runtimeIdBySocketId.get(socket.id);
+      if (runtimeId === undefined) return;
+      const player = this.gameState.players[runtimeId];
       if (!player) return;
       player.inputState = {
         left: !!input?.left,
@@ -114,7 +329,7 @@ export class GameManager {
       if (this.activeReplay && this.gameState.status === 'playing') {
         this.recordReplayInput({
           tick: this.gameState.tick,
-          playerId: socket.id,
+          playerId: runtimeId,
           kind: 'inputState',
           inputState: player.inputState,
         });
@@ -122,14 +337,16 @@ export class GameManager {
     });
 
     socket.on('action', (action: ActionType) => {
-      const player = this.gameState.players[socket.id];
+      const runtimeId = this.runtimeIdBySocketId.get(socket.id);
+      if (runtimeId === undefined) return;
+      const player = this.gameState.players[runtimeId];
       if (!player || this.gameState.status !== 'playing') return;
       if (!['rotateCW', 'rotateCCW', 'hardDrop', 'hold'].includes(action)) return;
       player.actionQueue.push(action);
       if (this.activeReplay) {
         this.recordReplayInput({
           tick: this.gameState.tick,
-          playerId: socket.id,
+          playerId: runtimeId,
           kind: 'action',
           action,
         });
@@ -137,75 +354,117 @@ export class GameManager {
     });
 
     socket.on('shopOpen', () => {
-      if (this.gameState.status !== 'playing') return;
-      const buyer = this.gameState.players[socket.id];
+      const runtimeId = this.runtimeIdBySocketId.get(socket.id);
+      if (runtimeId === undefined || this.gameState.status !== 'playing') return;
+      const buyer = this.gameState.players[runtimeId];
       if (!buyer) return;
       const accepted = openPlayerShop(buyer, this.gameState.tick);
       this.recordReplayInput({
         tick: this.gameState.tick,
-        playerId: socket.id,
+        playerId: runtimeId,
         kind: 'shopOpen',
         accepted,
       });
     });
 
     socket.on('shopPurchase', (itemId: string) => {
-      if (this.gameState.status !== 'playing') return;
+      const runtimeId = this.runtimeIdBySocketId.get(socket.id);
+      if (runtimeId === undefined || this.gameState.status !== 'playing') return;
       if (typeof itemId !== 'string') return;
-      const buyer = this.gameState.players[socket.id];
+      const buyer = this.gameState.players[runtimeId];
       if (!buyer) return;
 
       const pids = Object.keys(this.gameState.players);
-      const opponentId = pids.find((id) => id !== socket.id);
+      const opponentId = pids.find((id) => id !== runtimeId);
       const opponent = opponentId ? this.gameState.players[opponentId] : null;
       const catalogItem = SHOP_ITEM_BY_ID.get(itemId);
       const resolvedCost = catalogItem
         ? getPricingView(itemId, buyer.shop.pricing?.[itemId], this.gameState.tick).currentPrice
         : undefined;
-      const accepted = applyShopPurchase(this.gameState, buyer, opponent, itemId, this.playerRng(socket.id));
+      const accepted = applyShopPurchase(this.gameState, buyer, opponent, itemId, this.playerRng(runtimeId));
       this.recordReplayInput({
         tick: this.gameState.tick,
-        playerId: socket.id,
+        playerId: runtimeId,
         kind: 'shopPurchase',
         itemId,
         accepted,
         ...(resolvedCost === undefined ? {} : { cost: resolvedCost }),
       });
       // Flush immediately so cascade / pills aren't held back by the 30Hz netcast.
-      this.io.emit('gameState', this.gameState);
+      this.emitToMatch('gameState', this.gameState);
     });
 
-    socket.on("disconnect", () => {
-      const disconnectedPlayer = this.gameState.players[socket.id];
+    socket.on('disconnect', () => {
+      const runtimeId = this.runtimeIdBySocketId.get(socket.id);
+      if (runtimeId === undefined || this.activeSocketByRuntimeId.get(runtimeId) !== socket) return;
+
+      const disconnectedPlayer = this.gameState.players[runtimeId];
       if (disconnectedPlayer) {
-        this.terminalPlayerStats.set(socket.id, {
+        this.terminalPlayerStats.set(runtimeId, {
           score: disconnectedPlayer.score,
           linesCleared: disconnectedPlayer.linesCleared,
           topOut: disconnectedPlayer.topOut,
         });
       }
-      if (this.gameState.status === 'playing') {
-        const remainingIds = Object.keys(this.gameState.players).filter(id => id !== socket.id);
-        if (remainingIds.length === 1) {
-          this.gameState.status = 'ended';
-          this.gameState.winnerId = remainingIds[0];
-          this.gameState.technicalVictory = true;
-          this.gameState.restartTimer = RESTART_DELAY_SECONDS;
-        } else {
-          this.gameState.status = 'waiting';
-          this.gameState.restartTimer = undefined;
-        }
+      this.runtimeIdBySocketId.delete(socket.id);
+      this.activeSocketByRuntimeId.delete(runtimeId);
+      if (this.durableMatchId !== null && this.gameState.status !== 'ended') {
+        const budget = this.disconnectBudgets.get(runtimeId) ?? {
+          episodes: 0,
+          totalPausedMs: 0,
+        };
+        budget.episodes += 1;
+        this.disconnectBudgets.set(runtimeId, budget);
+        this.gameState.pause = {
+          playerId: runtimeId,
+          startedAt: Date.now(),
+        };
+        this.disconnectTimer = setTimeout(() => {
+          this.disconnectTimer = null;
+          this.forfeitDisconnectedPlayer(runtimeId);
+        }, 60_000);
+        logInfo('socket_disconnected_paused', {
+          matchId: this.durableMatchId,
+          playerId: runtimeId,
+          pauseEpisodes: budget.episodes,
+        });
+        this.enqueueCheckpoint();
       } else {
-        this.gameState.status = 'waiting';
-        this.gameState.restartTimer = undefined;
+        this.forfeitDisconnectedPlayer(runtimeId);
       }
-      delete this.gameState.players[socket.id];
-      this.rngChannelsByPlayer.delete(socket.id);
-      if (this.gameState.status !== 'ended') {
-        this.playerSlots.delete(socket.id);
-        this.durablePlayerIds.delete(socket.id);
-      }
-      this.io.emit("gameState", this.gameState);
+      this.emitToMatch('gameState', this.gameState);
+    });
+  }
+
+  private rejectSocket(socket: Socket, message: string): void {
+    socket.emit('error', message);
+    socket.disconnect(true);
+  }
+
+  private forfeitDisconnectedPlayer(runtimeId: string): void {
+    const disconnectedPlayer = this.gameState.players[runtimeId];
+    if (disconnectedPlayer === undefined) return;
+    const remainingIds = Object.keys(this.gameState.players).filter(id => id !== runtimeId);
+    if (remainingIds.length !== 1) {
+      this.gameState.status = 'waiting';
+      this.gameState.restartTimer = undefined;
+    } else {
+      this.gameState.status = 'ended';
+      this.gameState.winnerId = remainingIds[0];
+      this.gameState.technicalVictory = true;
+      this.gameState.restartTimer = RESTART_DELAY_SECONDS;
+    }
+    this.gameState.pause = undefined;
+    delete this.gameState.players[runtimeId];
+    this.rngChannelsByPlayer.delete(runtimeId);
+    if (this.gameState.status !== 'ended') {
+      this.playerSlots.delete(runtimeId);
+      this.durablePlayerIds.delete(runtimeId);
+    }
+    this.enqueueCheckpoint();
+    logInfo('match_disconnect_forfeit', {
+      matchId: this.durableMatchId,
+      playerId: runtimeId,
     });
   }
 
@@ -229,7 +488,7 @@ export class GameManager {
       const interval = cascading ? 1 : active ? this.netcastEveryNTicks : this.lobbyNetcastEveryNTicks;
       if (statusChanged || sinceEmit >= interval) {
         sinceEmit = 0;
-        this.io.emit('gameState', this.gameState);
+        this.emitToMatch('gameState', this.gameState);
       }
     }, 1000 / 60);
   }
@@ -314,10 +573,24 @@ export class GameManager {
     if (status === 'countdown') {
       const participants = this.captureDurableParticipants();
       if (participants === null) return;
+
+      if (this.durableMatchId !== null && this.durableMatchPreallocated) {
+        const matchId = this.durableMatchId;
+        this.enqueuePersistence(async () => {
+          await this.persistence!.advanceStatus({
+            matchId,
+            expectedStatus: 'allocating',
+            nextStatus: 'countdown',
+          });
+        });
+        return;
+      }
+
       const matchSeed = this.gameState.seed;
 
       this.enqueuePersistence(async () => {
         this.durableMatchId = null;
+        this.durableMatchPreallocated = false;
         const allocation = await this.persistence!.startMatch({
           matchSeed,
           participants: {
@@ -326,11 +599,19 @@ export class GameManager {
           },
         });
         this.durableMatchId = allocation.match.id;
+        this.durableMatchPreallocated = true;
+        this.onMatchCreated?.(allocation.match.id);
         await this.persistence!.advanceStatus({
           matchId: allocation.match.id,
           expectedStatus: 'allocating',
           nextStatus: 'countdown',
         });
+        this.emitMatchAssignments(
+          allocation.match.id,
+          allocation.match.matchSeed,
+          allocation.match.protocolVersion,
+          allocation.tickets,
+        );
       });
       return;
     }
@@ -350,6 +631,7 @@ export class GameManager {
     if (status === 'ended') {
       const finalization = this.captureDurableFinalization();
       if (finalization === null) return;
+      this.durableMatchPreallocated = false;
 
       this.enqueuePersistence(async () => {
         if (this.durableMatchId === null) return;
@@ -365,11 +647,33 @@ export class GameManager {
     this.persistenceTail = this.persistenceTail
       .then(operation)
       .catch((error: unknown) => {
-        console.error('Durable match persistence failed', {
-          event: 'durable_match_persistence_failed',
-          error,
+        logError('durable_match_persistence_failed', error, {
+          matchId: this.durableMatchId,
         });
       });
+  }
+
+  private emitMatchAssignments(
+    matchId: string,
+    matchSeed: number,
+    protocolVersion: number,
+    tickets: { A: JoinTicket; B: JoinTicket },
+  ): void {
+    for (const ticket of [tickets.A, tickets.B]) {
+      const runtimeEntry = [...this.durablePlayerIds.entries()]
+        .find(([, playerId]) => playerId === ticket.playerId);
+      if (runtimeEntry === undefined) continue;
+      const socket = this.activeSocketByRuntimeId.get(runtimeEntry[0]);
+      if (socket === undefined) continue;
+      socket.emit('matchAssignment', {
+        matchId,
+        playerId: ticket.playerId,
+        seat: ticket.seat,
+        ticket: ticket.ticket,
+        matchSeed,
+        protocolVersion,
+      } satisfies MatchAssignment);
+    }
   }
 
   private captureDurableParticipants(): {
@@ -453,6 +757,7 @@ export class GameManager {
   }
 
   private update() {
+    if (this.restoredAwaitingReconnect || this.gameState.pause !== undefined) return;
     this.handleStatusTransitions();
     if (this.gameState.status === 'waiting') {
       this.clearInputs();
@@ -493,7 +798,7 @@ export class GameManager {
       }
       if (stepResult.events.length > 0) {
         for (const ev of stepResult.events) {
-          this.io.emit('matchEvent', ev);
+          this.emitToMatch('matchEvent', ev);
         }
       }
 
@@ -504,6 +809,9 @@ export class GameManager {
           tick: this.gameState.tick,
           players: JSON.parse(JSON.stringify(this.gameState.players)),
         });
+      }
+      if (this.gameState.tick > 0 && this.gameState.tick % 60 === 0) {
+        this.enqueueCheckpoint();
       }
       if (stepResult.matchEnded) this.saveReplay();
     } else if (this.gameState.status === 'ended') {
@@ -546,4 +854,94 @@ export class GameManager {
     }
     this.activeReplay = null;
   }
+
+  private enqueueCheckpoint(): void {
+    const matchId = this.durableMatchId;
+    const writeCheckpoint = this.persistence?.writeCheckpoint;
+    if (matchId === null || writeCheckpoint === undefined) return;
+
+    const stateBlob = Buffer.from(JSON.stringify({
+      version: 1,
+      matchId,
+      state: this.gameState,
+      participants: [...this.playerSlots.entries()].map(([runtimeId, slot]) => ({
+        runtimeId,
+        playerId: this.durablePlayerIds.get(runtimeId) ?? runtimeId,
+        slot,
+        rng: this.rngChannelsByPlayer.get(runtimeId),
+      })),
+      disconnectBudgets: [...this.disconnectBudgets.entries()].map(([runtimeId, budget]) => ({
+        runtimeId,
+        ...budget,
+      })),
+    }), 'utf8');
+    const simTick = this.gameState.tick;
+    this.enqueuePersistence(async () => {
+      await writeCheckpoint.call(this.persistence, {
+        matchId,
+        simTick,
+        stateBlob,
+      });
+    });
+  }
+
+  private emitToMatch(event: string, payload: unknown): void {
+    if (this.durableMatchId !== null && typeof this.io.to === 'function') {
+      this.io.to(`match:${this.durableMatchId}`).emit(event, payload);
+      return;
+    }
+    this.io.emit(event, payload);
+  }
+}
+
+type CheckpointEnvelope = {
+  version: 1;
+  matchId: string;
+  state: GameState;
+  participants: Array<{
+    runtimeId: string;
+    playerId: string;
+    slot: number;
+    rng: RngChannels;
+  }>;
+  disconnectBudgets: Array<{
+    runtimeId: string;
+    episodes: number;
+    totalPausedMs: number;
+  }>;
+};
+
+function isCheckpointEnvelope(value: unknown): value is CheckpointEnvelope {
+  if (!isRecord(value) || value.version !== 1 || typeof value.matchId !== 'string') {
+    return false;
+  }
+  if (!isRecord(value.state) || !isRecord(value.state.players)) return false;
+  if (!Array.isArray(value.participants) || !Array.isArray(value.disconnectBudgets)) return false;
+  if (!value.participants.every((participant) => {
+    if (!isRecord(participant)) return false;
+    if (
+      typeof participant.runtimeId !== 'string'
+      || typeof participant.playerId !== 'string'
+      || typeof participant.slot !== 'number'
+      || !isRecord(participant.rng)
+    ) {
+      return false;
+    }
+    return ['pieces', 'garbage', 'shop', 'effects'].every((channel) => {
+      const rng = participant.rng[channel];
+      return isRecord(rng) && typeof rng.seed === 'number';
+    });
+  })) {
+    return false;
+  }
+  return value.disconnectBudgets.every((budget) => (
+    isRecord(budget)
+    && typeof budget.runtimeId === 'string'
+    && typeof budget.episodes === 'number'
+    && typeof budget.totalPausedMs === 'number'
+  ));
+}
+
+function isRecord(value: unknown): value is Record<string, any> {
+  return typeof value === 'object' && value !== null;
 }

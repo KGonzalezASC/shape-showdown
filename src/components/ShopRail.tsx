@@ -39,18 +39,14 @@ const ShopRail: React.FC<ShopRailProps> = ({
   viewportMode,
 }) => {
   const isExpanded = viewportMode !== 'phone';
-  const railWidthClass = viewportMode === 'phone'
-    ? 'w-[5.75rem] min-[661px]:w-full'
-    : viewportMode === 'tablet'
-      ? 'w-full'
-      : 'w-[8.875rem]';
+  const railWidthClass = 'w-full min-w-0';
   const iconRowClass = isExpanded ? 'min-h-11 px-2 py-1.5' : 'min-h-9 px-1.5 py-1';
   const bodyTextClass = isExpanded ? 'text-[9px]' : 'text-[8px]';
   const metaTextClass = isExpanded ? 'text-[8px]' : 'text-[7px]';
   const iconClass = isExpanded ? 'text-base' : 'text-sm';
   const offerListClass = viewportMode === 'desktop'
     ? 'max-h-none overflow-visible'
-    : `${isExpanded ? 'max-h-[18rem]' : 'max-h-[14rem]'} overflow-y-auto`;
+    : `${isExpanded ? 'max-h-[18rem]' : 'max-h-[14rem]'} min-w-0 overflow-y-auto`;
 
   const isWaiting = !isPlaying || shopPhase === 'waiting';
   const isReady = isPlaying && shopPhase === 'ready';
@@ -61,8 +57,8 @@ const ShopRail: React.FC<ShopRailProps> = ({
   return (
     <div className={`shop-rail shop-rail--${viewportMode} ${railWidthClass} select-none ${isWaiting ? 'shop-rail--waiting' : ''}`}>
       <div className={`shop-rail-panel ${showConfirmAction ? 'shop-rail-panel--actionable' : ''} ${ssShopClasses.panel} shadow-xl ${isExpanded ? 'p-2' : 'p-1.5'}`}>
-        <div className="shop-rail-header mb-2 flex items-center justify-between border-b border-[var(--ss-shop-border)] pb-1.5">
-          <p className={`shop-rail-title ${bodyTextClass} ${ssShopClasses.headerTitle}`}>Shop · {items.length}</p>
+        <div className="shop-rail-header mb-2 flex min-w-0 items-center justify-between border-b border-[var(--ss-shop-border)] pb-1.5">
+          <p className={`shop-rail-title min-w-0 truncate ${bodyTextClass} ${ssShopClasses.headerTitle}`}>Shop · {items.length}</p>
           {isExpired && isPlaying ? (
             <span className={`${bodyTextClass} ${ssShopClasses.waitBadge} px-1 py-0.5`}>Wait</span>
           ) : (
@@ -93,7 +89,7 @@ const ShopRail: React.FC<ShopRailProps> = ({
               return (
                 <div
                   key={item.id}
-                  className={`shop-offer-row relative grid w-full grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-x-1.5 transition-colors duration-150 ${iconRowClass} ${
+                  className={`shop-offer-row relative grid w-full min-w-0 grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-x-1.5 transition-colors duration-150 ${iconRowClass} ${
                     isHighlighted
                       ? canAfford
                         ? `${ssShopClasses.rowHighlighted} text-[var(--ss-text-primary)]`
@@ -152,13 +148,14 @@ const ShopRail: React.FC<ShopRailProps> = ({
           type="button"
           aria-pressed={hatchingEnabled}
           onClick={onToggleHatching}
-          className={`shop-hatch-button mt-1 w-full border px-2 py-1 text-center ss-mono text-[9px] uppercase tracking-wider transition ${
+          className={`shop-hatch-button mt-1 flex w-full min-w-0 flex-col items-center justify-center border px-1 py-1 text-center ss-mono text-[8px] uppercase leading-tight tracking-wide transition ${
             hatchingEnabled
               ? 'border-emerald-400/60 bg-emerald-500/20 text-emerald-100 hover:bg-emerald-500/30'
               : 'border-[var(--ss-stroke-primary)] bg-[var(--ss-fill-primary)] text-[var(--ss-text-tertiary)] hover:text-[var(--ss-text-secondary)]'
           }`}
         >
-          Hatch: {hatchingEnabled ? 'On' : 'Off'}
+          <span>Hatch</span>
+          <span>{hatchingEnabled ? 'On' : 'Off'}</span>
         </button>
       )}
     </div>

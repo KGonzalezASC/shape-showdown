@@ -1,6 +1,9 @@
 import { createHash, randomBytes } from 'node:crypto';
 import { Router, type Request, type RequestHandler, type Response } from 'express';
+import type { MatchAssignment } from '../../src/types.js';
 import type { Database } from './database.js';
+import { MatchStore } from './matchStore.js';
+import { logError, logInfo } from '../observability/logger.js';
 import { LobbyStore, QueueStore } from './queueLobbyStore.js';
 import { PlayerStore, type ValidatedSession } from './playerStore.js';
 
@@ -97,6 +100,54 @@ export function createControlPlaneRouter(database: Database): Router {
 
       const entryId = await queue.removeEntry(session.playerId);
       response.status(200).json({ removed: entryId !== null });
+    }),
+  );
+
+  router.get(
+    '/match-assignment',
+    asyncHandler(async (request, response) => {
+      const session = await authenticate(request, players);
+      if (session === null) {
+        sendClientError(response, 401, 'valid session required');
+        return;
+      }
+
+      let assignment: MatchAssignment | null;
+      try {
+        assignment = await database.begin(async (transaction) => {
+          const active = await new MatchStore(transaction).findActiveMatchForPlayer(session.playerId);
+          if (active === null) return null;
+          const ticket = await new MatchStore(transaction).issueReplacementJoinTicket({
+            matchId: active.match.id,
+            playerId: session.playerId,
+            seat: active.seat,
+          });
+          return {
+            matchId: active.match.id,
+            playerId: session.playerId,
+            seat: active.seat,
+            ticket: ticket.ticket,
+            matchSeed: active.match.matchSeed,
+            protocolVersion: active.match.protocolVersion,
+          };
+        });
+      } catch (error) {
+        logError('join_ticket_refresh_failed', error, {
+          playerId: session.playerId,
+        });
+        throw error;
+      }
+
+      if (assignment === null) {
+        response.status(204).end();
+        return;
+      }
+      logInfo('join_ticket_refreshed', {
+        matchId: assignment.matchId,
+        playerId: assignment.playerId,
+        seat: assignment.seat,
+      });
+      response.status(200).json(assignment);
     }),
   );
 

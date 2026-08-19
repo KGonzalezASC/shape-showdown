@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useLayoutEffect, useRef } from 'react';
 import { recordBoardCanvasPaint } from '../performance/boardPerformance';
 import {
   isCanvasLayoutVisible,
@@ -777,6 +777,26 @@ export const VoronoiFlowfieldCanvas: React.FC<VoronoiFlowfieldCanvasProps> = Rea
   const activeVisualStartedAtRef = useRef<number | null>(null);
   const previousActiveCellsRef = useRef<readonly ActiveVisualCell[]>([]);
   const previousActivePieceKeyRef = useRef<string | null>(null);
+  const renderedCellSizeRef = useRef<number | null>(null);
+  const discardPriorActiveGeometryRef = useRef(false);
+
+  useLayoutEffect(() => {
+    // The canvas element's CSS size updates during commit. Keep the animation
+    // loop on the same cell size before the browser paints that resize.
+    const previousCellSize = renderedCellSizeRef.current;
+    cellSizeRef.current = cellSize;
+    renderedCellSizeRef.current = cellSize;
+    if (previousCellSize === null || previousCellSize === cellSize) return;
+
+    // These values contain points calculated for the prior cell size. Letting
+    // them interpolate after a responsive resize produces a stale piece that
+    // alternates between the old and new board scales.
+    activeMotionRef.current.clear();
+    activeStackHandoffRef.current.clear();
+    explosionShardsRef.current = [];
+    poisonAnimationRef.current = null;
+    discardPriorActiveGeometryRef.current = true;
+  }, [cellSize]);
 
   useEffect(() => {
     if (
@@ -873,7 +893,11 @@ export const VoronoiFlowfieldCanvas: React.FC<VoronoiFlowfieldCanvasProps> = Rea
     visibleRowsRef.current = visibleRows;
     visiblePoisonRef.current = visiblePoison;
     const now = performance.now();
-    const priorActiveCells = previousActiveCellsRef.current;
+    const discardPriorActiveGeometry = discardPriorActiveGeometryRef.current;
+    discardPriorActiveGeometryRef.current = false;
+    const priorActiveCells = discardPriorActiveGeometry
+      ? []
+      : previousActiveCellsRef.current;
     const activeSequenceRestarted = shouldRestartActivePieceVisualLifetime(
       priorActiveCells,
       activeCells,
@@ -957,7 +981,6 @@ export const VoronoiFlowfieldCanvas: React.FC<VoronoiFlowfieldCanvasProps> = Rea
     previousActiveCellsRef.current = activeCells;
     previousActivePieceKeyRef.current = activePieceKey;
     activeCellsRef.current = activeCells;
-    cellSizeRef.current = cellSize;
     cellMapDirtyRef.current = true;
   }, [
     visibleRows,

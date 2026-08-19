@@ -24,4 +24,10 @@ describe('PlayfieldCellSizer shrine gutter', () => {
     assert.equal(cell, Math.floor(cell));
     assert.ok(cell >= 22);
   });
+
+  test('compact cells stay integer so grid hairlines remain continuous', () => {
+    const cell = fitMobilePlayfieldCellSize({ width: 268, height: 482 }, 30);
+    assert.equal(cell, Math.floor(cell));
+    assert.ok(cell >= 8);
+  });
 });

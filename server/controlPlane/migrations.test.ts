@@ -10,11 +10,16 @@ describe('control-plane migrations', () => {
 
     assert.deepEqual(migrations.map((migration) => migration.version), [
       '0001_control_plane',
+      '0002_concurrent_join_tickets',
     ]);
     assert.match(migrations[0]?.sql ?? '', /CREATE TABLE IF NOT EXISTS players/);
     assert.match(
       migrations[0]?.sql ?? '',
       /CREATE TABLE IF NOT EXISTS match_checkpoints/,
+    );
+    assert.match(
+      migrations[1]?.sql ?? '',
+      /DROP CONSTRAINT IF EXISTS match_tickets_match_id_seat_key/,
     );
   });
 });

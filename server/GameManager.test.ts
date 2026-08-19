@@ -131,7 +131,7 @@ describe('GameManager lifecycle harness', () => {
 
     internal.gameState.status = 'playing';
     internal.lastHandledStatus = 'playing';
-    internal.gameState.players.p1.topOut = true;
+    internal.gameState.players['durable-p1'].topOut = true;
     gm.tickOnceForTests();
     gm.tickOnceForTests();
     await flushPromises();
@@ -151,9 +151,77 @@ describe('GameManager lifecycle harness', () => {
       A: 'durable-p1',
       B: 'durable-p2',
     });
+
+    // A socket handoff can briefly publish waiting while the replacement
+    // tickets bind. That must not cause the already-created rematch to be
+    // inserted into PostgreSQL again when the state returns to countdown.
+    internal.gameState.status = 'waiting';
+    internal.lastHandledStatus = 'ended';
+    gm.tickOnceForTests();
+    gm.tickOnceForTests();
+    await flushPromises();
+    assert.equal(persistence.starts.length, 2);
   });
 
-  it('finalizes a disconnect as a durable forfeit with the disconnected seat retained', async () => {
+  it('pauses a durable match for disconnect and rebinds the same seat', async () => {
+    const persistence = new RecordingMatchPersistence();
+    const gm = new GameManager(createFakeIo(), 60, persistence);
+    managers.push(gm);
+    const p1 = new FakeSocket('p1');
+    const p2 = new FakeSocket('p2');
+    gm.handleConnection(p1 as unknown as Socket, 'durable-p1', {
+      matchId: 'match-1',
+      playerId: 'durable-p1',
+      seat: 'A',
+      matchSeed: 123,
+      protocolVersion: 1,
+    });
+    gm.handleConnection(p2 as unknown as Socket, 'durable-p2', {
+      matchId: 'match-1',
+      playerId: 'durable-p2',
+      seat: 'B',
+      matchSeed: 123,
+      protocolVersion: 1,
+    });
+
+    for (let i = 0; i < 5; i += 1) gm.tickOnceForTests();
+    await flushPromises();
+
+    const internal = gm as unknown as {
+      gameState: {
+        status: string;
+        pause?: { playerId: string };
+        players: Record<string, PlayerState>;
+      };
+      lastHandledStatus: string;
+    };
+    internal.gameState.status = 'playing';
+    internal.lastHandledStatus = 'playing';
+    p1.emit('disconnect');
+    gm.tickOnceForTests();
+    await flushPromises();
+
+    assert.equal(persistence.finalizations.length, 0);
+    assert.equal(internal.gameState.pause?.playerId, 'durable-p1');
+    assert.equal(internal.gameState.players['durable-p1'] !== undefined, true);
+
+    const replacement = new FakeSocket('p1-reconnected');
+    gm.handleConnection(
+      replacement as unknown as Socket,
+      'durable-p1',
+      {
+        matchId: 'match-1',
+        playerId: 'durable-p1',
+        seat: 'A',
+        matchSeed: 123,
+        protocolVersion: 1,
+      },
+    );
+    assert.equal(internal.gameState.pause, undefined);
+    assert.equal(internal.gameState.players['durable-p1'] !== undefined, true);
+  });
+
+  it('replaces a seat socket through a valid ticket without changing the runtime player identity', async () => {
     const persistence = new RecordingMatchPersistence();
     const gm = new GameManager(createFakeIo(), 60, persistence);
     managers.push(gm);
@@ -165,20 +233,31 @@ describe('GameManager lifecycle harness', () => {
     for (let i = 0; i < 5; i += 1) gm.tickOnceForTests();
     await flushPromises();
 
-    const internal = gm as unknown as {
-      gameState: { status: string };
-      lastHandledStatus: string;
-    };
-    internal.gameState.status = 'playing';
-    internal.lastHandledStatus = 'playing';
-    p1.emit('disconnect');
-    gm.tickOnceForTests();
-    await flushPromises();
+    const replacement = new FakeSocket('p1-replacement');
+    gm.handleConnection(
+      replacement as unknown as Socket,
+      'durable-p1',
+      {
+        matchId: 'match-1',
+        playerId: 'durable-p1',
+        seat: 'A',
+        matchSeed: 123,
+        protocolVersion: 1,
+      },
+    );
 
-    assert.equal(persistence.finalizations.length, 1);
-    assert.equal(persistence.finalizations[0].matchId, 'match-1');
-    assert.equal(persistence.finalizations[0].winnerId, 'durable-p2');
-    assert.equal(persistence.finalizations[0].outcomeReason, 'forfeit_disconnect');
+    const internal = gm as unknown as {
+      gameState: {
+        status: string;
+        players: Record<string, PlayerState>;
+      };
+    };
+    replacement.emit('inputState', { left: true, right: false, softDrop: false });
+
+    assert.equal(p1.disconnected, true);
+    assert.equal(internal.gameState.status, 'countdown');
+    assert.ok(internal.gameState.players['durable-p1']);
+    assert.equal(internal.gameState.players['durable-p1'].inputState.left, true);
   });
 
   it('transitions waiting → countdown when two players connect', () => {

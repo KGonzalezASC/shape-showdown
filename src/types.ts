@@ -65,6 +65,35 @@ import {
 } from './constants';
 
 export type MatchStatus = 'waiting' | 'countdown' | 'playing' | 'ended';
+export type MatchSeat = 'A' | 'B';
+export type MatchAssignment = {
+  matchId: string;
+  playerId: string;
+  seat: MatchSeat;
+  ticket: string;
+  matchSeed: number;
+  protocolVersion: number;
+};
+export type MatchConnectionPhase =
+  | 'idle'
+  | 'acquiring-session'
+  | 'queued'
+  | 'assigned'
+  | 'reconnecting'
+  | 'connecting'
+  | 'connected'
+  | 'error';
+export type MatchTicketState = 'none' | 'received' | 'presented' | 'consumed';
+export type MatchConnectionDiagnostics = {
+  phase: MatchConnectionPhase;
+  playerId: string | null;
+  matchId: string | null;
+  seat: MatchSeat | null;
+  protocolVersion: number | null;
+  ticketState: MatchTicketState;
+  ticketLength: number | null;
+  error: string | null;
+};
 export type ServerHealthStatus = 'unknown' | 'healthy' | 'unavailable';
 export type ServerDatabaseMode = 'unknown' | 'postgres' | 'in-memory';
 export type ServerDatabaseHealth = 'unknown' | 'healthy' | 'unavailable' | 'not-configured';
@@ -342,6 +371,10 @@ export interface GameState {
   status: MatchStatus;
   countdown: number;
   winnerId: string | null;
+  pause?: {
+    playerId: string;
+    startedAt: number;
+  };
   restartTimer?: number;
   technicalVictory?: boolean;
   tick: number;

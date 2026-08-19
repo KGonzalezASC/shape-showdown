@@ -339,7 +339,7 @@ const GameField = forwardRef<GameFieldRef, GameFieldProps>(({
   const swapZoneText = `Swap rows 0-${cutoffRow - 1}`;
   const swapLineY = cutoffRow * cellSize;
   const showSwapLine = isMe && cutoffRow > 0 && cutoffRow < BOARD_VISIBLE_ROWS;
-  const desktopShrineMargin = shrineEnabled && !boardFitRef ? SHRINE_PAD_PX : 0;
+  const desktopShrineMargin = shrineEnabled && !boardFitRef && cellSizeProp === undefined ? SHRINE_PAD_PX : 0;
 
   const storageFrozen = isMe && activeEffects.some((e) => e.kind === 'freeze');
   const snagged = isMe && !!player.snagHardDropBlocked;

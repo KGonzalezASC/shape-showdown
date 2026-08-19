@@ -1,16 +1,22 @@
 import express from 'express';
 import { createServer } from 'node:http';
+import { randomUUID } from 'node:crypto';
 import path from 'node:path';
 import { Server, type Socket } from 'socket.io';
 import { createControlPlaneRouter } from './controlPlane/routes.js';
 import { createHttpCorsMiddleware, resolveCorsOrigins } from './controlPlane/cors.js';
 import { createDatabase, healthPing } from './controlPlane/database.js';
+import { MatchAllocationService } from './controlPlane/matchAllocation.js';
 import { MatchStore } from './controlPlane/matchStore.js';
 import { PostgresMatchPersistence } from './controlPlane/matchPersistence.js';
 import { runMigrations } from './controlPlane/migrations.js';
 import { PlayerStore } from './controlPlane/playerStore.js';
-import { GameManager } from './GameManager.js';
+import { QueueStore } from './controlPlane/queueLobbyStore.js';
+import type { SocketSeatBinding } from './GameManager.js';
 import { loadServerConfig, type ServerConfig } from './loadConfig.js';
+import { MatchRegistry } from './matchRuntime/MatchRegistry.js';
+import { logError, logInfo } from './observability/logger.js';
+import { initialSeed } from './tetris/engine.js';
 
 type ServerMode = 'development' | 'production';
 
@@ -35,6 +41,9 @@ export async function startGameServer(
   const mode = options.mode ?? (process.env.NODE_ENV === 'production' ? 'production' : 'development');
   const database = createDatabase();
   const playerStore = database === null ? null : new PlayerStore(database);
+  const allocator = database === null ? null : new MatchAllocationService(database);
+  const queueJanitor = database === null ? null : new QueueStore(database);
+  const gameServerUrl = process.env.GAME_SERVER_URL?.trim() || `http://localhost:${config.port}`;
   const databaseRequired =
     mode === 'production' && process.env.ALLOW_IN_MEMORY_DATABASE !== 'true';
 
@@ -79,8 +88,11 @@ export async function startGameServer(
 
   if (database !== null) {
     const matchStore = new MatchStore(database);
+    const requireMatchTickets =
+      process.env.REQUIRE_MATCH_TICKETS === 'true'
+      || process.env.ALLOW_LEGACY_SOCKET_BOOTSTRAP !== 'true';
     io.use((socket, next) => {
-      void authorizeSocket(socket, matchStore).then(() => next()).catch(next);
+      void authorizeSocket(socket, matchStore, requireMatchTickets).then(() => next()).catch(next);
     });
   }
 
@@ -151,21 +163,29 @@ export async function startGameServer(
     ? undefined
     : new PostgresMatchPersistence(
       database,
-      process.env.GAME_SERVER_URL?.trim() || `http://localhost:${config.port}`,
+      gameServerUrl,
     );
-  const gameManager = new GameManager(io, config.replayKeyframeIntervalTicks, persistence);
+  const matchRegistry = new MatchRegistry(
+    io,
+    config.replayKeyframeIntervalTicks,
+    persistence,
+  );
   io.on('connection', (socket) => {
     void resolveDurablePlayerId(socket, playerStore)
       .then((durablePlayerId) => {
         if (!socket.connected) return;
-        console.log(`Player connected: ${socket.id}`);
-        gameManager.handleConnection(socket, durablePlayerId);
+        const binding = readSocketSeatBinding(socket);
+        logInfo('socket_bound', {
+          connection: binding === undefined ? 'legacy' : 'ticket',
+          matchId: binding?.matchId,
+          playerId: durablePlayerId ?? null,
+          seat: binding?.seat,
+        });
+        matchRegistry.handleConnection(socket, durablePlayerId, binding);
       })
       .catch((error: unknown) => {
-        console.error('Failed to prepare durable player', {
-          event: 'durable_player_prepare_failed',
-          socketId: socket.id,
-          error,
+        logError('durable_player_prepare_failed', error, {
+          connection: 'ticket',
         });
         socket.disconnect(true);
       });
@@ -181,7 +201,7 @@ export async function startGameServer(
       });
     });
   } catch (error) {
-    gameManager.stopLoop();
+    await matchRegistry.stop();
     await closeDevelopmentServer?.();
     io.close();
     await database?.end({ timeout: 1 });
@@ -190,12 +210,50 @@ export async function startGameServer(
 
   const address = httpServer.address();
   if (address === null || typeof address === 'string') {
-    gameManager.stopLoop();
+    await matchRegistry.stop();
     await closeDevelopmentServer?.();
     io.close();
     await database?.end({ timeout: 1 });
     throw new Error('Game server did not expose a TCP address');
   }
+  logInfo('server_started', {
+    database: database === null ? 'in_memory' : 'postgres',
+    mode,
+    origin: `http://${config.host}:${address.port}`,
+  });
+
+  let allocationInFlight = false;
+  const allocationHandle = allocator === null
+    ? null
+    : setInterval(() => {
+      if (allocationInFlight) return;
+      allocationInFlight = true;
+      void allocator.allocateNextMatch({
+        correlationId: randomUUID(),
+        matchSeed: initialSeed(),
+        gameServerUrl,
+        protocolVersion: 1,
+      })
+        .then(async (allocation) => {
+          if (allocation !== null) {
+            logInfo('queue_match_allocated', {
+              correlationId: allocation.match.correlationId,
+              matchId: allocation.match.id,
+              playerAId: allocation.match.playerAId,
+              playerBId: allocation.match.playerBId,
+            });
+          }
+          await queueJanitor?.purgeExpiredEntries();
+        })
+        .catch((error: unknown) => {
+          logError('match_allocation_cycle_failed', error, {
+            operation: 'queue_allocation',
+          });
+        })
+        .finally(() => {
+          allocationInFlight = false;
+        });
+    }, 500);
 
   let stopped = false;
   return {
@@ -205,7 +263,9 @@ export async function startGameServer(
     stop: async () => {
       if (stopped) return;
       stopped = true;
-      gameManager.stopLoop();
+      matchRegistry.beginDrain();
+      if (allocationHandle !== null) clearInterval(allocationHandle);
+      await matchRegistry.stop();
       await closeDevelopmentServer?.();
       await new Promise<void>((resolve) => io.close(() => resolve()));
       await database?.end({ timeout: 1 });
@@ -213,10 +273,14 @@ export async function startGameServer(
   };
 }
 
-async function authorizeSocket(socket: Socket, matches: MatchStore): Promise<void> {
+async function authorizeSocket(
+  socket: Socket,
+  matches: MatchStore,
+  requireMatchTickets: boolean,
+): Promise<void> {
   const ticket = readAuthString(socket.handshake.auth, 'ticket');
   if (ticket === null) {
-    if (process.env.REQUIRE_MATCH_TICKETS === 'true') {
+    if (requireMatchTickets) {
       throw new Error('match ticket required');
     }
     return;
@@ -243,11 +307,17 @@ async function authorizeSocket(socket: Socket, matches: MatchStore): Promise<voi
   if (consumed === null) {
     throw new Error('match ticket already consumed');
   }
+  logInfo('join_ticket_consumed', {
+    matchId: consumed.matchId,
+    playerId: consumed.playerId,
+    seat: consumed.seat,
+  });
 
   socket.data.controlPlane = {
     matchId: validated.matchId,
     playerId: validated.playerId,
     seat: validated.seat,
+    matchSeed: validated.matchSeed,
     protocolVersion: validated.protocolVersion,
   };
 }
@@ -264,6 +334,27 @@ async function resolveDurablePlayerId(
 
   const player = await players.createGuestPlayer(`Guest ${socket.id.slice(0, 8)}`);
   return player.id;
+}
+
+function readSocketSeatBinding(socket: Socket): SocketSeatBinding | undefined {
+  const controlPlane = socket.data?.controlPlane;
+  if (!isRecord(controlPlane)) return undefined;
+  const matchId = controlPlane.matchId;
+  const playerId = controlPlane.playerId;
+  const seat = controlPlane.seat;
+  const matchSeed = controlPlane.matchSeed;
+  const protocolVersion = controlPlane.protocolVersion;
+  if (
+    typeof matchId !== 'string'
+    || typeof playerId !== 'string'
+    || (seat !== 'A' && seat !== 'B')
+    || typeof matchSeed !== 'number'
+    || typeof protocolVersion !== 'number'
+    || !Number.isInteger(protocolVersion)
+  ) {
+    return undefined;
+  }
+  return { matchId, playerId, seat, matchSeed, protocolVersion };
 }
 
 function readAuthString(auth: unknown, key: string): string | null {

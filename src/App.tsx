@@ -1,18 +1,16 @@
 import React, { useCallback, useEffect, useLayoutEffect, useReducer, useRef } from 'react';
-import { Trophy } from 'lucide-react';
+import { RefreshCw, Trophy, WifiOff } from 'lucide-react';
 import { AnimatePresence, LazyMotion, domAnimation, m } from 'motion/react';
 import { DrillConsole, DrillResult } from './components/DrillConsole';
 import { MatchChrome } from './components/MatchChrome';
 import { PlayfieldShell } from './components/PlayfieldShell';
-import { fitMobilePlayfieldCellSize } from './components/PlayfieldCellSizer';
 import { ServerDiagnosticsPanel } from './components/ServerDiagnosticsPanel';
 import { ShopRailVariations } from './components/ShopRailVariations';
 import MobileControls from './components/MobileControls';
 import { GameFieldRef } from './components/GameField';
 import { BackgroundPrototype } from './components/BackgroundPrototype';
 import { ThemeBackground } from './presentation/ThemeBackground';
-import { ThemeProvider, useThemePackage } from './presentation/ThemeProvider';
-import { SHRINE_PAD_PX } from './board/shrineLayout';
+import { ThemeProvider } from './presentation/ThemeProvider';
 import { DEV_TOOLS_ENABLED } from './devTools';
 import { useLockDrill } from './hooks/useLockDrill';
 import { useShopConfirm } from './hooks/useShopConfirm';
@@ -22,12 +20,18 @@ import {
   useGameState,
   useIsConnected,
   useMatchChromeSnapshot,
+  useMatchDiagnostics,
   useMyId,
   usePlayfieldSnapshot,
   useServerHealth,
 } from './state/GameStateProvider';
 import { ActionType, COUNTDOWN_SECONDS } from './types';
 import { isShopViewportUnplayable } from './responsive/shopViewportWarning';
+import {
+  playfieldScreenClass,
+  playfieldViewportPaddingClass,
+  usePlayfieldLayoutMode,
+} from './responsive/playfieldLayoutMode';
 import { mixDecorationSeed } from './presentation/decorationSeed';
 
 interface DrillState {
@@ -57,9 +61,7 @@ function drillReducer(state: DrillState, action: DrillAction): DrillState {
 
 interface AppShellState {
   showTouchControls: boolean;
-  isDesktopLayout: boolean;
   showViewportWarning: boolean;
-  mobileCellSize: number;
   showVariations: boolean;
   hatchingEnabled: boolean;
   backgroundSeedKey: number;
@@ -70,9 +72,7 @@ interface AppShellState {
 
 type AppShellAction =
   | { type: 'REVEAL_TOUCH_CONTROLS' }
-  | { type: 'SET_DESKTOP_LAYOUT'; isDesktop: boolean }
   | { type: 'SET_VIEWPORT_WARNING'; visible: boolean }
-  | { type: 'SET_MOBILE_CELL_SIZE'; size: number }
   | { type: 'SET_SHOW_VARIATIONS'; visible: boolean }
   | { type: 'TOGGLE_HATCHING' }
   | { type: 'RESEED_PURCHASE'; matchSeed: number; startedAtMs: number }
@@ -83,9 +83,7 @@ function createInitialAppShellState(): AppShellState {
   return {
     showTouchControls: window.matchMedia('(pointer: coarse)').matches
       || window.matchMedia('(hover: none)').matches,
-    isDesktopLayout: window.matchMedia('(min-width: 901px)').matches,
     showViewportWarning: false,
-    mobileCellSize: 28,
     showVariations: DEV_TOOLS_ENABLED
       && typeof window !== 'undefined'
       && new URLSearchParams(window.location.search).get('shopMock') === '1',
@@ -101,18 +99,10 @@ function appShellReducer(state: AppShellState, action: AppShellAction): AppShell
   switch (action.type) {
     case 'REVEAL_TOUCH_CONTROLS':
       return state.showTouchControls ? state : { ...state, showTouchControls: true };
-    case 'SET_DESKTOP_LAYOUT':
-      return state.isDesktopLayout === action.isDesktop
-        ? state
-        : { ...state, isDesktopLayout: action.isDesktop };
     case 'SET_VIEWPORT_WARNING':
       return state.showViewportWarning === action.visible
         ? state
         : { ...state, showViewportWarning: action.visible };
-    case 'SET_MOBILE_CELL_SIZE':
-      return state.mobileCellSize === action.size
-        ? state
-        : { ...state, mobileCellSize: action.size };
     case 'SET_SHOW_VARIATIONS':
       return state.showVariations === action.visible
         ? state
@@ -146,11 +136,11 @@ function appShellReducer(state: AppShellState, action: AppShellAction): AppShell
 const AppShell: React.FC = () => {
   const connected = useIsConnected();
   const serverHealth = useServerHealth();
+  const matchDiagnostics = useMatchDiagnostics();
   const gameState = useGameState();
   const myId = useMyId();
   const playfield = usePlayfieldSnapshot();
-  const theme = useThemePackage();
-  const shrinePadPx = theme.shrine === 'watching-amalgam' ? SHRINE_PAD_PX : 0;
+  const layoutMode = usePlayfieldLayoutMode();
   const hasLocalPlayer = Boolean(playfield.myPlayer);
   const [appShellState, appShellDispatch] = useReducer(
     appShellReducer,
@@ -159,9 +149,7 @@ const AppShell: React.FC = () => {
   );
   const {
     showTouchControls,
-    isDesktopLayout,
     showViewportWarning,
-    mobileCellSize,
     showVariations,
     hatchingEnabled,
     backgroundSeedKey,
@@ -194,14 +182,6 @@ const AppShell: React.FC = () => {
     };
   }, []);
 
-  useEffect(() => {
-    const desktopQuery = window.matchMedia('(min-width: 901px)');
-    const update = () => appShellDispatch({ type: 'SET_DESKTOP_LAYOUT', isDesktop: desktopQuery.matches });
-    update();
-    desktopQuery.addEventListener('change', update);
-    return () => desktopQuery.removeEventListener('change', update);
-  }, []);
-
   const chrome = useMatchChromeSnapshot();
   const { sendAction, sendInputState } = useGameActions();
   const handleShopConfirm = useShopConfirm();
@@ -211,16 +191,13 @@ const AppShell: React.FC = () => {
     stateRef.current = { playfield, myId };
   }, [playfield, myId]);
 
-  const mobilePlayfieldRef = useRef<HTMLDivElement>(null);
-  const mobileBoardFitRef = useRef<HTMLDivElement>(null);
   const railRef = useRef<HTMLDivElement>(null);
   const [drill, drillDispatch] = useReducer(drillReducer, { enabled: false, result: null });
   const lastShopPurchaseRef = useRef<string | null | undefined>(undefined);
   const lastCountdownDigitRef = useRef<number | null>(null);
   const lastMatchStatusRef = useRef(chrome.status);
 
-  const myMobileFieldRef = useRef<GameFieldRef>(null);
-  const myDesktopFieldRef = useRef<GameFieldRef>(null);
+  const myFieldRef = useRef<GameFieldRef>(null);
   const oppDesktopFieldRef = useRef<GameFieldRef>(null);
 
   const handleDrillResult = useCallback((result: DrillResult) => {
@@ -250,8 +227,7 @@ const AppShell: React.FC = () => {
 
   const triggerShake = useCallback((isMe: boolean, type: 'soft' | 'medium') => {
     if (isMe) {
-      myMobileFieldRef.current?.shake(type);
-      myDesktopFieldRef.current?.shake(type);
+      myFieldRef.current?.shake(type);
     } else {
       oppDesktopFieldRef.current?.shake(type);
     }
@@ -262,38 +238,12 @@ const AppShell: React.FC = () => {
       const me = stateRef.current.playfield.myPlayer;
       if (action === 'hardDrop' && me?.activePiece && !me.snagHardDropBlocked) {
         triggerShake(true, 'soft');
-        myMobileFieldRef.current?.hardDrop();
-        myDesktopFieldRef.current?.hardDrop();
+        myFieldRef.current?.hardDrop();
       }
       sendAction(action);
     },
     [sendAction, triggerShake],
   );
-
-  useLayoutEffect(() => {
-    const boardSlot = mobileBoardFitRef.current;
-    if (!boardSlot) return;
-    let animationFrame = 0;
-    const measure = () => {
-      window.cancelAnimationFrame(animationFrame);
-      animationFrame = window.requestAnimationFrame(() => {
-        const ob = boardSlot.getBoundingClientRect();
-        if (ob.width < 8 || ob.height < 8) return;
-        const next = fitMobilePlayfieldCellSize(
-          { width: ob.width, height: ob.height },
-          shrinePadPx,
-        );
-        appShellDispatch({ type: 'SET_MOBILE_CELL_SIZE', size: next });
-      });
-    };
-    measure();
-    const ro = new ResizeObserver(measure);
-    ro.observe(boardSlot);
-    return () => {
-      window.cancelAnimationFrame(animationFrame);
-      ro.disconnect();
-    };
-  }, [connected, hasLocalPlayer, isDesktopLayout, shrinePadPx]);
 
   useLayoutEffect(() => {
     const rail = railRef.current;
@@ -354,7 +304,7 @@ const AppShell: React.FC = () => {
       window.removeEventListener('resize', measure);
       window.visualViewport?.removeEventListener('resize', measure);
     };
-  }, [chrome.shopPhase, connected, hasLocalPlayer, isDesktopLayout, showTouchControls]);
+  }, [chrome.shopPhase, connected, hasLocalPlayer, layoutMode, showTouchControls]);
 
   useEffect(() => {
     if (!drill.result) return;
@@ -464,6 +414,12 @@ const AppShell: React.FC = () => {
   }, [chrome.lastMatchEvent, myId, triggerShake]);
 
   const isPlaying = chrome.status === 'playing';
+  const isConnectionInterrupted = connected
+    && chrome.status !== 'ended'
+    && (
+      matchDiagnostics.phase === 'reconnecting'
+      || matchDiagnostics.phase === 'error'
+    );
   // Keep the background's per-countdown reroll cadence unchanged. Shrine faces
   // use a separate seed so their entrance animation is not restarted per digit.
   const backgroundDecorationSeed = mixDecorationSeed(
@@ -519,7 +475,7 @@ const AppShell: React.FC = () => {
   }
 
   return (
-    <div className="relative flex h-dvh max-h-dvh min-h-0 flex-col items-center justify-center overflow-hidden p-[5px] text-[var(--ss-text-primary)] min-[661px]:p-3">
+    <div className={`relative flex h-dvh max-h-dvh min-h-0 flex-col items-center justify-center overflow-hidden text-[var(--ss-text-primary)] ${playfieldViewportPaddingClass(layoutMode)}`}>
       <ThemeBackground isPlaying={isPlaying} decorationSeed={backgroundDecorationSeed} />
       {DEV_TOOLS_ENABLED && (
         <ServerDiagnosticsPanel
@@ -527,6 +483,7 @@ const AppShell: React.FC = () => {
           database={serverHealth}
           tick={gameState?.tick ?? null}
           matchSeed={gameState?.seed ?? null}
+          match={matchDiagnostics}
         />
       )}
 
@@ -538,8 +495,8 @@ const AppShell: React.FC = () => {
       ) : (
         <>
           <main
-            inert={showViewportWarning}
-            className="shape-showdown-screen relative z-10 flex h-[min(820px,calc(100dvh-10px))] min-h-[500px] w-full max-w-[430px] flex-col overflow-hidden border-0 bg-transparent p-1.5 shadow-none min-[661px]:h-[min(820px,calc(100dvh-24px))] min-[661px]:max-w-[820px] min-[661px]:p-2.5 min-[901px]:max-w-[1180px]"
+            inert={showViewportWarning || isConnectionInterrupted}
+            className={playfieldScreenClass(layoutMode)}
           >
             <MatchChrome />
             {DEV_TOOLS_ENABLED && drill.enabled && gameState && myId && gameState.players[myId] && (
@@ -552,20 +509,19 @@ const AppShell: React.FC = () => {
             )}
 
             <PlayfieldShell
-              mobilePlayfieldRef={mobilePlayfieldRef}
-              mobileBoardFitRef={mobileBoardFitRef}
               railRef={railRef}
-              mobileCellSize={mobileCellSize}
-              myMobileFieldRef={myMobileFieldRef}
-              myDesktopFieldRef={myDesktopFieldRef}
+              myFieldRef={myFieldRef}
               oppDesktopFieldRef={oppDesktopFieldRef}
-              isDesktopLayout={isDesktopLayout}
+              layoutMode={layoutMode}
               hatchingEnabled={DEV_TOOLS_ENABLED && hatchingEnabled}
               decorationSeed={faceDecorationSeed}
               faceGrowthStartedAtMs={
                 faceGrowthMatchSeed === (gameState?.seed ?? 4207) && faceSeedKey > 0
                   ? (faceGrowthStartedAtMs ?? null)
                   : null
+              }
+              matchVisualKey={
+                matchDiagnostics.matchId ?? (gameState ? String(gameState.seed) : 'unassigned')
               }
               onToggleHatching={
                 DEV_TOOLS_ENABLED
@@ -657,6 +613,44 @@ const AppShell: React.FC = () => {
                   {chrome.restartTimer !== undefined
                     ? `Restarting level in ${Math.ceil(chrome.restartTimer)} seconds...`
                     : 'Waiting for server reset...'}
+                </p>
+              </div>
+            </m.div>
+          )}
+
+          {isConnectionInterrupted && (
+            <m.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              className="fixed inset-0 z-[90] flex items-center justify-center bg-[#0a0a0f]/80 p-4 backdrop-blur-md sm:p-8"
+            >
+              <div
+                role="alertdialog"
+                aria-modal="true"
+                aria-labelledby="connection-status-title"
+                aria-describedby="connection-status-description"
+                className="w-full max-w-[min(calc(100vw-2rem),28rem)] rounded-[1.5rem] border border-white/10 bg-[#1a1a1a] p-6 text-center shadow-2xl sm:rounded-[2rem] sm:p-10 md:p-12"
+              >
+                {matchDiagnostics.phase === 'reconnecting' ? (
+                  <RefreshCw className="mx-auto mb-4 h-12 w-12 animate-spin text-amber-300 sm:mb-6 sm:h-16 sm:w-16 md:h-20 md:w-20" />
+                ) : (
+                  <WifiOff className="mx-auto mb-4 h-12 w-12 text-rose-300 sm:mb-6 sm:h-16 sm:w-16 md:h-20 md:w-20" />
+                )}
+                <h2
+                  id="connection-status-title"
+                  className="mb-2 text-[18px] font-bold uppercase tracking-[0.08em] sm:text-[22px] md:text-[26px]"
+                >
+                  {matchDiagnostics.phase === 'reconnecting'
+                    ? 'Connection Interrupted'
+                    : 'Connection Lost'}
+                </h2>
+                <p
+                  id="connection-status-description"
+                  className="text-[8px] text-zinc-400 sm:text-[9px]"
+                >
+                  {matchDiagnostics.phase === 'reconnecting'
+                    ? 'Reconnecting to the match...'
+                    : 'Unable to reach the game server. Waiting for the connection to return.'}
                 </p>
               </div>
             </m.div>

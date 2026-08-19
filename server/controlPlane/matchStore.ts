@@ -22,6 +22,11 @@ export type MatchRecord = {
   status: MatchStatus;
 };
 
+export type ActiveMatchForPlayer = {
+  match: MatchRecord;
+  seat: MatchSeat;
+};
+
 export type JoinTicket = {
   id: string;
   matchId: string;
@@ -34,6 +39,7 @@ export type JoinTicket = {
 export type ValidatedJoinTicket = {
   id: string;
   matchId: string;
+  matchSeed: number;
   playerId: string;
   seat: MatchSeat;
   status: MatchStatus;
@@ -58,12 +64,16 @@ export type MatchStatusChange = {
 type MatchRow = {
   id: string;
   correlation_id: string;
-  match_seed: number;
+  match_seed: number | string;
   player_a_id: string;
   player_b_id: string;
   game_server_url: string;
   protocol_version: number;
   status: MatchStatus;
+};
+
+type ActiveMatchRow = MatchRow & {
+  seat: MatchSeat;
 };
 
 type JoinTicketRow = {
@@ -77,6 +87,7 @@ type JoinTicketRow = {
 type ValidatedJoinTicketRow = {
   id: string;
   match_id: string;
+  match_seed: number | string;
   player_id: string;
   seat: MatchSeat;
   status: MatchStatus;
@@ -146,6 +157,37 @@ export class MatchStore {
     return toMatchRecord(row);
   }
 
+  public async findActiveMatchForPlayer(playerId: string): Promise<ActiveMatchForPlayer | null> {
+    const rows = await this.database<ActiveMatchRow[]>`
+      SELECT
+        m.id,
+        m.correlation_id,
+        m.match_seed,
+        m.player_a_id,
+        m.player_b_id,
+        m.game_server_url,
+        m.protocol_version,
+        m.status,
+        CASE
+          WHEN m.player_a_id = ${playerId} THEN 'A'
+          ELSE 'B'
+        END AS seat
+      FROM matches m
+      WHERE ${playerId} IN (m.player_a_id, m.player_b_id)
+        AND m.status IN ('allocating', 'countdown', 'playing')
+      ORDER BY m.created_at DESC, m.id DESC
+      LIMIT 1
+    `;
+
+    const row = rows[0];
+    return row
+      ? {
+          match: toMatchRecord(row),
+          seat: row.seat,
+        }
+      : null;
+  }
+
   public async issueJoinTicket(input: {
     matchId: string;
     playerId: string;
@@ -180,11 +222,42 @@ export class MatchStore {
     };
   }
 
+  public async issueReplacementJoinTicket(input: {
+    matchId: string;
+    playerId: string;
+    seat: MatchSeat;
+  }): Promise<JoinTicket> {
+    // Concurrent browser tabs may both ask for a refresh. Keep each
+    // short-lived ticket valid instead of deleting a ticket another request
+    // is about to return; GameManager still permits only one active socket
+    // for the durable seat.
+    await this.database`
+      DELETE FROM match_tickets
+      WHERE match_id = ${input.matchId}
+        AND seat = ${input.seat}
+        AND (
+          revoked = TRUE
+          OR expires_at <= CURRENT_TIMESTAMP
+        )
+    `;
+    return this.issueJoinTicket(input);
+  }
+
+  public async deleteMatchTickets(matchId: string): Promise<number> {
+    const rows = await this.database<{ id: string }[]>`
+      DELETE FROM match_tickets
+      WHERE match_id = ${matchId}
+      RETURNING id
+    `;
+    return rows.length;
+  }
+
   public async validateJoinTicket(rawTicket: string): Promise<ValidatedJoinTicket | null> {
     const rows = await this.database<ValidatedJoinTicketRow[]>`
       SELECT
         t.id,
         t.match_id,
+        m.match_seed,
         t.player_id,
         t.seat,
         m.status,
@@ -203,6 +276,7 @@ export class MatchStore {
       ? {
           id: row.id,
           matchId: row.match_id,
+          matchSeed: normalizeMatchSeed(row.match_seed),
           playerId: row.player_id,
           seat: row.seat,
           status: row.status,
@@ -279,11 +353,19 @@ function toMatchRecord(row: MatchRow): MatchRecord {
   return {
     id: row.id,
     correlationId: row.correlation_id,
-    matchSeed: row.match_seed,
+    matchSeed: normalizeMatchSeed(row.match_seed),
     playerAId: row.player_a_id,
     playerBId: row.player_b_id,
     gameServerUrl: row.game_server_url,
     protocolVersion: row.protocol_version,
     status: row.status,
   };
+}
+
+function normalizeMatchSeed(value: number | string): number {
+  const seed = Number(value);
+  if (!Number.isSafeInteger(seed)) {
+    throw new Error(`Invalid match seed returned from PostgreSQL: ${String(value)}`);
+  }
+  return seed;
 }

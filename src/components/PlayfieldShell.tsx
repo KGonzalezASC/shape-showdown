@@ -1,10 +1,10 @@
-import React, { useContext, useEffect, useMemo, useState } from 'react';
+import React, { useContext, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import GameField, { GameFieldRef } from './GameField';
 import OpponentMiniField from './OpponentMiniField';
 import ShopRail from './ShopRail';
-import { PlayfieldLayout } from './PlayfieldLayout';
 import { PlayfieldCellSizeContext } from './playfieldCellSizeContext';
-import { BOARD_COLS, BOARD_VISIBLE_ROWS } from '../types';
+import { fitMobilePlayfieldCellSize } from './PlayfieldCellSizer';
+import { BOARD_COLS, BOARD_VISIBLE_ROWS, CELL_SIZE } from '../types';
 import { resolveShopOffers, SHOP_ITEM_BY_ID } from '../shop/shopCatalog';
 import { useMatchChromeSnapshot, usePlayfieldSnapshot } from '../state/GameStateProvider';
 import { useShopConfirm } from '../hooks/useShopConfirm';
@@ -12,6 +12,12 @@ import { BoardProfiler } from '../performance/BoardProfiler';
 import { IncomingGarbageReadout } from './IncomingGarbageReadout';
 import DesktopKeyboardLegend from './DesktopKeyboardLegend';
 import { fieldFrameClass, fieldTitleClass } from '../ui/shapeShowdownTheme';
+import { useThemePackage } from '../presentation/ThemeProvider';
+import { SHRINE_PAD_PX } from '../board/shrineLayout';
+import {
+  playfieldGridClass,
+  type PlayfieldLayoutMode,
+} from '../responsive/playfieldLayoutMode';
 
 function WaitingForOpponentBoard() {
   const cell = useContext(PlayfieldCellSizeContext);
@@ -32,41 +38,38 @@ function WaitingForOpponentBoard() {
 }
 
 interface PlayfieldShellProps {
-  mobilePlayfieldRef: React.RefObject<HTMLDivElement | null>;
-  mobileBoardFitRef: React.RefObject<HTMLDivElement | null>;
   railRef: React.RefObject<HTMLDivElement | null>;
-  mobileCellSize: number;
-  myMobileFieldRef: React.RefObject<GameFieldRef | null>;
-  myDesktopFieldRef: React.RefObject<GameFieldRef | null>;
+  myFieldRef: React.RefObject<GameFieldRef | null>;
   oppDesktopFieldRef: React.RefObject<GameFieldRef | null>;
   hatchingEnabled: boolean;
   decorationSeed: number;
   faceGrowthStartedAtMs: number | null;
-  isDesktopLayout: boolean;
+  matchVisualKey: string;
+  layoutMode: PlayfieldLayoutMode;
   onToggleHatching?: () => void;
 }
 
 export const PlayfieldShell: React.FC<PlayfieldShellProps> = ({
-  mobilePlayfieldRef,
-  mobileBoardFitRef,
   railRef,
-  mobileCellSize,
-  myMobileFieldRef,
-  myDesktopFieldRef,
+  myFieldRef,
   oppDesktopFieldRef,
   hatchingEnabled,
   decorationSeed,
   faceGrowthStartedAtMs,
-  isDesktopLayout,
+  matchVisualKey,
+  layoutMode,
   onToggleHatching,
 }) => {
-  const [isTabletLayout, setIsTabletLayout] = useState(() => (
-    typeof window !== 'undefined' && window.matchMedia('(min-width: 661px)').matches
-  ));
+  const playfieldRef = useRef<HTMLDivElement>(null);
+  const boardFitRef = useRef<HTMLDivElement>(null);
+  const [cellSize, setCellSize] = useState(CELL_SIZE);
+  const theme = useThemePackage();
+  const shrinePadPx = theme.shrine === 'watching-amalgam' ? SHRINE_PAD_PX : 0;
   const playfield = usePlayfieldSnapshot();
   const chrome = useMatchChromeSnapshot();
   const handleShopConfirm = useShopConfirm();
   const { myPlayer, opponentPlayer } = playfield;
+  const isDesktop = layoutMode === 'desktop';
 
   const shopOffers = useMemo(() => resolveShopOffers(chrome.shopOfferIds), [chrome.shopOfferIds]);
   const purchasedItem = useMemo(() => {
@@ -86,53 +89,104 @@ export const PlayfieldShell: React.FC<PlayfieldShellProps> = ({
   const shopCanPurchase = chrome.shopPhase === 'cycling' || chrome.shopPhase === 'ready';
   const isPlaying = playfield.status === 'playing';
 
-  useEffect(() => {
-    const query = window.matchMedia('(min-width: 661px)');
-    const update = () => setIsTabletLayout(query.matches);
-    update();
-    query.addEventListener('change', update);
-    return () => query.removeEventListener('change', update);
-  }, []);
+  useLayoutEffect(() => {
+    const playfieldLayout = playfieldRef.current;
+    if (!playfieldLayout) return;
 
-  const compactViewportMode = isTabletLayout ? 'tablet' : 'phone';
+    const measure = () => {
+      const slot = boardFitRef.current;
+      if (!slot) return;
+      const box = slot.getBoundingClientRect();
+      if (box.width < 8 || box.height < 8) return;
+      const next = fitMobilePlayfieldCellSize(
+        { width: box.width, height: box.height },
+        shrinePadPx,
+      );
+      setCellSize((previous) => (previous === next ? previous : next));
+    };
+
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(playfieldLayout);
+    return () => observer.disconnect();
+  }, [layoutMode, myPlayer, shrinePadPx]);
+
+  const boardFramePadding = layoutMode === 'phone' ? 'p-1.5' : 'p-2';
 
   return (
-    <>
-      {!isDesktopLayout && (
+    <PlayfieldCellSizeContext.Provider value={cellSize}>
       <div className="relative min-h-0 w-full flex-1">
         <div
-          ref={mobilePlayfieldRef}
-          className="mx-auto grid h-full w-full max-w-[430px] grid-cols-[minmax(0,1fr)_6rem] items-stretch gap-1.5 overflow-visible pb-2 min-[661px]:max-w-[820px] min-[661px]:grid-cols-[minmax(0,1fr)_13.125rem] min-[661px]:gap-3"
+          ref={playfieldRef}
+          data-playfield-layout={layoutMode}
+          className={playfieldGridClass(layoutMode)}
         >
-          <div className={`h-full min-h-0 min-w-0 overflow-visible border ${fieldFrameClass('self')} p-1.5 min-[661px]:p-2`}>
+          <div
+            className={`min-h-0 min-w-0 overflow-visible border ${fieldFrameClass('self')} ${boardFramePadding} [grid-area:board]`}
+          >
             {myPlayer && (
-              <BoardProfiler id="mobile-player-field" renderer="board-canvas">
+              <BoardProfiler id="local-player-field" renderer="board-canvas">
                 <GameField
-                  ref={myMobileFieldRef}
+                  key={matchVisualKey}
+                  ref={myFieldRef}
                   player={myPlayer}
                   isMe={true}
                   title="Your Field"
                   fieldRole="self"
-                  cellSize={mobileCellSize}
-                  boardFitRef={mobileBoardFitRef}
+                  cellSize={cellSize}
+                  boardFitRef={boardFitRef}
                   status={playfield.status}
                   hatchingEnabled={hatchingEnabled}
                   decorationSeed={decorationSeed}
                   faceGrowthStartedAtMs={faceGrowthStartedAtMs}
-                  performanceId="mobile-player-field"
+                  performanceId="local-player-field"
                 />
               </BoardProfiler>
             )}
           </div>
+
+          <div
+            className={`min-h-0 min-w-0 overflow-visible [grid-area:opponent] ${
+              isDesktop ? `border ${fieldFrameClass('opponent')} p-2` : ''
+            }`}
+          >
+            {isDesktop ? (
+              opponentPlayer ? (
+                <BoardProfiler id="desktop-opponent-field" renderer="board-canvas">
+                  <GameField
+                    key={matchVisualKey}
+                    ref={oppDesktopFieldRef}
+                    player={opponentPlayer}
+                    isMe={false}
+                    title="Opponent Field"
+                    fieldRole="opponent"
+                    cellSize={cellSize}
+                    status={playfield.status}
+                    hatchingEnabled={hatchingEnabled}
+                    decorationSeed={decorationSeed}
+                    faceGrowthStartedAtMs={faceGrowthStartedAtMs}
+                    performanceId="desktop-opponent-field"
+                  />
+                </BoardProfiler>
+              ) : (
+                <WaitingForOpponentBoard />
+              )
+            ) : (
+              <OpponentMiniField
+                key={matchVisualKey}
+                player={opponentPlayer}
+                hatchingEnabled={hatchingEnabled}
+                viewportMode={layoutMode === 'tablet' ? 'tablet' : 'phone'}
+              />
+            )}
+          </div>
+
           <div
             ref={railRef}
-            className="shop-utility-rail flex max-h-full min-h-0 min-w-0 flex-col gap-2 overflow-y-auto"
+            className={`flex min-h-0 min-w-0 flex-col gap-2 [grid-area:shop] ${
+              isDesktop ? '' : 'shop-utility-rail overflow-y-auto'
+            }`}
           >
-            <OpponentMiniField
-              player={opponentPlayer}
-              hatchingEnabled={hatchingEnabled}
-              viewportMode={compactViewportMode}
-            />
             <ShopRail
               items={shopOffers}
               isPlaying={isPlaying}
@@ -145,79 +199,14 @@ export const PlayfieldShell: React.FC<PlayfieldShellProps> = ({
               pricing={chrome.shopPricing}
               currentTick={chrome.tick}
               isItemDisabled={isItemDisabled}
-              viewportMode={compactViewportMode}
+              viewportMode={layoutMode}
               hatchingEnabled={hatchingEnabled}
               onToggleHatching={onToggleHatching}
             />
+            {isDesktop && <DesktopKeyboardLegend />}
           </div>
         </div>
       </div>
-      )}
-
-      {isDesktopLayout && (
-      <div className="min-h-0 w-full flex-1">
-        <PlayfieldLayout>
-          <div className="flex min-h-0 shrink-0 flex-col gap-2">
-            <ShopRail
-                  items={shopOffers}
-                  isPlaying={isPlaying}
-                  canPurchase={shopCanPurchase}
-                  cycleIndex={chrome.shopCycleIndex}
-                  shopPhase={chrome.shopPhase}
-                  purchasedItem={purchasedItem}
-                  onConfirm={handleShopConfirm}
-                  availableFunds={chrome.availableFunds}
-                  pricing={chrome.shopPricing}
-                  currentTick={chrome.tick}
-                  isItemDisabled={isItemDisabled}
-                  viewportMode="desktop"
-                  hatchingEnabled={hatchingEnabled}
-                  onToggleHatching={onToggleHatching}
-            />
-            <DesktopKeyboardLegend />
-          </div>
-          {myPlayer && (
-            <div className={`min-w-0 overflow-visible border ${fieldFrameClass('self')} p-2`}>
-              <BoardProfiler id="desktop-player-field" renderer="board-canvas">
-                <GameField
-                  ref={myDesktopFieldRef}
-                  player={myPlayer}
-                  isMe={true}
-                  title="Your Field"
-                  fieldRole="self"
-                  status={playfield.status}
-                  hatchingEnabled={hatchingEnabled}
-                  decorationSeed={decorationSeed}
-                  faceGrowthStartedAtMs={faceGrowthStartedAtMs}
-                  performanceId="desktop-player-field"
-                />
-              </BoardProfiler>
-            </div>
-          )}
-
-          <div className={`relative min-w-0 overflow-visible border ${fieldFrameClass('opponent')} p-2`}>
-            {opponentPlayer ? (
-              <BoardProfiler id="desktop-opponent-field" renderer="board-canvas">
-                <GameField
-                  ref={oppDesktopFieldRef}
-                  player={opponentPlayer}
-                  isMe={false}
-                  title="Opponent Field"
-                  fieldRole="opponent"
-                  status={playfield.status}
-                  hatchingEnabled={hatchingEnabled}
-                  decorationSeed={decorationSeed}
-                  faceGrowthStartedAtMs={faceGrowthStartedAtMs}
-                  performanceId="desktop-opponent-field"
-                />
-              </BoardProfiler>
-            ) : (
-              <WaitingForOpponentBoard />
-            )}
-          </div>
-        </PlayfieldLayout>
-      </div>
-      )}
-    </>
+    </PlayfieldCellSizeContext.Provider>
   );
 };

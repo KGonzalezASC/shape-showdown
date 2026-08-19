@@ -28,8 +28,8 @@ const OpponentMiniField: React.FC<OpponentMiniFieldProps> = ({
 }) => {
   const theme = useThemePackage();
   const shellClass = viewportMode === 'tablet'
-    ? `w-full overflow-visible border ${fieldFrameClass('opponent')} p-2 shadow-xl`
-    : `w-24 min-[661px]:w-full overflow-visible border ${fieldFrameClass('opponent')} p-1 min-[661px]:p-2 shadow-xl`;
+    ? `w-full min-w-0 overflow-hidden border ${fieldFrameClass('opponent')} p-2 shadow-xl`
+    : `w-full min-w-0 overflow-hidden border ${fieldFrameClass('opponent')} p-1 shadow-xl`;
   const visualModel = useMemo(
     () =>
       player
@@ -69,10 +69,18 @@ const OpponentMiniField: React.FC<OpponentMiniFieldProps> = ({
           Opp
         </p>
         <IncomingGarbageReadout fieldTitle="Opponent Field" lines={0} compact />
-        <div className="mt-1 flex h-[100px] items-center justify-center border border-[var(--ss-opponent-border)] bg-[var(--ss-panel-well)] px-1">
-          <p className="ss-opponent-waiting-text text-center text-[8px] font-bold uppercase tracking-widest">
-            Waiting
-          </p>
+        <div
+          role="status"
+          aria-label="Searching for opponent"
+          className="mt-1 flex h-[100px] flex-col items-center justify-center gap-2 border border-[var(--ss-opponent-border)] bg-[var(--ss-panel-well)] px-1"
+        >
+          <span
+            aria-hidden="true"
+            className="h-5 w-5 animate-spin rounded-full border-2 border-[var(--ss-opponent-muted)]/30 border-t-[var(--ss-opponent-strong)]"
+          />
+          <span className="text-center text-[8px] font-bold uppercase tracking-widest text-[var(--ss-opponent-muted)]">
+            Searching
+          </span>
         </div>
       </div>
     );
@@ -132,5 +140,6 @@ const OpponentMiniField: React.FC<OpponentMiniFieldProps> = ({
 
 export default React.memo(OpponentMiniField, (prev, next) => (
   prev.hatchingEnabled === next.hatchingEnabled &&
+  prev.viewportMode === next.viewportMode &&
   publicPlayersEqual(prev.player, next.player)
 ));

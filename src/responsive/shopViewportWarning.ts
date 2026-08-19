@@ -1,4 +1,5 @@
 import type { ShopPhase } from '../types';
+import { PLAYFIELD_DESKTOP_MIN_WIDTH_PX } from './playfieldLayoutMode';
 
 const MIN_VISIBLE_SHOP_ROW_HEIGHT_PX = 6;
 const COMPACT_SHOP_ROW_GAP_PX = 2;
@@ -17,7 +18,7 @@ export function isShopViewportUnplayable({
   offerListHeight,
 }: ShopViewportMeasurement): boolean {
   if (
-    viewportWidth >= 901
+    viewportWidth >= PLAYFIELD_DESKTOP_MIN_WIDTH_PX
     || offerCount === 0
     || shopPhase === 'ready'
     || shopPhase === 'cycling'
