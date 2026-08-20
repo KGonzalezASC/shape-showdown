@@ -1,5 +1,6 @@
 {
-  "gameServerUrl": "",
+  "gameServerUrl": "https://shape-showdown-production.up.railway.app",
   "gameServerHost": "",
   "gameServerPort": null
 }
+
