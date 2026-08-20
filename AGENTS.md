@@ -157,6 +157,16 @@ guests continue using the guest bootstrap.
 - **Clean Boundary Lines:** Bottom frame lines must use clean, crisp white line segments with pixel gap breaks (no dripping teeth, spikes, or tentacles).
 - **Voronoi Tetromino Cells:** Cells must remain smooth, clean, glowing filled polygons without interior hatching lines or striping overlays.
 
+## Environments & Deployment Topology
+
+| Tier | Git Branch | Railway Environment & Service | Cloudflare Pages Target | Database |
+|---|---|---|---|---|
+| **Staging** | `main` | `staging` (`shape-showdown-staging.up.railway.app`) | Preview deployments (`main.shape-showdown.pages.dev`) | Staging Railway Postgres |
+| **Production** | `production` | `production` (`shape-showdown-production.up.railway.app`) | Production root (`shape-showdown.pages.dev`) | Production Railway Postgres |
+
+- **Branch workflow**: Active development and integration PRs land on `main`. Promoting to production requires fast-forwarding or merging `main` into the `production` branch (`git checkout production && git merge main --ff-only && git push origin production`).
+- **Discord Activity routing**: Point production Discord URL mappings (`/socket.io`, `/api`, `/health`) to `https://shape-showdown-production.up.railway.app` and `/` to `https://shape-showdown.pages.dev`.
+
 ## Hosting / ticket jargon (plain language)
 
 When explaining Wayfinder / production-deployment tickets (especially ticket 04 staging evidence), agents must use **communicate-clearly** (and **teach** if the owner asks to really understand). Do not dump cloud acronyms. Say what to click or measure on Railway/Pages in everyday words first, then the formal name.
