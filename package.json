@@ -26,7 +26,7 @@
     "test:shop": "bun test server/shop.test.ts",
     "test:manager": "bun test server/GameManager.test.ts",
     "test:control-plane": "bun test server/controlPlane/",
-    "test:name-drop": "bun test server/nameDrop.test.ts",
+    "test:protocol": "bun test src/protocol/packetCodec.test.ts",
     "test:harness": "bun test server/testHarness/**/*.test.ts",
     "test:pricing": "bun scripts/pricing-lab.mts",
     "test:smoke": "bun scripts/live-smoke.mts",

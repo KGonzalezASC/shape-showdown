@@ -6,6 +6,7 @@ import {
   PlayerShopState,
   ShopPhase,
 } from '../types';
+import type { ClientMatchModel } from '../protocol/wireTypes';
 import {
   PublicPlayerState,
   publicPlayersEqual,
@@ -46,9 +47,10 @@ export interface PlayfieldSnapshot {
 
 type Listener = () => void;
 
-let gameState: GameState | null = null;
+let clientMatchModel: ClientMatchModel | null = null;
 let myId: string | null = null;
 let lastMatchEvent: MatchEvent | null = null;
+let rawGameStateSnapshot: GameState | null = null;
 
 let chromeSnapshot: MatchChromeSnapshot = emptyChromeSnapshot();
 let playfieldSnapshot: PlayfieldSnapshot = emptyPlayfieldSnapshot();
@@ -91,51 +93,46 @@ function emptyPlayfieldSnapshot(): PlayfieldSnapshot {
 }
 
 function buildChromeSnapshot(): MatchChromeSnapshot {
-  if (!gameState) return emptyChromeSnapshot();
+  if (!clientMatchModel) return emptyChromeSnapshot();
 
-  const me = myId ? gameState.players[myId] : null;
-  const opponentId = myId ? Object.keys(gameState.players).find((id) => id !== myId) : null;
-  const opponent = opponentId ? gameState.players[opponentId] : null;
+  const me = clientMatchModel.myPlayer;
+  const opponent = clientMatchModel.opponentPlayer;
   const shop = me?.shop;
 
   return {
-    status: gameState.status,
-    countdown: gameState.countdown,
-    tick: gameState.tick,
+    status: clientMatchModel.chrome.status,
+    countdown: clientMatchModel.chrome.countdown,
+    tick: clientMatchModel.tick,
     myId,
     myScore: me?.score ?? 0,
     oppScore: opponent?.score ?? 0,
-    myFunds: me ? (me.funds ?? me.score ?? 0) : 0,
-    oppFunds: opponent ? (opponent.funds ?? opponent.score ?? 0) : 0,
-    availableFunds: me ? (me.funds ?? me.score ?? 0) : 0,
+    myFunds: me?.funds ?? 0,
+    oppFunds: opponent?.funds ?? 0,
+    availableFunds: me?.funds ?? 0,
     shopOfferIds: shop?.offerIds ?? [],
     shopPhase: shop?.phase ?? 'waiting',
     shopCycleIndex: shop?.cycleIndex ?? -1,
     shopLastPurchasedItemId: shop?.lastPurchasedItemId ?? null,
     shopPricing: shop?.pricing ?? {},
-    playerCount: Object.keys(gameState.players).length,
+    playerCount: (me ? 1 : 0) + (opponent ? 1 : 0),
     lastMatchEvent,
-    winnerId: gameState.winnerId,
-    endReason: gameState.endReason,
-    pausePlayerId: gameState.pause?.playerId ?? null,
-    pauseStartedAt: gameState.pause?.startedAt ?? null,
-    technicalVictory: gameState.technicalVictory,
-    restartTimer: gameState.restartTimer,
+    winnerId: clientMatchModel.chrome.winnerId,
+    endReason: clientMatchModel.chrome.endReason,
+    pausePlayerId: clientMatchModel.chrome.pausePlayerId,
+    pauseStartedAt: clientMatchModel.chrome.pauseStartedAt,
+    technicalVictory: clientMatchModel.chrome.technicalVictory,
+    restartTimer: clientMatchModel.chrome.restartTimer,
   };
 }
 
 function buildPlayfieldSnapshot(): PlayfieldSnapshot {
-  if (!gameState) return emptyPlayfieldSnapshot();
-
-  const opponentId = myId ? Object.keys(gameState.players).find((id) => id !== myId) : null;
-  const me = myId ? gameState.players[myId] : null;
-  const opponent = opponentId ? gameState.players[opponentId] : null;
+  if (!clientMatchModel) return emptyPlayfieldSnapshot();
 
   return {
-    status: gameState.status,
+    status: clientMatchModel.chrome.status,
     myId,
-    myPlayer: me ? toPublicPlayerState(me) : null,
-    opponentPlayer: opponent ? toPublicPlayerState(opponent) : null,
+    myPlayer: clientMatchModel.myPlayer,
+    opponentPlayer: clientMatchModel.opponentPlayer,
   };
 }
 
@@ -198,7 +195,38 @@ function playfieldSnapshotsEqual(a: PlayfieldSnapshot, b: PlayfieldSnapshot): bo
   );
 }
 
+function buildRawGameStateSnapshot(): GameState | null {
+  if (!clientMatchModel) return null;
+
+  const players: GameState['players'] = {};
+  if (clientMatchModel.myPlayer && clientMatchModel.myId) {
+    players[clientMatchModel.myId] = clientMatchModel.myPlayer as GameState['players'][string];
+  }
+  if (clientMatchModel.opponentPlayer) {
+    players[clientMatchModel.opponentPlayer.id] =
+      clientMatchModel.opponentPlayer as GameState['players'][string];
+  }
+  return {
+    players,
+    status: clientMatchModel.chrome.status,
+    countdown: clientMatchModel.chrome.countdown,
+    winnerId: clientMatchModel.chrome.winnerId,
+    endReason: clientMatchModel.chrome.endReason,
+    technicalVictory: clientMatchModel.chrome.technicalVictory,
+    restartTimer: clientMatchModel.chrome.restartTimer,
+    pause: clientMatchModel.chrome.pausePlayerId
+      ? {
+          playerId: clientMatchModel.chrome.pausePlayerId,
+          startedAt: clientMatchModel.chrome.pauseStartedAt ?? Date.now(),
+        }
+      : undefined,
+    tick: clientMatchModel.tick,
+    seed: clientMatchModel.seed,
+  };
+}
+
 function publishSnapshots() {
+  rawGameStateSnapshot = buildRawGameStateSnapshot();
   const nextChrome = buildChromeSnapshot();
   if (!chromeSnapshotsEqual(chromeSnapshot, nextChrome)) {
     chromeSnapshot = nextChrome;
@@ -212,15 +240,57 @@ function publishSnapshots() {
   }
 }
 
-export function setGameStateStore(state: GameState | null, id: string | null) {
-  const wasConnected = gameState !== null;
-  gameState = state;
+export function setMyIdStore(id: string | null): void {
   myId = id;
   publishSnapshots();
-  const isConnected = gameState !== null;
+}
+
+export function setClientMatchModelStore(model: ClientMatchModel | null, id: string | null) {
+  const wasConnected = clientMatchModel !== null;
+  clientMatchModel = model;
+  myId = id;
+  publishSnapshots();
+  const isConnected = clientMatchModel !== null;
   if (wasConnected !== isConnected) {
     connectionListeners.forEach((listener) => listener());
   }
+}
+
+/** @deprecated Legacy JSON gameState path — use setClientMatchModelStore. */
+export function setGameStateStore(state: GameState | null, id: string | null) {
+  if (state === null) {
+    setClientMatchModelStore(null, id);
+    return;
+  }
+  const runtimeId = id ?? Object.keys(state.players)[0] ?? null;
+  const opponentId = runtimeId
+    ? Object.keys(state.players).find((playerId) => playerId !== runtimeId) ?? null
+    : null;
+  const me = runtimeId ? state.players[runtimeId] : null;
+  const opponent = opponentId ? state.players[opponentId] : null;
+  if (!me) {
+    setClientMatchModelStore(null, id);
+    return;
+  }
+  setClientMatchModelStore({
+    tick: state.tick,
+    seed: state.seed,
+    chrome: {
+      status: state.status,
+      countdown: state.countdown,
+      seed: state.seed,
+      winnerId: state.winnerId,
+      endReason: state.endReason,
+      technicalVictory: state.technicalVictory,
+      restartTimer: state.restartTimer,
+      pausePlayerId: state.pause?.playerId ?? null,
+      pauseStartedAt: state.pause?.startedAt ?? null,
+    },
+    myId: runtimeId,
+    myPlayer: toPublicPlayerState(me),
+    opponentPlayer: opponent ? toPublicPlayerState(opponent) : null,
+  }, runtimeId);
+  rawGameStateSnapshot = state;
 }
 
 export function setLastMatchEventStore(event: MatchEvent | null) {
@@ -256,11 +326,12 @@ export function getPlayfieldSnapshot(): PlayfieldSnapshot {
 }
 
 export function getIsConnected(): boolean {
-  return gameState !== null;
+  return clientMatchModel !== null;
 }
 
+/** Minimal shim for components that still read seed/tick/pause from GameState. */
 export function getRawGameState(): GameState | null {
-  return gameState;
+  return rawGameStateSnapshot;
 }
 
 export function getMyId(): string | null {

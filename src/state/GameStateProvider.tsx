@@ -12,19 +12,21 @@ import {
   getMyId as getStoredMyId,
   getPlayfieldSnapshot,
   getRawGameState,
-  setGameStateStore,
+  setClientMatchModelStore,
   setLastMatchEventStore,
+  setMyIdStore,
   subscribeChrome,
   subscribeConnection,
   subscribePlayfield,
 } from './gameStateStore';
+import type { ClientMatchModel } from '../protocol/wireTypes';
 
-function publishGameState(state: ReturnType<typeof getRawGameState>): void {
-  setGameStateStore(state, getStoredMyId());
+function publishClientMatchModel(model: ClientMatchModel | null): void {
+  setClientMatchModelStore(model, getStoredMyId());
 }
 
 function publishMyId(id: string | null): void {
-  setGameStateStore(getRawGameState(), id);
+  setMyIdStore(id);
 }
 
 function publishMatchEvent(event: Parameters<typeof setLastMatchEventStore>[0]): void {
@@ -70,7 +72,7 @@ export function GameStateProvider({ children }: { children: React.ReactNode }) {
     sendShopPurchase,
     resetClientSession,
   } = useGameSocket({
-    onGameState: publishGameState,
+    onClientMatchModel: publishClientMatchModel,
     onMyId: publishMyId,
     onMatchEvent: publishMatchEvent,
     onServerHealth: setServerHealth,

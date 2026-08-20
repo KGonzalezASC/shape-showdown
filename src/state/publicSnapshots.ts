@@ -51,6 +51,9 @@ export interface PublicPlayerState {
     PlayerShopState,
     'offerIds' | 'phase' | 'cycleIndex' | 'lastPurchasedItemId' | 'activeSynergySeeds' | 'pricing'
   >;
+  /** Opponent wire capability — not present on local player snapshots. */
+  opponentHasHold?: boolean;
+  opponentHasPoison?: boolean;
 }
 
 export interface PublicGameState {

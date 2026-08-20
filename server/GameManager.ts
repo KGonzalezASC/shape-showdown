@@ -36,6 +36,8 @@ import type {
   MatchOutcomeReason,
   MatchResultStats,
 } from './controlPlane/matchResultStore.js';
+import { GAME_PROTOCOL_VERSION } from '../src/protocol/version.js';
+import { MatchPacketSync } from './sync/MatchPacketSync.js';
 
 export type SocketSeatBinding = Omit<MatchAssignment, 'ticket'>;
 
@@ -50,6 +52,8 @@ export class GameManager {
   private readonly replayKeyframeIntervalTicks: number;
   private readonly netcastEveryNTicks: number;
   private readonly lobbyNetcastEveryNTicks: number;
+  private readonly packetSync: MatchPacketSync;
+  private lastTickEvents: import('../src/types.js').MatchEvent[] = [];
   private lastHandledStatus: GameState['status'] = 'waiting';
   private readonly persistence?: MatchPersistence;
   private readonly onMatchCreated?: (matchId: string) => void;
@@ -89,6 +93,10 @@ export class GameManager {
     const hz = Number(process.env.NETCAST_HZ);
     this.netcastEveryNTicks = Number.isFinite(hz) && hz > 0 ? Math.max(1, Math.round(60 / hz)) : 2;
     this.lobbyNetcastEveryNTicks = Math.max(this.netcastEveryNTicks, 12);
+    this.packetSync = new MatchPacketSync({
+      netcastEveryNTicks: this.netcastEveryNTicks,
+      lobbyNetcastEveryNTicks: this.lobbyNetcastEveryNTicks,
+    });
     this.gameState = {
       players: {},
       status: 'waiting',
@@ -99,6 +107,14 @@ export class GameManager {
     };
 
     this.loopHandle = this.startLoop();
+  }
+
+  private emitGameplayPackets(immediate = false): void {
+    if (immediate) {
+      this.packetSync.sendImmediate(this.gameState, this.activeSocketByRuntimeId);
+      return;
+    }
+    this.packetSync.onTick(this.gameState, this.activeSocketByRuntimeId, []);
   }
 
   /** Test / shutdown hook — stops the 60Hz interval. */
@@ -173,7 +189,7 @@ export class GameManager {
       code: 'MATCH_VOIDED',
       message: 'The server voided this match. No player won.',
     } satisfies SocketAuthErrorPayload);
-    this.emitToMatch('gameState', this.gameState);
+    this.emitGameplayPackets(true);
     logInfo('match_voided_runtime', { matchId });
     logInfo('match_voided_after_restore_timeout', { matchId });
     this.enqueuePersistence(async () => {
@@ -222,11 +238,11 @@ export class GameManager {
 
     this.bindSocket(socket, runtimeId);
     socket.emit('playerIdentity', runtimeId);
-    this.emitToMatch('gameState', this.gameState);
+    this.emitGameplayPackets(true);
   }
 
   private bindTicketSocket(socket: Socket, binding: SocketSeatBinding): void {
-    if (binding.protocolVersion !== 1) {
+    if (binding.protocolVersion !== GAME_PROTOCOL_VERSION) {
       this.recordReplayDiscontinuity({
         tick: this.gameState.tick,
         kind: 'protocol_mismatch',
@@ -311,7 +327,7 @@ export class GameManager {
 
     this.bindSocket(socket, runtimeId);
     socket.emit('playerIdentity', runtimeId);
-    socket.emit('gameState', this.gameState);
+    this.packetSync.sendKeyframe(socket, runtimeId, this.gameState);
     if (this.gameState.pause?.playerId === runtimeId) {
       const pausedForMs = Math.max(0, Date.now() - this.gameState.pause.startedAt);
       const budget = this.disconnectBudgets.get(runtimeId) ?? { episodes: 0, totalPausedMs: 0 };
@@ -344,7 +360,7 @@ export class GameManager {
         kind: 'reconnect_success',
         playerId: binding.playerId,
       });
-      this.emitToMatch('gameState', this.gameState);
+      this.emitGameplayPackets(true);
     } else {
       this.clearDisconnectForfeiture(runtimeId);
       if (previousSocket !== undefined && previousSocket !== socket) {
@@ -429,6 +445,12 @@ export class GameManager {
       });
     });
 
+    socket.on('requestKeyframe', () => {
+      const runtimeId = this.runtimeIdBySocketId.get(socket.id);
+      if (runtimeId === undefined) return;
+      this.packetSync.handleRequestKeyframe(socket, runtimeId, this.gameState);
+    });
+
     socket.on('shopPurchase', (itemId: string) => {
       const runtimeId = this.runtimeIdBySocketId.get(socket.id);
       if (runtimeId === undefined || this.gameState.status !== 'playing') return;
@@ -453,7 +475,7 @@ export class GameManager {
         ...(resolvedCost === undefined ? {} : { cost: resolvedCost }),
       });
       // Flush immediately so cascade / pills aren't held back by the 30Hz netcast.
-      this.emitToMatch('gameState', this.gameState);
+      this.emitGameplayPackets(true);
     });
 
     socket.on('disconnect', () => {
@@ -505,7 +527,7 @@ export class GameManager {
       } else {
         this.forfeitDisconnectedPlayer(runtimeId);
       }
-      this.emitToMatch('gameState', this.gameState);
+      this.emitGameplayPackets(true);
     });
   }
 
@@ -602,27 +624,11 @@ export class GameManager {
   }
 
   private startLoop() {
-    let sinceEmit = 0;
-    let prevStatus = this.gameState.status;
     return setInterval(() => {
+      this.packetSync.capturePreStepBoards(this.gameState);
       this.update();
-      sinceEmit += 1;
-
-      // Always flush immediately on a status transition so lobby/countdown/
-      // ended changes aren't held back by the slower lobby cadence.
-      const statusChanged = this.gameState.status !== prevStatus;
-      prevStatus = this.gameState.status;
-
-      const active = this.gameState.status === 'playing' || this.gameState.status === 'countdown';
-      const cascading = Object.values(this.gameState.players).some(
-        (p) => p.tectonicShiftNextStepTick != null,
-      );
-      // Cascade is only readable if clients see every gravity step (60Hz while active).
-      const interval = cascading ? 1 : active ? this.netcastEveryNTicks : this.lobbyNetcastEveryNTicks;
-      if (statusChanged || sinceEmit >= interval) {
-        sinceEmit = 0;
-        this.emitToMatch('gameState', this.gameState);
-      }
+      this.packetSync.onTick(this.gameState, this.activeSocketByRuntimeId, this.lastTickEvents);
+      this.lastTickEvents = [];
     }, 1000 / 60);
   }
 
@@ -949,8 +955,11 @@ export class GameManager {
       }
       if (stepResult.events.length > 0) {
         for (const ev of stepResult.events) {
-          this.emitToMatch('matchEvent', ev);
+          if (this.packetSync.shouldEmitMatchEvent(ev)) {
+            this.emitToMatch('matchEvent', ev);
+          }
         }
+        this.lastTickEvents.push(...stepResult.events);
       }
 
       if (this.activeReplay && (

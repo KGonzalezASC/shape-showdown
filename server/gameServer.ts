@@ -22,6 +22,7 @@ import { loadServerConfig, type ServerConfig } from './loadConfig.js';
 import { MatchRegistry } from './matchRuntime/MatchRegistry.js';
 import { logError, logInfo } from './observability/logger.js';
 import { initialSeed } from './tetris/engine.js';
+import { GAME_PROTOCOL_VERSION } from '../src/protocol/version.js';
 import type {
   SocketAuthErrorCode,
   SocketAuthErrorPayload,
@@ -265,7 +266,7 @@ export async function startGameServer(
         correlationId: randomUUID(),
         matchSeed: initialSeed(),
         gameServerUrl,
-        protocolVersion: 1,
+        protocolVersion: GAME_PROTOCOL_VERSION,
       })
         .then(async (allocation) => {
           if (allocation !== null) {
@@ -347,6 +348,7 @@ async function authorizeSocket(
   const playerId = readAuthString(socket.handshake.auth, 'playerId');
   const seat = readAuthSeat(socket.handshake.auth);
   const protocolVersion = readAuthNumber(socket.handshake.auth, 'protocolVersion');
+  const clientProtocolVersion = readAuthNumber(socket.handshake.auth, 'clientProtocolVersion');
   if (seat === 'invalid') {
     throw new SocketAuthorizationError(
       'MATCH_SEAT_REJECTED',
@@ -357,10 +359,16 @@ async function authorizeSocket(
     matchId === null
     || playerId === null
     || protocolVersion === null
+    || clientProtocolVersion === null
+    || clientProtocolVersion !== GAME_PROTOCOL_VERSION
   ) {
     throw new SocketAuthorizationError(
-      'MATCH_TICKET_REJECTED',
-      'The match ticket could not be accepted',
+      clientProtocolVersion !== null && clientProtocolVersion !== GAME_PROTOCOL_VERSION
+        ? 'PROTOCOL_VERSION_MISMATCH'
+        : 'MATCH_TICKET_REJECTED',
+      clientProtocolVersion !== null && clientProtocolVersion !== GAME_PROTOCOL_VERSION
+        ? 'Match protocol version is not supported'
+        : 'The match ticket could not be accepted',
     );
   }
 

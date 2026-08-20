@@ -7,6 +7,8 @@ import path from 'node:path';
 import { GameManager } from './GameManager.js';
 import { BOARD_COLS, BOARD_ROWS } from '../src/constants.js';
 import type { PlayerState, ReplayDataV2 } from '../src/types.js';
+import { decodeKeyframePacket } from '../src/protocol/decodeMatchPacket.js';
+import { GAME_PROTOCOL_VERSION } from '../src/protocol/version.js';
 import type { Server, Socket } from 'socket.io';
 import type { JoinTicket, MatchRecord } from './controlPlane/matchStore.js';
 import type {
@@ -61,7 +63,7 @@ class RecordingMatchPersistence implements MatchPersistence {
       playerAId: input.participants.A,
       playerBId: input.participants.B,
       gameServerUrl: 'http://localhost:3000',
-      protocolVersion: 1,
+      protocolVersion: GAME_PROTOCOL_VERSION,
       status: 'allocating',
     };
     const ticket = (seat: 'A' | 'B'): JoinTicket => ({
@@ -174,14 +176,14 @@ describe('GameManager lifecycle harness', () => {
       playerId: 'durable-p1',
       seat: 'A',
       matchSeed: 123,
-      protocolVersion: 1,
+      protocolVersion: GAME_PROTOCOL_VERSION,
     });
     gm.handleConnection(p2 as unknown as Socket, 'durable-p2', {
       matchId: 'match-1',
       playerId: 'durable-p2',
       seat: 'B',
       matchSeed: 123,
-      protocolVersion: 1,
+      protocolVersion: GAME_PROTOCOL_VERSION,
     });
 
     for (let i = 0; i < 5; i += 1) gm.tickOnceForTests();
@@ -214,7 +216,7 @@ describe('GameManager lifecycle harness', () => {
         playerId: 'durable-p1',
         seat: 'A',
         matchSeed: 123,
-        protocolVersion: 1,
+        protocolVersion: GAME_PROTOCOL_VERSION,
       },
     );
     assert.equal(internal.gameState.pause, undefined);
@@ -232,7 +234,7 @@ describe('GameManager lifecycle harness', () => {
       playerId,
       seat,
       matchSeed: 123,
-      protocolVersion: 1,
+      protocolVersion: GAME_PROTOCOL_VERSION,
     } as const);
 
     gm.handleConnection(p1 as unknown as Socket, 'durable-p1', ticket('durable-p1', 'A'));
@@ -282,7 +284,7 @@ describe('GameManager lifecycle harness', () => {
       playerId,
       seat,
       matchSeed: 123,
-      protocolVersion: 1,
+      protocolVersion: GAME_PROTOCOL_VERSION,
     } as const);
 
     gm.handleConnection(p1 as unknown as Socket, 'durable-p1', ticket('durable-p1', 'A'));
@@ -360,7 +362,7 @@ describe('GameManager lifecycle harness', () => {
 
     const replacement = new FakeSocket('p1-replacement');
     const replacementSnapshots: unknown[] = [];
-    replacement.on('gameState', (state) => replacementSnapshots.push(state));
+    replacement.on('gamePacket', (state) => replacementSnapshots.push(state));
     gm.handleConnection(
       replacement as unknown as Socket,
       'durable-p1',
@@ -369,7 +371,7 @@ describe('GameManager lifecycle harness', () => {
         playerId: 'durable-p1',
         seat: 'A',
         matchSeed: 123,
-        protocolVersion: 1,
+        protocolVersion: GAME_PROTOCOL_VERSION,
       },
     );
 
@@ -386,7 +388,9 @@ describe('GameManager lifecycle harness', () => {
     assert.ok(internal.gameState.players['durable-p1']);
     assert.equal(internal.gameState.players['durable-p1'].inputState.left, true);
     assert.equal(replacementSnapshots.length, 1);
-    assert.equal((replacementSnapshots[0] as { players: Record<string, unknown> }).players['durable-p2'] !== undefined, true);
+    const keyframe = decodeKeyframePacket(replacementSnapshots[0] as ArrayBuffer);
+    assert.equal(keyframe.local.id, 'durable-p1');
+    assert.equal(keyframe.opponent.id, 'durable-p2');
   });
 
   it('rejects a third assigned socket without displacing either active seat', () => {
@@ -397,7 +401,7 @@ describe('GameManager lifecycle harness', () => {
       playerId,
       seat,
       matchSeed: 123,
-      protocolVersion: 1,
+      protocolVersion: GAME_PROTOCOL_VERSION,
     } as const);
     const first = new FakeSocket('first');
     const second = new FakeSocket('second');
@@ -426,20 +430,20 @@ describe('GameManager lifecycle harness', () => {
       playerId: 'durable-p1',
       seat: 'A',
       matchSeed: 123,
-      protocolVersion: 1,
+      protocolVersion: GAME_PROTOCOL_VERSION,
     });
 
     const wrongSeat = new FakeSocket('wrong-seat');
     const wrongSeatErrors: unknown[] = [];
     const wrongSeatSnapshots: unknown[] = [];
     wrongSeat.on('error', (error) => wrongSeatErrors.push(error));
-    wrongSeat.on('gameState', (state) => wrongSeatSnapshots.push(state));
+    wrongSeat.on('gamePacket', (state) => wrongSeatSnapshots.push(state));
     gm.handleConnection(wrongSeat as unknown as Socket, 'durable-p1', {
       matchId: 'match-1',
       playerId: 'durable-p1',
       seat: 'B',
       matchSeed: 123,
-      protocolVersion: 1,
+      protocolVersion: GAME_PROTOCOL_VERSION,
     });
 
     assert.deepEqual(wrongSeatErrors, [{
@@ -456,7 +460,7 @@ describe('GameManager lifecycle harness', () => {
       playerId: 'durable-p1',
       seat: 'A',
       matchSeed: 123,
-      protocolVersion: 2,
+      protocolVersion: 1,
     });
 
     assert.deepEqual(wrongProtocolErrors, [{
@@ -479,7 +483,7 @@ describe('GameManager lifecycle harness', () => {
       playerId,
       seat,
       matchSeed: 123,
-      protocolVersion: 1,
+      protocolVersion: GAME_PROTOCOL_VERSION,
     } as const);
     const first = new FakeSocket('first');
     const opponent = new FakeSocket('opponent');

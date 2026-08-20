@@ -16,6 +16,10 @@ import {
   isDiscordActivityContext,
   requestDiscordActivitySession,
 } from '../discordActivity';
+import { ClientPacketDecoder } from '../protocol/ClientPacketDecoder';
+import type { ClientMatchModel } from '../protocol/wireTypes';
+import { GAME_PROTOCOL_VERSION } from '../protocol/version';
+import { toArrayBuffer } from '../protocol/binary';
 
 type GameRuntimeConfig = {
   /** Full origin, e.g. https://api.example.com:10106 — highest priority when non-empty */
@@ -415,7 +419,7 @@ function waitFor(milliseconds: number, signal: AbortSignal): Promise<void> {
 }
 
 interface GameSocketCallbacks {
-  onGameState?: (state: GameState | null) => void;
+  onClientMatchModel?: (model: ClientMatchModel | null) => void;
   onMyId?: (id: string | null) => void;
   onMatchEvent?: (event: MatchEvent | null) => void;
   onServerHealth?: (snapshot: ServerHealthSnapshot) => void;
@@ -423,7 +427,7 @@ interface GameSocketCallbacks {
 }
 
 export const useGameSocket = ({
-  onGameState,
+  onClientMatchModel,
   onMyId,
   onMatchEvent,
   onServerHealth,
@@ -434,13 +438,13 @@ export const useGameSocket = ({
 
   useEffect(() => {
     callbacksRef.current = {
-      onGameState,
+      onClientMatchModel,
       onMyId,
       onMatchEvent,
       onServerHealth,
       onMatchDiagnostics,
     };
-  }, [onGameState, onMatchEvent, onMyId, onServerHealth, onMatchDiagnostics]);
+  }, [onClientMatchModel, onMatchEvent, onMyId, onServerHealth, onMatchDiagnostics]);
 
   useEffect(() => {
     let cancelled = false;
@@ -448,6 +452,7 @@ export const useGameSocket = ({
     let ticketRebound = false;
     let recoveryInFlight = false;
     let lastGameStatus: GameState['status'] | null = null;
+    const packetDecoder = new ClientPacketDecoder();
     let bootstrapAbortController: AbortController | null = null;
     let healthAbortController: AbortController | null = null;
     let healthInterval: number | null = null;
@@ -478,7 +483,7 @@ export const useGameSocket = ({
       callbacksRef.current.onMatchDiagnostics?.(matchDiagnostics);
     };
 
-    callbacksRef.current.onGameState?.(null);
+    callbacksRef.current.onClientMatchModel?.(null);
     callbacksRef.current.onMyId?.(null);
     callbacksRef.current.onMatchEvent?.(null);
     callbacksRef.current.onServerHealth?.({
@@ -817,9 +822,41 @@ export const useGameSocket = ({
 
         nextSocket.on('playerIdentity', (playerId: unknown) => {
           if (typeof playerId === 'string' && playerId.length > 0) {
+            packetDecoder.setMyId(playerId);
             callbacksRef.current.onMyId?.(playerId);
             reportMatchDiagnostics({ playerId });
           }
+        });
+
+        const handlePacket = (payload: unknown) => {
+          const model = packetDecoder.decode(toArrayBuffer(payload));
+          if (model !== null) {
+            lastGameStatus = model.chrome.status;
+            if (model.chrome.endReason === undefined) lastReportedEndReason = undefined;
+            if (
+              model.chrome.endReason !== undefined
+              && model.chrome.endReason !== lastReportedEndReason
+            ) {
+              lastReportedEndReason = model.chrome.endReason;
+              reportReliability(
+                model.chrome.endReason === 'server-void' ? 'match_voided' : 'match_end',
+                {
+                  ...(model.chrome.winnerId === null ? {} : { winner_id: model.chrome.winnerId }),
+                  reason: model.chrome.endReason,
+                  duration_s: Math.floor(model.tick / 60),
+                },
+              );
+            }
+            callbacksRef.current.onClientMatchModel?.(model);
+          }
+          if (packetDecoder.shouldRequestKeyframe()) {
+            packetDecoder.consumeKeyframeRequest();
+            nextSocket.emit('requestKeyframe');
+          }
+        };
+
+        nextSocket.on('gamePacket', (payload: ArrayBuffer) => {
+          handlePacket(payload);
         });
 
         nextSocket.on('matchAssignment', (assignment: unknown) => {
@@ -840,7 +877,10 @@ export const useGameSocket = ({
           });
           attachSocket(
             io(url, {
-              auth: assignment,
+              auth: {
+                ...assignment,
+                clientProtocolVersion: GAME_PROTOCOL_VERSION,
+              },
               path: socketPath,
               transports: ['websocket', 'polling'],
             }),
@@ -849,25 +889,6 @@ export const useGameSocket = ({
           );
         });
 
-        nextSocket.on('gameState', (state: GameState) => {
-          // socket.io already hands us a freshly-deserialized object per message,
-          // so structuredClone here is pure wasted CPU/GC — deep-cloning two
-          // 10x20 boards on every network update would be wasteful on phones. Use directly.
-          lastGameStatus = state.status;
-          if (state.endReason === undefined) lastReportedEndReason = undefined;
-          if (state.endReason !== undefined && state.endReason !== lastReportedEndReason) {
-            lastReportedEndReason = state.endReason;
-            reportReliability(
-              state.endReason === 'server-void' ? 'match_voided' : 'match_end',
-              {
-                ...(state.winnerId === null ? {} : { winner_id: state.winnerId }),
-                reason: state.endReason,
-                duration_s: Math.floor(state.tick / 60),
-              },
-            );
-          }
-          callbacksRef.current.onGameState?.(state);
-        });
         nextSocket.on('matchEvent', (evt: MatchEvent) => {
           callbacksRef.current.onMatchEvent?.(evt);
         });
@@ -941,7 +962,10 @@ export const useGameSocket = ({
             });
             attachSocket(
               io(url, {
-                auth: assignment,
+                auth: {
+                  ...assignment,
+                  clientProtocolVersion: GAME_PROTOCOL_VERSION,
+                },
                 path: socketPath,
                 transports: ['websocket', 'polling'],
               }),
@@ -1003,7 +1027,10 @@ export const useGameSocket = ({
       }
       if (initialBootstrap === null) return;
       attachSocket(io(url, {
-        auth: initialBootstrap.assignment,
+        auth: {
+          ...initialBootstrap.assignment,
+          clientProtocolVersion: GAME_PROTOCOL_VERSION,
+        },
         path: socketPath,
         transports: ['websocket', 'polling'],
       }), true, initialBootstrap.assignment);

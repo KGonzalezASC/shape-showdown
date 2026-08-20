@@ -9,7 +9,7 @@ const assignment: MatchAssignment = {
   seat: 'A',
   ticket: 'ticket-1',
   matchSeed: 123,
-  protocolVersion: 1,
+  protocolVersion: 2,
 };
 
 describe('match recovery assignment polling', () => {

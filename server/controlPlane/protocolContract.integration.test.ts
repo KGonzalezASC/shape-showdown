@@ -11,6 +11,7 @@ import type {
   SocketAuthErrorCode,
   SocketAuthErrorPayload,
 } from '../../src/types.js';
+import { GAME_PROTOCOL_VERSION } from '../../src/protocol/version.js';
 
 const database = createDatabase();
 
@@ -83,33 +84,46 @@ describe('Socket match protocol contract', () => {
 
       assert.equal(
         (await expectConnectError(server.origin, toAuth(consumedTicket, {
-          protocolVersion: 1,
+          protocolVersion: GAME_PROTOCOL_VERSION,
+          clientProtocolVersion: GAME_PROTOCOL_VERSION,
         }))).code,
         'MATCH_TICKET_CONSUMED',
       );
       assert.equal(
         (await expectConnectError(server.origin, {
-          ...toAuth(wrongPlayerTicket, { protocolVersion: 1 }),
+          ...toAuth(wrongPlayerTicket, {
+            protocolVersion: GAME_PROTOCOL_VERSION,
+            clientProtocolVersion: GAME_PROTOCOL_VERSION,
+          }),
           playerId: playerIds[2],
         })).code,
         'MATCH_TICKET_REJECTED',
       );
       assert.equal(
         (await expectConnectError(server.origin, {
-          ...toAuth(wrongSeatTicket, { protocolVersion: 1 }),
+          ...toAuth(wrongSeatTicket, {
+            protocolVersion: GAME_PROTOCOL_VERSION,
+            clientProtocolVersion: GAME_PROTOCOL_VERSION,
+          }),
           seat: 'B',
         })).code,
         'MATCH_SEAT_REJECTED',
       );
       assert.equal(
         (await expectConnectError(server.origin, {
-          ...toAuth(protocolTicket, { protocolVersion: 2 }),
+          ...toAuth(protocolTicket, {
+            protocolVersion: GAME_PROTOCOL_VERSION,
+            clientProtocolVersion: 1,
+          }),
         })).code,
         'PROTOCOL_VERSION_MISMATCH',
       );
       assert.equal(
         (await expectConnectError(server.origin, {
-          ...toAuth(ticketA, { protocolVersion: 1 }),
+          ...toAuth(ticketA, {
+            protocolVersion: GAME_PROTOCOL_VERSION,
+            clientProtocolVersion: GAME_PROTOCOL_VERSION,
+          }),
           matchId: matchIds[1],
         })).code,
         'MATCH_TICKET_REJECTED',
@@ -134,15 +148,15 @@ async function insertPlayingMatch(
     )
     VALUES (
       ${matchId}, ${randomUUID()}, 12345, ${playerAId}, ${playerBId},
-      'http://127.0.0.1:3000', 1, 'playing'
+      'http://127.0.0.1:3000', ${GAME_PROTOCOL_VERSION}, 'playing'
     )
   `;
 }
 
 function toAuth(
   ticket: JoinTicket,
-  overrides: { protocolVersion: number },
-): MatchAssignment {
+  overrides: { protocolVersion: number; clientProtocolVersion: number },
+): MatchAssignment & { clientProtocolVersion: number } {
   return {
     matchId: ticket.matchId,
     playerId: ticket.playerId,
@@ -150,12 +164,13 @@ function toAuth(
     ticket: ticket.ticket,
     matchSeed: 12345,
     protocolVersion: overrides.protocolVersion,
+    clientProtocolVersion: overrides.clientProtocolVersion,
   };
 }
 
 function expectConnectError(
   origin: string,
-  auth: MatchAssignment,
+  auth: MatchAssignment & { clientProtocolVersion?: number },
 ): Promise<SocketAuthErrorPayload> {
   return new Promise((resolve, reject) => {
     const socket = ioClient(origin, {

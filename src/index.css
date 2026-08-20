@@ -1,5 +1,13 @@
 @import "tailwindcss";
 
+@font-face {
+  font-family: "Press Start 2P";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("/fonts/PressStart2P-Regular.ttf") format("truetype");
+}
+
 @theme {
   --font-sans: "Press Start 2P", Consolas, monospace;
   --font-mono: "Press Start 2P", Consolas, monospace;

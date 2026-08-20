@@ -5,6 +5,7 @@ import path from 'node:path';
 import { createDatabase } from './database.js';
 import { MatchStore } from './matchStore.js';
 import { runMigrations } from './migrations.js';
+import { GAME_PROTOCOL_VERSION } from '../../src/protocol/version.js';
 
 const database = createDatabase();
 
@@ -39,7 +40,7 @@ describe('MatchStore ticket refresh integration', () => {
         playerAId,
         playerBId,
         gameServerUrl: 'http://localhost:3000',
-        protocolVersion: 1,
+        protocolVersion: GAME_PROTOCOL_VERSION,
       });
       matchId = match.id;
       await matches.issueJoinTicket({ matchId, playerId: playerAId, seat: 'A' });

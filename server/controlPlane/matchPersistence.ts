@@ -11,6 +11,7 @@ import {
   type MatchResultInput,
 } from './matchResultStore.js';
 import { logInfo } from '../observability/logger.js';
+import { GAME_PROTOCOL_VERSION } from '../../src/protocol/version.js';
 
 export type DurableMatchParticipants = {
   A: string;
@@ -55,8 +56,6 @@ export type MatchPersistence = {
   getLatestCheckpoint?(matchId: string): Promise<MatchCheckpoint | null>;
 };
 
-const PROTOCOL_VERSION = 1;
-
 export class PostgresMatchPersistence implements MatchPersistence {
   public constructor(
     private readonly database: Database,
@@ -72,7 +71,7 @@ export class PostgresMatchPersistence implements MatchPersistence {
         playerAId: input.participants.A,
         playerBId: input.participants.B,
         gameServerUrl: this.gameServerUrl,
-        protocolVersion: PROTOCOL_VERSION,
+        protocolVersion: GAME_PROTOCOL_VERSION,
       });
 
       const ticketA = await matches.issueJoinTicket({

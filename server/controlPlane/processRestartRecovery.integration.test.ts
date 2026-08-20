@@ -224,7 +224,7 @@ describe('Process restart and graceful drain recovery integration', () => {
       assert.equal(assignment1.seat, 'A');
       assert.equal(assignment2.seat, 'B');
       assert.equal(assignment1.matchSeed, assignment2.matchSeed);
-      assert.equal(assignment1.protocolVersion, 1);
+      assert.equal(assignment1.protocolVersion, 2);
 
       const client1 = connectSocket(server1.origin, assignment1);
       const client2 = connectSocket(server1.origin, assignment2);
@@ -469,7 +469,7 @@ describe('Process restart and graceful drain recovery integration', () => {
         seat: 'A',
         ticket: ticketA.ticket,
         matchSeed: 12345,
-        protocolVersion: 1,
+        protocolVersion: 2,
       });
       clientSocket = client.socket;
 
@@ -600,7 +600,7 @@ describe('Process restart and graceful drain recovery integration', () => {
         seat: 'A',
         ticket: ticketA.ticket,
         matchSeed: 54321,
-        protocolVersion: 1,
+        protocolVersion: 2,
       });
       clientASocket = clientA.socket;
 

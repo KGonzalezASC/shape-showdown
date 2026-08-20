@@ -24,12 +24,9 @@ export function useShopConfirm() {
       const pricingView = getPricingView(pickedId, chrome.shopPricing[pickedId], chrome.tick);
       if (chrome.availableFunds < pricingView.currentPrice) return;
       const opponent = playfield.opponentPlayer;
-      if (pickedId === 'storage-toxin' && !opponent?.holdPiece) return;
+      if (pickedId === 'storage-toxin' && !opponent?.opponentHasHold) return;
       if (pickedId === 'bounty-tax' && chrome.oppFunds <= chrome.myFunds) return;
-      if (
-        pickedId === 'wildcard-four' &&
-        !opponent?.poisonBoard?.some((row) => row.some((cell) => cell > 0))
-      ) return;
+      if (pickedId === 'wildcard-four' && !opponent?.opponentHasPoison) return;
       sendShopPurchase(pickedId);
     }
   }, [chrome, playfield.opponentPlayer, sendShopOpen, sendShopPurchase]);
