@@ -46,7 +46,32 @@ export default defineConfig(({ mode }) => {
 
   return {
     base: normalizedBase,
-    plugins: [react(), tailwindcss()],
+    plugins: [
+      react(),
+      tailwindcss(),
+      {
+        name: 'generate-game-config',
+        closeBundle() {
+          const gameServerUrl = env.GAME_SERVER_URL || env.VITE_GAME_SERVER_URL;
+          if (gameServerUrl && gameServerUrl.trim().length > 0) {
+            const configPath = path.resolve(projectRoot, 'dist/client/game-config.json');
+            fs.writeFileSync(
+              configPath,
+              JSON.stringify(
+                {
+                  gameServerUrl: gameServerUrl.trim(),
+                  gameServerHost: '',
+                  gameServerPort: null,
+                },
+                null,
+                2
+              ) + '\n',
+              'utf8'
+            );
+          }
+        },
+      },
+    ],
     define: {
       'process.env.GEMINI_API_KEY': JSON.stringify(env.GEMINI_API_KEY),
     },
