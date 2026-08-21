@@ -13,6 +13,10 @@ export const GAME_HEIGHT = BOARD_VISIBLE_ROWS * CELL_SIZE;
 export const GAME_TICK_RATE = 60;
 export const COUNTDOWN_SECONDS = 3;
 export const RESTART_DELAY_SECONDS = 5;
+/** Seat reclaim window after a disconnect or checkpoint restore. */
+export const DISCONNECT_SEAT_LEASE_MS = 60_000;
+/** Wall-clock budget to load a checkpoint before the restore is treated as failed. */
+export const RESTORE_READY_TIMEOUT_MS = 15_000;
 
 export const NEXT_PREVIEW_COUNT = 5;
 /** Server ticks for the temporary Landing Forecast shown after a piece spawns. */

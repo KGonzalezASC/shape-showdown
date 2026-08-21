@@ -38,6 +38,7 @@ import type {
 } from './controlPlane/matchResultStore.js';
 import { GAME_PROTOCOL_VERSION } from '../src/protocol/version.js';
 import { MatchPacketSync } from './sync/MatchPacketSync.js';
+import { DISCONNECT_SEAT_LEASE_MS } from '../src/constants.js';
 
 export type SocketSeatBinding = Omit<MatchAssignment, 'ticket'>;
 
@@ -152,11 +153,20 @@ export class GameManager {
     this.playerSlots.clear();
     this.durablePlayerIds.clear();
     this.rngChannelsByPlayer.clear();
+    this.clearAllDisconnectForfeitures();
+    const restoredAt = Date.now();
     for (const participant of envelope.participants) {
       this.playerSlots.set(participant.runtimeId, participant.slot);
       this.durablePlayerIds.set(participant.runtimeId, participant.playerId);
       this.rngChannelsByPlayer.set(participant.runtimeId, participant.rng);
+      this.disconnectedAtByRuntimeId.set(participant.runtimeId, restoredAt);
     }
+    this.gameState.pause = envelope.participants[0] === undefined
+      ? undefined
+      : {
+          playerId: envelope.participants[0].runtimeId,
+          startedAt: restoredAt,
+        };
     this.disconnectBudgets.clear();
     for (const budget of envelope.disconnectBudgets) {
       this.disconnectBudgets.set(budget.runtimeId, {
@@ -331,15 +341,19 @@ export class GameManager {
     this.bindSocket(socket, runtimeId);
     socket.emit('playerIdentity', runtimeId);
     this.packetSync.sendKeyframe(socket, runtimeId, this.gameState);
-    if (this.gameState.pause?.playerId === runtimeId) {
-      const pausedForMs = Math.max(0, Date.now() - this.gameState.pause.startedAt);
-      const budget = this.disconnectBudgets.get(runtimeId) ?? { episodes: 0, totalPausedMs: 0 };
-      budget.totalPausedMs += pausedForMs;
-      this.disconnectBudgets.set(runtimeId, budget);
-      this.clearDisconnectForfeiture(runtimeId);
-      if (budget.episodes >= 3 || budget.totalPausedMs >= 90_000) {
-        this.forfeitDisconnectedPlayer(runtimeId);
-        return;
+    this.clearDisconnectForfeiture(runtimeId);
+    if (this.gameState.pause?.playerId === runtimeId || this.restoredAwaitingReconnect) {
+      const pausedForMs = this.gameState.pause === undefined
+        ? 0
+        : Math.max(0, Date.now() - this.gameState.pause.startedAt);
+      if (this.gameState.pause?.playerId === runtimeId) {
+        const budget = this.disconnectBudgets.get(runtimeId) ?? { episodes: 0, totalPausedMs: 0 };
+        budget.totalPausedMs += pausedForMs;
+        this.disconnectBudgets.set(runtimeId, budget);
+        if (budget.episodes >= 3 || budget.totalPausedMs >= 90_000) {
+          this.forfeitDisconnectedPlayer(runtimeId);
+          return;
+        }
       }
       const nextPausedRuntimeId = this.findDisconnectedRuntimeId();
       this.gameState.pause = nextPausedRuntimeId === null
@@ -351,7 +365,7 @@ export class GameManager {
       logInfo('socket_reconnected', {
         matchId: this.durableMatchId,
         playerId: runtimeId,
-        pauseEpisodes: budget.episodes,
+        pauseEpisodes: this.disconnectBudgets.get(runtimeId)?.episodes ?? 0,
         pausedMs: pausedForMs,
       });
       logInfo('reconnect_success', {
@@ -364,21 +378,19 @@ export class GameManager {
         playerId: binding.playerId,
       });
       this.emitGameplayPackets(true);
-    } else {
-      this.clearDisconnectForfeiture(runtimeId);
-      if (previousSocket !== undefined && previousSocket !== socket) {
-        this.recordReplayDiscontinuity({
-          tick: this.gameState.tick,
-          kind: 'reconnect_success',
-          playerId: binding.playerId,
-        });
-      }
+    } else if (previousSocket !== undefined && previousSocket !== socket) {
+      this.recordReplayDiscontinuity({
+        tick: this.gameState.tick,
+        kind: 'reconnect_success',
+        playerId: binding.playerId,
+      });
     }
     if (
       this.restoredAwaitingReconnect
       && this.activeSocketByRuntimeId.size >= Object.keys(this.gameState.players).length
     ) {
       this.restoredAwaitingReconnect = false;
+      this.gameState.pause = undefined;
       this.onRecoveryReady?.();
     }
   }
@@ -597,7 +609,7 @@ export class GameManager {
     const timer = setTimeout(() => {
       this.disconnectTimers.delete(runtimeId);
       this.forfeitDisconnectedPlayer(runtimeId);
-    }, 60_000);
+    }, DISCONNECT_SEAT_LEASE_MS);
     this.disconnectTimers.set(runtimeId, timer);
   }
 

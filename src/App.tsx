@@ -735,7 +735,7 @@ const AppShell: React.FC = () => {
                 <p className="text-[8px] leading-5 text-zinc-400 sm:text-[9px]">
                   {gameState?.pause?.playerId === myId
                     ? 'Your seat is being reclaimed. The match will resume from the server snapshot.'
-                    : 'Your opponent is reconnecting. The server is holding both boards safely.'}
+                    : 'Opponent disconnected. Waiting to reconnect.'}
                 </p>
               </div>
             </m.div>

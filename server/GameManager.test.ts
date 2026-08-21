@@ -9,6 +9,8 @@ import { BOARD_COLS, BOARD_ROWS } from '../src/constants.js';
 import type { PlayerState, ReplayDataV2 } from '../src/types.js';
 import { decodeKeyframePacket } from '../src/protocol/decodeMatchPacket.js';
 import { GAME_PROTOCOL_VERSION } from '../src/protocol/version.js';
+import { makePlayer } from './tetris/engine.js';
+import { createPlayerRngChannels } from '../src/rng.js';
 import type { Server, Socket } from 'socket.io';
 import type { JoinTicket, MatchRecord } from './controlPlane/matchStore.js';
 import type {
@@ -235,6 +237,72 @@ describe('GameManager lifecycle harness', () => {
     );
     assert.equal(internal.gameState.pause, undefined);
     assert.equal(internal.gameState.players['durable-p1'] !== undefined, true);
+  });
+
+  it('keeps a restored match paused until both seats reclaim', () => {
+    const gm = new GameManager(createFakeIo(), 60);
+    managers.push(gm);
+    const rngA = createPlayerRngChannels(54321, 0);
+    const rngB = createPlayerRngChannels(54321, 1);
+    const stateBlob = Buffer.from(JSON.stringify({
+      version: 1,
+      matchId: 'match-restore',
+      state: {
+        players: {
+          'durable-p1': makePlayer('durable-p1', rngA),
+          'durable-p2': makePlayer('durable-p2', rngB),
+        },
+        status: 'playing',
+        countdown: 0,
+        winnerId: null,
+        tick: 180,
+        seed: 54321,
+      },
+      participants: [
+        { runtimeId: 'durable-p1', playerId: 'durable-p1', slot: 0, rng: rngA },
+        { runtimeId: 'durable-p2', playerId: 'durable-p2', slot: 1, rng: rngB },
+      ],
+      disconnectBudgets: [],
+    }), 'utf8');
+
+    gm.restoreCheckpoint({ matchId: 'match-restore', stateBlob });
+    const internal = gm as unknown as {
+      gameState: {
+        status: string;
+        pause?: { playerId: string };
+        tick: number;
+      };
+      restoredAwaitingReconnect: boolean;
+    };
+    const tickBefore = internal.gameState.tick;
+    gm.tickOnceForTests();
+    assert.equal(internal.restoredAwaitingReconnect, true);
+    assert.equal(internal.gameState.pause?.playerId, 'durable-p1');
+    assert.equal(internal.gameState.tick, tickBefore);
+
+    const first = new FakeSocket('p1-restore');
+    gm.handleConnection(first as unknown as Socket, 'durable-p1', {
+      matchId: 'match-restore',
+      playerId: 'durable-p1',
+      seat: 'A',
+      matchSeed: 54321,
+      protocolVersion: GAME_PROTOCOL_VERSION,
+    });
+    gm.tickOnceForTests();
+    assert.equal(internal.restoredAwaitingReconnect, true);
+    assert.equal(internal.gameState.pause?.playerId, 'durable-p2');
+    assert.equal(internal.gameState.tick, tickBefore);
+
+    const second = new FakeSocket('p2-restore');
+    gm.handleConnection(second as unknown as Socket, 'durable-p2', {
+      matchId: 'match-restore',
+      playerId: 'durable-p2',
+      seat: 'B',
+      matchSeed: 54321,
+      protocolVersion: GAME_PROTOCOL_VERSION,
+    });
+    assert.equal(internal.restoredAwaitingReconnect, false);
+    assert.equal(internal.gameState.pause, undefined);
   });
 
   it('keeps an opponent pause when the other player refreshes', async () => {

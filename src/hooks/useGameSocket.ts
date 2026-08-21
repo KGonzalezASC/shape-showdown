@@ -11,7 +11,7 @@ import {
   SocketAuthErrorCode,
 } from '../types';
 import { localDevelopmentGameServerUrl } from '../network/localGameServer';
-import { pollForMatchRecoveryAssignment } from './matchRecovery';
+import { pollForMatchRecoveryAssignment, canContinueMatchRecovery } from './matchRecovery';
 import {
   isDiscordActivityContext,
   requestDiscordActivitySession,
@@ -20,6 +20,7 @@ import { ClientPacketDecoder } from '../protocol/ClientPacketDecoder';
 import type { ClientMatchModel } from '../protocol/wireTypes';
 import { GAME_PROTOCOL_VERSION } from '../protocol/version';
 import { toArrayBuffer } from '../protocol/binary';
+import { DISCONNECT_SEAT_LEASE_MS } from '../constants';
 
 type GameRuntimeConfig = {
   /** Full origin, e.g. https://api.example.com:10106 — highest priority when non-empty */
@@ -900,11 +901,15 @@ export const useGameSocket = ({
         if (recoveryInFlight || cancelled) return;
         const now = Date.now();
         if (recoveryDeadlineAt === null) {
-          recoveryDeadlineAt = now + 60_000;
+          recoveryDeadlineAt = now + DISCONNECT_SEAT_LEASE_MS;
           recoveryAttempts = 0;
         }
-        const maxAttempts = reason === 'runtime' ? 3 : 1;
-        if (recoveryAttempts >= maxAttempts || now >= recoveryDeadlineAt) {
+        if (!canContinueMatchRecovery({
+          reason,
+          attempts: recoveryAttempts,
+          nowMs: now,
+          deadlineAtMs: recoveryDeadlineAt,
+        })) {
           reportMatchDiagnostics({
             phase: 'error',
             error: reason === 'runtime'

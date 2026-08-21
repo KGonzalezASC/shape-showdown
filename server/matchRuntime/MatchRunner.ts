@@ -1,6 +1,7 @@
 import type { Server, Socket } from 'socket.io';
 import { GameManager, type SocketSeatBinding } from '../GameManager.js';
 import type { MatchPersistence } from '../controlPlane/matchPersistence.js';
+import { DISCONNECT_SEAT_LEASE_MS, RESTORE_READY_TIMEOUT_MS } from '../../src/constants.js';
 import { logError, logInfo } from '../observability/logger.js';
 
 export class MatchRunner {
@@ -15,7 +16,7 @@ export class MatchRunner {
     persistence: MatchPersistence | undefined,
     onMatchCreated: (matchId: string) => void,
     matchId: string,
-    recoveryVoidTimeoutMs = 15_000,
+    recoveryVoidTimeoutMs = DISCONNECT_SEAT_LEASE_MS,
   ) {
     this.recoveryVoidTimeoutMs = recoveryVoidTimeoutMs;
     this.manager = new GameManager(
@@ -58,7 +59,11 @@ export class MatchRunner {
       return;
     }
     logInfo('restore_start', { matchId });
-    const checkpoint = await persistence.getLatestCheckpoint(matchId);
+    const checkpoint = await withTimeout(
+      persistence.getLatestCheckpoint(matchId),
+      RESTORE_READY_TIMEOUT_MS,
+      `Checkpoint restore exceeded ${RESTORE_READY_TIMEOUT_MS}ms`,
+    );
     if (checkpoint !== null) {
       try {
         this.manager.restoreCheckpoint({
@@ -90,4 +95,20 @@ export class MatchRunner {
       }, this.recoveryVoidTimeoutMs);
     }
   }
+}
+
+function withTimeout<T>(promise: Promise<T>, timeoutMs: number, message: string): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error(message)), timeoutMs);
+    promise.then(
+      (value) => {
+        clearTimeout(timer);
+        resolve(value);
+      },
+      (error) => {
+        clearTimeout(timer);
+        reject(error);
+      },
+    );
+  });
 }

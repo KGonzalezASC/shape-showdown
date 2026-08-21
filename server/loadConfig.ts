@@ -1,5 +1,6 @@
 import fs from "fs";
 import path from "path";
+import { DISCONNECT_SEAT_LEASE_MS } from "../src/constants.js";
 
 export type ServerConfig = {
   port: number;
@@ -14,7 +15,7 @@ const defaults: ServerConfig = {
   host: "0.0.0.0",
   serveClient: false,
   replayKeyframeIntervalTicks: 30,
-  recoveryVoidTimeoutMs: 15_000,
+  recoveryVoidTimeoutMs: DISCONNECT_SEAT_LEASE_MS,
 };
 
 /**
