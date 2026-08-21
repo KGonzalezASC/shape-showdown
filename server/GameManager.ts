@@ -31,7 +31,7 @@ import {
 } from './shop.js';
 import type { MatchPersistence } from './controlPlane/matchPersistence.js';
 import type { JoinTicket } from './controlPlane/matchStore.js';
-import { logError, logInfo } from './observability/logger.js';
+import { logError, logInfo, logWarn } from './observability/logger.js';
 import type {
   MatchOutcomeReason,
   MatchResultStats,
@@ -72,6 +72,9 @@ export class GameManager {
     totalPausedMs: number;
   }>();
   private persistenceTail: Promise<void> = Promise.resolve();
+  private isCheckpointWriting = false;
+  private pendingCheckpoint: PendingCheckpoint | null = null;
+  private coalescedCheckpointCount = 0;
 
   constructor(
     io: Server,
@@ -1049,12 +1052,55 @@ export class GameManager {
       })),
     }), 'utf8');
     const simTick = this.gameState.tick;
+    const checkpoint: PendingCheckpoint = {
+      matchId,
+      simTick,
+      stateBlob,
+      enqueuedAt: Date.now(),
+    };
+
+    if (this.isCheckpointWriting) {
+      if (this.pendingCheckpoint !== null) {
+        this.coalescedCheckpointCount += 1;
+        logInfo('checkpoint_write_coalesced', {
+          matchId,
+          skippedSimTick: this.pendingCheckpoint.simTick,
+          nextSimTick: simTick,
+          totalCoalesced: this.coalescedCheckpointCount,
+        });
+      }
+      this.pendingCheckpoint = checkpoint;
+      return;
+    }
+
+    this.isCheckpointWriting = true;
+    this.pendingCheckpoint = checkpoint;
+
     this.enqueuePersistence(async () => {
-      await writeCheckpoint.call(this.persistence, {
-        matchId,
-        simTick,
-        stateBlob,
-      });
+      try {
+        while (this.pendingCheckpoint !== null) {
+          const current: PendingCheckpoint = this.pendingCheckpoint;
+          this.pendingCheckpoint = null;
+          const writeStart = Date.now();
+          await writeCheckpoint.call(this.persistence, {
+            matchId: current.matchId,
+            simTick: current.simTick,
+            stateBlob: current.stateBlob,
+          });
+          const writeDurationMs = Date.now() - writeStart;
+          const totalQueueDurationMs = Date.now() - current.enqueuedAt;
+          if (totalQueueDurationMs > 1_000) {
+            logWarn('checkpoint_write_stale', {
+              matchId: current.matchId,
+              simTick: current.simTick,
+              writeDurationMs,
+              totalQueueDurationMs,
+            });
+          }
+        }
+      } finally {
+        this.isCheckpointWriting = false;
+      }
     });
   }
 
@@ -1066,6 +1112,13 @@ export class GameManager {
     this.io.emit(event, payload);
   }
 }
+
+type PendingCheckpoint = {
+  matchId: string;
+  simTick: number;
+  stateBlob: Uint8Array;
+  enqueuedAt: number;
+};
 
 type CheckpointEnvelope = {
   version: 1;

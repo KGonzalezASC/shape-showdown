@@ -136,23 +136,39 @@ export class PostgresMatchPersistence implements MatchPersistence {
     simTick: number;
     stateBlob: Uint8Array;
   }): Promise<void> {
-    await this.database.begin(async (transaction) => {
-      await transaction`
+    await this.database`
+      WITH inserted AS (
         INSERT INTO match_checkpoints (match_id, sim_tick, state_blob)
         VALUES (${input.matchId}, ${input.simTick}, ${input.stateBlob})
-      `;
-      await transaction`
-        DELETE FROM match_checkpoints
-        WHERE match_id = ${input.matchId}
-          AND id NOT IN (
-            SELECT id
-            FROM match_checkpoints
-            WHERE match_id = ${input.matchId}
-            ORDER BY sim_tick DESC, id DESC
-            LIMIT 2
-          )
-      `;
-    });
+        RETURNING id, match_id, sim_tick
+      ),
+      ranked AS (
+        SELECT id,
+               ROW_NUMBER() OVER (
+                 PARTITION BY match_id
+                 ORDER BY sim_tick DESC, id DESC
+               ) AS rn
+        FROM (
+          SELECT id, match_id, sim_tick
+          FROM match_checkpoints
+          WHERE match_id = ${input.matchId}
+
+          UNION ALL
+
+          SELECT id, match_id, sim_tick
+          FROM inserted
+        ) all_checkpoints
+      ),
+      deleted AS (
+        DELETE FROM match_checkpoints c
+        USING ranked r
+        WHERE c.id = r.id
+          AND r.rn > 2
+        RETURNING c.id
+      )
+      SELECT id, match_id, sim_tick
+      FROM inserted;
+    `;
     logInfo('durable_match_checkpoint_written', {
       matchId: input.matchId,
       simTick: input.simTick,

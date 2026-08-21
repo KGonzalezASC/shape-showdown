@@ -17,3 +17,7 @@ fixtures/replays/
 
 # Local hosting incident log. Keep operational failures out of version control.
 .scratch/production-multiplayer-deployment/hosting-issues.local.md
+
+# Match load test and smoke test screenshots
+.scratch/match-screenshots/
+

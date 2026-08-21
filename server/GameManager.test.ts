@@ -92,6 +92,20 @@ class RecordingMatchPersistence implements MatchPersistence {
   }): Promise<void> {
     this.finalizations.push(input);
   }
+
+  readonly checkpoints: Array<{ matchId: string; simTick: number; stateBlob: Uint8Array }> = [];
+  checkpointDelayMs = 0;
+
+  async writeCheckpoint(input: {
+    matchId: string;
+    simTick: number;
+    stateBlob: Uint8Array;
+  }): Promise<void> {
+    if (this.checkpointDelayMs > 0) {
+      await new Promise<void>((resolve) => setTimeout(resolve, this.checkpointDelayMs));
+    }
+    this.checkpoints.push(input);
+  }
 }
 
 async function flushPromises(): Promise<void> {
@@ -824,5 +838,45 @@ describe('GameManager lifecycle harness', () => {
     assert.ok(sparse.activeReplay);
     assert.ok((everyTick.activeReplay?.keyframes.length ?? 0) > (sparse.activeReplay?.keyframes.length ?? 0));
     assert.equal(sparse.activeReplay?.keyframeIntervalTicks, 30);
+  });
+
+  it('coalesces intermediate checkpoints when database writes are delayed', async () => {
+    const persistence = new RecordingMatchPersistence();
+    persistence.checkpointDelayMs = 25;
+    const gm = new GameManager(createFakeIo(), 60, persistence);
+    managers.push(gm);
+
+    const p1 = new FakeSocket('p1');
+    const p2 = new FakeSocket('p2');
+    gm.handleConnection(p1 as unknown as Socket, 'durable-p1');
+    gm.handleConnection(p2 as unknown as Socket, 'durable-p2');
+
+    for (let i = 0; i < 5; i += 1) gm.tickOnceForTests();
+    await flushPromises();
+
+    const internal = gm as unknown as {
+      gameState: { status: string; tick: number };
+      lastHandledStatus: string;
+      enqueueCheckpoint: () => void;
+    };
+    internal.gameState.status = 'playing';
+    internal.lastHandledStatus = 'playing';
+
+    internal.gameState.tick = 60;
+    internal.enqueueCheckpoint();
+    await flushPromises();
+
+    internal.gameState.tick = 120;
+    internal.enqueueCheckpoint();
+    internal.gameState.tick = 180;
+    internal.enqueueCheckpoint();
+    internal.gameState.tick = 240;
+    internal.enqueueCheckpoint();
+
+    await gm.stopAndFlush();
+
+    assert.equal(persistence.checkpoints.length, 2);
+    assert.equal(persistence.checkpoints[0].simTick, 60);
+    assert.equal(persistence.checkpoints[1].simTick, 240);
   });
 });

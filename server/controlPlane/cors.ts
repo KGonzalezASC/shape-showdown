@@ -11,9 +11,8 @@ export function resolveCorsOrigins(mode: 'development' | 'production'): CorsOrig
 
   const explicitOrigins = parseExplicitOrigins(process.env.CORS_ALLOWED_ORIGINS);
   const origins: Array<string | RegExp> = [
-    pagesOriginPattern,
     discordOriginPattern,
-    ...explicitOrigins,
+    ...(explicitOrigins.length > 0 ? explicitOrigins : [pagesOriginPattern]),
   ];
 
   if (process.env.ALLOW_LOCALHOST === 'true') {
