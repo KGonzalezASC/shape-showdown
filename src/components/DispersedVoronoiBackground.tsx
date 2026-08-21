@@ -2,6 +2,7 @@ import React, { memo, startTransition, useEffect, useRef, useState } from 'react
 
 import { DEFAULT_VORONOI_TILE_PALETTE } from '../presentation/themePackage';
 import { createDecorationRandom } from '../presentation/decorationSeed';
+import { SHAPE_COLORS } from '../presentation/shapePalette';
 
 /** Lobby / idle: light dim so the Voronoi pattern reads clearly. */
 const BG_SCRIM_IDLE = 0.35;
@@ -31,15 +32,27 @@ interface TetrominoPiece {
   shapes: ReadonlyArray<ReadonlyArray<readonly [number, number]>>;
 }
 
+function hexToRgb(hex: string): [number, number, number] {
+  const clean = hex.replace('#', '');
+  const num = parseInt(clean, 16);
+  return [(num >> 16) & 255, (num >> 8) & 255, num & 255];
+}
+
+function makePieceStyle(hex: string): { fill: string; stroke: string } {
+  const [r, g, b] = hexToRgb(hex);
+  return {
+    fill: `rgb(${Math.round(r * 0.28)}, ${Math.round(g * 0.28)}, ${Math.round(b * 0.28)})`,
+    stroke: `rgb(${Math.round(r * 0.65)}, ${Math.round(g * 0.65)}, ${Math.round(b * 0.65)})`,
+  };
+}
+
 const TETROMINO_PIECES: readonly TetrominoPiece[] = [
   {
-    fill: 'rgb(20, 52, 64)',
-    stroke: 'rgb(45, 110, 130)',
+    ...makePieceStyle(SHAPE_COLORS.I),
     shapes: [[[0, 0], [0, 1], [0, 2], [0, 3]], [[0, 0], [1, 0], [2, 0], [3, 0]]],
   },
   {
-    fill: 'rgb(22, 40, 68)',
-    stroke: 'rgb(50, 85, 140)',
+    ...makePieceStyle(SHAPE_COLORS.J),
     shapes: [
       [[0, 0], [1, 0], [1, 1], [1, 2]],
       [[0, 0], [0, 1], [1, 0], [2, 0]],
@@ -48,8 +61,7 @@ const TETROMINO_PIECES: readonly TetrominoPiece[] = [
     ],
   },
   {
-    fill: 'rgb(60, 42, 24)',
-    stroke: 'rgb(125, 85, 45)',
+    ...makePieceStyle(SHAPE_COLORS.L),
     shapes: [
       [[0, 2], [1, 0], [1, 1], [1, 2]],
       [[0, 0], [1, 0], [2, 0], [2, 1]],
@@ -58,18 +70,15 @@ const TETROMINO_PIECES: readonly TetrominoPiece[] = [
     ],
   },
   {
-    fill: 'rgb(56, 52, 22)',
-    stroke: 'rgb(115, 105, 40)',
+    ...makePieceStyle(SHAPE_COLORS.O),
     shapes: [[[0, 0], [0, 1], [1, 0], [1, 1]]],
   },
   {
-    fill: 'rgb(22, 54, 34)',
-    stroke: 'rgb(45, 110, 70)',
+    ...makePieceStyle(SHAPE_COLORS.S),
     shapes: [[[0, 1], [0, 2], [1, 0], [1, 1]], [[0, 0], [1, 0], [1, 1], [2, 1]]],
   },
   {
-    fill: 'rgb(46, 28, 62)',
-    stroke: 'rgb(95, 60, 125)',
+    ...makePieceStyle(SHAPE_COLORS.T),
     shapes: [
       [[0, 1], [1, 0], [1, 1], [1, 2]],
       [[0, 0], [1, 0], [1, 1], [2, 0]],
@@ -78,8 +87,7 @@ const TETROMINO_PIECES: readonly TetrominoPiece[] = [
     ],
   },
   {
-    fill: 'rgb(60, 26, 28)',
-    stroke: 'rgb(125, 52, 58)',
+    ...makePieceStyle(SHAPE_COLORS.Z),
     shapes: [[[0, 0], [0, 1], [1, 1], [1, 2]], [[0, 1], [1, 0], [1, 1], [2, 0]]],
   },
 ];
