@@ -89,8 +89,8 @@ export default defineConfig(({ mode }) => {
       emptyOutDir: true,
       rollupOptions: {
         input: {
-          main: path.resolve(projectRoot, 'index.html'),
-          landing: path.resolve(projectRoot, 'landing', 'index.html'),
+          landing: path.resolve(projectRoot, 'index.html'),
+          game: path.resolve(projectRoot, 'game', 'index.html'),
         },
       },
     },

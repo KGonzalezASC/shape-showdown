@@ -2,10 +2,10 @@ import { describe, test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   BIO_TOXIN_POISON_PALETTE,
+  BLOODBUCKET_SHAPE_COLORS,
   COMIC_TOXIN_POISON_PALETTE,
   DEFAULT_POISON_PALETTE,
-  DOWNWELL_SHAPE_COLORS,
-  INVINCIBLE_SHAPE_COLORS,
+  SEASALT_SHAPE_COLORS,
   SHAPE_COLORS,
 } from './shapePalette';
 import {
@@ -19,11 +19,12 @@ describe('themePackage', () => {
   test('parseThemeId falls back to default', () => {
     assert.equal(parseThemeId(null), 'default');
     assert.equal(parseThemeId('nope'), 'default');
-    assert.equal(parseThemeId('downwell'), 'downwell');
+    assert.equal(parseThemeId('bloodbucket'), 'bloodbucket');
+    assert.equal(parseThemeId('seasalt'), 'seasalt');
   });
 
   test('query string picks a known theme', () => {
-    assert.equal(readThemeIdFromLocation('?theme=invincible'), 'invincible');
+    assert.equal(readThemeIdFromLocation('?theme=seasalt'), 'seasalt');
     assert.equal(readThemeIdFromLocation('?theme=nope'), null);
   });
 
@@ -32,14 +33,14 @@ describe('themePackage', () => {
     assert.deepEqual(THEME_PACKAGES.default.poisonPalette, DEFAULT_POISON_PALETTE);
   });
 
-  test('downwell uses shrine pieces and bio-toxin poison', () => {
-    assert.deepEqual(THEME_PACKAGES.downwell.piecePalette, DOWNWELL_SHAPE_COLORS);
-    assert.deepEqual(THEME_PACKAGES.downwell.poisonPalette, BIO_TOXIN_POISON_PALETTE);
+  test('bloodbucket uses shrine pieces and bio-toxin poison', () => {
+    assert.deepEqual(THEME_PACKAGES.bloodbucket.piecePalette, BLOODBUCKET_SHAPE_COLORS);
+    assert.deepEqual(THEME_PACKAGES.bloodbucket.poisonPalette, BIO_TOXIN_POISON_PALETTE);
   });
 
-  test('invincible uses comic pieces and comic-toxin poison', () => {
-    assert.deepEqual(THEME_PACKAGES.invincible.piecePalette, INVINCIBLE_SHAPE_COLORS);
-    assert.deepEqual(THEME_PACKAGES.invincible.poisonPalette, COMIC_TOXIN_POISON_PALETTE);
+  test('seasalt uses comic pieces and comic-toxin poison', () => {
+    assert.deepEqual(THEME_PACKAGES.seasalt.piecePalette, SEASALT_SHAPE_COLORS);
+    assert.deepEqual(THEME_PACKAGES.seasalt.poisonPalette, COMIC_TOXIN_POISON_PALETTE);
   });
 
   test('poison variants are unique within and across every theme palette', () => {
@@ -67,10 +68,10 @@ describe('themePackage', () => {
 
   test('theme backgrounds stay assigned to their visual treatments', () => {
     assert.equal(resolveThemePackage('default').shrine, 'none');
-    assert.equal(resolveThemePackage('invincible').shrine, 'none');
-    assert.equal(resolveThemePackage('downwell').shrine, 'watching-amalgam');
+    assert.equal(resolveThemePackage('seasalt').shrine, 'none');
+    assert.equal(resolveThemePackage('bloodbucket').shrine, 'watching-amalgam');
     assert.equal(resolveThemePackage('default').background.kind, 'dispersed-voronoi');
-    assert.equal(resolveThemePackage('invincible').background.kind, 'comic-halftone');
-    assert.deepEqual(resolveThemePackage('downwell').background, { kind: 'solid', color: '#171717' });
+    assert.equal(resolveThemePackage('seasalt').background.kind, 'comic-halftone');
+    assert.deepEqual(resolveThemePackage('bloodbucket').background, { kind: 'solid', color: '#171717' });
   });
 });

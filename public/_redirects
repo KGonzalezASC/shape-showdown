@@ -1,0 +1,3 @@
+# Legacy routes from the pre-/game layout
+/landing / 301
+/landing/* / 301

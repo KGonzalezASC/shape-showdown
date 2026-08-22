@@ -17,10 +17,10 @@ export const SHAPE_COLORS: Record<Exclude<CellValue, null>, string> = {
 };
 
 /**
- * Downwell's paper, faded-crimson, and shaft-gray palette. The intentionally
+ * Bloodbucket's paper, faded-crimson, and shaft-gray palette. The intentionally
  * non-rainbow mapping keeps the pieces in the shrine's 1-bit visual language.
  */
-export const DOWNWELL_SHAPE_COLORS: Record<Exclude<CellValue, null>, string> = {
+export const BLOODBUCKET_SHAPE_COLORS: Record<Exclude<CellValue, null>, string> = {
   I: '#dedede',
   J: '#9e5259',
   L: '#dedede',
@@ -33,10 +33,10 @@ export const DOWNWELL_SHAPE_COLORS: Record<Exclude<CellValue, null>, string> = {
 };
 
 /**
- * Invincible's dark comic palette: sky-blue, amber, magenta, and ink. It is
- * deliberately distinct from the source game's familiar Guideline mapping.
+ * Seasalt's dark comic palette: sky-blue, amber, magenta, and ink. It is
+ * deliberately distinct from conventional Guideline shape-to-color mappings.
  */
-export const INVINCIBLE_SHAPE_COLORS: Record<Exclude<CellValue, null>, string> = {
+export const SEASALT_SHAPE_COLORS: Record<Exclude<CellValue, null>, string> = {
   I: '#7bafe9',
   J: '#4f77c9',
   L: '#f1b467',

@@ -643,7 +643,7 @@ const GameField = forwardRef<GameFieldRef, GameFieldProps>(({
                             >
                               <div className="shape-token-highlight pointer-events-none absolute inset-0" aria-hidden />
                               {hatchingEnabled && !heldPiece.poisoned && !heldPiece.bomber && (
-                                <div className="tetromino-hatch pointer-events-none absolute inset-0" aria-hidden />
+                                <div className="shape-hatch pointer-events-none absolute inset-0" aria-hidden />
                               )}
                               {heldPiece.bomber && (
                                 <span className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center text-[8px] leading-none animate-bomb-wiggle">

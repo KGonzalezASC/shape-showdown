@@ -10,7 +10,15 @@ import {
 
 const STORAGE_KEY = 'ss-theme';
 
-const ThemePackageContext = createContext<ThemePackage>(resolveThemePackage(DEFAULT_THEME_ID));
+interface ThemeContextValue {
+  theme: ThemePackage;
+  setThemeId: (id: ThemeId) => void;
+}
+
+const ThemePackageContext = createContext<ThemeContextValue>({
+  theme: resolveThemePackage(DEFAULT_THEME_ID),
+  setThemeId: () => {},
+});
 
 function readStoredThemeId(): ThemeId {
   if (typeof window === 'undefined') return DEFAULT_THEME_ID;
@@ -24,7 +32,7 @@ function readStoredThemeId(): ThemeId {
 }
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
-  const [themeId] = useState<ThemeId>(readStoredThemeId);
+  const [themeId, setThemeId] = useState<ThemeId>(readStoredThemeId);
   const theme = useMemo(() => resolveThemePackage(themeId), [themeId]);
 
   useLayoutEffect(() => {
@@ -36,13 +44,22 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     }
   }, [theme.id]);
 
+  const value = useMemo<ThemeContextValue>(
+    () => ({ theme, setThemeId }),
+    [theme]
+  );
+
   return (
-    <ThemePackageContext.Provider value={theme}>
+    <ThemePackageContext.Provider value={value}>
       {children}
     </ThemePackageContext.Provider>
   );
 }
 
 export function useThemePackage(): ThemePackage {
-  return useContext(ThemePackageContext);
+  return useContext(ThemePackageContext).theme;
+}
+
+export function useSetThemeId(): (id: ThemeId) => void {
+  return useContext(ThemePackageContext).setThemeId;
 }
