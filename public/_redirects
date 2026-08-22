@@ -1,3 +1,8 @@
+# Legal pages
+/terms /terms.html 200
+/tos /tos.html 200
+/privacy /privacy.html 200
+
 # Legacy routes from the pre-/game layout
 /landing / 301
 /landing/* / 301

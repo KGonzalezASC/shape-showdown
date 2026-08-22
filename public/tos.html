@@ -1,0 +1,322 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#181716" />
+    <meta
+      name="description"
+      content="Terms of Service for Shape Showdown — independent real-time multiplayer puzzle combat."
+    />
+    <title>Terms of Service — Shape Showdown</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Montserrat:wght@800;900&family=Plus+Jakarta+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        --color-bg: #181716;
+        --color-surface: #22201e;
+        --color-border: #33302c;
+        --color-text-main: #f2f0ed;
+        --color-text-muted: #a39e98;
+        --color-accent: #e5983c;
+        --color-accent-subtle: #8a7359;
+      }
+
+      * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+
+      body {
+        background-color: var(--color-bg);
+        color: var(--color-text-main);
+        font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        line-height: 1.65;
+        padding: 4rem 1.5rem 6rem;
+        -webkit-font-smoothing: antialiased;
+        -moz-osx-font-smoothing: grayscale;
+        text-rendering: optimizeLegibility;
+      }
+
+      .article-container {
+        max-width: 68ch;
+        margin: 0 auto;
+      }
+
+      .header {
+        margin-bottom: 2.75rem;
+        padding-bottom: 1.5rem;
+        border-bottom: 1px solid var(--color-border);
+      }
+
+      .category-tag {
+        font-family: 'JetBrains Mono', monospace;
+        font-size: 0.75rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.12em;
+        color: var(--color-accent-subtle);
+        margin-bottom: 0.5rem;
+      }
+
+      .tokon-title-wrapper {
+        margin-bottom: 0.35rem;
+      }
+
+      .tokon-title {
+        font-family: 'Montserrat', sans-serif;
+        font-weight: 900;
+        font-size: clamp(2rem, 4.5vw, 2.6rem);
+        line-height: 1.05;
+        text-transform: uppercase;
+        letter-spacing: -0.02em;
+        transform: scaleY(0.85);
+        transform-origin: top left;
+        display: inline-block;
+        color: var(--color-text-main);
+      }
+
+      .meta-bar {
+        font-family: 'JetBrains Mono', monospace;
+        font-size: 0.8rem;
+        color: var(--color-text-muted);
+        margin-top: 0.5rem;
+      }
+
+      .content h2 {
+        font-size: 1.15rem;
+        font-weight: 700;
+        color: var(--color-text-main);
+        margin-top: 2.5rem;
+        margin-bottom: 0.85rem;
+        padding-bottom: 0.35rem;
+        border-bottom: 1px solid var(--color-border);
+        letter-spacing: -0.01em;
+        display: flex;
+        align-items: baseline;
+        gap: 0.5rem;
+      }
+
+      .content h2 span.num {
+        font-family: 'JetBrains Mono', monospace;
+        font-size: 0.9rem;
+        color: var(--color-accent-subtle);
+        font-weight: 600;
+      }
+
+      .content p {
+        color: var(--color-text-main);
+        font-size: 0.95rem;
+        line-height: 1.65;
+        margin-bottom: 1rem;
+        letter-spacing: 0.008em;
+      }
+
+      .content ul {
+        list-style: none;
+        margin: 0.75rem 0 1.25rem 0;
+        padding-left: 1.25rem;
+      }
+
+      .content ul li {
+        position: relative;
+        color: var(--color-text-main);
+        font-size: 0.95rem;
+        line-height: 1.6;
+        margin-bottom: 0.6rem;
+      }
+
+      .content ul li::before {
+        content: '—';
+        color: var(--color-accent-subtle);
+        position: absolute;
+        left: -1.25rem;
+      }
+
+      strong {
+        color: #ffffff;
+        font-weight: 600;
+      }
+
+      a {
+        color: var(--color-text-main);
+        text-decoration: underline;
+        text-underline-offset: 3px;
+        text-decoration-color: var(--color-accent-subtle);
+        transition: color 0.15s ease, text-decoration-color 0.15s ease;
+      }
+
+      a:hover {
+        color: var(--color-accent);
+        text-decoration-color: var(--color-accent);
+      }
+
+      blockquote.legal-notice {
+        border-left: 2px solid var(--color-border);
+        padding: 0.85rem 1.15rem;
+        margin: 1.25rem 0;
+        font-family: 'JetBrains Mono', monospace;
+        font-size: 0.8rem;
+        line-height: 1.55;
+        color: var(--color-text-muted);
+        background: var(--color-surface);
+      }
+
+      .footer {
+        margin-top: 4.5rem;
+        padding-top: 1.5rem;
+        border-top: 1px solid var(--color-border);
+        font-family: 'JetBrains Mono', monospace;
+        font-size: 0.8rem;
+        color: var(--color-text-muted);
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 1rem;
+      }
+
+      @media (max-width: 640px) {
+        body {
+          padding: 2.5rem 1rem 4rem;
+        }
+        .tokon-title {
+          font-size: 1.75rem;
+        }
+        .content h2 {
+          font-size: 1.05rem;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <article class="article-container">
+      <header class="header">
+        <div class="category-tag">Legal // Terms</div>
+        <div class="tokon-title-wrapper">
+          <h1 class="tokon-title">Terms of Service</h1>
+        </div>
+        <div class="meta-bar">Shape Showdown • Effective August 22, 2026</div>
+      </header>
+
+      <main class="content">
+        <h2><span class="num">00.</span> Agreement to Terms</h2>
+        <p>
+          Welcome to <strong>Shape Showdown</strong> ("the Game", "the Service", "we", "us", or "our"). These Terms of Service ("Terms") define the operational rules and legal boundaries for accessing and playing Shape Showdown across our web client, game servers, Discord Activity integration, and related online systems.
+        </p>
+        <p>
+          By launching, connecting to, or playing Shape Showdown, you agree to these Terms. If you do not agree, do not access or use the Game.
+        </p>
+
+        <h2><span class="num">01.</span> Description of the Game</h2>
+        <p>
+          Shape Showdown is an independent, real-time multiplayer falling-block puzzle combat game. Players compete in head-to-head matches, clear lines, and deploy tactical in-match powerups. The Game runs as an embedded Discord Activity via the Discord Embedded App SDK and as a standalone web browser game.
+        </p>
+
+        <h2><span class="num">02.</span> Discord Platform and Third-Party Boundaries</h2>
+        <p>
+          Shape Showdown is an independent application. It is not owned, operated, endorsed, or certified by Discord Inc., Tetris Holding LLC, The Tetris Company, or their affiliates.
+        </p>
+        <ul>
+          <li><strong>Discord Platform Rules:</strong> If you access Shape Showdown through Discord, your account and communications remain subject to the <a href="https://discord.com/terms" target="_blank" rel="noopener noreferrer">Discord Terms of Service</a> and <a href="https://discord.com/guidelines" target="_blank" rel="noopener noreferrer">Discord Community Guidelines</a>.</li>
+          <li><strong>Platform Division:</strong> Discord provides the underlying chat infrastructure, voice channels, and authentication gateway. We build, host, and maintain the game simulation, netcode, match state, and authoritative game servers.</li>
+          <li><strong>Authentication Scope:</strong> When you launch the Game in Discord, we request standard profile identification (Discord User ID, username, and avatar) via the Discord SDK. We use this data only to establish your match session, prevent abuse, and render your player tag. We do not harvest, broker, or sell user data. See our <a href="/privacy">Privacy Policy</a> for full details.</li>
+        </ul>
+
+        <h2><span class="num">03.</span> Eligibility and Age Minimums</h2>
+        <p>
+          You must be at least 13 years old (or the minimum legal age in your country) to play Shape Showdown. If you are between 13 and the legal age of majority in your jurisdiction, you confirm that your parent or guardian reviewed and agreed to these Terms on your behalf.
+        </p>
+
+        <h2><span class="num">04.</span> Limited License to Play</h2>
+        <p>
+          We grant you a personal, non-exclusive, non-transferable, non-sublicensable, revocable license to access and play Shape Showdown for personal, non-commercial entertainment.
+        </p>
+        <p>
+          You receive a license to play the Game. You do not purchase or own any part of the Game, its server binaries, source code, visual design, or underlying game assets.
+        </p>
+
+        <h2><span class="num">05.</span> Fair Play, Anti-Botting, and Prohibited Conduct</h2>
+        <p>
+          We build Shape Showdown for authentic human competition. Artificial engagement, automated tools, and malicious disruption degrade the game experience and are strictly prohibited. You agree not to:
+        </p>
+        <ul>
+          <li><strong>Deploy Bots or Automation:</strong> Run bots, auto-droppers, aim scripts, macros, key-injection tools, or AI assistants to play or simulate inputs.</li>
+          <li><strong>Tamper with Simulation or Code:</strong> Modify client memory, decompile client bundles, intercept WebSocket packets, inject unauthorized network payloads, or trigger deliberate server desyncs.</li>
+          <li><strong>Disrupt Server Infrastructure:</strong> Execute Denial of Service (DoS/DDoS) attacks, flood WebSocket connections, spam HTTP routes, or overload game servers.</li>
+          <li><strong>Abuse and Harassment:</strong> Send hate speech, threats, harassment, sexually explicit text, or toxic abuse in lobby names, player tags, or chat channels.</li>
+          <li><strong>Commercialize or Resell:</strong> Sell, rent, lease, or broker access to the Game, session tokens, or match access.</li>
+        </ul>
+
+        <h2><span class="num">06.</span> Accounts, Session Data, and Analytics</h2>
+        <p>
+          Access is managed through Discord OAuth or temporary web guest sessions. The Game does not maintain persistent user accounts, profiles, or leaderboards. Our database records only temporary connection identifiers, basic gameplay diagnostics, and non-personal operational analytics required to maintain server stability. Ephemeral session identifiers do not constitute personal property.
+        </p>
+
+        <h2><span class="num">07.</span> In-Match Powerup Mechanics (No Real Purchases)</h2>
+        <p>
+          The Game features tactical powerups (such as Elixir, Bomber, Magnet, Tectonic Shift, and Poison variants) drafted dynamically using points earned during an active match.
+        </p>
+        <ul>
+          <li><strong>No Real-Money Purchases:</strong> The Game contains no microtransactions, fiat currencies, persistent inventories, or purchasable digital goods.</li>
+          <li><strong>Zero Monetary Value:</strong> Points and powerups exist solely inside the active match simulation, hold zero monetary value, and cannot be traded, transferred, or redeemed for cash or cryptocurrency.</li>
+          <li><strong>Game Balancing:</strong> We reserve the right to tweak costs, change powerup behaviors, add new items, or remove mechanics at any time for competitive balance.</li>
+        </ul>
+
+        <h2><span class="num">08.</span> Intellectual Property and Asset Protection</h2>
+        <p>
+          The developers of Shape Showdown retain all rights, title, and interest in the Game. This includes original source code, game engine logic, netcode, procedural Voronoi cell shaders, visual styling, sound effects, music tracks, branding, and logos.
+        </p>
+        <p>
+          If you send bug reports, balance feedback, or feature ideas, you grant us the right to implement and use those ideas without payment, royalties, or restriction.
+        </p>
+
+        <h2><span class="num">09.</span> Moderation and Infrastructure Defense</h2>
+        <p>
+          To protect server stability and player safety, we reserve the right to investigate violations and enforce penalties at our discretion, including terminating abusive or desynchronized matches, rate-limiting connections, or banning disruptive Discord User IDs, IP addresses, or session tokens. We may revoke access immediately without prior notice for severe violations.
+        </p>
+
+        <h2><span class="num">10.</span> Service Availability and "As Is" Disclaimer</h2>
+        <p>
+          Shape Showdown is provided on an "AS IS" and "AS AVAILABLE" basis. Online games experience packet loss, rollback corrections, and temporary server restarts. We do not guarantee uninterrupted uptime, zero-latency connections, or glitch-free matches. We may update, take offline, patch, or modify server instances at any time without advance warning.
+        </p>
+        <blockquote class="legal-notice">
+          TO THE MAXIMUM EXTENT PERMITTED BY LAW, WE DISCLAIM ALL WARRANTIES, EXPRESS, IMPLIED, OR STATUTORY, INCLUDING IMPLIED WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, AND NON-INFRINGEMENT.
+        </blockquote>
+
+        <h2><span class="num">11.</span> Limitation of Liability</h2>
+        <blockquote class="legal-notice">
+          TO THE MAXIMUM EXTENT PERMITTED BY APPLICABLE LAW, THE DEVELOPERS, OPERATORS, CONTRIBUTORS, AND HOSTING PROVIDERS OF SHAPE SHOWDOWN WILL NOT BE LIABLE FOR ANY INDIRECT, INCIDENTAL, SPECIAL, CONSEQUENTIAL, OR PUNITIVE DAMAGES. OUR TOTAL CUMULATIVE LIABILITY FOR ANY CLAIM RELATING TO SHAPE SHOWDOWN WILL NOT EXCEED FIFTY US DOLLARS ($50.00 USD).
+        </blockquote>
+
+        <h2><span class="num">12.</span> Changes to Terms</h2>
+        <p>
+          We may update these Terms when adding features or adjusting policies. When changes occur, we will update the "Last Updated" date at the top. Continued use of Shape Showdown after an update confirms your acceptance of the revised Terms.
+        </p>
+
+        <h2><span class="num">13.</span> Contact and Inquiries</h2>
+        <p>
+          For support requests, bug reports, or legal inquiries, reach out through our official channels:
+        </p>
+        <ul>
+          <li><strong>Game URL:</strong> <a href="https://shape-showdown.pages.dev">https://shape-showdown.pages.dev</a></li>
+          <li><strong>Privacy Policy:</strong> <a href="/privacy">https://shape-showdown.pages.dev/privacy</a></li>
+          <li><strong>Developer Inquiries:</strong> <a href="mailto:keithgonzalez.work@gmail.com">keithgonzalez.work@gmail.com</a></li>
+        </ul>
+      </main>
+
+      <footer class="footer">
+        <div>&copy; 2026 Shape Showdown. All rights reserved.</div>
+        <div>
+          <a href="/privacy">Privacy Policy</a> &bull; 
+          <a href="https://shape-showdown.pages.dev">Return to Game &rarr;</a>
+        </div>
+      </footer>
+    </article>
+  </body>
+</html>
