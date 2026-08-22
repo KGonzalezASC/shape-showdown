@@ -10,6 +10,7 @@ import type {
   LocalPlayerWire,
   MatchChromeWire,
   OpponentPlayerWire,
+  PendingGarbageWire,
   SeatWireSnapshot,
 } from '../../src/protocol/wireTypes.js';
 
@@ -18,35 +19,29 @@ function ensurePoisonBoard(player: PlayerState): number[][] {
   return Array.from({ length: BOARD_ROWS }, () => Array.from({ length: BOARD_COLS }, () => 0));
 }
 
-function relativeGarbage(player: PlayerState, tick: number) {
+/**
+ * Wire garbage carries the ABSOLUTE arrival tick. Stable across ticks, so
+ * deltas skip the meta section while garbage is merely in flight.
+ */
+function absoluteGarbage(player: PlayerState, tick: number): PendingGarbageWire[] {
   return (player.pendingGarbage ?? []).map((packet) => ({
     lines: packet.lines,
-    ticksUntilArrival: packet.arrivalTick !== undefined
-      ? Math.max(0, packet.arrivalTick - tick)
-      : packet.ticksUntilArrival,
+    ...(packet.arrivalTick !== undefined
+      ? { arrivalTick: packet.arrivalTick }
+      : packet.ticksUntilArrival !== undefined
+        ? { arrivalTick: tick + packet.ticksUntilArrival }
+        : {}),
   }));
 }
 
-function relativeOptionalTick(value: number | null | undefined, tick: number): number | null {
-  if (value === null || value === undefined) return value ?? null;
-  return Math.max(0, value - tick);
+/** Effect expiry ticks are stored absolute; pass through untouched. */
+function absoluteEffects(player: PlayerState): PlayerState['activeEffects'] {
+  return (player.activeEffects ?? []).map((effect) => ({ ...effect }));
 }
 
-function relativePoisonSpread(player: PlayerState, tick: number) {
-  if (!player.poisonSpread) return null;
-  return {
-    ...player.poisonSpread,
-    nextSpreadTick: Math.max(0, player.poisonSpread.nextSpreadTick - tick),
-  };
-}
-
-function relativeEffects(player: PlayerState, tick: number) {
-  return (player.activeEffects ?? []).map((effect) => ({
-    ...effect,
-    expiresAtTick: effect.expiresAtTick !== undefined
-      ? Math.max(0, effect.expiresAtTick - tick)
-      : undefined,
-  }));
+/** Poison spread state stores absolute ticks; pass through untouched. */
+function absolutePoisonSpread(player: PlayerState): PlayerState['poisonSpread'] {
+  return player.poisonSpread ? { ...player.poisonSpread } : null;
 }
 
 function projectOpponentBoard(player: PlayerState): OpponentPlayerWire['board'] {
@@ -86,7 +81,9 @@ function buildLocalWire(player: PlayerState, tick: number): LocalPlayerWire {
     board: publicPlayer.board.map((row) => [...row]),
     poisonBoard: ensurePoisonBoard(player).map((row) => [...row]),
     activePiece: publicPlayer.activePiece,
-    landingForecastTicksRemaining: publicPlayer.landingForecastTicksRemaining,
+    landingForecastAtTick: publicPlayer.landingForecastTicksRemaining === undefined
+      ? undefined
+      : tick + publicPlayer.landingForecastTicksRemaining,
     holdPiece: publicPlayer.holdPiece,
     canHold: publicPlayer.canHold,
     nextQueue: [...publicPlayer.nextQueue],
@@ -95,16 +92,16 @@ function buildLocalWire(player: PlayerState, tick: number): LocalPlayerWire {
     linesCleared: publicPlayer.linesCleared,
     combo: publicPlayer.combo,
     backToBack: publicPlayer.backToBack,
-    pendingGarbage: relativeGarbage(player, tick),
-    activeEffects: relativeEffects(player, tick),
+    pendingGarbage: absoluteGarbage(player, tick),
+    activeEffects: absoluteEffects(player),
     topOut: publicPlayer.topOut,
     swapCutoffRow: publicPlayer.swapCutoffRow,
     curtainDefenseLevel: publicPlayer.curtainDefenseLevel ?? 0,
-    poisonSpread: relativePoisonSpread(player, tick),
+    poisonSpread: absolutePoisonSpread(player),
     customNextPieceSourceCells: publicPlayer.customNextPieceSourceCells
       ? [...publicPlayer.customNextPieceSourceCells]
       : undefined,
-    holdFrozenUntilTick: relativeOptionalTick(publicPlayer.holdFrozenUntilTick, tick) ?? undefined,
+    holdFrozenUntilTick: publicPlayer.holdFrozenUntilTick,
     magnetPermanentStacks: publicPlayer.magnetPermanentStacks,
     magnetPieceBoost: publicPlayer.magnetPieceBoost,
     pieceHasHardDropped: publicPlayer.pieceHasHardDropped,
@@ -113,8 +110,8 @@ function buildLocalWire(player: PlayerState, tick: number): LocalPlayerWire {
       : undefined,
     snagHardDropBlocked: publicPlayer.snagHardDropBlocked,
     satelliteArmed: publicPlayer.satelliteArmed,
-    satelliteDelayUntilTick: relativeOptionalTick(publicPlayer.satelliteDelayUntilTick, tick) ?? undefined,
-    tectonicShiftNextStepTick: relativeOptionalTick(publicPlayer.tectonicShiftNextStepTick ?? null, tick),
+    satelliteDelayUntilTick: publicPlayer.satelliteDelayUntilTick,
+    tectonicShiftNextStepTick: publicPlayer.tectonicShiftNextStepTick ?? null,
     shop: {
       offerIds: [...player.shop.offerIds],
       phase: player.shop.phase,
@@ -140,13 +137,13 @@ function buildOpponentWire(player: PlayerState, tick: number): OpponentPlayerWir
     linesCleared: publicPlayer.linesCleared,
     combo: publicPlayer.combo,
     backToBack: publicPlayer.backToBack,
-    pendingGarbage: relativeGarbage(player, tick),
-    activeEffects: relativeEffects(player, tick),
+    pendingGarbage: absoluteGarbage(player, tick),
+    activeEffects: absoluteEffects(player),
     topOut: publicPlayer.topOut,
     swapCutoffRow: publicPlayer.swapCutoffRow,
     curtainDefenseLevel: publicPlayer.curtainDefenseLevel ?? 0,
-    poisonSpread: relativePoisonSpread(player, tick),
-    tectonicShiftNextStepTick: relativeOptionalTick(publicPlayer.tectonicShiftNextStepTick ?? null, tick),
+    poisonSpread: absolutePoisonSpread(player),
+    tectonicShiftNextStepTick: publicPlayer.tectonicShiftNextStepTick ?? null,
     magnetPermanentStacks: publicPlayer.magnetPermanentStacks,
     magnetPieceBoost: publicPlayer.magnetPieceBoost,
     hasHold: publicPlayer.holdPiece !== null,

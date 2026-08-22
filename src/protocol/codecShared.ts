@@ -22,9 +22,12 @@ import {
 } from './cellCodec.js';
 import {
   FIELD_EFFECT_KINDS,
+  type DecodedLocalPlayerWire,
+  type DecodedOpponentPlayerWire,
   type LocalPlayerWire,
   type MatchChromeWire,
   type OpponentPlayerWire,
+  type PendingGarbageWire,
   SHOP_PHASE_TO_U8,
   type TectonicCellMove,
   U8_TO_END_REASON,
@@ -149,36 +152,47 @@ export function writeEffects(writer: BinaryWriter, effects: readonly ActiveField
   }
 }
 
-export function readEffects(reader: BinaryReader): ActiveFieldEffect[] {
+/** Relativizes absolute wire expiry ticks against the packet header tick. */
+export function readEffects(reader: BinaryReader, headerTick: number): ActiveFieldEffect[] {
   const count = reader.readU8();
   const effects: ActiveFieldEffect[] = [];
   for (let i = 0; i < count; i += 1) {
     const id = reader.readString();
     const kind = FIELD_EFFECT_KINDS[reader.readU8()] ?? 'retrim';
     const label = reader.readString();
-    const expiresAtTick = readOptionalU32(reader) ?? undefined;
+    const expiresAtTickAbs = readOptionalU32(reader);
     const hasIcon = reader.readU8() === 1;
     const icon = hasIcon ? reader.readString() : undefined;
-    effects.push({ id, kind, label, expiresAtTick, icon });
+    effects.push({
+      id,
+      kind,
+      label,
+      ...(expiresAtTickAbs === null ? {} : { expiresAtTick: Math.max(0, expiresAtTickAbs - headerTick) }),
+      ...(icon === undefined ? {} : { icon }),
+    });
   }
   return effects;
 }
 
-export function writeGarbage(writer: BinaryWriter, packets: readonly PendingGarbagePacket[]): void {
+export function writeGarbage(writer: BinaryWriter, packets: readonly PendingGarbageWire[]): void {
   writer.writeU8(packets.length);
   for (const packet of packets) {
     writer.writeU8(packet.lines);
-    writeOptionalU32(writer, packet.ticksUntilArrival ?? null);
+    writeOptionalU32(writer, packet.arrivalTick ?? null);
   }
 }
 
-export function readGarbage(reader: BinaryReader): PendingGarbagePacket[] {
+/** Relativizes absolute wire arrival ticks against the packet header tick. */
+export function readGarbage(reader: BinaryReader, headerTick: number): PendingGarbagePacket[] {
   const count = reader.readU8();
   const packets: PendingGarbagePacket[] = [];
   for (let i = 0; i < count; i += 1) {
     const lines = reader.readU8();
-    const ticksUntilArrival = readOptionalU32(reader) ?? undefined;
-    packets.push({ lines, ticksUntilArrival });
+    const arrivalTick = readOptionalU32(reader);
+    packets.push({
+      lines,
+      ...(arrivalTick === null ? {} : { ticksUntilArrival: Math.max(0, arrivalTick - headerTick) }),
+    });
   }
   return packets;
 }
@@ -194,11 +208,13 @@ export function writePoisonSpread(writer: BinaryWriter, spread: PoisonSpreadStat
   writer.writeU8(spread.variant);
 }
 
-export function readPoisonSpread(reader: BinaryReader): PoisonSpreadState | null {
+/** Relativizes the absolute wire spread tick against the packet header tick. */
+export function readPoisonSpread(reader: BinaryReader, headerTick: number): PoisonSpreadState | null {
   if (reader.readU8() === 0) return null;
+  const nextSpreadTickAbs = reader.readU32();
   return {
     generationsRemaining: reader.readU8(),
-    nextSpreadTick: reader.readU32(),
+    nextSpreadTick: Math.max(0, nextSpreadTickAbs - headerTick),
     variant: reader.readU8(),
   };
 }
@@ -458,10 +474,12 @@ export function applyDirtyPoison(
   }
 }
 
-export function writeLocalMeta(writer: BinaryWriter, local: LocalPlayerWire): void {
-  writer.writeString(local.id);
+export type LocalMetaDecoded = Omit<DecodedLocalPlayerWire, 'board' | 'poisonBoard' | 'shop'>;
+
+export function writeLocalMeta(writer: BinaryWriter, local: LocalPlayerWire, includeId: boolean): void {
+  if (includeId) writer.writeString(local.id);
   writePiece(writer, local.activePiece);
-  writeOptionalU32(writer, local.landingForecastTicksRemaining ?? null);
+  writeOptionalU32(writer, local.landingForecastAtTick ?? null);
   writeHeldPiece(writer, local.holdPiece);
   writer.writeBool(local.canHold);
   writer.writeU8(local.nextQueue.length);
@@ -494,10 +512,25 @@ export function writeLocalMeta(writer: BinaryWriter, local: LocalPlayerWire): vo
   }
 }
 
-export function readLocalMeta(reader: BinaryReader): Omit<LocalPlayerWire, 'board' | 'poisonBoard' | 'shop'> {
-  const id = reader.readString();
+/**
+ * Decodes local meta relativized against `headerTick`. With `includeId` the
+ * seat id is part of the payload (keyframes); otherwise it is omitted and the
+ * caller's existing snapshot keeps its id.
+ */
+export function readLocalMeta(reader: BinaryReader, includeId: true, headerTick: number): LocalMetaDecoded;
+export function readLocalMeta(
+  reader: BinaryReader,
+  includeId: false,
+  headerTick: number,
+): Omit<LocalMetaDecoded, 'id'>;
+export function readLocalMeta(
+  reader: BinaryReader,
+  includeId: boolean,
+  headerTick: number,
+): LocalMetaDecoded | Omit<LocalMetaDecoded, 'id'> {
+  const id = includeId ? reader.readString() : undefined;
   const activePiece = readPiece(reader);
-  const landingForecastTicksRemaining = readOptionalU32(reader) ?? undefined;
+  const landingForecastAtTick = readOptionalU32(reader);
   const holdPiece = readHeldPiece(reader);
   const canHold = reader.readBool();
   const queueCount = reader.readU8();
@@ -508,30 +541,32 @@ export function readLocalMeta(reader: BinaryReader): Omit<LocalPlayerWire, 'boar
   const linesCleared = reader.readU32();
   const combo = reader.readU8();
   const backToBack = reader.readBool();
-  const pendingGarbage = readGarbage(reader);
-  const activeEffects = readEffects(reader);
+  const pendingGarbage = readGarbage(reader, headerTick);
+  const activeEffects = readEffects(reader, headerTick);
   const topOut = reader.readBool();
   const swapCutoffRow = reader.readU8();
   const curtainDefenseLevel = reader.readU8();
-  const poisonSpread = readPoisonSpread(reader);
-  const holdFrozenUntilTick = readOptionalU32(reader) ?? undefined;
-  const magnetPermanentStacks = readOptionalU32(reader) ?? undefined;
-  const magnetPieceBoost = readOptionalU32(reader) ?? undefined;
+  const poisonSpread = readPoisonSpread(reader, headerTick);
+  const holdFrozenAbs = readOptionalU32(reader);
+  const magnetPermanentStacks = readOptionalU32(reader);
+  const magnetPieceBoost = readOptionalU32(reader);
   const pieceHasHardDropped = reader.readBool() || undefined;
   const lastHardDropTick = readOptionalU32(reader) ?? undefined;
   const snagHardDropBlocked = reader.readBool() || undefined;
   const satelliteArmed = reader.readBool() || undefined;
-  const satelliteDelayUntilTick = readOptionalU32(reader) ?? undefined;
-  const tectonicShiftNextStepTick = readOptionalU32(reader);
+  const satelliteDelayAbs = readOptionalU32(reader);
+  const tectonicShiftNextStepAbs = readOptionalU32(reader);
   const sourceCount = reader.readU8();
   const customNextPieceSourceCells: [number, number][] = [];
   for (let i = 0; i < sourceCount; i += 1) {
     customNextPieceSourceCells.push([reader.readU8(), reader.readU8()]);
   }
   return {
-    id,
+    ...(id === undefined ? {} : { id }),
     activePiece,
-    landingForecastTicksRemaining,
+    landingForecastTicksRemaining: landingForecastAtTick === null
+      ? undefined
+      : Math.max(0, landingForecastAtTick - headerTick),
     holdPiece,
     canHold,
     nextQueue,
@@ -546,21 +581,25 @@ export function readLocalMeta(reader: BinaryReader): Omit<LocalPlayerWire, 'boar
     swapCutoffRow,
     curtainDefenseLevel,
     poisonSpread,
-    holdFrozenUntilTick,
-    magnetPermanentStacks,
-    magnetPieceBoost,
+    holdFrozenUntilTick: holdFrozenAbs === null ? undefined : Math.max(0, holdFrozenAbs - headerTick),
+    magnetPermanentStacks: magnetPermanentStacks ?? undefined,
+    magnetPieceBoost: magnetPieceBoost ?? undefined,
     pieceHasHardDropped,
     lastHardDropTick,
     snagHardDropBlocked,
     satelliteArmed,
-    satelliteDelayUntilTick,
-    tectonicShiftNextStepTick,
+    satelliteDelayUntilTick: satelliteDelayAbs === null ? undefined : Math.max(0, satelliteDelayAbs - headerTick),
+    tectonicShiftNextStepTick: tectonicShiftNextStepAbs === null
+      ? null
+      : Math.max(0, tectonicShiftNextStepAbs - headerTick),
     customNextPieceSourceCells: sourceCount > 0 ? customNextPieceSourceCells : undefined,
   };
 }
 
-export function writeOpponentMeta(writer: BinaryWriter, opponent: OpponentPlayerWire): void {
-  writer.writeString(opponent.id);
+export type OpponentMetaDecoded = Omit<DecodedOpponentPlayerWire, 'board' | 'poisonBoard'>;
+
+export function writeOpponentMeta(writer: BinaryWriter, opponent: OpponentPlayerWire, includeId: boolean): void {
+  if (includeId) writer.writeString(opponent.id);
   writePiece(writer, opponent.activePiece);
   writer.writeU32(opponent.score >>> 0);
   writer.writeU32(opponent.funds >>> 0);
@@ -580,29 +619,42 @@ export function writeOpponentMeta(writer: BinaryWriter, opponent: OpponentPlayer
   writer.writeBool(opponent.hasPoison);
 }
 
+/**
+ * Decodes opponent meta relativized against `headerTick`. With `includeId` the
+ * seat id is part of the payload (keyframes); otherwise the caller's existing
+ * snapshot keeps its id.
+ */
+export function readOpponentMeta(reader: BinaryReader, includeId: true, headerTick: number): OpponentMetaDecoded;
 export function readOpponentMeta(
   reader: BinaryReader,
-): Omit<OpponentPlayerWire, 'board' | 'poisonBoard'> {
-  const id = reader.readString();
+  includeId: false,
+  headerTick: number,
+): Omit<OpponentMetaDecoded, 'id'>;
+export function readOpponentMeta(
+  reader: BinaryReader,
+  includeId: boolean,
+  headerTick: number,
+): OpponentMetaDecoded | Omit<OpponentMetaDecoded, 'id'> {
+  const id = includeId ? reader.readString() : undefined;
   const activePiece = readPiece(reader);
   const score = reader.readU32();
   const funds = reader.readU32();
   const linesCleared = reader.readU32();
   const combo = reader.readU8();
   const backToBack = reader.readBool();
-  const pendingGarbage = readGarbage(reader);
-  const activeEffects = readEffects(reader);
+  const pendingGarbage = readGarbage(reader, headerTick);
+  const activeEffects = readEffects(reader, headerTick);
   const topOut = reader.readBool();
   const swapCutoffRow = reader.readU8();
   const curtainDefenseLevel = reader.readU8();
-  const poisonSpread = readPoisonSpread(reader);
-  const tectonicShiftNextStepTick = readOptionalU32(reader);
-  const magnetPermanentStacks = readOptionalU32(reader) ?? undefined;
-  const magnetPieceBoost = readOptionalU32(reader) ?? undefined;
+  const poisonSpread = readPoisonSpread(reader, headerTick);
+  const tectonicShiftNextStepAbs = readOptionalU32(reader);
+  const magnetPermanentStacks = readOptionalU32(reader);
+  const magnetPieceBoost = readOptionalU32(reader);
   const hasHold = reader.readBool();
   const hasPoison = reader.readBool();
   return {
-    id,
+    ...(id === undefined ? {} : { id }),
     activePiece,
     score,
     funds,
@@ -615,9 +667,11 @@ export function readOpponentMeta(
     swapCutoffRow,
     curtainDefenseLevel,
     poisonSpread,
-    tectonicShiftNextStepTick,
-    magnetPermanentStacks,
-    magnetPieceBoost,
+    tectonicShiftNextStepTick: tectonicShiftNextStepAbs === null
+      ? null
+      : Math.max(0, tectonicShiftNextStepAbs - headerTick),
+    magnetPermanentStacks: magnetPermanentStacks ?? undefined,
+    magnetPieceBoost: magnetPieceBoost ?? undefined,
     hasHold,
     hasPoison,
   };

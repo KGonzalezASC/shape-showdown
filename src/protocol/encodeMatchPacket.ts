@@ -63,10 +63,10 @@ export function encodeKeyframePacket(
   writeHeader(writer, PACKET_KIND_KEYFRAME, sequence, generation, snapshot.tick);
   writeChrome(writer, snapshot.chrome);
   writeFullBoard(writer, snapshot.local.board, snapshot.local.poisonBoard, BOARD_ROWS);
-  writeLocalMeta(writer, snapshot.local);
+  writeLocalMeta(writer, snapshot.local, true);
   writeLocalShop(writer, snapshot.local.shop);
   writeFullBoard(writer, snapshot.opponent.board, snapshot.opponent.poisonBoard, BOARD_VISIBLE_ROWS);
-  writeOpponentMeta(writer, snapshot.opponent);
+  writeOpponentMeta(writer, snapshot.opponent, true);
   return writer.finish();
 }
 
@@ -120,7 +120,7 @@ export function encodeDeltaPacket(
   if (sections & DELTA_SECTION_LOCAL_POISON) {
     writeDirtyPoison(writer, snapshot.local.poisonBoard, baseline.local.poisonBoard, BOARD_ROWS);
   }
-  if (sections & DELTA_SECTION_LOCAL_META) writeLocalMeta(writer, snapshot.local);
+  if (sections & DELTA_SECTION_LOCAL_META) writeLocalMeta(writer, snapshot.local, false);
   if (sections & DELTA_SECTION_LOCAL_SHOP) writeLocalShop(writer, snapshot.local.shop);
   if (sections & DELTA_SECTION_OPPONENT_BOARD) {
     writeDirtyBoard(writer, snapshot.opponent.board, baseline.opponent.board, BOARD_VISIBLE_ROWS);
@@ -133,7 +133,7 @@ export function encodeDeltaPacket(
       BOARD_VISIBLE_ROWS,
     );
   }
-  if (sections & DELTA_SECTION_OPPONENT_META) writeOpponentMeta(writer, snapshot.opponent);
+  if (sections & DELTA_SECTION_OPPONENT_META) writeOpponentMeta(writer, snapshot.opponent, false);
 
   if (writer.position <= bodyStart + 2) return null;
   return writer.finish();

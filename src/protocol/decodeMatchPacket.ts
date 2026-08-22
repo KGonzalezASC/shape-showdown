@@ -20,9 +20,9 @@ import {
   DELTA_SECTION_OPPONENT_BOARD,
   DELTA_SECTION_OPPONENT_META,
   DELTA_SECTION_OPPONENT_POISON,
-  type LocalPlayerWire,
-  type OpponentPlayerWire,
-  type SeatWireSnapshot,
+  type DecodedLocalPlayerWire,
+  type DecodedOpponentPlayerWire,
+  type DecodedSeatSnapshot,
   type TectonicCellMove,
   type TectonicCompleteWire,
   type TectonicStepWire,
@@ -42,7 +42,7 @@ export class PacketDecodeError extends Error {
   }
 }
 
-function emptyLocal(id: string): LocalPlayerWire {
+function emptyLocal(id: string): DecodedLocalPlayerWire {
   return {
     id,
     board: Array.from({ length: BOARD_ROWS }, () => Array.from({ length: BOARD_COLS }, () => null)),
@@ -73,7 +73,7 @@ function emptyLocal(id: string): LocalPlayerWire {
   };
 }
 
-function emptyOpponent(id: string): OpponentPlayerWire {
+function emptyOpponent(id: string): DecodedOpponentPlayerWire {
   return {
     id,
     board: Array.from({ length: BOARD_VISIBLE_ROWS }, () => Array.from({ length: BOARD_COLS }, () => null)),
@@ -95,11 +95,11 @@ function emptyOpponent(id: string): OpponentPlayerWire {
   };
 }
 
-export function cloneSeatSnapshot(snapshot: SeatWireSnapshot): SeatWireSnapshot {
-  return JSON.parse(JSON.stringify(snapshot)) as SeatWireSnapshot;
+export function cloneSeatSnapshot<T>(snapshot: T): T {
+  return JSON.parse(JSON.stringify(snapshot)) as T;
 }
 
-export function decodeKeyframePacket(buffer: ArrayBuffer): SeatWireSnapshot {
+export function decodeKeyframePacket(buffer: ArrayBuffer): DecodedSeatSnapshot {
   const header = readPacketHeader(buffer);
   if (header.version !== GAME_PROTOCOL_VERSION || header.kind !== PACKET_KIND_KEYFRAME) {
     throw new PacketDecodeError('Not a keyframe packet');
@@ -112,10 +112,10 @@ export function decodeKeyframePacket(buffer: ArrayBuffer): SeatWireSnapshot {
   reader.readU32();
   const chrome = readChrome(reader);
   const localBoard = readFullBoard(reader, BOARD_COLS);
-  const localMeta = readLocalMeta(reader);
+  const localMeta = readLocalMeta(reader, true, header.tick);
   const shop = readLocalShop(reader);
   const opponentBoard = readFullBoard(reader, BOARD_COLS);
-  const opponentMeta = readOpponentMeta(reader);
+  const opponentMeta = readOpponentMeta(reader, true, header.tick);
   return {
     tick: header.tick,
     chrome,
@@ -134,9 +134,9 @@ export function decodeKeyframePacket(buffer: ArrayBuffer): SeatWireSnapshot {
 }
 
 export function applyDeltaPacket(
-  baseline: SeatWireSnapshot,
+  baseline: DecodedSeatSnapshot,
   buffer: ArrayBuffer,
-): SeatWireSnapshot {
+): DecodedSeatSnapshot {
   const header = readPacketHeader(buffer);
   if (header.version !== GAME_PROTOCOL_VERSION || header.kind !== PACKET_KIND_DELTA) {
     throw new PacketDecodeError('Not a delta packet');
@@ -157,14 +157,14 @@ export function applyDeltaPacket(
   if (sections & DELTA_SECTION_LOCAL_BOARD) applyDirtyBoard(next.local.board, reader);
   if (sections & DELTA_SECTION_LOCAL_POISON) applyDirtyPoison(next.local.poisonBoard, reader);
   if (sections & DELTA_SECTION_LOCAL_META) {
-    const meta = readLocalMeta(reader);
+    const meta = readLocalMeta(reader, false, header.tick);
     next.local = { ...next.local, ...meta };
   }
   if (sections & DELTA_SECTION_LOCAL_SHOP) next.local.shop = readLocalShop(reader);
   if (sections & DELTA_SECTION_OPPONENT_BOARD) applyDirtyBoard(next.opponent.board, reader);
   if (sections & DELTA_SECTION_OPPONENT_POISON) applyDirtyPoison(next.opponent.poisonBoard, reader);
   if (sections & DELTA_SECTION_OPPONENT_META) {
-    const meta = readOpponentMeta(reader);
+    const meta = readOpponentMeta(reader, false, header.tick);
     next.opponent = { ...next.opponent, ...meta };
   }
   return next;
@@ -234,7 +234,7 @@ export function applyTectonicMovesToBoard(
   }
 }
 
-export function createEmptySeatSnapshot(localId: string, opponentId: string, seed: number): SeatWireSnapshot {
+export function createEmptySeatSnapshot(localId: string, opponentId: string, seed: number): DecodedSeatSnapshot {
   return {
     tick: 0,
     chrome: {

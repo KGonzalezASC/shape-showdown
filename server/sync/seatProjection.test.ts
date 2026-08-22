@@ -4,6 +4,8 @@ import { makePlayer } from '../tetris/engine.js';
 import { makeRng } from '../../src/rng.js';
 import type { GameState } from '../../src/types.js';
 import { seatSnapshotToClientModel } from '../../src/protocol/clientMatchModel.js';
+import { encodeKeyframePacket } from '../../src/protocol/encodeMatchPacket.js';
+import { decodeKeyframePacket } from '../../src/protocol/decodeMatchPacket.js';
 import { BOARD_HIDDEN_ROWS } from '../../src/constants.js';
 import { buildSeatWireSnapshot } from './seatProjection.js';
 
@@ -81,5 +83,37 @@ describe('seat projection', () => {
     const snapshot = buildSeatWireSnapshot(gameState, 'local');
 
     assert.equal(snapshot?.opponent.board[15][2], 'L');
+  });
+
+  it('projects absolute ticks that stay stable as the simulation tick advances', () => {
+    const local = makePlayer('local', makeRng(51));
+    const opponent = makePlayer('opponent', makeRng(52));
+    local.pendingGarbage.push({ lines: 3, arrivalTick: 120 });
+    local.activeEffects = [
+      { id: 'magnet-1', kind: 'magnet', label: 'Magnet', expiresAtTick: 300 },
+    ];
+    const gameStateAt = (tick: number): GameState => ({
+      players: { local, opponent },
+      status: 'playing',
+      countdown: 0,
+      winnerId: null,
+      tick,
+      seed: 51,
+    });
+
+    const at20 = buildSeatWireSnapshot(gameStateAt(20), 'local');
+    const at21 = buildSeatWireSnapshot(gameStateAt(21), 'local');
+    assert.ok(at20 && at21);
+
+    // Wire values are absolute: identical across consecutive ticks.
+    assert.deepEqual(at21.local.pendingGarbage, at20.local.pendingGarbage);
+    assert.deepEqual(at21.local.activeEffects, at20.local.activeEffects);
+    assert.equal(at20.local.pendingGarbage[0]?.arrivalTick, 120);
+
+    // Decoded models stay relative to their own packet tick.
+    const buffer = encodeKeyframePacket(at20, 1, 1);
+    const decoded = decodeKeyframePacket(buffer);
+    assert.equal(decoded.local.pendingGarbage[0]?.ticksUntilArrival, 100);
+    assert.equal(decoded.local.activeEffects[0]?.expiresAtTick, 280);
   });
 });

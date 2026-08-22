@@ -10,7 +10,7 @@ import {
 import { readPacketHeader } from './encodeMatchPacket.js';
 import { toArrayBuffer } from './binary.js';
 import { seatSnapshotToClientModel } from './clientMatchModel.js';
-import type { ClientMatchModel, SeatWireSnapshot } from './wireTypes.js';
+import type { ClientMatchModel, DecodedSeatSnapshot } from './wireTypes.js';
 import {
   GAME_PROTOCOL_VERSION,
   PACKET_KIND_DELTA,
@@ -25,7 +25,7 @@ export type ClientPacketDecoderState =
       kind: 'ready';
       generation: number;
       expectedSequence: number;
-      snapshot: SeatWireSnapshot;
+      snapshot: DecodedSeatSnapshot;
     };
 
 export class ClientPacketDecoder {

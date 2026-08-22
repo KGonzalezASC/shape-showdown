@@ -13,6 +13,16 @@ import type {
   TetrominoType,
 } from '../types.js';
 
+/**
+ * Wire garbage entry. All tick fields are ABSOLUTE simulation ticks; decoders
+ * relativize against the packet header tick so client models stay relative.
+ */
+export interface PendingGarbageWire {
+  lines: number;
+  /** Absolute simulation tick at which the packet lands. */
+  arrivalTick?: number;
+}
+
 export interface MatchChromeWire {
   status: MatchStatus;
   countdown: number;
@@ -25,12 +35,18 @@ export interface MatchChromeWire {
   pauseStartedAt: number | null;
 }
 
+/**
+ * Local seat wire snapshot. Tick-bearing fields (`expiresAtTick`,
+ * `nextSpreadTick`, `*UntilTick`, `landingForecastAtTick`, `arrivalTick`)
+ * carry ABSOLUTE simulation ticks on the wire.
+ */
 export interface LocalPlayerWire {
   id: string;
   board: CellValue[][];
   poisonBoard: number[][];
   activePiece: TetrisPiece | null;
-  landingForecastTicksRemaining?: number;
+  /** Absolute simulation tick at which the landing forecast expires. */
+  landingForecastAtTick?: number;
   holdPiece: HeldPiece | null;
   canHold: boolean;
   nextQueue: TetrominoType[];
@@ -39,7 +55,7 @@ export interface LocalPlayerWire {
   linesCleared: number;
   combo: number;
   backToBack: boolean;
-  pendingGarbage: PendingGarbagePacket[];
+  pendingGarbage: PendingGarbageWire[];
   activeEffects: ActiveFieldEffect[];
   topOut: boolean;
   swapCutoffRow: number;
@@ -61,6 +77,7 @@ export interface LocalPlayerWire {
   >;
 }
 
+/** Opponent seat wire snapshot; same absolute-tick convention as {@link LocalPlayerWire}. */
 export interface OpponentPlayerWire {
   id: string;
   /** Visible 10×18 board (no hidden spawn rows). */
@@ -73,7 +90,7 @@ export interface OpponentPlayerWire {
   linesCleared: number;
   combo: number;
   backToBack: boolean;
-  pendingGarbage: PendingGarbagePacket[];
+  pendingGarbage: PendingGarbageWire[];
   activeEffects: ActiveFieldEffect[];
   topOut: boolean;
   swapCutoffRow: number;
@@ -91,6 +108,28 @@ export interface SeatWireSnapshot {
   chrome: MatchChromeWire;
   local: LocalPlayerWire;
   opponent: OpponentPlayerWire;
+}
+
+/**
+ * Client-side decoded seat model. Identical to the pre-v3 relative contract:
+ * every tick field is RELATIVE to the carrying packet's tick, so downstream
+ * consumers never see the wire's absolute-tick encoding.
+ */
+export type DecodedLocalPlayerWire = Omit<LocalPlayerWire, 'landingForecastAtTick' | 'pendingGarbage'> & {
+  landingForecastTicksRemaining?: number;
+  pendingGarbage: PendingGarbagePacket[];
+};
+
+/** Client-side decoded opponent model (relative tick semantics). */
+export type DecodedOpponentPlayerWire = Omit<OpponentPlayerWire, 'pendingGarbage'> & {
+  pendingGarbage: PendingGarbagePacket[];
+};
+
+export interface DecodedSeatSnapshot {
+  tick: number;
+  chrome: MatchChromeWire;
+  local: DecodedLocalPlayerWire;
+  opponent: DecodedOpponentPlayerWire;
 }
 
 export interface TectonicCellMove {

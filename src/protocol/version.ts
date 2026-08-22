@@ -1,5 +1,5 @@
 /** Shared gameplay transport protocol version (client + server). */
-export const GAME_PROTOCOL_VERSION = 2;
+export const GAME_PROTOCOL_VERSION = 3;
 
 export const PACKET_KIND_KEYFRAME = 1;
 export const PACKET_KIND_DELTA = 2;

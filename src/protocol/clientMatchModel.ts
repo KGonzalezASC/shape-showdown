@@ -1,9 +1,9 @@
 import type { PublicPlayerState } from '../state/publicSnapshots.js';
 import { normalizeHeldPiece } from '../state/publicSnapshots.js';
-import type { ClientMatchModel, LocalPlayerWire, OpponentPlayerWire, SeatWireSnapshot } from './wireTypes.js';
+import type { ClientMatchModel, DecodedLocalPlayerWire, DecodedOpponentPlayerWire, DecodedSeatSnapshot } from './wireTypes.js';
 import { expandOpponentBoard } from './decodeMatchPacket.js';
 
-function localToPublic(local: LocalPlayerWire): PublicPlayerState {
+function localToPublic(local: DecodedLocalPlayerWire): PublicPlayerState {
   return {
     id: local.id,
     board: local.board.map((row) => [...row]),
@@ -47,7 +47,7 @@ function localToPublic(local: LocalPlayerWire): PublicPlayerState {
   };
 }
 
-function opponentToPublic(opponent: OpponentPlayerWire): PublicPlayerState {
+function opponentToPublic(opponent: DecodedOpponentPlayerWire): PublicPlayerState {
   const expandedBoard = expandOpponentBoard(opponent.board);
   const hiddenPoisonRows = Array.from(
     { length: expandedBoard.length - opponent.poisonBoard.length },
@@ -93,7 +93,7 @@ function opponentToPublic(opponent: OpponentPlayerWire): PublicPlayerState {
 }
 
 export function seatSnapshotToClientModel(
-  snapshot: SeatWireSnapshot,
+  snapshot: DecodedSeatSnapshot,
   myId: string | null,
 ): ClientMatchModel {
   return {
