@@ -1,6 +1,6 @@
 import { BOARD_COLS, BOARD_ROWS } from '../../src/constants.js';
-import type { CellValue, PlayerState, TetrisPiece } from '../../src/types.js';
-import { createEmptyBoard, makePlayer } from '../tetris/engine.js';
+import type { CellValue, PlayerState, GamePiece } from '../../src/types.js';
+import { createEmptyBoard, makePlayer } from '../puzzleEngine/engine.js';
 import { type RngChannels } from '../../src/rng.js';
 
 export type PlayerFixture = (player: PlayerState) => void;
@@ -53,7 +53,7 @@ function withPendingGarbage(lines: number, arrivalTick: number): PlayerFixture {
 }
 
 /** Helper fixture: set active piece shape & position. */
-function withActivePiece(piece: TetrisPiece | null): PlayerFixture {
+function withActivePiece(piece: GamePiece | null): PlayerFixture {
   return (player: PlayerState) => {
     player.activePiece = piece ? JSON.parse(JSON.stringify(piece)) : null;
   };

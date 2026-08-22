@@ -1,22 +1,23 @@
 import React, { useEffect, useRef } from 'react';
-import { SHAPES } from '../tetris/shapes';
-import { SHAPE_COLORS } from '../presentation/shapePalette';
-import type { TetrominoType } from '../types';
+import { SHAPES } from '../puzzleEngine/shapes';
+import { useThemePackage } from '../presentation/ThemeProvider';
+import type { ShapeType } from '../types';
 
-interface TetrominoLoadingSpinnerProps {
+interface ShapeLoadingSpinnerProps {
   cellSize?: number;
   orbitDurationMs?: number;
   className?: string;
 }
 
-const PIECE_SEQUENCE: readonly TetrominoType[] = ['I', 'T', 'O', 'L', 'J', 'S', 'Z'];
+const PIECE_SEQUENCE: readonly ShapeType[] = ['I', 'T', 'O', 'L', 'J', 'S', 'Z'];
 
-export const TetrominoLoadingSpinner: React.FC<TetrominoLoadingSpinnerProps> = ({
+export const ShapeLoadingSpinner: React.FC<ShapeLoadingSpinnerProps> = ({
   cellSize = 11,
   orbitDurationMs = 4200,
   className = '',
 }) => {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const theme = useThemePackage();
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -50,7 +51,7 @@ export const TetrominoLoadingSpinner: React.FC<TetrominoLoadingSpinnerProps> = (
       const cy = height / 2;
       const radius = width * 0.32;
 
-      // Draw each orbiting tetromino
+      // Draw each orbiting shape piece
       const count = PIECE_SEQUENCE.length;
       for (let i = 0; i < count; i++) {
         const type = PIECE_SEQUENCE[i];
@@ -65,7 +66,7 @@ export const TetrominoLoadingSpinner: React.FC<TetrominoLoadingSpinnerProps> = (
         ctx.rotate(pieceRotAngle);
 
         const offsets = SHAPES[type][0];
-        const color = SHAPE_COLORS[type];
+        const color = theme.piecePalette[type];
 
         // Soft outer bloom
         ctx.shadowColor = color;
@@ -104,7 +105,7 @@ export const TetrominoLoadingSpinner: React.FC<TetrominoLoadingSpinnerProps> = (
     return () => {
       cancelAnimationFrame(animationFrameId);
     };
-  }, [cellSize, orbitDurationMs]);
+  }, [cellSize, orbitDurationMs, theme]);
 
   return (
     <canvas

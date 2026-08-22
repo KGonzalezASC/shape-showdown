@@ -116,9 +116,9 @@ describe('matchStep authoritative match seam', () => {
   it('canonicalizes events by tick, type priority, and playerId', () => {
     const events: MatchEvent[] = [
       { tick: 5, type: 'topOut', playerId: 'p2' },
-      { tick: 5, type: 'lineClear', playerId: 'p1', lines: 4, tSpin: false },
+      { tick: 5, type: 'lineClear', playerId: 'p1', lines: 4, plusAttack: false },
       { tick: 5, type: 'attackSent', playerId: 'p1', lines: 4 },
-      { tick: 5, type: 'lineClear', playerId: 'p0', lines: 1, tSpin: false },
+      { tick: 5, type: 'lineClear', playerId: 'p0', lines: 1, plusAttack: false },
     ];
 
     const sorted = canonicalMatchEvents(events);

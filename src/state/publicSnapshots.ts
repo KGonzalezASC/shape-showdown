@@ -8,8 +8,8 @@ import {
   PlayerShopState,
   PlayerState,
   PoisonSpreadState,
-  TetrisPiece,
-  TetrominoType,
+  GamePiece,
+  ShapeType,
 } from '../types';
 
 /**
@@ -20,11 +20,11 @@ import {
 export interface PublicPlayerState {
   id: string;
   board: CellValue[][];
-  activePiece: TetrisPiece | null;
+  activePiece: GamePiece | null;
   landingForecastTicksRemaining?: number;
   holdPiece: HeldPiece | null;
   canHold: boolean;
-  nextQueue: TetrominoType[];
+  nextQueue: ShapeType[];
   score: number;
   funds: number;
   linesCleared: number;
@@ -67,21 +67,21 @@ export interface PublicGameState {
   seed: number;
 }
 
-const TETROMINO_TYPES = new Set<TetrominoType>(['I', 'J', 'L', 'O', 'S', 'T', 'Z']);
+const SHAPE_TYPES = new Set<ShapeType>(['I', 'J', 'L', 'O', 'S', 'T', 'Z']);
 
 /**
- * Normalize storage from the wire. Legacy servers sent a bare TetrominoType string;
+ * Normalize storage from the wire. Legacy servers sent a bare ShapeType string;
  * current servers send HeldPiece. Without this, `holdPiece.type` is undefined and
  * GameField crashes on Shift/hold.
  */
 export function normalizeHeldPiece(
-  hold: HeldPiece | TetrominoType | null | undefined,
+  hold: HeldPiece | ShapeType | null | undefined,
 ): HeldPiece | null {
   if (hold == null) return null;
   if (typeof hold === 'string') {
-    return TETROMINO_TYPES.has(hold) ? { type: hold } : null;
+    return SHAPE_TYPES.has(hold) ? { type: hold } : null;
   }
-  if (typeof hold === 'object' && TETROMINO_TYPES.has(hold.type)) {
+  if (typeof hold === 'object' && SHAPE_TYPES.has(hold.type)) {
     return hold;
   }
   return null;
@@ -93,7 +93,7 @@ export function toPublicPlayerState(player: PlayerState): PublicPlayerState {
     board: player.board,
     activePiece: player.activePiece,
     landingForecastTicksRemaining: player.landingForecastTicksRemaining,
-    holdPiece: normalizeHeldPiece(player.holdPiece as HeldPiece | TetrominoType | null),
+    holdPiece: normalizeHeldPiece(player.holdPiece as HeldPiece | ShapeType | null),
     canHold: player.canHold,
     nextQueue: player.nextQueue,
     score: player.score,
@@ -169,7 +169,7 @@ function effectsEqual(a?: ActiveFieldEffect[], b?: ActiveFieldEffect[]): boolean
   return true;
 }
 
-function pieceEqual(a: TetrisPiece | null, b: TetrisPiece | null): boolean {
+function pieceEqual(a: GamePiece | null, b: GamePiece | null): boolean {
   if (a === b) return true;
   if (!a || !b) return false;
   if (

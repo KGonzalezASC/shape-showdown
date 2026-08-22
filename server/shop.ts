@@ -21,7 +21,7 @@ import {
   applyStickyToActivePiece,
   armSatelliteToBuyer,
   startTectonicShift,
-} from './tetris/engine.js';
+} from './puzzleEngine/engine.js';
 import {
   ensurePlayerShopPricing,
   recordShopPurchasePricing,

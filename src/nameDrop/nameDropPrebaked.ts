@@ -1,10 +1,10 @@
-import { SHAPES } from '../tetris/shapes';
-import type { RotationState, TetrominoType } from '../types';
+import { SHAPES } from '../puzzleEngine/shapes';
+import type { RotationState, ShapeType } from '../types';
 import { nameTargetCells } from './nameDropLayout';
 import type { NameDropPlan, NameDropPiece } from './nameDropShared';
 
 type PrebakedPiece = readonly [
-  TetrominoType,
+  ShapeType,
   RotationState,
   number,
   number,

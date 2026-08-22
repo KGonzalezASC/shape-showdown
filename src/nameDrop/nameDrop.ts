@@ -1,6 +1,6 @@
 import { makeRng, rngInt, type MutableRng } from '../rng';
-import { PIECE_SEQUENCE, SHAPES, type ShapeOffset } from '../tetris/shapes';
-import type { RotationState, TetrominoType } from '../types';
+import { PIECE_SEQUENCE, SHAPES, type ShapeOffset } from '../puzzleEngine/shapes';
+import type { RotationState, ShapeType } from '../types';
 import {
   NAME_DROP_COLUMNS,
   NAME_DROP_EDGE_RELAXATION_CELLS,
@@ -24,7 +24,7 @@ export { nameLines, nameTargetCells } from './nameDropLayout';
 export * from './nameDropShared';
 
 interface TilingCandidate {
-  type: TetrominoType;
+  type: ShapeType;
   rotation: RotationState;
   x: number;
   y: number;
@@ -34,7 +34,7 @@ interface TilingCandidate {
 }
 
 function pieceCells(
-  type: TetrominoType,
+  type: ShapeType,
   rotation: RotationState,
   x: number,
   y: number,
@@ -60,8 +60,8 @@ function isEdgeCell(
   ].some((neighbor) => target.has(cellKey(neighbor)));
 }
 
-function piecePriority(type: TetrominoType, rng: MutableRng): number {
-  const varietyBias: Record<TetrominoType, number> = {
+function piecePriority(type: ShapeType, rng: MutableRng): number {
+  const varietyBias: Record<ShapeType, number> = {
     I: 350_000,
     J: 90_000,
     L: 90_000,
@@ -182,7 +182,7 @@ function tileGlyph(
   return solution;
 }
 
-/** Create a deterministic exact-cover plan made exclusively from playable tetrominoes. */
+/** Create a deterministic exact-cover plan made exclusively from playable shapes. */
 export function createNameDropPlan(
   value = 'SHAPE SHOWDOWN',
   seed = 0x53485045,

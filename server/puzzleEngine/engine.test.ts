@@ -47,7 +47,7 @@ function makeGame(players: PlayerState[]): GameState {
   };
 }
 
-describe('tetris engine', () => {
+describe('puzzle engine', () => {
   it('uses the compact 10x18 field with a 10x20 simulation board', () => {
     const player = makePlayer('a', makeRng(41));
 

@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { runExperimentTrace } from './experimentTrace.js';
 import { generatePricingReport } from './economyPricing.js';
 import { computeBoardPressure } from './boardPressure.js';
-import { createEmptyBoard } from '../tetris/engine.js';
+import { createEmptyBoard } from '../puzzleEngine/engine.js';
 import { BOARD_ROWS } from '../../src/constants.js';
 
 describe('Experiment Trace & Pricing Lab', () => {

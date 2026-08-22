@@ -5,7 +5,7 @@ import { DrillConsole, DrillResult } from './components/DrillConsole';
 import { MatchChrome } from './components/MatchChrome';
 import { PlayfieldShell } from './components/PlayfieldShell';
 import { ServerDiagnosticsPanel } from './components/ServerDiagnosticsPanel';
-import { TetrominoLoadingSpinner } from './components/TetrominoLoadingSpinner';
+import { ShapeLoadingSpinner } from './components/ShapeLoadingSpinner';
 import { ShopRailVariations } from './components/ShopRailVariations';
 import MobileControls from './components/MobileControls';
 import { GameFieldRef } from './components/GameField';
@@ -560,7 +560,7 @@ const AppShell: React.FC = () => {
 
       {!connected ? (
         <div className="relative z-10 flex flex-1 flex-col items-center justify-center gap-6 p-4">
-          <TetrominoLoadingSpinner cellSize={11} orbitDurationMs={4200} />
+          <ShapeLoadingSpinner cellSize={11} orbitDurationMs={4200} />
           <p className="text-[9px] uppercase tracking-[0.14em] text-white drop-shadow-[0_2px_8px_rgba(0,0,0,0.9)] animate-pulse">
             {matchDiagnostics.phase === 'queued'
               ? 'Searching for an opponent...'

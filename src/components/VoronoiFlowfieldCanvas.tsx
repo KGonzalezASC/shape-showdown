@@ -10,9 +10,9 @@ import {
   BOARD_VISIBLE_ROWS,
   CellValue,
   PoisonSpreadState,
-  TetrisPiece,
+  GamePiece,
 } from '../types';
-import { SHAPES } from '../tetris/shapes';
+import { SHAPES } from '../puzzleEngine/shapes';
 import {
   DEFAULT_POISON_PALETTE,
   poisonColor,
@@ -202,7 +202,7 @@ function tracePolygon(
   const baseAngles = POLYGON_BASE_ANGLES[sides];
   // The opponent preview uses 5px cells. Keep the full-size 3px wobble on
   // normal boards, but scale it down for miniatures so the radius never folds
-  // through zero and turns a tetromino into crossed/fragmented polygons.
+  // through zero and turns a piece into crossed/fragmented polygons.
   const radiusWobble = Math.min(3, cellSize * 0.12);
   for (let i = 0; i < sides; i++) {
     const base = baseAngles[i];
@@ -500,7 +500,7 @@ interface VoronoiFlowfieldCanvasProps {
   cellSize: number;
   poisonSpread?: PoisonSpreadState | null;
   board?: CellValue[][];
-  activePiece?: TetrisPiece | null;
+  activePiece?: GamePiece | null;
   /** Sparse replay snapshots cannot attribute every cleared cell to Bomber. */
   suppressBomberExplosionAnimation?: boolean;
   performanceId: string;
@@ -760,7 +760,7 @@ export const VoronoiFlowfieldCanvas: React.FC<VoronoiFlowfieldCanvasProps> = Rea
   const previousSpreadRef = useRef<PoisonSpreadState | null>(null);
   const poisonAnimationRef = useRef<PoisonAnimation | null>(null);
   const previousBoardRef = useRef<CellValue[][] | null>(null);
-  const previousActivePieceRef = useRef<TetrisPiece | null>(null);
+  const previousActivePieceRef = useRef<GamePiece | null>(null);
   const explosionShardsRef = useRef<ExplosionShard[]>([]);
   const piecePaletteRef = useRef(piecePalette);
   const poisonPaletteRef = useRef(poisonPalette);

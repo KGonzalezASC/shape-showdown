@@ -1,11 +1,11 @@
-import type { TetrominoType } from '../types';
+import type { ShapeType } from '../types';
 
 export type ShapeOffset = [number, number];
 
-export const PIECE_SEQUENCE: TetrominoType[] = ['I', 'J', 'L', 'O', 'S', 'T', 'Z'];
+export const PIECE_SEQUENCE: ShapeType[] = ['I', 'J', 'L', 'O', 'S', 'T', 'Z'];
 
-/** SRS-style rotation offsets shared by server simulation and client renderers. */
-export const SHAPES: Record<TetrominoType, ShapeOffset[][]> = {
+/** Standard wall-kick rotation offsets shared by server simulation and client renderers. */
+export const SHAPES: Record<ShapeType, ShapeOffset[][]> = {
   I: [
     [[0, 1], [1, 1], [2, 1], [3, 1]],
     [[2, 0], [2, 1], [2, 2], [2, 3]],

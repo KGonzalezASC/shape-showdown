@@ -3,7 +3,7 @@ import { AnimatePresence, m } from 'motion/react';
 import { PlayerState } from '../types';
 import { statusPillClass } from '../ui/shapeShowdownTheme';
 
-interface SRSKickOverlayProps {
+interface WallKickOverlayProps {
   player: PlayerState;
 }
 
@@ -14,7 +14,7 @@ function kickPopupReducer(_state: KickPopup, action: KickPopupAction): KickPopup
   return action.type === 'SHOW' ? action.popup : null;
 }
 
-export const SRSKickOverlay: React.FC<SRSKickOverlayProps> = ({ player }) => {
+export const WallKickOverlay: React.FC<WallKickOverlayProps> = ({ player }) => {
   const [kickPopup, dispatchKickPopup] = useReducer(kickPopupReducer, null);
   const prevKickNonceRef = useRef(0);
   const kickPopupTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -26,20 +26,20 @@ export const SRSKickOverlay: React.FC<SRSKickOverlayProps> = ({ player }) => {
   }, []);
 
   useEffect(() => {
-    const n = player.srsKickNonce ?? 0;
-    if (n > prevKickNonceRef.current && player.lastSrsKick) {
+    const n = player.wallKickNonce ?? 0;
+    if (n > prevKickNonceRef.current && player.lastWallKick) {
       if (kickPopupTimeoutRef.current) clearTimeout(kickPopupTimeoutRef.current);
-      dispatchKickPopup({ type: 'SHOW', popup: { kx: player.lastSrsKick.kx, ky: player.lastSrsKick.ky } });
+      dispatchKickPopup({ type: 'SHOW', popup: { kx: player.lastWallKick.kx, ky: player.lastWallKick.ky } });
       kickPopupTimeoutRef.current = setTimeout(() => dispatchKickPopup({ type: 'HIDE' }), 480);
     }
     prevKickNonceRef.current = n;
-  }, [player.srsKickNonce, player.lastSrsKick]);
+  }, [player.wallKickNonce, player.lastWallKick]);
 
   return (
     <AnimatePresence>
       {kickPopup && (
         <m.div
-          key={`${kickPopup.kx},${kickPopup.ky}-${player.srsKickNonce ?? 0}`}
+          key={`${kickPopup.kx},${kickPopup.ky}-${player.wallKickNonce ?? 0}`}
           initial={{ opacity: 0, scale: 0.92, y: 6 }}
           animate={{ opacity: 1, scale: 1, y: 0 }}
           exit={{ opacity: 0, scale: 0.94, y: -4 }}

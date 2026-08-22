@@ -8,7 +8,7 @@ import {
   nameTargetCells,
   normalizeName,
 } from '../src/nameDrop/nameDrop';
-import { SHAPES } from '../src/tetris/shapes';
+import { SHAPES } from '../src/puzzleEngine/shapes';
 import { getPrebakedNameDropPlan } from '../src/nameDrop/nameDropPrebaked';
 import {
   collectNewlySettledPieceIndices,
@@ -36,7 +36,7 @@ describe('name drop planner', () => {
     assert.equal(cells.every(({ x, y }) => x >= 0 && x < NAME_DROP_COLUMNS && y >= 0 && y < NAME_DROP_ROWS), true);
   });
 
-  it('creates a deterministic exact cover from canonical tetrominoes', () => {
+  it('creates a deterministic exact cover from canonical game pieces', () => {
     const first = createNameDropPlan('SHAPE SHOWDOWN', 12345);
     const second = createNameDropPlan('SHAPE SHOWDOWN', 12345);
     assert.deepEqual(second, first);

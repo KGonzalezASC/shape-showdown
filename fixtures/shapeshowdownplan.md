@@ -1,6 +1,6 @@
 # Shape Showdown — Core Architecture & Protocol Specification
 
-> **Canonical System Specification.** This document defines the active architecture, game rules, network contracts, and simulation invariants for **Shape Showdown** (1v1 server-authoritative Tetris). For local setup and contributor commands, consult [`AGENTS.md`](./AGENTS.md).
+> **Canonical System Specification.** This document defines the active architecture, game rules, network contracts, and simulation invariants for **Shape Showdown** (1v1 server-authoritative falling-shape puzzle game). For local setup and contributor commands, consult [`AGENTS.md`](./AGENTS.md).
 
 ---
 
@@ -19,7 +19,7 @@
 * **Board Dimensions:** 
   * **Visible Field:** 10 columns × 18 rows (`src/constants.ts`).
   * **Simulation Matrix:** 10 columns × 20 rows (includes 2 hidden spawn rows at the top).
-* **Piece Generation:** Standard SRS (Super Rotation System) 7-Bag generator driven by a shared, seeded [`MutableRng`](file:///c:/Users/Keithythefrog/source/BubbleBlitzers/src/rng.ts).
+* **Piece Generation:** Standard wallkick 7-Bag generator driven by a shared, seeded [`MutableRng`](file:///c:/Users/Keithythefrog/source/BubbleBlitzers/src/rng.ts).
 * **Lock Delay:** Extended placement rule — successful movement or rotation resets the lock timer up to `LOCK_RESET_CAP` (default: 10 resets per piece).
 * **Hold Storage:** Single piece hold buffer with swap cooldown until piece lock. Storage toxin/freeze items can temporarily lock or poison hold operations.
 
@@ -28,7 +28,7 @@
 ## 3. Server-Authoritative Netcode & Protocol
 
 ### Network Loop
-Clients send discrete actions and continuous held inputs. The server applies movement, gravity, locks, line clears, garbage arrival, and shop effects inside [`server/tetris/engine.ts`](file:///c:/Users/Keithythefrog/source/BubbleBlitzers/server/tetris/engine.ts) via `stepPlayer()`.
+Clients send discrete actions and continuous held inputs. The server applies movement, gravity, locks, line clears, garbage arrival, and shop effects inside [`server/puzzleEngine/engine.ts`](file:///c:/Users/Keithythefrog/source/BubbleBlitzers/server/puzzleEngine/engine.ts) via `stepPlayer()`.
 
 ### Socket Events
 
@@ -52,11 +52,11 @@ Garbage is generated when a player locks a piece and clears lines:
 | **Single** | 0 |
 | **Double** | 1 |
 | **Triple** | 2 |
-| **Tetris** | 4 |
-| **T-Spin Single** | 2 |
-| **T-Spin Double** | 4 |
-| **T-Spin Triple** | 6 |
-| **Back-to-Back (B2B)** | +1 bonus to Tetris / T-Spins |
+| **Quadruple** | 4 |
+| **PlusAttack Single** | 2 |
+| **PlusAttack Double** | 4 |
+| **PlusAttack Triple** | 6 |
+| **Back-to-Back (B2B)** | +1 bonus to Quadruple / PlusAttacks |
 | **Combos** | Scaled incoming attack bonus |
 | **Perfect Clear** | +10 bonus lines |
 
@@ -88,6 +88,6 @@ Garbage is generated when a player locks a piece and clears lines:
 
 * **Server Entry:** [`server.ts`](file:///c:/Users/Keithythefrog/source/BubbleBlitzers/server.ts)
 * **Match Lifecycle:** [`server/GameManager.ts`](file:///c:/Users/Keithythefrog/source/BubbleBlitzers/server/GameManager.ts)
-* **Simulation Core:** [`server/tetris/engine.ts`](file:///c:/Users/Keithythefrog/source/BubbleBlitzers/server/tetris/engine.ts)
+* **Simulation Core:** [`server/puzzleEngine/engine.ts`](file:///c:/Users/Keithythefrog/source/BubbleBlitzers/server/puzzleEngine/engine.ts)
 * **Shop Catalog & Handlers:** [`server/shop.ts`](file:///c:/Users/Keithythefrog/source/BubbleBlitzers/server/shop.ts) & [`src/shop/shopCatalog.ts`](file:///c:/Users/Keithythefrog/source/BubbleBlitzers/src/shop/shopCatalog.ts)
 * **Board Model Seam:** [`src/board/boardVisualModel.ts`](file:///c:/Users/Keithythefrog/source/BubbleBlitzers/src/board/boardVisualModel.ts)

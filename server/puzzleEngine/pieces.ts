@@ -1,5 +1,5 @@
-import { TetrominoType } from '../../src/types.js';
-import { PIECE_SEQUENCE, SHAPES, type ShapeOffset } from '../../src/tetris/shapes.js';
+import { ShapeType } from '../../src/types.js';
+import { PIECE_SEQUENCE, SHAPES, type ShapeOffset } from '../../src/puzzleEngine/shapes.js';
 
 export { PIECE_SEQUENCE, SHAPES };
 export type Offset = ShapeOffset;
@@ -26,7 +26,7 @@ const KICKS_I = {
   '0>3': [[0, 0], [-1, 0], [2, 0], [-1, 2], [2, -1]],
 } as const;
 
-export function getKickTests(type: TetrominoType, from: number, to: number): Offset[] {
+export function getKickTests(type: ShapeType, from: number, to: number): Offset[] {
   if (type === 'O') return [[0, 0]];
   const key = `${from}>${to}` as keyof typeof KICKS_JLSTZ;
   const tests = type === 'I' ? KICKS_I[key] : KICKS_JLSTZ[key];

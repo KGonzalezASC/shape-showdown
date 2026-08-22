@@ -9,7 +9,7 @@ import { createDatabase } from './database.js';
 import { MatchStore } from './matchStore.js';
 import { runMigrations } from './migrations.js';
 import { startGameServer, type RunningGameServer } from '../gameServer.js';
-import { makePlayer } from '../tetris/engine.js';
+import { makePlayer } from '../puzzleEngine/engine.js';
 import { createPlayerRngChannels } from '../../src/rng.js';
 import type { GameState, MatchAssignment } from '../../src/types.js';
 

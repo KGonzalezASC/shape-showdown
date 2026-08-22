@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import type { Socket } from 'socket.io';
-import { makePlayer, makeRng } from '../tetris/engine.js';
+import { makePlayer, makeRng } from '../puzzleEngine/engine.js';
 import { ClientPacketDecoder } from '../../src/protocol/ClientPacketDecoder.js';
 import type { GameState } from '../../src/types.js';
 import { MatchPacketSync } from './MatchPacketSync.js';

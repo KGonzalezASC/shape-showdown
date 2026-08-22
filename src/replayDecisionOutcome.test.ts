@@ -72,7 +72,7 @@ function makeReplay(): ReplayDataV2 {
       },
     ],
     events: [
-      { tick: 39, type: 'lineClear', playerId: 'p1', lines: 1, tSpin: false },
+      { tick: 39, type: 'lineClear', playerId: 'p1', lines: 1, plusAttack: false },
       { tick: 39, type: 'attackSent', playerId: 'p1', lines: 1 },
       { tick: 39, type: 'garbageApplied', playerId: 'p1', lines: 2 },
     ],

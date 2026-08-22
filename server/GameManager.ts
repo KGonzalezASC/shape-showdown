@@ -19,8 +19,8 @@ import {
   makePlayer,
   replayDateLabel,
   tickSeconds,
-} from './tetris/engine.js';
-import { matchStep } from './tetris/matchStep.js';
+} from './puzzleEngine/engine.js';
+import { matchStep } from './puzzleEngine/matchStep.js';
 import { createPlayerRngChannels, type RngChannels } from '../src/rng.js';
 import { SHOP_ITEM_BY_ID } from '../src/shop/shopCatalog.js';
 import { getPricingView, PRICING_POLICY_VERSION } from '../src/shop/shopPricing.js';

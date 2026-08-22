@@ -6,17 +6,17 @@ import type {
   ItemPricingState,
   PendingGarbagePacket,
   PoisonSpreadState,
-  TetrisPiece,
-  TetrominoType,
+  GamePiece,
+  ShapeType,
 } from '../types.js';
 import { BinaryReader, BinaryWriter } from './binary.js';
 import {
   cellToNibble,
   nibbleToCell,
-  nibbleToTetromino,
+  nibbleToShape,
   packCellRow,
   packPoisonRow,
-  tetrominoToNibble,
+  shapeToNibble,
   unpackCellRow,
   unpackPoisonRow,
 } from './cellCodec.js';
@@ -50,21 +50,21 @@ export function readOptionalU32(reader: BinaryReader): number | null {
   return reader.readU8() === 0 ? null : reader.readU32();
 }
 
-export function writeTetromino(writer: BinaryWriter, type: TetrominoType): void {
-  writer.writeU8(tetrominoToNibble(type));
+export function writeShape(writer: BinaryWriter, type: ShapeType): void {
+  writer.writeU8(shapeToNibble(type));
 }
 
-export function readTetromino(reader: BinaryReader): TetrominoType {
-  return nibbleToTetromino(reader.readU8());
+export function readShape(reader: BinaryReader): ShapeType {
+  return nibbleToShape(reader.readU8());
 }
 
-export function writePiece(writer: BinaryWriter, piece: TetrisPiece | null): void {
+export function writePiece(writer: BinaryWriter, piece: GamePiece | null): void {
   if (piece === null) {
     writer.writeU8(0);
     return;
   }
   writer.writeU8(1);
-  writeTetromino(writer, piece.type);
+  writeShape(writer, piece.type);
   writer.writeU8(piece.rotation);
   writer.writeI16(piece.x);
   writer.writeI16(piece.y);
@@ -83,10 +83,10 @@ export function writePiece(writer: BinaryWriter, piece: TetrisPiece | null): voi
   writer.writeU8(piece.rotationBlockedNonce ?? 0);
 }
 
-export function readPiece(reader: BinaryReader): TetrisPiece | null {
+export function readPiece(reader: BinaryReader): GamePiece | null {
   if (reader.readU8() === 0) return null;
-  const type = readTetromino(reader);
-  const rotation = reader.readU8() as TetrisPiece['rotation'];
+  const type = readShape(reader);
+  const rotation = reader.readU8() as GamePiece['rotation'];
   const x = reader.readI16();
   const y = reader.readI16();
   const flags = reader.readU8();
@@ -115,7 +115,7 @@ export function writeHeldPiece(writer: BinaryWriter, held: HeldPiece | null): vo
     return;
   }
   writer.writeU8(1);
-  writeTetromino(writer, held.type);
+  writeShape(writer, held.type);
   writer.writeU8(
     (held.poisoned ? 1 : 0)
     | (held.bomber ? 2 : 0),
@@ -125,7 +125,7 @@ export function writeHeldPiece(writer: BinaryWriter, held: HeldPiece | null): vo
 
 export function readHeldPiece(reader: BinaryReader): HeldPiece | null {
   if (reader.readU8() === 0) return null;
-  const type = readTetromino(reader);
+  const type = readShape(reader);
   const flags = reader.readU8();
   const poisonVariant = reader.readU8();
   return {
@@ -483,7 +483,7 @@ export function writeLocalMeta(writer: BinaryWriter, local: LocalPlayerWire, inc
   writeHeldPiece(writer, local.holdPiece);
   writer.writeBool(local.canHold);
   writer.writeU8(local.nextQueue.length);
-  for (const piece of local.nextQueue) writeTetromino(writer, piece);
+  for (const piece of local.nextQueue) writeShape(writer, piece);
   writer.writeU32(local.score >>> 0);
   writer.writeU32(local.funds >>> 0);
   writer.writeU32(local.linesCleared >>> 0);
@@ -534,8 +534,8 @@ export function readLocalMeta(
   const holdPiece = readHeldPiece(reader);
   const canHold = reader.readBool();
   const queueCount = reader.readU8();
-  const nextQueue: TetrominoType[] = [];
-  for (let i = 0; i < queueCount; i += 1) nextQueue.push(readTetromino(reader));
+  const nextQueue: ShapeType[] = [];
+  for (let i = 0; i < queueCount; i += 1) nextQueue.push(readShape(reader));
   const score = reader.readU32();
   const funds = reader.readU32();
   const linesCleared = reader.readU32();

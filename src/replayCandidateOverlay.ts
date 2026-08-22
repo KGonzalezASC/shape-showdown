@@ -1,4 +1,4 @@
-import type { CandidateEvaluationTrace, CellValue, TetrominoType } from './types';
+import type { CandidateEvaluationTrace, CellValue, ShapeType } from './types';
 import {
   BOMBER_BLAST_RADIUS,
   BOARD_COLS,
@@ -6,7 +6,7 @@ import {
   BOARD_ROWS,
   BOARD_VISIBLE_ROWS,
 } from './types';
-import { SHAPES } from './tetris/shapes';
+import { SHAPES } from './puzzleEngine/shapes';
 
 export interface CandidatePlacementProjection {
   cells: Array<{ x: number; y: number }>;
@@ -25,7 +25,7 @@ export interface ReplayCandidateOverlay {
  */
 export function projectCandidatePlacement(
   board: CellValue[][],
-  pieceType: TetrominoType,
+  pieceType: ShapeType,
   candidate: Pick<CandidateEvaluationTrace, 'rotation' | 'x'>,
   isBomber = false,
 ): CandidatePlacementProjection {

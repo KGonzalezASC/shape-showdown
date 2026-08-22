@@ -1,6 +1,6 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { makePlayer, makeRng, stepPlayer } from './tetris/engine.js';
+import { makePlayer, makeRng, stepPlayer } from './puzzleEngine/engine.js';
 import {
   applyShopPurchase,
   openPlayerShop,

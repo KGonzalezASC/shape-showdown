@@ -125,9 +125,9 @@ export type ServerHealthSnapshot = {
   databaseHealth: ServerDatabaseHealth;
   migrationsReady: boolean;
 };
-export type TetrominoType = 'I' | 'J' | 'L' | 'O' | 'S' | 'T' | 'Z';
+export type ShapeType = 'I' | 'J' | 'L' | 'O' | 'S' | 'T' | 'Z';
 export type RotationState = 0 | 1 | 2 | 3;
-export type CellValue = TetrominoType | 'G' | 'W' | null;
+export type CellValue = ShapeType | 'G' | 'W' | null;
 export type ActionType = 'rotateCW' | 'rotateCCW' | 'hardDrop' | 'hold';
 
 /** Who the purchased effect primarily affects. */
@@ -220,8 +220,8 @@ export interface InputState {
   softDrop: boolean;
 }
 
-export interface TetrisPiece {
-  type: TetrominoType;
+export interface GamePiece {
+  type: ShapeType;
   rotation: RotationState;
   x: number;
   y: number;
@@ -244,7 +244,7 @@ export interface TetrisPiece {
 
 /** Piece parked in storage — carries type plus piece-level flags that survive hold. */
 export interface HeldPiece {
-  type: TetrominoType;
+  type: ShapeType;
   poisoned?: boolean;
   poisonVariant?: number;
   bomber?: boolean;
@@ -290,13 +290,13 @@ export interface PendingShopEffect {
 export interface PlayerState {
   id: string;
   board: CellValue[][];
-  activePiece: TetrisPiece | null;
+  activePiece: GamePiece | null;
   /** Server-tick countdown for the temporary Landing Forecast UI. */
   landingForecastTicksRemaining?: number;
   holdPiece: HeldPiece | null;
   canHold: boolean;
-  nextQueue: TetrominoType[];
-  bag: TetrominoType[];
+  nextQueue: ShapeType[];
+  bag: ShapeType[];
   score: number;
   funds: number;
   linesCleared: number;
@@ -311,10 +311,10 @@ export interface PlayerState {
   lockDelayRemainingTicks: number;
   lockResetsUsed: number;
   lowestY: number;
-  /** Increments when a rotation succeeds using a non-zero SRS kick offset (debug / UI). */
-  srsKickNonce?: number;
-  /** Last SRS kick offset (kick table kx, ky); null if none since spawn or after lock/hold. */
-  lastSrsKick?: { kx: number; ky: number } | null;
+  /** Increments when a rotation succeeds using a non-zero wall kick offset (debug / UI). */
+  wallKickNonce?: number;
+  /** Last wall kick offset (kick table kx, ky); null if none since spawn or after lock/hold. */
+  lastWallKick?: { kx: number; ky: number } | null;
   lastActionWasRotate: boolean;
   pendingGarbage: PendingGarbagePacket[];
   /** Active visual effects applied to this player's field */
@@ -405,10 +405,10 @@ export interface GameState {
   seed: number;
 }
 
-export type TSpinType = 'full' | 'mini' | false;
+export type PlusAttackType = 'full' | 'mini' | false;
 
 export type MatchEvent =
-  | { tick: number; type: 'lineClear'; playerId: string; lines: number; tSpin: TSpinType }
+  | { tick: number; type: 'lineClear'; playerId: string; lines: number; plusAttack: PlusAttackType }
   | { tick: number; type: 'attackSent'; playerId: string; lines: number }
   | { tick: number; type: 'garbageApplied'; playerId: string; lines: number }
   | { tick: number; type: 'topOut'; playerId: string }
@@ -500,7 +500,7 @@ export interface BotDecisionTrace {
   /** Absolute replay/simulation tick; player-limited policy time may be normalized. */
   replayTick?: number;
   playerId: string;
-  pieceType: TetrominoType;
+  pieceType: ShapeType;
   /** Monotonic bot-local decision id; optional for legacy replay files. */
   decisionId?: number;
   /** Whether this trace came from the active piece or a speculative hold evaluation. */

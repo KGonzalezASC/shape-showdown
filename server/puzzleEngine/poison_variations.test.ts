@@ -21,7 +21,7 @@ import {
   BOARD_HIDDEN_ROWS,
   POISON_GENERATIONS,
 } from '../../src/constants.js';
-import type { CellValue, TetrominoType, RotationState } from '../../src/types.js';
+import type { CellValue, ShapeType, RotationState } from '../../src/types.js';
 
 function createEmptyBoard(): CellValue[][] {
   return Array.from({ length: BOARD_ROWS }, () =>
@@ -118,7 +118,7 @@ describe('poison spread variations', () => {
 
   it('variations count is finite and non-zero for every piece type on the sample board', () => {
     const baseBoard = buildSampleBoard();
-    const TYPES: TetrominoType[] = ['I', 'J', 'L', 'O', 'S', 'T', 'Z'];
+    const TYPES: ShapeType[] = ['I', 'J', 'L', 'O', 'S', 'T', 'Z'];
 
     for (const type of TYPES) {
       const seen = enumerateVariations(baseBoard, type);

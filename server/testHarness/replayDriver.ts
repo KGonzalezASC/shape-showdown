@@ -10,7 +10,7 @@ import type {
 import { createPlayerRngChannels, type RngChannels } from '../../src/rng.js';
 import { applyShopPurchase, openPlayerShop } from '../shop.js';
 import { PRICING_POLICY_VERSION } from '../../src/shop/shopPricing.js';
-import { matchStep } from '../tetris/matchStep.js';
+import { matchStep } from '../puzzleEngine/matchStep.js';
 import type { DriverObservation, InputDriver, PlayerCommand } from './inputDriver.js';
 
 export interface ReplayVerificationOptions {

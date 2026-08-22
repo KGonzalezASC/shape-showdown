@@ -9,8 +9,8 @@ import type {
   PendingGarbagePacket,
   PlayerShopState,
   PoisonSpreadState,
-  TetrisPiece,
-  TetrominoType,
+  GamePiece,
+  ShapeType,
 } from '../types.js';
 
 /**
@@ -44,12 +44,12 @@ export interface LocalPlayerWire {
   id: string;
   board: CellValue[][];
   poisonBoard: number[][];
-  activePiece: TetrisPiece | null;
+  activePiece: GamePiece | null;
   /** Absolute simulation tick at which the landing forecast expires. */
   landingForecastAtTick?: number;
   holdPiece: HeldPiece | null;
   canHold: boolean;
-  nextQueue: TetrominoType[];
+  nextQueue: ShapeType[];
   score: number;
   funds: number;
   linesCleared: number;
@@ -84,7 +84,7 @@ export interface OpponentPlayerWire {
   board: CellValue[][];
   /** Visible 10×18 poison variants aligned with `board`. */
   poisonBoard: number[][];
-  activePiece: TetrisPiece | null;
+  activePiece: GamePiece | null;
   score: number;
   funds: number;
   linesCleared: number;

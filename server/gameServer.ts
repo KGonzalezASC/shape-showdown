@@ -21,7 +21,7 @@ import type { SocketSeatBinding } from './GameManager.js';
 import { loadServerConfig, type ServerConfig } from './loadConfig.js';
 import { MatchRegistry } from './matchRuntime/MatchRegistry.js';
 import { logError, logInfo } from './observability/logger.js';
-import { initialSeed } from './tetris/engine.js';
+import { initialSeed } from './puzzleEngine/engine.js';
 import { GAME_PROTOCOL_VERSION } from '../src/protocol/version.js';
 import type {
   SocketAuthErrorCode,

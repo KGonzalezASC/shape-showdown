@@ -7,7 +7,7 @@ import {
   HOLD_SWAP_CUTOFF_VISIBLE_ROW,
   MatchStatus,
 } from '../types';
-import { SHAPES } from '../tetris/shapes';
+import { SHAPES } from '../puzzleEngine/shapes';
 import { poisonColor } from '../presentation/shapePalette';
 import { BoardGridLines } from './BoardGridLines';
 import { BoardCanvasOverlay } from '../board/BoardCanvasOverlay';

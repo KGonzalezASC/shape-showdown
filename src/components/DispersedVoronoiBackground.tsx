@@ -26,7 +26,7 @@ for (let sides = 5; sides <= 7; sides++) {
   });
 }
 
-interface TetrominoPiece {
+interface ShapeClusterPiece {
   fill: string;
   stroke: string;
   shapes: ReadonlyArray<ReadonlyArray<readonly [number, number]>>;
@@ -46,7 +46,7 @@ function makePieceStyle(hex: string): { fill: string; stroke: string } {
   };
 }
 
-const TETROMINO_PIECES: readonly TetrominoPiece[] = [
+const SHAPE_CLUSTER_PIECES: readonly ShapeClusterPiece[] = [
   {
     ...makePieceStyle(SHAPE_COLORS.I),
     shapes: [[[0, 0], [0, 1], [0, 2], [0, 3]], [[0, 0], [1, 0], [2, 0], [3, 0]]],
@@ -141,7 +141,7 @@ function traceVoronoiBgPolygon(
   ctx.closePath();
 }
 
-/** Jack Rugile–style tiled Voronoi mesh with ~4% dispersed tetromino clusters, driven by the presentation seed. */
+/** Jack Rugile–style tiled Voronoi mesh with ~4% dispersed shape clusters, driven by the presentation seed. */
 function generateDispersedVoronoiTileDataUrl(
   decorationSeed: number,
   palette: ReadonlyArray<readonly [number, number]> = DEFAULT_VORONOI_TILE_PALETTE,
@@ -163,7 +163,7 @@ function generateDispersedVoronoiTileDataUrl(
 
   while (piecesPlaced < targetPieces && attempts < 1000) {
     attempts++;
-    const pieceDef = TETROMINO_PIECES[Math.floor(random() * TETROMINO_PIECES.length)];
+    const pieceDef = SHAPE_CLUSTER_PIECES[Math.floor(random() * SHAPE_CLUSTER_PIECES.length)];
     const shape = pieceDef.shapes[Math.floor(random() * pieceDef.shapes.length)];
     const startR = Math.floor(random() * (BG_ROWS - 4));
     const startC = Math.floor(random() * (BG_COLS - 4));

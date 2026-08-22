@@ -20,10 +20,10 @@ import {
   PendingShopEffect,
   PlayerState,
   HeldPiece,
-  TetrisPiece,
+  GamePiece,
   RotationState,
   SOFT_DROP_CELLS_PER_TICK,
-  TetrominoType,
+  ShapeType,
   POISON_LINE_CLEAR_PENALTY_MAX_RATIO,
 } from '../../src/types.js';
 import type { StepOptions, StepResult } from './stepTypes.js';
@@ -71,7 +71,7 @@ function ensurePoisonBoard(player: PlayerState): number[][] {
   return player.poisonBoard;
 }
 
-function shuffledBag(rng: MutableRng): TetrominoType[] {
+function shuffledBag(rng: MutableRng): ShapeType[] {
   const bag = [...PIECE_SEQUENCE];
   for (let i = bag.length - 1; i > 0; i--) {
     const j = Math.floor(rngNext(rng) * (i + 1));
@@ -115,8 +115,8 @@ export function makePlayer(id: string, rng: RngChannels | MutableRng): PlayerSta
     lockDelayRemainingTicks: LOCK_DELAY_TICKS,
     lockResetsUsed: 0,
     lowestY: BOARD_HIDDEN_ROWS - 2,
-    srsKickNonce: 0,
-    lastSrsKick: null,
+    wallKickNonce: 0,
+    lastWallKick: null,
     lastActionWasRotate: false,
     pendingGarbage: [],
     topOut: false,
@@ -203,7 +203,7 @@ function spawnNextPiece(player: PlayerState, rng: MutableRng) {
   };
 }
 
-function getCells(piece: { type: TetrominoType; rotation: RotationState; x: number; y: number; customOffsets?: [number, number][] }) {
+function getCells(piece: { type: ShapeType; rotation: RotationState; x: number; y: number; customOffsets?: [number, number][] }) {
   if (piece.customOffsets) {
     return piece.customOffsets.map(([dx, dy]) => ({ x: piece.x + dx, y: piece.y + dy }));
   }
@@ -231,7 +231,7 @@ function rotateCustomOffsets(offsets: [number, number][], dir: 1 | -1): [number,
     .sort((a, b) => a[1] - b[1] || a[0] - b[0]);
 }
 
-function collides(board: CellValue[][], piece: { type: TetrominoType; rotation: RotationState; x: number; y: number; customOffsets?: [number, number][] }): boolean {
+function collides(board: CellValue[][], piece: { type: ShapeType; rotation: RotationState; x: number; y: number; customOffsets?: [number, number][] }): boolean {
   for (const cell of getCells(piece)) {
     if (cell.x < 0 || cell.x >= BOARD_COLS || cell.y >= BOARD_ROWS) return true;
     if (cell.y >= 0 && board[cell.y][cell.x] !== null) return true;
@@ -275,7 +275,7 @@ function tryRotate(player: PlayerState, dir: 1 | -1): boolean {
 
   if (player.activePiece.customOffsets) {
     const newOffsets = rotateCustomOffsets(player.activePiece.customOffsets, dir);
-    // Bounding-box spin + simple wall kicks (no SRS tables — those assume tetrominoes).
+    // Bounding-box spin + simple wall kicks (no kick tables — those assume standard shapes).
     const kickTests: Array<[number, number]> = [
       [0, 0],
       [-1, 0],
@@ -297,8 +297,8 @@ function tryRotate(player: PlayerState, dir: 1 | -1): boolean {
         player.activePiece = candidate;
         player.lastActionWasRotate = true;
         if (kx !== 0 || ky !== 0) {
-          player.srsKickNonce += 1;
-          player.lastSrsKick = { kx, ky };
+          player.wallKickNonce = (player.wallKickNonce ?? 0) + 1;
+          player.lastWallKick = { kx, ky };
         }
         if (wasGrounded && player.lockResetsUsed < lockResetCapFor(player)) {
           player.lockResetsUsed += 1;
@@ -318,10 +318,10 @@ function tryRotate(player: PlayerState, dir: 1 | -1): boolean {
       player.activePiece = candidate;
       player.lastActionWasRotate = true;
       if (kx !== 0 || ky !== 0) {
-        player.srsKickNonce += 1;
-        player.lastSrsKick = { kx, ky };
+        player.wallKickNonce = (player.wallKickNonce ?? 0) + 1;
+        player.lastWallKick = { kx, ky };
       }
-      // Count resets whenever the piece was grounded before the rotate, even if SRS kicks it airborne.
+      // Count resets whenever the piece was grounded before the rotate, even if wall kick moves it airborne.
       if (wasGrounded && player.lockResetsUsed < lockResetCapFor(player)) {
         player.lockResetsUsed += 1;
         player.lockDelayRemainingTicks = LOCK_DELAY_TICKS;
@@ -489,8 +489,8 @@ export function detonateBomberBlast(player: PlayerState, centers: Array<{ x: num
   }
 }
 
-function lockPiece(player: PlayerState, tick: number): { lines: number; tSpin: 'full' | 'mini' | false; perfectClear: boolean; poisonedRatio: number } {
-  if (!player.activePiece) return { lines: 0, tSpin: false, perfectClear: false, poisonedRatio: 0 };
+function lockPiece(player: PlayerState, tick: number): { lines: number; plusAttack: 'full' | 'mini' | false; perfectClear: boolean; poisonedRatio: number } {
+  if (!player.activePiece) return { lines: 0, plusAttack: false, perfectClear: false, poisonedRatio: 0 };
   player.lastLockTick = tick;
   const poison = ensurePoisonBoard(player);
   const piece = player.activePiece;
@@ -519,9 +519,9 @@ function lockPiece(player: PlayerState, tick: number): { lines: number; tSpin: '
 function resolveBoardAfterLock(
   player: PlayerState,
   tick: number,
-  piece: TetrisPiece,
+  piece: GamePiece,
   lastActionWasRotate: boolean,
-): { lines: number; tSpin: 'full' | 'mini' | false; perfectClear: boolean; poisonedRatio: number } {
+): { lines: number; plusAttack: 'full' | 'mini' | false; perfectClear: boolean; poisonedRatio: number } {
   const poison = ensurePoisonBoard(player);
   const linesToClear: number[] = [];
   for (let y = 0; y < BOARD_ROWS; y++) {
@@ -545,7 +545,7 @@ function resolveBoardAfterLock(
   }
 
   const lines = linesToClear.length;
-  const tSpin = detectTSpinFor(player.board, piece, lastActionWasRotate);
+  const plusAttack = detectPlusAttackFor(player.board, piece, lastActionWasRotate);
   const perfectClear = player.board.every((row) => row.every((cell) => cell === null));
   player.linesCleared += lines;
   player.activePiece = null;
@@ -554,19 +554,19 @@ function resolveBoardAfterLock(
   player.lockDelayRemainingTicks = LOCK_DELAY_TICKS;
   player.lockResetsUsed = 0;
   player.lowestY = 0;
-  player.lastSrsKick = null;
+  player.lastWallKick = null;
   player.lastActionWasRotate = false;
   if (lines > 0) {
     clearPieceLockResetCap(player);
   }
   clearMagnetPieceBoost(player);
   clearSnagHardDrop(player);
-  return { lines, tSpin, perfectClear, poisonedRatio };
+  return { lines, plusAttack, perfectClear, poisonedRatio };
 }
 
-export function detectTSpinFor(
+export function detectPlusAttackFor(
   board: CellValue[][],
-  piece: TetrisPiece,
+  piece: GamePiece,
   lastActionWasRotate: boolean,
 ): 'full' | 'mini' | false {
   if (piece.type !== 'T' || !lastActionWasRotate) return false;
@@ -598,30 +598,30 @@ export function detectTSpinFor(
 
 export function previewAttackFromClear(params: {
   lines: number;
-  tSpin?: 'full' | 'mini' | false;
+  plusAttack?: 'full' | 'mini' | false;
   perfectClear?: boolean;
   combo?: number;
   backToBack?: boolean;
 }): number {
-  const { lines, tSpin = false, perfectClear = false, combo = -1, backToBack = false } = params;
+  const { lines, plusAttack = false, perfectClear = false, combo = -1, backToBack = false } = params;
   if (lines === 0) return 0;
 
   let attack = 0;
-  if (tSpin === 'full') {
-    if (lines === 1) attack = ATTACK_TABLE.tSpinSingle;
-    if (lines === 2) attack = ATTACK_TABLE.tSpinDouble;
-    if (lines >= 3) attack = ATTACK_TABLE.tSpinTriple;
-  } else if (tSpin === 'mini') {
-    if (lines === 1) attack = ATTACK_TABLE.tSpinMiniSingle;
-    if (lines >= 2) attack = ATTACK_TABLE.tSpinMiniDouble;
+  if (plusAttack === 'full') {
+    if (lines === 1) attack = ATTACK_TABLE.plusAttackSingle;
+    if (lines === 2) attack = ATTACK_TABLE.plusAttackDouble;
+    if (lines >= 3) attack = ATTACK_TABLE.plusAttackTriple;
+  } else if (plusAttack === 'mini') {
+    if (lines === 1) attack = ATTACK_TABLE.plusAttackMiniSingle;
+    if (lines >= 2) attack = ATTACK_TABLE.plusAttackMiniDouble;
   } else {
     if (lines === 1) attack = ATTACK_TABLE.single;
     if (lines === 2) attack = ATTACK_TABLE.double;
     if (lines === 3) attack = ATTACK_TABLE.triple;
-    if (lines >= 4) attack = ATTACK_TABLE.tetris;
+    if (lines >= 4) attack = ATTACK_TABLE.quadruple;
   }
 
-  const b2bAction = !!tSpin || lines >= 4;
+  const b2bAction = !!plusAttack || lines >= 4;
   if (b2bAction && backToBack && attack > 0) {
     attack += ATTACK_TABLE.backToBackBonus;
   }
@@ -638,7 +638,7 @@ export function previewAttackFromClear(params: {
 
 function attackFromClear(
   lines: number,
-  tSpin: 'full' | 'mini' | false,
+  plusAttack: 'full' | 'mini' | false,
   perfectClear: boolean,
   player: PlayerState,
   poisonedRatio: number,
@@ -650,13 +650,13 @@ function attackFromClear(
 
   const attack = previewAttackFromClear({
     lines,
-    tSpin,
+    plusAttack,
     perfectClear,
     combo: player.combo,
     backToBack: player.backToBack,
   });
 
-  player.backToBack = !!tSpin || lines >= 4;
+  player.backToBack = !!plusAttack || lines >= 4;
   player.combo += 1;
 
   const baseScore = lines * 100 + attack * 10;
@@ -727,11 +727,11 @@ function applyLockResult(
   player: PlayerState,
   garbageRng: MutableRng,
   matchEvents: MatchEvent[],
-  clearResult: { lines: number; tSpin: 'full' | 'mini' | false; perfectClear: boolean; poisonedRatio: number },
+  clearResult: { lines: number; plusAttack: 'full' | 'mini' | false; perfectClear: boolean; poisonedRatio: number },
 ): number {
   const attackLines = attackFromClear(
     clearResult.lines,
-    clearResult.tSpin,
+    clearResult.plusAttack,
     clearResult.perfectClear,
     player,
     clearResult.poisonedRatio,
@@ -742,7 +742,7 @@ function applyLockResult(
       type: 'lineClear',
       playerId: player.id,
       lines: clearResult.lines,
-      tSpin: clearResult.tSpin,
+      plusAttack: clearResult.plusAttack,
     });
   }
 
@@ -765,7 +765,7 @@ function pieceWouldTopOut(player: PlayerState): boolean {
 }
 
 /** Snapshot piece-level flags into storage (type + poison/bomber). */
-function toHeldPiece(piece: TetrisPiece): HeldPiece {
+function toHeldPiece(piece: GamePiece): HeldPiece {
   const held: HeldPiece = { type: piece.type };
   if (piece.poisoned) {
     held.poisoned = true;
@@ -776,7 +776,7 @@ function toHeldPiece(piece: TetrisPiece): HeldPiece {
 }
 
 /** Restore a held piece as a fresh active spawn (rotation/x/y reset). */
-function activeFromHeld(held: HeldPiece): TetrisPiece {
+function activeFromHeld(held: HeldPiece): GamePiece {
   return {
     type: held.type,
     rotation: 0,
@@ -800,7 +800,7 @@ function processActions(player: PlayerState, tick: number): boolean {
       if (player.activePiece?.customOffsets) continue; // Block hold for custom pieces
       if (player.activePiece?.poisoned) continue; // Poisoned active pieces cannot be stored/swapped away
       if (!player.canHold || !player.activePiece || !canHoldAtCurrentHeight(player)) continue;
-      player.lastSrsKick = null;
+      player.lastWallKick = null;
       const stored = toHeldPiece(player.activePiece);
       if (player.holdPiece) {
         player.activePiece = activeFromHeld(player.holdPiece);
@@ -1057,7 +1057,7 @@ export function stepPlayer(
   }
 
   if (!player.activePiece) {
-    player.lastSrsKick = null;
+    player.lastWallKick = null;
     player.activePiece = spawnNextPiece(player, channels.pieces);
     if (player.activePiece) {
       player.landingForecastTicksRemaining = LANDING_FORECAST_TICKS;
@@ -1262,7 +1262,7 @@ function tectonicStepTicksFor(player: PlayerState): number {
   return Math.max(1, player.tectonicShiftStepTicks ?? TECTONIC_SHIFT_STEP_TICKS);
 }
 
-/** Begin Magical Tetris–style animated column gravity; piece stays paused until settle. */
+/** Begin animated column gravity; piece stays paused until settle. */
 export function startTectonicShift(player: PlayerState, tick: number): void {
   const fallRows = maxTectonicFallRows(player);
   // Pace so the fall itself spans ≥ min duration (short 1-row collapses stay readable).

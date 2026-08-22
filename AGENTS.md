@@ -28,15 +28,15 @@ server/
   GameManager.ts               # Match flow, connections, 60 Hz loop, netcast, replay
   shop.ts                      # Purchase handler registry (authoritative shop effects)
   loadConfig.ts                # Reads config/server.json (+ env overrides)
-  tetris/
+  puzzleEngine/
     engine.ts                  # Deep tick module: stepPlayer, lock, garbage, poison, tectonic
-    pieces.ts                  # SRS kicks; re-exports shared SHAPES
+    pieces.ts                  # Wall kicks; re-exports shared SHAPES
 src/
   App.tsx                      # Shell, keyboard, overlays
   constants.ts                 # Board sizes, speeds, shop costs, attack tables
   types.ts                     # GameState, PlayerState, semantic ActiveFieldEffect
   rng.ts                       # Seeded MutableRng (sim + shop rolls)
-  tetris/shapes.ts             # Shared tetromino SHAPES for server + client
+  puzzleEngine/shapes.ts       # Shared piece SHAPES for server + client
   shop/
     shopCatalog.ts             # Canonical item catalog (cost, target, purchasable)
     shopRoll.ts                # Weighted offer draw (injected RNG)
@@ -80,7 +80,7 @@ fixtures/                      # QA / internal only — NOT copied into dist/cli
 | `bun run start:serve-client` | Production + serve `./dist` |
 | `bun run lint` | `tsc --noEmit` |
 | `bun run test:board` | Board model, canvas sizing, and painter tests |
-| `bun run test:engine` | Tetris engine movement, locking, hold, and timing tests |
+| `bun run test:engine` | Puzzle engine movement, locking, hold, and timing tests |
 | `bun run test:poison` | Poison spread and poison-related special tests |
 | `bun run test:shop` | Shop catalog, rolls, phases, and purchase handlers |
 | `bun run test:manager` | GameManager lifecycle tests |
@@ -98,7 +98,7 @@ Use the smallest relevant verification command for each change. `bun run test` i
 |---|---|
 | Markdown, docs, or comments | No tests; run `git diff --check` when useful |
 | Board model or canvas rendering | `bun run test:board` |
-| Tetris engine | `bun run test:engine`; add `bun run test:poison` or `bun run test:shop` when those seams are touched |
+| Puzzle engine | `bun run test:engine`; add `bun run test:poison` or `bun run test:shop` when those seams are touched |
 | Shop catalog, handlers, or rolls | `bun run test:shop`; add `bun run test:poison` for poison effects |
 | GameManager or socket contract | `bun run test:manager`; use the full suite for broad protocol changes |
 | Name-drop planner or playback | `bun run test:name-drop` |
@@ -135,12 +135,14 @@ guests continue using the guest bootstrap.
 
 ## Game design rules (server truth)
 
-- **Movement / actions:** Client sends `inputState` and discrete `action`; server applies DAS/ARR, gravity, locks, and garbage in **`engine.ts`**.
+- **Movement / actions:** Client sends `inputState` and discrete `action`; server applies DAS/ARR, gravity, locks, and garbage in **`puzzleEngine/engine.ts`**.
 - **Shop:** Line clears roll offers; client opens/purchases; server validates phase, highlight index, cost, and gates.
 - **Poison / specials:** Elixir, Wild Purge, Magnet, Snag, Sticky, Satellite, Bomber, Curtain, Retrim, Bounty Tax, Wildcard +4, Tectonic Shift — owned by shop handlers + engine tick.
 - **Match states:** `waiting` → `countdown` → `playing` → `ended` (top-out, disconnect, server void, or restart flow). Matches have no wall-clock timeout; the first top-out ends the match immediately.
 
 ## UI conventions
+
+- **Client routes:** `/` serves the landing page (`index.html` → `src/landing.tsx`); `/game/` serves the game (`game/index.html` → `src/main.tsx`). Legacy `/landing` URLs redirect to `/` via `public/_redirects`.
 
 - **Responsive:** Root uses `h-dvh`; playfield shell scales fields to fit.
 - **Effect pills:** Semantic kinds styled by the client adapter.
@@ -155,7 +157,7 @@ guests continue using the guest bootstrap.
 - **Embedded Creature Faces/Eyes:** Creature faces/watching eyes (1 to max 3 per board) must be physically embedded on and directly connected to the broken cut line gaps of the board frame (bridging the line segment ends), never floating detached or disconnected.
 - **Subtle Red Sparks:** Red spark accents must be subtle with reduced opacity (0.55–0.7 with soft glow) placed across 3 perimeter gap positions.
 - **Clean Boundary Lines:** Bottom frame lines must use clean, crisp white line segments with pixel gap breaks (no dripping teeth, spikes, or tentacles).
-- **Voronoi Tetromino Cells:** Cells must remain smooth, clean, glowing filled polygons without interior hatching lines or striping overlays.
+- **Voronoi shape cells:** Cells must remain smooth, clean, glowing filled polygons without interior hatching lines or striping overlays.
 
 ## Environments & Deployment Topology
 

@@ -1,7 +1,7 @@
 import type { ActionType, GameState, InputState, MatchEvent, PlayerState } from '../../src/types.js';
 import { createPlayerRngChannels, type RngChannels } from '../../src/rng.js';
-import { makePlayer } from '../tetris/engine.js';
-import { matchStep } from '../tetris/matchStep.js';
+import { makePlayer } from '../puzzleEngine/engine.js';
+import { matchStep } from '../puzzleEngine/matchStep.js';
 import { applyShopPurchase, openPlayerShop } from '../shop.js';
 import { SHOP_ITEM_BY_ID } from '../../src/shop/shopCatalog.js';
 import { getPricingView } from '../../src/shop/shopPricing.js';

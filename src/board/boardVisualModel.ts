@@ -1,5 +1,5 @@
 import type { PublicPlayerState } from '../state/publicSnapshots';
-import { SHAPES } from '../tetris/shapes';
+import { SHAPES } from '../puzzleEngine/shapes';
 import { CURTAIN_FROST_ROWS } from '../constants';
 import {
   BOARD_COLS,

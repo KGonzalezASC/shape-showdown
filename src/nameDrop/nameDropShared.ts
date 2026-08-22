@@ -1,4 +1,4 @@
-import type { RotationState, TetrominoType } from '../types';
+import type { RotationState, ShapeType } from '../types';
 
 export const NAME_DROP_COLUMNS = 64;
 export const NAME_DROP_ROWS = 28;
@@ -19,7 +19,7 @@ export interface NameDropCell {
 }
 
 export interface NameDropPiece {
-  type: TetrominoType;
+  type: ShapeType;
   rotation: RotationState;
   x: number;
   y: number;

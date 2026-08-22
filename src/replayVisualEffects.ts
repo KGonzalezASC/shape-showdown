@@ -1,4 +1,4 @@
-import type { TetrisPiece } from './types';
+import type { GamePiece } from './types';
 
 /**
  * Sparse replay snapshots cannot identify which cleared cells came from a
@@ -7,7 +7,7 @@ import type { TetrisPiece } from './types';
  */
 export function shouldAnimateBomberExplosion(
   suppressSparseReplayAnimation: boolean,
-  previousActivePiece: Pick<TetrisPiece, 'bomber'> | null,
+  previousActivePiece: Pick<GamePiece, 'bomber'> | null,
 ): boolean {
   return !suppressSparseReplayAnimation && !!previousActivePiece?.bomber;
 }

@@ -23,7 +23,7 @@ import { paintBoardCanvasOverlay } from '../src/board/BoardCanvasOverlay';
 import { localDevelopmentGameServerUrl } from '../src/network/localGameServer';
 import { BOARD_COLS, BOARD_HIDDEN_ROWS, BOARD_ROWS } from '../src/types';
 import { toPublicPlayerState } from '../src/state/publicSnapshots';
-import { makePlayer, makeRng } from './tetris/engine';
+import { makePlayer, makeRng } from './puzzleEngine/engine.js';
 
 function visualPlayer() {
   const player = makePlayer('visual', makeRng(7));
@@ -38,7 +38,7 @@ function visualPlayer() {
 }
 
 describe('buildBoardVisualModel', () => {
-  test('merges locked and active tetromino cells into visible coordinates', () => {
+  test('merges locked and active gamepiece cells into visible coordinates', () => {
     const player = visualPlayer();
     player.board[BOARD_HIDDEN_ROWS + 5][1] = 'J';
     player.activePiece = {

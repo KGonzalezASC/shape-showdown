@@ -278,7 +278,7 @@ export interface NameDropShowcaseProps {
   statusLabel?: string;
 }
 
-/** Landing-page visual: deterministic tetromino drops reveal a compact block-letter name. */
+/** Landing-page visual: deterministic falling shape drops reveal a compact block-letter name. */
 const NameDropShowcase: React.FC<NameDropShowcaseProps> = ({
   name = 'KEITH GONZALEZ',
   statusLabel = 'Live name drop',
@@ -307,7 +307,7 @@ const NameDropShowcase: React.FC<NameDropShowcaseProps> = ({
       </div>
 
       <header className="relative z-10 mx-auto flex w-full max-w-7xl shrink-0 items-center justify-between gap-4 px-4 py-4 sm:px-8 sm:py-6">
-        <a href="../" className="group flex min-w-0 items-center gap-3 sm:gap-4" aria-label="Shape Showdown home">
+        <a href="/" className="group flex min-w-0 items-center gap-3 sm:gap-4" aria-label="Shape Showdown home">
           <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-emerald-300/20 bg-emerald-300/10 text-emerald-300 shadow-[0_0_24px_rgba(52,211,153,0.16)] transition-colors group-hover:bg-emerald-300/15 sm:h-12 sm:w-12">
             <Swords className="h-5 w-5 sm:h-6 sm:w-6" />
           </span>
@@ -348,8 +348,8 @@ const NameDropShowcase: React.FC<NameDropShowcaseProps> = ({
               role="img"
               aria-busy={!plan}
               aria-label={plan
-                ? `Animated tetromino showcase spelling ${plan.name}`
-                : `Preparing tetromino showcase spelling ${normalizedName}`}
+                ? `Animated piece showcase spelling ${plan.name}`
+                : `Preparing piece showcase spelling ${normalizedName}`}
             />
           </div>
         </div>
@@ -361,8 +361,8 @@ const NameDropShowcase: React.FC<NameDropShowcaseProps> = ({
             </p>
             <p className="mt-1 text-xs text-zinc-600 sm:text-sm">
               {plan
-                ? `${plan.pieces.length} tetrominoes. One name.`
-                : 'Preparing the tetromino arrangement…'}
+                ? `${plan.pieces.length} game pieces. One name.`
+                : 'Preparing the piece arrangement…'}
             </p>
           </div>
 
@@ -378,7 +378,7 @@ const NameDropShowcase: React.FC<NameDropShowcaseProps> = ({
               <ArrowUpRight className="h-3.5 w-3.5 text-zinc-500" />
             </a>
             <a
-              href="../"
+              href="/game/"
               className="inline-flex h-10 items-center gap-2 rounded-full bg-emerald-300 px-5 text-xs font-black text-[#07110d] shadow-[0_0_30px_rgba(110,231,183,.18)] transition-colors hover:bg-emerald-200 sm:h-11 sm:text-sm"
             >
               <Play className="h-4 w-4 fill-current" />

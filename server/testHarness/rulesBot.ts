@@ -14,10 +14,10 @@ import {
   MAGNET_PIECE_GRAVITY_STEP,
   POISON_LINE_CLEAR_PENALTY_MAX_RATIO,
 } from '../../src/constants.js';
-import type { ActionType, CellValue, PendingGarbagePacket, RotationState, TetrominoType, TetrisPiece, CandidateSubScores, CandidateEvaluationTrace, BotDecisionTrace } from '../../src/types.js';
+import type { ActionType, CellValue, PendingGarbagePacket, RotationState, ShapeType, GamePiece, CandidateSubScores, CandidateEvaluationTrace, BotDecisionTrace } from '../../src/types.js';
 import { PublicPlayerState } from '../../src/state/publicSnapshots.js';
-import { SHAPES } from '../tetris/pieces.js';
-import { detectTSpinFor, previewAttackFromClear } from '../tetris/engine.js';
+import { SHAPES } from '../puzzleEngine/pieces.js';
+import { detectPlusAttackFor, previewAttackFromClear } from '../puzzleEngine/engine.js';
 import type { DriverObservation, InputDriver, PlayerCommand } from './inputDriver.js';
 import type { ObservationMode, PlayerObservation } from './observationProjector.js';
 
@@ -193,7 +193,7 @@ export function scoreCurtainReference(board: CellValue[][], unknownFromRow: numb
 // window decisively unattractive.
 const MAGNET_CONTROL_OVERRUN_WEIGHT = 1000;
 
-type MagnetControlPiece = Pick<TetrisPiece, 'x' | 'y' | 'rotation'>;
+type MagnetControlPiece = Pick<GamePiece, 'x' | 'y' | 'rotation'>;
 
 export function scoreMagnetControl(
   player: Pick<PublicPlayerState, 'activePiece' | 'score' | 'magnetPermanentStacks' | 'magnetPieceBoost'>,
@@ -631,7 +631,7 @@ function projectWildPurge(
 
 function applyPlacementToRememberedBoard(
   board: CellValue[][],
-  type: TetrominoType,
+  type: ShapeType,
   plan: PlacementPlan,
   shapeRotations?: PieceShapeRotations,
 ): CellValue[][] {
@@ -684,7 +684,7 @@ export class RulesBot implements InputDriver {
   private readonly rotationFailures = new Map<string, RotationFailureState>();
   private readonly lastVisibleBoards = new Map<string, CellValue[][]>();
   private readonly curtainBeliefs = new Map<string, { contextKey: string; board: CellValue[][] }>();
-  private readonly lastActivePieceTypes = new Map<string, TetrominoType>();
+  private readonly lastActivePieceTypes = new Map<string, ShapeType>();
   private readonly lastActivePieceShapeRotations = new Map<string, PieceShapeRotations>();
   private readonly garbageEnabled: boolean;
 
@@ -993,7 +993,7 @@ export class RulesBot implements InputDriver {
     );
 
     if (!rotation && active.rotation !== targetRot) {
-      // Neither SRS direction is reachable from this authoritative state.
+      // Neither wallkick direction is reachable from this authoritative state.
       // Replan in the current orientation instead of retrying the same
       // blocked turn until the piece locks.
       this.currentPlan = buildPlan([active.rotation]);
@@ -1083,7 +1083,7 @@ export class RulesBot implements InputDriver {
 
   private findBestPlacement(
     player: PublicPlayerState,
-    type: TetrominoType,
+    type: ShapeType,
     isBomber: boolean,
     currentTick?: number,
     visibility?: BoardMetricVisibility,
@@ -1301,11 +1301,11 @@ export class RulesBot implements InputDriver {
         const activeType = player.activePiece?.type;
         const activeRot = player.activePiece?.rotation ?? 0;
         const lastActionWasRotate = !isCustomPiece && activeType === 'T' && type === 'T' && rotation !== activeRot;
-        const tSpin = detectTSpinFor(simBoard, candidatePiece, lastActionWasRotate);
+        const plusAttack = detectPlusAttackFor(simBoard, candidatePiece, lastActionWasRotate);
         const perfectClear = simBoard.every((row) => row.every((cell) => cell === null));
         const attackGenerated = previewAttackFromClear({
           lines: linesCleared,
-          tSpin,
+          plusAttack,
           perfectClear,
           combo: player.combo,
           backToBack: player.backToBack,

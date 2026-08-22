@@ -17,7 +17,7 @@ import {
 } from './rulesBot.js';
 import { Scenario } from './scenario.js';
 import { createSimpleShopPolicy, PairedRunner } from './pairedRunner.js';
-import { createEmptyBoard, detectTSpinFor, previewAttackFromClear } from '../tetris/engine.js';
+import { createEmptyBoard, detectPlusAttackFor, previewAttackFromClear } from '../puzzleEngine/engine.js';
 import { BOARD_COLS, BOARD_ROWS, BOARD_HIDDEN_ROWS } from '../../src/constants.js';
 import type { DriverObservation } from './inputDriver.js';
 import { defaultObservationProjector } from './observationProjector.js';
@@ -32,17 +32,17 @@ describe('RulesBot Adapter & Attack Preview', () => {
       assert.equal(previewAttackFromClear({ lines: 4 }), 4);
     });
 
-    it('applies T-Spin bonuses for full and mini T-spins', () => {
-      assert.equal(previewAttackFromClear({ lines: 1, tSpin: 'full' }), 2);
-      assert.equal(previewAttackFromClear({ lines: 2, tSpin: 'full' }), 4);
-      assert.equal(previewAttackFromClear({ lines: 3, tSpin: 'full' }), 6);
-      assert.equal(previewAttackFromClear({ lines: 1, tSpin: 'mini' }), 1);
-      assert.equal(previewAttackFromClear({ lines: 2, tSpin: 'mini' }), 2);
+    it('applies PlusAttack bonuses for full and mini plus attacks', () => {
+      assert.equal(previewAttackFromClear({ lines: 1, plusAttack: 'full' }), 2);
+      assert.equal(previewAttackFromClear({ lines: 2, plusAttack: 'full' }), 4);
+      assert.equal(previewAttackFromClear({ lines: 3, plusAttack: 'full' }), 6);
+      assert.equal(previewAttackFromClear({ lines: 1, plusAttack: 'mini' }), 1);
+      assert.equal(previewAttackFromClear({ lines: 2, plusAttack: 'mini' }), 2);
     });
 
-    it('applies Back-to-Back bonus (+1) on consecutive Tetris or T-spins', () => {
+    it('applies Back-to-Back bonus (+1) on consecutive Quadruple or PlusAttacks', () => {
       assert.equal(previewAttackFromClear({ lines: 4, backToBack: true }), 5);
-      assert.equal(previewAttackFromClear({ lines: 2, tSpin: 'full', backToBack: true }), 5);
+      assert.equal(previewAttackFromClear({ lines: 2, plusAttack: 'full', backToBack: true }), 5);
       // Non-B2B clear does not receive B2B bonus even if backToBack was active
       assert.equal(previewAttackFromClear({ lines: 1, backToBack: true }), 1);
     });
@@ -350,7 +350,7 @@ describe('RulesBot Adapter & Attack Preview', () => {
     assert.ok(planCombo.score > planBase.score);
   });
 
-  it('evaluates T-spin preview on simulated post-placement board and distinguishes rotated vs unrotated drops', () => {
+  it('evaluates PlusAttack preview on simulated post-placement board and distinguishes rotated vs unrotated drops', () => {
     const scenario = new Scenario({ seed: 303 });
     const p = scenario.getPlayerState('p1');
 
@@ -376,12 +376,12 @@ describe('RulesBot Adapter & Attack Preview', () => {
     const candidateRotated = { type: 'T' as const, rotation: 2 as const, x: 1, y: BOARD_ROWS - 3, bomber: false };
 
     // Unrotated drop (rotation 0 -> 0) returns false
-    const tSpinUnrotated = detectTSpinFor(simBoardUnrotated, candidateUnrotated, false);
+    const plusAttackUnrotated = detectPlusAttackFor(simBoardUnrotated, candidateUnrotated, false);
     // Rotated drop (rotation 0 -> 2) into 3-corner T-slot returns 'full'
-    const tSpinRotated = detectTSpinFor(simBoardUnrotated, candidateRotated, true);
+    const plusAttackRotated = detectPlusAttackFor(simBoardUnrotated, candidateRotated, true);
 
-    assert.equal(tSpinUnrotated, false);
-    assert.equal(tSpinRotated, 'full');
+    assert.equal(plusAttackUnrotated, false);
+    assert.equal(plusAttackRotated, 'full');
 
     const bot = new RulesBot();
     const plan = (bot as unknown as {
@@ -740,7 +740,7 @@ describe('RulesBot Adapter & Attack Preview', () => {
       assert.deepEqual(warningCommand.actions, []);
     });
 
-    it('uses a reachable counter-clockwise SRS route when the clockwise route is blocked', () => {
+    it('uses a reachable counter-clockwise wallkick route when the clockwise route is blocked', () => {
       const board = createEmptyBoard();
       board[5][4] = 'T';
       board[6][3] = 'T';

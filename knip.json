@@ -24,7 +24,7 @@
   "ignoreIssues": {
     "src/types.ts": ["exports"],
     "server/loadConfig.ts": ["types"],
-    "server/tetris/engine.ts": ["exports"]
+    "server/puzzleEngine/engine.ts": ["exports"]
   },
   "ignoreDependencies": ["tailwindcss"]
 }

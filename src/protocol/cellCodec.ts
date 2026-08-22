@@ -1,4 +1,4 @@
-import type { CellValue, TetrominoType } from '../types.js';
+import type { CellValue, ShapeType } from '../types.js';
 
 const CELL_TO_NIBBLE: Record<string, number> = {
   '': 0,
@@ -26,14 +26,14 @@ export function nibbleToCell(nibble: number): CellValue {
   return NIBBLE_TO_CELL[nibble & 0x0f] ?? null;
 }
 
-export function tetrominoToNibble(type: TetrominoType): number {
+export function shapeToNibble(type: ShapeType): number {
   return CELL_TO_NIBBLE[type] ?? 0;
 }
 
-export function nibbleToTetromino(nibble: number): TetrominoType {
+export function nibbleToShape(nibble: number): ShapeType {
   const cell = nibbleToCell(nibble);
   if (cell === null || cell === 'G' || cell === 'W') {
-    throw new Error(`Invalid tetromino nibble: ${nibble}`);
+    throw new Error(`Invalid shape nibble: ${nibble}`);
   }
   return cell;
 }

@@ -5,7 +5,7 @@
  * fixed sample board, seeds poison at the lock cells, runs 4-generation BFS
  * spread, and prints every unique final poison group as an ASCII board.
  *
- * Run: bun run server/tetris/poison_demo.ts
+ * Run: bun run server/puzzleEngine/poison_demo.ts
  */
 
 import { SHAPES } from './pieces.js';
@@ -14,17 +14,17 @@ import {
   BOARD_ROWS,
   POISON_GENERATIONS,
 } from '../../src/constants.js';
-import type { CellValue, TetrominoType, RotationState } from '../../src/types.js';
+import type { CellValue, ShapeType, RotationState } from '../../src/types.js';
 import { createEmptyBoard, createEmptyPoisonBoard, spreadPoisonWaveOnce } from './engine.js';
 
-function getCells(piece: { type: TetrominoType; rotation: RotationState; x: number; y: number }) {
+function getCells(piece: { type: ShapeType; rotation: RotationState; x: number; y: number }) {
   return SHAPES[piece.type][piece.rotation].map(([dx, dy]) => ({
     x: piece.x + dx,
     y: piece.y + dy,
   }));
 }
 
-function collides(board: CellValue[][], piece: { type: TetrominoType; rotation: RotationState; x: number; y: number }): boolean {
+function collides(board: CellValue[][], piece: { type: ShapeType; rotation: RotationState; x: number; y: number }): boolean {
   for (const cell of getCells(piece)) {
     if (cell.x < 0 || cell.x >= BOARD_COLS || cell.y >= BOARD_ROWS) return true;
     if (cell.y >= 0 && board[cell.y][cell.x] !== null) return true;
@@ -33,7 +33,7 @@ function collides(board: CellValue[][], piece: { type: TetrominoType; rotation: 
 }
 
 /** Drop a piece straight down (hard drop) and return the landing Y, or null if invalid spawn. */
-function hardDropY(board: CellValue[][], type: TetrominoType, rotation: RotationState, x: number, startY: number): number | null {
+function hardDropY(board: CellValue[][], type: ShapeType, rotation: RotationState, x: number, startY: number): number | null {
   const piece = { type, rotation, x, y: startY };
   if (collides(board, piece)) return null;
   let y = startY;
@@ -63,7 +63,7 @@ export function poisonKey(poisonBoard: number[][]): string {
 /** Enumerate all unique poison variations for a piece type on a board. */
 export function enumerateVariations(
   baseBoard: CellValue[][],
-  type: TetrominoType,
+  type: ShapeType,
 ): Map<string, { rotation: RotationState; x: number; y: number }> {
   const seen = new Map<string, { rotation: RotationState; x: number; y: number }>();
   const ROTATIONS: RotationState[] = [0, 1, 2, 3];
@@ -148,7 +148,7 @@ const isMainModule = typeof process !== 'undefined' &&
    process.argv[1].replace(/\\/g, '/').endsWith('poison_demo.js'));
 
 if (isMainModule) {
-  const TYPES: TetrominoType[] = ['I', 'J', 'L', 'O', 'S', 'T', 'Z'];
+  const TYPES: ShapeType[] = ['I', 'J', 'L', 'O', 'S', 'T', 'Z'];
   const VARIANT = 1;
   const baseBoard = buildSampleBoard();
   const bottomRow = BOARD_ROWS - 1;

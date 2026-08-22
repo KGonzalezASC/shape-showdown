@@ -9,7 +9,7 @@ import { BOARD_COLS, BOARD_ROWS } from '../src/constants.js';
 import type { PlayerState, ReplayDataV2 } from '../src/types.js';
 import { decodeKeyframePacket } from '../src/protocol/decodeMatchPacket.js';
 import { GAME_PROTOCOL_VERSION } from '../src/protocol/version.js';
-import { makePlayer } from './tetris/engine.js';
+import { makePlayer } from './puzzleEngine/engine.js';
 import { createPlayerRngChannels } from '../src/rng.js';
 import type { Server, Socket } from 'socket.io';
 import type { JoinTicket, MatchRecord } from './controlPlane/matchStore.js';

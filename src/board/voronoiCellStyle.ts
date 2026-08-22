@@ -1,6 +1,6 @@
 /**
  * Falling cells must not change polygon topology just because their board
- * position changed. Their tetromino-local offset is stable for their lifetime.
+ * position changed. Their shape-local offset is stable for their lifetime.
  */
 export const ACTIVE_VORONOI_SHAPE_HOLD_SECONDS = 1.6;
 export const ACTIVE_VORONOI_SHAPE_MORPH_SECONDS = 0.8;

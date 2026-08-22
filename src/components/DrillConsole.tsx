@@ -1,6 +1,6 @@
 import React from 'react';
 import { LOCK_RESET_CAP, PlayerState } from '../types';
-import { SRSKickOverlay } from './SRSKickOverlay';
+import { WallKickOverlay } from './WallKickOverlay';
 
 export type DrillResult = { status: 'pass' | 'fail'; message: string };
 
@@ -25,7 +25,7 @@ export const DrillConsole: React.FC<DrillConsoleProps> = ({ player, enabled, onT
       </div>
     )}
     <div className="relative mb-2 hidden w-full max-w-5xl self-center rounded-lg border border-cyan-500/25 bg-cyan-950/15 px-3 py-2 text-xs text-cyan-100 lg:block">
-      <SRSKickOverlay player={player} />
+      <WallKickOverlay player={player} />
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="font-semibold uppercase tracking-wide">Lock Debug</div>
         <button
@@ -43,7 +43,7 @@ export const DrillConsole: React.FC<DrillConsoleProps> = ({ player, enabled, onT
         <span>cap: {player.pieceLockResetCap ?? LOCK_RESET_CAP}</span>
         <span>
           lastKick:{' '}
-          {player.lastSrsKick ? `${player.lastSrsKick.kx},${player.lastSrsKick.ky}` : '—'}
+          {player.lastWallKick ? `${player.lastWallKick.kx},${player.lastWallKick.ky}` : '—'}
         </span>
       </div>
       <div className="mt-1 text-[10px] text-cyan-200/80">

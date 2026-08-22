@@ -6,7 +6,7 @@ import type { Server, Socket } from 'socket.io';
 import type { ReplayDataV2 } from '../../src/types.js';
 import { EventEmitter } from 'node:events';
 import { createPlayerRngChannels } from '../../src/rng.js';
-import { makePlayer } from '../tetris/engine.js';
+import { makePlayer } from '../puzzleEngine/engine.js';
 import { PRICING_POLICY_VERSION } from '../../src/shop/shopPricing.js';
 
 class FakeSocket extends EventEmitter {

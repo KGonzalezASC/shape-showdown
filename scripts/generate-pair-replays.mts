@@ -12,8 +12,8 @@ import type {
   ReplayKeyframe,
 } from '../src/types.js';
 import { applyShopPurchase, openPlayerShop } from '../server/shop.js';
-import { makePlayer } from '../server/tetris/engine.js';
-import { matchStep } from '../server/tetris/matchStep.js';
+import { makePlayer } from '../server/puzzleEngine/engine.js';
+import { matchStep } from '../server/puzzleEngine/matchStep.js';
 import { Scenario } from '../server/testHarness/scenario.js';
 import { computePlayerPressure } from '../server/testHarness/boardPressure.js';
 import type { DriverObservation, InputDriver, PlayerCommand } from '../server/testHarness/inputDriver.js';
