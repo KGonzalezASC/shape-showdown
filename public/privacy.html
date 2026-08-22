@@ -1,0 +1,277 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#181716" />
+    <meta
+      name="description"
+      content="Privacy Policy for Shape Showdown — minimal, transparent data handling and zero persistent tracking."
+    />
+    <title>Privacy Policy — Shape Showdown</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Montserrat:wght@800;900&family=Plus+Jakarta+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        --color-bg: #181716;
+        --color-surface: #22201e;
+        --color-border: #33302c;
+        --color-text-main: #f2f0ed;
+        --color-text-muted: #a39e98;
+        --color-accent: #e5983c;
+        --color-accent-subtle: #8a7359;
+      }
+
+      * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+
+      body {
+        background-color: var(--color-bg);
+        color: var(--color-text-main);
+        font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        line-height: 1.65;
+        padding: 4rem 1.5rem 6rem;
+        -webkit-font-smoothing: antialiased;
+        -moz-osx-font-smoothing: grayscale;
+        text-rendering: optimizeLegibility;
+      }
+
+      .article-container {
+        max-width: 68ch;
+        margin: 0 auto;
+      }
+
+      .header {
+        margin-bottom: 2.75rem;
+        padding-bottom: 1.5rem;
+        border-bottom: 1px solid var(--color-border);
+      }
+
+      .category-tag {
+        font-family: 'JetBrains Mono', monospace;
+        font-size: 0.75rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.12em;
+        color: var(--color-accent-subtle);
+        margin-bottom: 0.5rem;
+      }
+
+      .tokon-title-wrapper {
+        margin-bottom: 0.35rem;
+      }
+
+      .tokon-title {
+        font-family: 'Montserrat', sans-serif;
+        font-weight: 900;
+        font-size: clamp(2rem, 4.5vw, 2.6rem);
+        line-height: 1.05;
+        text-transform: uppercase;
+        letter-spacing: -0.02em;
+        transform: scaleY(0.85);
+        transform-origin: top left;
+        display: inline-block;
+        color: var(--color-text-main);
+      }
+
+      .meta-bar {
+        font-family: 'JetBrains Mono', monospace;
+        font-size: 0.8rem;
+        color: var(--color-text-muted);
+        margin-top: 0.5rem;
+      }
+
+      .content h2 {
+        font-size: 1.15rem;
+        font-weight: 700;
+        color: var(--color-text-main);
+        margin-top: 2.5rem;
+        margin-bottom: 0.85rem;
+        padding-bottom: 0.35rem;
+        border-bottom: 1px solid var(--color-border);
+        letter-spacing: -0.01em;
+        display: flex;
+        align-items: baseline;
+        gap: 0.5rem;
+      }
+
+      .content h2 span.num {
+        font-family: 'JetBrains Mono', monospace;
+        font-size: 0.9rem;
+        color: var(--color-accent-subtle);
+        font-weight: 600;
+      }
+
+      .content p {
+        color: var(--color-text-main);
+        font-size: 0.95rem;
+        line-height: 1.65;
+        margin-bottom: 1rem;
+        letter-spacing: 0.008em;
+      }
+
+      .content ul {
+        list-style: none;
+        margin: 0.75rem 0 1.25rem 0;
+        padding-left: 1.25rem;
+      }
+
+      .content ul li {
+        position: relative;
+        color: var(--color-text-main);
+        font-size: 0.95rem;
+        line-height: 1.6;
+        margin-bottom: 0.6rem;
+      }
+
+      .content ul li::before {
+        content: '—';
+        color: var(--color-accent-subtle);
+        position: absolute;
+        left: -1.25rem;
+      }
+
+      strong {
+        color: #ffffff;
+        font-weight: 600;
+      }
+
+      a {
+        color: var(--color-text-main);
+        text-decoration: underline;
+        text-underline-offset: 3px;
+        text-decoration-color: var(--color-accent-subtle);
+        transition: color 0.15s ease, text-decoration-color 0.15s ease;
+      }
+
+      a:hover {
+        color: var(--color-accent);
+        text-decoration-color: var(--color-accent);
+      }
+
+      blockquote.legal-notice {
+        border-left: 2px solid var(--color-border);
+        padding: 0.85rem 1.15rem;
+        margin: 1.25rem 0;
+        font-family: 'JetBrains Mono', monospace;
+        font-size: 0.8rem;
+        line-height: 1.55;
+        color: var(--color-text-muted);
+        background: var(--color-surface);
+      }
+
+      .footer {
+        margin-top: 4.5rem;
+        padding-top: 1.5rem;
+        border-top: 1px solid var(--color-border);
+        font-family: 'JetBrains Mono', monospace;
+        font-size: 0.8rem;
+        color: var(--color-text-muted);
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 1rem;
+      }
+
+      @media (max-width: 640px) {
+        body {
+          padding: 2.5rem 1rem 4rem;
+        }
+        .tokon-title {
+          font-size: 1.75rem;
+        }
+        .content h2 {
+          font-size: 1.05rem;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <article class="article-container">
+      <header class="header">
+        <div class="category-tag">Legal // Privacy</div>
+        <div class="tokon-title-wrapper">
+          <h1 class="tokon-title">Privacy Policy</h1>
+        </div>
+        <div class="meta-bar">Shape Showdown • Effective August 22, 2026</div>
+      </header>
+
+      <main class="content">
+        <p>
+          Shape Showdown ("the Game", "we", "us", or "our") is an independent multiplayer puzzle combat game. This Privacy Policy outlines our strict data minimization principles. We do not sell data, track players across the web, build marketing profiles, or log IP addresses.
+        </p>
+
+        <h2><span class="num">01.</span> Information We Process</h2>
+        <p>
+          <strong>A. Discord Profile Details (Active Display Only):</strong> When launching the Game via Discord, we receive your Discord User ID, username, and avatar URL via the Discord Embedded App SDK. This information is used strictly to render your player tag and avatar on your game field during an active match. We do not store or use this data to track users across sessions.
+        </p>
+        <p>
+          <strong>B. Anonymous Telemetry &amp; Diagnostics:</strong> To ensure server stability, optimize packet bandwidth, and debug synchronization issues, we record anonymous, aggregated telemetry (such as frame timings, packet drop rates, and error traces). These operational logs are not tied to individual player identities.
+        </p>
+        <p>
+          <strong>C. No IP Address Logging:</strong> We do not log, record, or store player IP addresses in our database. Network connections use temporary socket identifiers that expire when the match ends.
+        </p>
+
+        <h2><span class="num">02.</span> Information We Do Not Collect</h2>
+        <p>
+          To maintain an ethical and clean platform, Shape Showdown does <strong>not</strong>:
+        </p>
+        <ul>
+          <li>Collect or store payment or credit card details.</li>
+          <li>Use tracking cookies, marketing beacons, or fingerprinting scripts.</li>
+          <li>Integrate third-party ad networks or data brokers.</li>
+          <li>Access your private Discord messages, channels, or friend lists.</li>
+          <li>Sell, rent, trade, or monetize personal information.</li>
+        </ul>
+
+        <h2><span class="num">03.</span> Data Retention &amp; Sessions</h2>
+        <p>
+          Match session state is held in ephemeral server memory only for the duration of the match and is purged immediately upon completion. Standalone web guest sessions generate random temporary IDs that carry no personal identifiers and expire automatically.
+        </p>
+
+        <h2><span class="num">04.</span> Third-Party Platforms</h2>
+        <p>
+          <strong>Discord:</strong> When playing through Discord, your account is subject to the <a href="https://discord.com/privacy" target="_blank" rel="noopener noreferrer">Discord Privacy Policy</a>. Discord independently manages user authentication and voice/chat data.
+        </p>
+        <p>
+          <strong>Hosting:</strong> Our game servers and static assets run on infrastructure providers (Railway and Cloudflare) that handle standard network routing under secure protocols.
+        </p>
+
+        <h2><span class="num">05.</span> Children's Privacy</h2>
+        <p>
+          Shape Showdown is not directed toward children under 13, in compliance with COPPA and Discord minimum age requirements. We do not knowingly process personal data from children under 13.
+        </p>
+
+        <h2><span class="num">06.</span> Changes to This Policy</h2>
+        <p>
+          We may update this Privacy Policy to reflect technical updates. Revisions will be published on this page with an updated "Last Updated" date.
+        </p>
+
+        <h2><span class="num">07.</span> Contact Information</h2>
+        <p>
+          For questions or privacy inquiries:
+        </p>
+        <ul>
+          <li><strong>Developer Inquiries:</strong> <a href="mailto:keithgonzalez.work@gmail.com">keithgonzalez.work@gmail.com</a></li>
+          <li><strong>Game Website:</strong> <a href="https://shape-showdown.pages.dev">https://shape-showdown.pages.dev</a></li>
+        </ul>
+      </main>
+
+      <footer class="footer">
+        <div>&copy; 2026 Shape Showdown. All rights reserved.</div>
+        <div>
+          <a href="/tos">Terms of Service</a> &bull; 
+          <a href="https://shape-showdown.pages.dev">Return to Game &rarr;</a>
+        </div>
+      </footer>
+    </article>
+  </body>
+</html>
