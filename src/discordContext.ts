@@ -18,3 +18,16 @@ export function isDiscordActivityContext(): boolean {
     || window.parent !== window
   );
 }
+
+export function appendDiscordFrameId(url: string): string {
+  if (!isDiscordActivityContext() || typeof window === 'undefined') return url;
+  const frameId = new URLSearchParams(window.location.search).get('frame_id');
+  return appendFrameId(url, frameId);
+}
+
+export function appendFrameId(url: string, frameId: string | null): string {
+  if (!frameId) return url;
+  const target = new URL(url);
+  target.searchParams.set('frame_id', frameId);
+  return target.toString();
+}

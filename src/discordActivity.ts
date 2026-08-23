@@ -1,7 +1,7 @@
 import { DiscordSDK } from '@discord/embedded-app-sdk';
 
 export { isDiscordActivityContext } from './discordContext';
-import { isDiscordActivityContext } from './discordContext';
+import { appendDiscordFrameId, isDiscordActivityContext } from './discordContext';
 
 export type DiscordActivitySessionResponse = {
   player: {
@@ -63,13 +63,16 @@ export async function requestDiscordActivitySession(
   }
   if (signal.aborted) throw signal.reason;
 
-  const response = await fetch(`${stripTrailingSlash(gameServerUrl)}/api/players/discord`, {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ code: authorization.code }),
-    cache: 'no-store',
-    signal,
-  });
+  const response = await fetch(
+    appendDiscordFrameId(`${stripTrailingSlash(gameServerUrl)}/api/players/discord`),
+    {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ code: authorization.code }),
+      cache: 'no-store',
+      signal,
+    },
+  );
   if (response.status === 404) {
     throw new Error('Control-plane Discord bootstrap endpoint is unavailable');
   }

@@ -15,7 +15,10 @@ import { pollForMatchRecoveryAssignment, canContinueMatchRecovery } from './matc
 import {
   requestDiscordActivitySession,
 } from '../discordActivity';
-import { isDiscordActivityContext } from '../discordContext';
+import {
+  appendDiscordFrameId,
+  isDiscordActivityContext,
+} from '../discordContext';
 import {
   readPreferredMatchScope,
   resolveEffectiveSearchScope,
@@ -69,6 +72,14 @@ function stripTrailingSlash(u: string) {
   return u.replace(/\/$/, '');
 }
 
+export function gameConfigUrl(origin: string): string {
+  return new URL('/game-config.json', origin).toString();
+}
+
+function serverRequestUrl(gameServerUrl: string, path: string): string {
+  return appendDiscordFrameId(`${stripTrailingSlash(gameServerUrl)}${path}`);
+}
+
 function originFromHostPort(host: string, port: number) {
   const proto = window.location.protocol === 'https:' ? 'https:' : 'http:';
   return stripTrailingSlash(`${proto}//${host}:${port}`);
@@ -104,7 +115,7 @@ async function resolveGameServerUrl(): Promise<string> {
     return window.location.origin;
   }
 
-  const configPath = `${import.meta.env.BASE_URL}game-config.json`;
+  const configPath = gameConfigUrl(window.location.origin);
   try {
     const res = await fetch(configPath, { cache: 'no-store' });
     if (res.ok) {
@@ -209,7 +220,7 @@ async function resolveInitialMatchAssignment(
         ...(effectiveScope.guildId === null ? {} : { guildId: effectiveScope.guildId }),
       });
 
-  const queueResponse = await fetch(`${stripTrailingSlash(gameServerUrl)}/api/queue`, {
+  const queueResponse = await fetch(serverRequestUrl(gameServerUrl, '/api/queue'), {
     method: 'POST',
     headers: {
       authorization: `Bearer ${session.token}`,
@@ -237,7 +248,7 @@ async function resolveInitialMatchAssignment(
     if (assignment !== null) return { session, assignment };
 
     if (Date.now() - lastHeartbeatAt >= 4_000) {
-      const heartbeat = await fetch(`${stripTrailingSlash(gameServerUrl)}/api/queue/heartbeat`, {
+      const heartbeat = await fetch(serverRequestUrl(gameServerUrl, '/api/queue/heartbeat'), {
         method: 'POST',
         headers: { authorization: `Bearer ${session.token}` },
         cache: 'no-store',
@@ -293,7 +304,7 @@ async function getOrCreateClientSession(
   }
 
   const idempotencyKey = readOrCreateGuestBootstrapKey();
-  const response = await fetch(`${stripTrailingSlash(gameServerUrl)}/api/players/guest`, {
+  const response = await fetch(serverRequestUrl(gameServerUrl, '/api/players/guest'), {
     method: 'POST',
     headers: {
       'content-type': 'application/json',
@@ -331,7 +342,7 @@ async function requestMatchAssignment(
   session: ClientSession,
   signal: AbortSignal,
 ): Promise<MatchAssignment | null> {
-  const response = await fetch(`${stripTrailingSlash(gameServerUrl)}/api/match-assignment`, {
+  const response = await fetch(serverRequestUrl(gameServerUrl, '/api/match-assignment'), {
     headers: { authorization: `Bearer ${session.token}` },
     cache: 'no-store',
     signal,
@@ -360,7 +371,10 @@ async function requestMatchOutcome(
   signal: AbortSignal,
 ): Promise<'server-void' | 'disconnect-forfeit' | null> {
   const response = await fetch(
-    `${stripTrailingSlash(gameServerUrl)}/api/matches/${encodeURIComponent(matchId)}/outcome`,
+    serverRequestUrl(
+      gameServerUrl,
+      `/api/matches/${encodeURIComponent(matchId)}/outcome`,
+    ),
     {
       headers: { authorization: `Bearer ${session.token}` },
       cache: 'no-store',
@@ -525,13 +539,14 @@ export const useGameSocket = ({
       const url = await resolveGameServerUrl();
       if (cancelled) return;
       const socketPath = isDiscordActivityContext() ? '/socketio' : '/socket.io';
+      const socketUrl = appendDiscordFrameId(url);
       const reportReliability = (
         eventName: ReliabilityEventName,
         properties: Record<string, string | number | boolean> = {},
       ): void => {
         const session = clientSession;
         if (session === null) return;
-        void fetch(`${stripTrailingSlash(url)}/api/analytics`, {
+        void fetch(serverRequestUrl(url, '/api/analytics'), {
           method: 'POST',
           headers: {
             authorization: `Bearer ${session.token}`,
@@ -598,7 +613,7 @@ export const useGameSocket = ({
       healthAbortController = new AbortController();
       const checkServerHealth = async () => {
         try {
-          const response = await fetch(`${stripTrailingSlash(url)}/health/details`, {
+          const response = await fetch(serverRequestUrl(url, '/health/details'), {
             cache: 'no-store',
             signal: healthAbortController?.signal,
           });
@@ -904,7 +919,7 @@ export const useGameSocket = ({
             error: null,
           });
           attachSocket(
-            io(url, {
+            io(socketUrl, {
               auth: {
                 ...assignment,
                 clientProtocolVersion: GAME_PROTOCOL_VERSION,
@@ -993,7 +1008,7 @@ export const useGameSocket = ({
               error: null,
             });
             attachSocket(
-              io(url, {
+              io(socketUrl, {
                 auth: {
                   ...assignment,
                   clientProtocolVersion: GAME_PROTOCOL_VERSION,
@@ -1051,14 +1066,14 @@ export const useGameSocket = ({
 
       console.log(`[Socket] Initializing connection to resolved URL: ${url}`);
       if (useLegacySocket) {
-        attachSocket(io(url, {
+        attachSocket(io(socketUrl, {
           path: socketPath,
           transports: ['websocket', 'polling'],
         }));
         return;
       }
       if (initialBootstrap === null) return;
-      attachSocket(io(url, {
+      attachSocket(io(socketUrl, {
         auth: {
           ...initialBootstrap.assignment,
           clientProtocolVersion: GAME_PROTOCOL_VERSION,

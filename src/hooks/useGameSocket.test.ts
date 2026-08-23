@@ -1,9 +1,19 @@
-import { describe, test } from 'node:test';
+import { describe, it, test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
+  gameConfigUrl,
   isProtocolMismatchError,
   isRetryableTicketConnectError,
 } from './useGameSocket';
+
+describe('game client request routing', () => {
+  it('loads runtime config from the site root for the /game/ entry point', () => {
+    assert.equal(
+      gameConfigUrl('https://main.shape-showdown.pages.dev/game/'),
+      'https://main.shape-showdown.pages.dev/game-config.json',
+    );
+  });
+});
 
 describe('ticket connection recovery', () => {
   test('refreshes a ticket rejected as stale or already consumed', () => {
