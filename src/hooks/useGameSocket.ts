@@ -13,9 +13,14 @@ import {
 import { localDevelopmentGameServerUrl } from '../network/localGameServer';
 import { pollForMatchRecoveryAssignment, canContinueMatchRecovery } from './matchRecovery';
 import {
-  isDiscordActivityContext,
   requestDiscordActivitySession,
 } from '../discordActivity';
+import { isDiscordActivityContext } from '../discordContext';
+import {
+  readPreferredMatchScope,
+  resolveEffectiveSearchScope,
+  type SearchScope,
+} from '../matchmaking/searchScope';
 import { ClientPacketDecoder } from '../protocol/ClientPacketDecoder';
 import type { ClientMatchModel } from '../protocol/wireTypes';
 import { GAME_PROTOCOL_VERSION } from '../protocol/version';
@@ -185,12 +190,24 @@ async function resolveInitialMatchAssignment(
   onProgress: (phase: MatchBootstrapProgress) => void,
 ): Promise<InitialMatchBootstrap> {
   onProgress('acquiring-session');
-  const session = await getOrCreateClientSession(gameServerUrl, signal);
+  const { session, guildId } = await getOrCreateClientSession(gameServerUrl, signal);
 
   const existingAssignment = await requestMatchAssignment(gameServerUrl, session, signal);
   if (existingAssignment !== null) {
     return { session, assignment: existingAssignment };
   }
+
+  const effectiveScope = resolveEffectiveSearchScope({
+    provider: session.provider,
+    preferredScope: readPreferredMatchScope(),
+    guildId,
+  });
+  const queueRequestBody = effectiveScope.searchScope === 'global'
+    ? '{}'
+    : JSON.stringify({
+        searchScope: effectiveScope.searchScope,
+        ...(effectiveScope.guildId === null ? {} : { guildId: effectiveScope.guildId }),
+      });
 
   const queueResponse = await fetch(`${stripTrailingSlash(gameServerUrl)}/api/queue`, {
     method: 'POST',
@@ -198,7 +215,7 @@ async function resolveInitialMatchAssignment(
       authorization: `Bearer ${session.token}`,
       'content-type': 'application/json',
     },
-    body: '{}',
+    body: queueRequestBody,
     cache: 'no-store',
     signal,
   });
@@ -236,33 +253,43 @@ async function resolveInitialMatchAssignment(
     }
     await waitFor(500, signal);
   }
-  throw new Error('Search timed out before an opponent was found');
+  throw new Error(queueTimeoutMessage(effectiveScope.searchScope));
+}
+
+function queueTimeoutMessage(scope: SearchScope): string {
+  if (scope === 'guild') {
+    return 'No one else in your Discord server is searching right now.';
+  }
+  if (scope === 'discord_only') {
+    return 'No other Discord players are searching right now.';
+  }
+  return 'Search timed out before an opponent was found';
 }
 
 async function getOrCreateClientSession(
   gameServerUrl: string,
   signal: AbortSignal,
-): Promise<ClientSession> {
+): Promise<{ session: ClientSession; guildId: string | null }> {
   const stored = readClientSession();
   if (isDiscordActivityContext()) {
     const body = await requestDiscordActivitySession(gameServerUrl, signal);
-    if (typeof body.player.id !== 'string' || body.player.id.length === 0) {
+    if (typeof body.playerId !== 'string' || body.playerId.length === 0) {
       throw new Error('Discord Activity session response was malformed');
     }
     const session: ClientSession = {
-      playerId: body.player.id,
-      token: body.session.token,
-      expiresAt: typeof body.session.expiresAt === 'string' ? body.session.expiresAt : null,
+      playerId: body.playerId,
+      token: body.token,
+      expiresAt: body.expiresAt,
       provider: 'discord',
     };
     writeClientSession(session);
-    return session;
+    return { session, guildId: body.guildId };
   }
   if (stored !== null && stored.provider === 'guest') {
     if (stored.expiresAt !== null && Date.parse(stored.expiresAt) <= Date.now()) {
       throw new SessionInvalidError(stored.playerId, stored.provider);
     }
-    return stored;
+    return { session: stored, guildId: null };
   }
 
   const idempotencyKey = readOrCreateGuestBootstrapKey();
@@ -296,7 +323,7 @@ async function getOrCreateClientSession(
     provider: 'guest' as const,
   };
   writeClientSession(session);
-  return session;
+  return { session, guildId: null };
 }
 
 async function requestMatchAssignment(

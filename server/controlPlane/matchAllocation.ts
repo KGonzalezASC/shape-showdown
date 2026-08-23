@@ -13,6 +13,12 @@ export type MatchAllocation = {
 export class MatchAllocationService {
   public constructor(private readonly database: Database) {}
 
+  /**
+   * Drains the queue once per tick in strict-pool priority order: guild,
+   * discord-only, then global. The first successful claim wins; a younger
+   * scoped pair can therefore beat an older global pair. That ordering is a
+   * deliberate product choice, not global FIFO across pools.
+   */
   public async allocateNextMatch(input: {
     correlationId: string;
     matchSeed: number;
@@ -20,26 +26,33 @@ export class MatchAllocationService {
     protocolVersion: number;
   }): Promise<MatchAllocation | null> {
     return this.database.begin(async (transaction) => {
-      const pair = await new QueueStore(transaction).claimPair();
-      if (pair === null) return null;
+      const queue = new QueueStore(transaction);
+      const claimed =
+        (await queue.claimGuildPair())
+        ?? (await queue.claimScopePair('discord_only'))
+        ?? (await queue.claimScopePair('global'));
+      if (claimed === null) return null;
 
+      const [first, second] = claimed.pair;
       const matches = new MatchStore(transaction);
       const match = await matches.createMatch({
         correlationId: input.correlationId,
         matchSeed: input.matchSeed,
-        playerAId: pair[0].playerId,
-        playerBId: pair[1].playerId,
+        playerAId: first.playerId,
+        playerBId: second.playerId,
         gameServerUrl: input.gameServerUrl,
         protocolVersion: input.protocolVersion,
+        searchScope: claimed.searchScope,
+        guildId: claimed.guildId,
       });
       const ticketA = await matches.issueJoinTicket({
         matchId: match.id,
-        playerId: pair[0].playerId,
+        playerId: first.playerId,
         seat: 'A',
       });
       const ticketB = await matches.issueJoinTicket({
         matchId: match.id,
-        playerId: pair[1].playerId,
+        playerId: second.playerId,
         seat: 'B',
       });
 

@@ -1,5 +1,8 @@
 import { DiscordSDK } from '@discord/embedded-app-sdk';
 
+export { isDiscordActivityContext } from './discordContext';
+import { isDiscordActivityContext } from './discordContext';
+
 export type DiscordActivitySessionResponse = {
   player: {
     id: string;
@@ -12,28 +15,27 @@ export type DiscordActivitySessionResponse = {
   };
 };
 
+export type DiscordActivityBootstrap = {
+  playerId: string;
+  token: string;
+  expiresAt: string | null;
+  /**
+   * Frame-context launch target: the server the Activity was opened in.
+   * Null on DM/profile launches. Re-read every launch — never persisted —
+   * because the same user can open the Activity in different servers.
+   */
+  guildId: string | null;
+};
+
 const discordClientId =
   typeof import.meta.env.VITE_DISCORD_CLIENT_ID === 'string'
     ? import.meta.env.VITE_DISCORD_CLIENT_ID.trim()
     : '';
 
-/**
- * The same bundle can run as a direct web client or inside Discord. A
- * configured client ID alone is not enough to select Activity auth, because
- * direct Pages guests must remain independent of the SDK.
- */
-export function isDiscordActivityContext(): boolean {
-  if (discordClientId.length === 0 || typeof window === 'undefined') return false;
-  return (
-    window.location.hostname.toLowerCase().endsWith('.discordsays.com')
-    || window.parent !== window
-  );
-}
-
 export async function requestDiscordActivitySession(
   gameServerUrl: string,
   signal: AbortSignal,
-): Promise<DiscordActivitySessionResponse> {
+): Promise<DiscordActivityBootstrap> {
   if (!isDiscordActivityContext()) {
     throw new Error('Discord Activity authentication is not available in this context');
   }
@@ -41,6 +43,10 @@ export async function requestDiscordActivitySession(
   const discordSdk = new DiscordSDK(discordClientId);
   await discordSdk.ready();
   if (signal.aborted) throw signal.reason;
+
+  const rawGuildId: unknown = discordSdk.guildId;
+  const guildId =
+    typeof rawGuildId === 'string' && /^\d{1,64}$/.test(rawGuildId) ? rawGuildId : null;
 
   const authorization = await discordSdk.commands.authorize({
     client_id: discordClientId,
@@ -78,7 +84,13 @@ export async function requestDiscordActivitySession(
   if (!isDiscordActivitySessionResponse(body)) {
     throw new Error('Discord Activity session response was malformed');
   }
-  return body;
+  return {
+    playerId: body.player.id,
+    token: body.session.token,
+    expiresAt:
+      typeof body.session.expiresAt === 'string' ? body.session.expiresAt : null,
+    guildId,
+  };
 }
 
 function isDiscordActivitySessionResponse(

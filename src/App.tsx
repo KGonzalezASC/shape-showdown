@@ -3,6 +3,7 @@ import { AlertTriangle, RefreshCw, Trophy, WifiOff } from 'lucide-react';
 import { AnimatePresence, LazyMotion, domAnimation, m } from 'motion/react';
 import { DrillConsole, DrillResult } from './components/DrillConsole';
 import { MatchChrome } from './components/MatchChrome';
+import { MatchScopePicker } from './components/MatchScopePicker';
 import { PlayfieldShell } from './components/PlayfieldShell';
 import { ServerDiagnosticsPanel } from './components/ServerDiagnosticsPanel';
 import { ShapeLoadingSpinner } from './components/ShapeLoadingSpinner';
@@ -34,6 +35,11 @@ import {
   usePlayfieldLayoutMode,
 } from './responsive/playfieldLayoutMode';
 import { mixDecorationSeed } from './presentation/decorationSeed';
+import {
+  readPreferredMatchScope,
+  writePreferredMatchScope,
+  type SearchScope,
+} from './matchmaking/searchScope';
 
 interface DrillState {
   enabled: boolean;
@@ -186,6 +192,15 @@ const AppShell: React.FC = () => {
   const chrome = useMatchChromeSnapshot();
   const { sendAction, sendInputState, resetClientSession } = useGameActions();
   const handleShopConfirm = useShopConfirm();
+
+  // Scope changes only apply to the next search: switching mid-wait restarts
+  // bootstrap (reload re-enqueues with the new scope; no assignment exists yet).
+  const queuedSearchScope = readPreferredMatchScope() ?? 'global';
+  const changeSearchScope = (scope: SearchScope) => {
+    if (scope === queuedSearchScope) return;
+    writePreferredMatchScope(scope);
+    window.location.reload();
+  };
 
   const stateRef = useRef({ playfield, myId });
   useLayoutEffect(() => {
@@ -570,6 +585,9 @@ const AppShell: React.FC = () => {
                   ? 'Reconnecting to the match...'
                   : 'Connecting to Game Server...'}
           </p>
+          {matchDiagnostics.phase === 'queued' && (
+            <MatchScopePicker value={queuedSearchScope} onChange={changeSearchScope} />
+          )}
         </div>
       ) : (
         <>

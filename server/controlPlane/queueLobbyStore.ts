@@ -1,5 +1,9 @@
 import { randomUUID } from 'node:crypto';
 import type { SqlExecutor } from './database.js';
+import type { SearchScope } from './queueScope.js';
+
+/** How many oldest guild-scoped rows each guild claim considers before pairing. */
+const GUILD_CANDIDATE_WINDOW = 16;
 
 export type QueueEntry = {
   id: string;
@@ -20,6 +24,12 @@ export type QueueParticipant = {
 };
 
 export type QueuePair = [QueueParticipant, QueueParticipant];
+
+export type ClaimedQueuePair = {
+  pair: QueuePair;
+  searchScope: SearchScope;
+  guildId: string | null;
+};
 
 export type LobbyRecord = {
   code: string;
@@ -88,23 +98,38 @@ export class QueueStore {
   public async upsertEntry(input: {
     playerId: string;
     sessionId: string;
+    searchScope: SearchScope;
+    guildId: string | null;
   }): Promise<QueueEntry | null> {
     const rows = await this.database<QueueEntryRow[]>`
       INSERT INTO queue_entries (
-        id, player_id, session_id, status, expires_at
+        id, player_id, session_id, status, search_scope, guild_id, expires_at
       )
       VALUES (
         ${randomUUID()},
         ${input.playerId},
         ${input.sessionId},
         'searching',
+        ${input.searchScope},
+        ${input.guildId},
         CURRENT_TIMESTAMP + INTERVAL '10 seconds'
       )
       ON CONFLICT (player_id) DO UPDATE SET
         session_id = EXCLUDED.session_id,
         status = 'searching',
         matched_match_id = NULL,
-        expires_at = CURRENT_TIMESTAMP + INTERVAL '10 seconds'
+        expires_at = CURRENT_TIMESTAMP + INTERVAL '10 seconds',
+        search_scope = EXCLUDED.search_scope,
+        guild_id = EXCLUDED.guild_id,
+        -- Keep FIFO seniority for same-pool re-enqueues (heartbeat-style
+        -- refresh), but reset it when the pool changed so toggling scope
+        -- cannot carry an older position into a new pool.
+        created_at = CASE
+          WHEN queue_entries.search_scope IS DISTINCT FROM EXCLUDED.search_scope
+            OR queue_entries.guild_id IS DISTINCT FROM EXCLUDED.guild_id
+          THEN CURRENT_TIMESTAMP
+          ELSE queue_entries.created_at
+        END
       WHERE queue_entries.status <> 'matched'
          OR queue_entries.expires_at <= CURRENT_TIMESTAMP
       RETURNING id, player_id, status, expires_at
@@ -133,12 +158,65 @@ export class QueueStore {
       : null;
   }
 
-  public async claimPair(): Promise<QueuePair | null> {
+  /**
+   * Claims the oldest two guild-scoped rows that share a guild id.
+   *
+   * Considers a window of the oldest live guild searchers, picks the earliest
+   * guild id in that window having at least two candidates, and deletes its
+   * two oldest rows. The bounded window prevents a solo searcher at the head
+   * of the queue from stalling pairable guilds behind them indefinitely.
+   */
+  public async claimGuildPair(): Promise<ClaimedQueuePair | null> {
+    const rows = await this.database<QueueParticipantRow[]>`
+      WITH candidates AS MATERIALIZED (
+        SELECT id, player_id, session_id, guild_id, created_at
+        FROM queue_entries
+        WHERE status = 'searching'
+          AND search_scope = 'guild'
+          AND guild_id IS NOT NULL
+          AND expires_at > CURRENT_TIMESTAMP
+        ORDER BY created_at ASC, id ASC
+        LIMIT ${GUILD_CANDIDATE_WINDOW}
+        FOR UPDATE SKIP LOCKED
+      ),
+      eligible AS (
+        SELECT c.guild_id
+        FROM candidates c
+        GROUP BY c.guild_id
+        HAVING COUNT(*) >= 2
+      ),
+      target AS (
+        SELECT c.guild_id
+        FROM candidates c
+        JOIN eligible e ON e.guild_id = c.guild_id
+        ORDER BY c.created_at ASC, c.id ASC
+        LIMIT 1
+      ),
+      pair AS (
+        SELECT c.id
+        FROM candidates c
+        JOIN target t ON t.guild_id = c.guild_id
+        ORDER BY c.created_at ASC, c.id ASC
+        LIMIT 2
+      )
+      DELETE FROM queue_entries q
+      USING pair
+      WHERE q.id = pair.id
+      RETURNING q.id, q.player_id, q.session_id
+    `;
+
+    return toClaimedPair(rows, 'guild', null);
+  }
+
+  public async claimScopePair(
+    scope: Extract<SearchScope, 'global' | 'discord_only'>,
+  ): Promise<ClaimedQueuePair | null> {
     const rows = await this.database<QueueParticipantRow[]>`
       WITH candidates AS MATERIALIZED (
         SELECT id, player_id, session_id
         FROM queue_entries
         WHERE status = 'searching'
+          AND search_scope = ${scope}
           AND expires_at > CURRENT_TIMESTAMP
         ORDER BY created_at ASC, id ASC
         LIMIT 2
@@ -155,12 +233,7 @@ export class QueueStore {
       RETURNING q.id, q.player_id, q.session_id
     `;
 
-    if (rows.length === 0) return null;
-    if (rows.length !== 2) {
-      throw new Error(`Queue pair claim returned ${rows.length} participants`);
-    }
-
-    return [toQueueParticipant(rows[0]), toQueueParticipant(rows[1])];
+    return toClaimedPair(rows, scope, null);
   }
 
   public async purgeExpiredEntries(batchSize = 500): Promise<string[]> {
@@ -347,6 +420,23 @@ function toQueueEntry(row: QueueEntryRow): QueueEntry {
     playerId: row.player_id,
     status: row.status,
     expiresAt: row.expires_at,
+  };
+}
+
+function toClaimedPair(
+  rows: QueueParticipantRow[],
+  searchScope: SearchScope,
+  guildId: string | null,
+): ClaimedQueuePair | null {
+  if (rows.length === 0) return null;
+  if (rows.length !== 2) {
+    throw new Error(`Queue pair claim returned ${rows.length} participants`);
+  }
+
+  return {
+    pair: [toQueueParticipant(rows[0]), toQueueParticipant(rows[1])],
+    searchScope,
+    guildId,
   };
 }
 

@@ -16,6 +16,7 @@ import {
 import { MatchStore } from './matchStore.js';
 import { logError, logInfo } from '../observability/logger.js';
 import { LobbyStore, QueueStore } from './queueLobbyStore.js';
+import { isScopedEnqueueEnabled, validateQueueScopeRequest } from './queueScope.js';
 import {
   deriveGuestPlayerId,
   PlayerStore,
@@ -184,9 +185,20 @@ export function createControlPlaneRouter(
         return;
       }
 
+      const resolution = validateQueueScopeRequest(request.body, {
+        discordUserId: session.discordUserId,
+        scopedEnqueueEnabled: isScopedEnqueueEnabled(),
+      });
+      if (resolution.reason !== null) {
+        sendClientError(response, 400, resolution.reason);
+        return;
+      }
+
       const entry = await queue.upsertEntry({
         playerId: session.playerId,
         sessionId: session.sessionId,
+        searchScope: resolution.scope.searchScope,
+        guildId: resolution.scope.guildId,
       });
       if (entry === null) {
         sendClientError(response, 409, 'player already has a matched queue entry');

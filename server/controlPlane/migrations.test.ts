@@ -12,6 +12,7 @@ describe('control-plane migrations', () => {
       '0001_control_plane',
       '0002_concurrent_join_tickets',
       '0003_ticket_consumption_state',
+      '0004_queue_search_scope',
     ]);
     assert.match(migrations[0]?.sql ?? '', /CREATE TABLE IF NOT EXISTS players/);
     assert.match(
@@ -25,6 +26,14 @@ describe('control-plane migrations', () => {
     assert.match(
       migrations[2]?.sql ?? '',
       /ADD COLUMN IF NOT EXISTS consumed_at/,
+    );
+    assert.match(
+      migrations[3]?.sql ?? '',
+      /ADD COLUMN IF NOT EXISTS search_scope/,
+    );
+    assert.match(
+      migrations[3]?.sql ?? '',
+      /chk_queue_entries_guild_required/,
     );
   });
 });

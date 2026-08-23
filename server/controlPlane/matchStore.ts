@@ -1,6 +1,7 @@
 import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import type { SqlExecutor } from './database.js';
 import type { MatchOutcomeReason } from './matchResultStore.js';
+import type { SearchScope } from './queueScope.js';
 
 export type MatchStatus =
   | 'allocating'
@@ -122,6 +123,8 @@ export class MatchStore {
     playerBId: string;
     gameServerUrl: string;
     protocolVersion: number;
+    searchScope?: SearchScope;
+    guildId?: string | null;
   }): Promise<MatchRecord> {
     const rows = await this.database<MatchRow[]>`
       INSERT INTO matches (
@@ -132,6 +135,8 @@ export class MatchStore {
         player_b_id,
         game_server_url,
         protocol_version,
+        search_scope,
+        guild_id,
         status
       )
       VALUES (
@@ -142,6 +147,8 @@ export class MatchStore {
         ${input.playerBId},
         ${input.gameServerUrl},
         ${input.protocolVersion},
+        ${input.searchScope ?? 'global'},
+        ${input.guildId ?? null},
         'allocating'
       )
       RETURNING

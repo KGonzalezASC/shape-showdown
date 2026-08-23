@@ -2,6 +2,13 @@ import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { HelpCircle, Play, X } from 'lucide-react';
 import { useSetThemeId, useThemePackage } from '../presentation/ThemeProvider';
 import { THEME_IDS, type ThemeId } from '../presentation/themePackage';
+import { isDiscordActivityContext } from '../discordContext';
+import {
+  readPreferredMatchScope,
+  writePreferredMatchScope,
+  type SearchScope,
+} from '../matchmaking/searchScope';
+import { MatchScopePicker } from './MatchScopePicker';
 
 type PieceKey = 'I' | 'J' | 'L' | 'O' | 'S' | 'T' | 'Z';
 
@@ -228,6 +235,17 @@ const LandingShowcase: React.FC = () => {
   const [showHowToPlay, setShowHowToPlay] = useState(false);
   const elapsedRef = useRef(0);
 
+  const inDiscordActivity = isDiscordActivityContext();
+  const [matchScope, setMatchScope] = useState<SearchScope>(
+    () => readPreferredMatchScope() ?? 'global',
+  );
+
+  const changeMatchScope = (scope: SearchScope) => {
+    if (scope === matchScope) return;
+    setMatchScope(scope);
+    writePreferredMatchScope(scope);
+  };
+
   const restartAnimation = () => {
     elapsedRef.current = 0;
   };
@@ -422,6 +440,13 @@ const LandingShowcase: React.FC = () => {
               <span>How To Play</span>
             </button>
           </div>
+
+          {/* Opponent search scope — only meaningful inside a Discord Activity */}
+          {inDiscordActivity && (
+            <div className="mt-3 flex justify-center">
+              <MatchScopePicker value={matchScope} onChange={changeMatchScope} />
+            </div>
+          )}
 
           {/* Theme Picker */}
           <div
