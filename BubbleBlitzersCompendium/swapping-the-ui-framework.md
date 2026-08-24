@@ -20,7 +20,6 @@ src/
     OpponentMiniField.tsx # small read-only opponent board
     MobileControls.tsx    # touch buttons → onInput / onAction / onShopPress
     ShopRail.tsx          # shop offers UI + cycle/confirm interaction
-    ShopRailVariations.tsx# design-explorer view (toggled with 'v')
     GameFieldsLayout.tsx  # desktop scale-to-fit + PlayfieldCellSizeContext provider
     playfieldCellSizeContext.tsx # the shared cell-size context
   ReplayApp.tsx, replay.tsx    # standalone replay viewer (separate Vite entry,

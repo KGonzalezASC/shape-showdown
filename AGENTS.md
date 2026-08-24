@@ -85,14 +85,20 @@ fixtures/                      # QA / internal only — NOT copied into dist/cli
 | `bun run test:shop` | Shop catalog, rolls, phases, and purchase handlers |
 | `bun run test:manager` | GameManager lifecycle tests |
 | `bun run test:name-drop` | Name-drop planner and playback tests |
-| `bun run test` / `bun run test:all` | Full aggregate suite; use for broad/shared changes and pre-merge or release verification |
+| `bun run test` | Fast unit and deterministic suite; does not require Postgres |
+| `bun run test:integration` | Postgres-backed integration suite; uses `TEST_DATABASE_URL` |
+| `bun run test:all` | Runs the unit suite, then the integration suite when its test database is configured |
 | `bun run clean` | Remove build artifacts |
 
 **Two clients locally:** two browsers/tabs on the same origin.
 
+**Integration test database:** set `TEST_DATABASE_URL` to a disposable Postgres database before
+running `bun run test:integration`. Integration tests ignore the normal `DATABASE_URL`, so a
+stopped development database cannot turn the default test command red.
+
 ### Targeted verification policy
 
-Use the smallest relevant verification command for each change. `bun run test` is the full-suite command, not the default response to every edit.
+Use the smallest relevant verification command for each change. `bun run test` is the default deterministic suite. Run `bun run test:integration` for database-backed changes. `bun run test:all` is the release check.
 
 | Changed area | Verification |
 |---|---|
@@ -103,9 +109,10 @@ Use the smallest relevant verification command for each change. `bun run test` i
 | GameManager or socket contract | `bun run test:manager`; use the full suite for broad protocol changes |
 | Name-drop planner or playback | `bun run test:name-drop` |
 | UI, layout, or socket-client changes without a matching harness | `bun run lint`, then browser/manual verification for visual or network behavior |
+| Control-plane SQL, migrations, queue allocation, sessions, or match tickets | `bun run test:integration`; `bun run test` for related pure logic |
 | Shared constants, shared types, RNG, or broad simulation behavior | `bun run test` |
 
-For pre-merge or release verification, run `bun run lint` and the full `bun run test` suite regardless of the targeted command used during iteration.
+For pre-merge or release verification, run `bun run lint` and `bun run test:all`. Set `TEST_DATABASE_URL` first so the integration tier runs rather than reporting that it was not configured.
 
 ## Module seams (design)
 
