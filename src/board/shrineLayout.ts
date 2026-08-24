@@ -1,5 +1,6 @@
 import { seededDecorationUnit } from '../presentation/decorationSeed';
 
+export const SHRINE_REFERENCE_CELL_SIZE_PX = 30;
 export const SHRINE_PAD_PX = 30;
 
 export type ShrineFaceSide = 'top' | 'left' | 'right';

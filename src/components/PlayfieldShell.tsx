@@ -12,8 +12,6 @@ import { BoardProfiler } from '../performance/BoardProfiler';
 import { IncomingGarbageReadout } from './IncomingGarbageReadout';
 import DesktopKeyboardLegend from './DesktopKeyboardLegend';
 import { fieldFrameClass, fieldTitleClass } from '../ui/shapeShowdownTheme';
-import { useThemePackage } from '../presentation/ThemeProvider';
-import { SHRINE_PAD_PX } from '../board/shrineLayout';
 import {
   playfieldGridClass,
   type PlayfieldLayoutMode,
@@ -23,8 +21,15 @@ function WaitingForOpponentBoard() {
   const cell = useContext(PlayfieldCellSizeContext);
   return (
     <div className="relative shrink-0">
-      <div className="mb-2">
-        <h2 className={`text-[11px] font-bold uppercase tracking-[0.08em] ${fieldTitleClass('opponent')}`}>Opponent Field</h2>
+      <div className="mb-1">
+        <h2 className={`text-sm font-bold uppercase tracking-widest ${fieldTitleClass('opponent')}`}>Opponent Field</h2>
+        <div className="mb-1 flex items-center font-mono text-[10px] font-bold text-zinc-500">
+          <span className="truncate tracking-wide">Searching for opponent…</span>
+        </div>
+        <div className="mb-1 flex items-center gap-3 font-mono text-[9px] font-bold uppercase tracking-wider text-zinc-500">
+          <span>Funds <strong className="text-rose-200">0</strong></span>
+          <span>Score <strong className="text-rose-200">0</strong></span>
+        </div>
         <IncomingGarbageReadout fieldTitle="Opponent Field" lines={0} />
       </div>
       <div
@@ -63,8 +68,6 @@ export const PlayfieldShell: React.FC<PlayfieldShellProps> = ({
   const playfieldRef = useRef<HTMLDivElement>(null);
   const boardFitRef = useRef<HTMLDivElement>(null);
   const [cellSize, setCellSize] = useState(CELL_SIZE);
-  const theme = useThemePackage();
-  const shrinePadPx = theme.shrine === 'watching-amalgam' ? SHRINE_PAD_PX : 0;
   const playfield = usePlayfieldSnapshot();
   const chrome = useMatchChromeSnapshot();
   const handleShopConfirm = useShopConfirm();
@@ -98,10 +101,7 @@ export const PlayfieldShell: React.FC<PlayfieldShellProps> = ({
     const measure = () => {
       const box = slot.getBoundingClientRect();
       if (box.width < 8 || box.height < 8) return;
-      const next = fitMobilePlayfieldCellSize(
-        { width: box.width, height: box.height },
-        shrinePadPx,
-      );
+      const next = fitMobilePlayfieldCellSize({ width: box.width, height: box.height });
       setCellSize((previous) => (previous === next ? previous : next));
     };
 
@@ -109,7 +109,7 @@ export const PlayfieldShell: React.FC<PlayfieldShellProps> = ({
     const observer = new ResizeObserver(measure);
     observer.observe(playfieldLayout);
     return () => observer.disconnect();
-  }, [hasLocalPlayer, layoutMode, shrinePadPx]);
+  }, [hasLocalPlayer, layoutMode]);
 
   const boardFramePadding = layoutMode === 'phone' ? 'p-1.5' : 'p-2';
 

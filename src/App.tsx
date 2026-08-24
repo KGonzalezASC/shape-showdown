@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useLayoutEffect, useReducer, useRef } from 'react';
+import React, { useCallback, useEffect, useLayoutEffect, useReducer, useRef, useState } from 'react';
 import { AlertTriangle, RefreshCw, Trophy, WifiOff } from 'lucide-react';
 import { AnimatePresence, LazyMotion, domAnimation, m } from 'motion/react';
 import { DrillConsole, DrillResult } from './components/DrillConsole';
@@ -7,7 +7,6 @@ import { MatchScopePicker } from './components/MatchScopePicker';
 import { PlayfieldShell } from './components/PlayfieldShell';
 import { ServerDiagnosticsPanel } from './components/ServerDiagnosticsPanel';
 import { ShapeLoadingSpinner } from './components/ShapeLoadingSpinner';
-import { ShopRailVariations } from './components/ShopRailVariations';
 import MobileControls from './components/MobileControls';
 import { GameFieldRef } from './components/GameField';
 import { BackgroundPrototype } from './components/BackgroundPrototype';
@@ -69,7 +68,6 @@ function drillReducer(state: DrillState, action: DrillAction): DrillState {
 interface AppShellState {
   showTouchControls: boolean;
   showViewportWarning: boolean;
-  showVariations: boolean;
   hatchingEnabled: boolean;
   backgroundSeedKey: number;
   faceSeedKey: number;
@@ -80,7 +78,6 @@ interface AppShellState {
 type AppShellAction =
   | { type: 'REVEAL_TOUCH_CONTROLS' }
   | { type: 'SET_VIEWPORT_WARNING'; visible: boolean }
-  | { type: 'SET_SHOW_VARIATIONS'; visible: boolean }
   | { type: 'TOGGLE_HATCHING' }
   | { type: 'RESEED_PURCHASE'; matchSeed: number; startedAtMs: number }
   | { type: 'RESEED_COUNTDOWN' }
@@ -91,9 +88,6 @@ function createInitialAppShellState(): AppShellState {
     showTouchControls: window.matchMedia('(pointer: coarse)').matches
       || window.matchMedia('(hover: none)').matches,
     showViewportWarning: false,
-    showVariations: DEV_TOOLS_ENABLED
-      && typeof window !== 'undefined'
-      && new URLSearchParams(window.location.search).get('shopMock') === '1',
     hatchingEnabled: false,
     backgroundSeedKey: 0,
     faceSeedKey: 0,
@@ -110,10 +104,6 @@ function appShellReducer(state: AppShellState, action: AppShellAction): AppShell
       return state.showViewportWarning === action.visible
         ? state
         : { ...state, showViewportWarning: action.visible };
-    case 'SET_SHOW_VARIATIONS':
-      return state.showVariations === action.visible
-        ? state
-        : { ...state, showVariations: action.visible };
     case 'TOGGLE_HATCHING':
       return { ...state, hatchingEnabled: !state.hatchingEnabled };
     case 'RESEED_PURCHASE':
@@ -157,7 +147,6 @@ const AppShell: React.FC = () => {
   const {
     showTouchControls,
     showViewportWarning,
-    showVariations,
     hatchingEnabled,
     backgroundSeedKey,
     faceSeedKey,
@@ -190,7 +179,13 @@ const AppShell: React.FC = () => {
   }, []);
 
   const chrome = useMatchChromeSnapshot();
-  const { sendAction, sendInputState, resetClientSession } = useGameActions();
+  const {
+    sendAction,
+    sendInputState,
+    resetClientSession,
+    cancelQueueSearch,
+    findNewOpponent,
+  } = useGameActions();
   const handleShopConfirm = useShopConfirm();
 
   // Scope changes only apply to the next search: switching mid-wait restarts
@@ -201,6 +196,18 @@ const AppShell: React.FC = () => {
     writePreferredMatchScope(scope);
     window.location.reload();
   };
+
+  const [queuedSeconds, setQueuedSeconds] = useState(0);
+  useEffect(() => {
+    if (matchDiagnostics.phase !== 'queued') {
+      setQueuedSeconds(0);
+      return;
+    }
+    const interval = window.setInterval(() => {
+      setQueuedSeconds((prev) => prev + 1);
+    }, 1000);
+    return () => window.clearInterval(interval);
+  }, [matchDiagnostics.phase]);
 
   const stateRef = useRef({ playfield, myId });
   useLayoutEffect(() => {
@@ -218,18 +225,6 @@ const AppShell: React.FC = () => {
 
   const handleDrillResult = useCallback((result: DrillResult) => {
     drillDispatch({ type: 'SET_RESULT', payload: result });
-  }, []);
-
-  const setShopMockVisibility = useCallback((visible: boolean) => {
-    appShellDispatch({ type: 'SET_SHOW_VARIATIONS', visible });
-    if (typeof window === 'undefined') return;
-    const url = new URL(window.location.href);
-    if (visible) {
-      url.searchParams.set('shopMock', '1');
-    } else {
-      url.searchParams.delete('shopMock');
-    }
-    window.history.replaceState({}, '', url);
   }, []);
 
   useLockDrill(
@@ -351,11 +346,6 @@ const AppShell: React.FC = () => {
           drillDispatch({ type: 'TOGGLE' });
           return;
         }
-        if (e.key.toLowerCase() === 'v') {
-          e.preventDefault();
-          setShopMockVisibility(!showVariations);
-          return;
-        }
       }
       const { playfield: pf, myId: id } = stateRef.current;
       if (pf.status !== 'playing' || !id || !pf.myPlayer) return;
@@ -416,7 +406,7 @@ const AppShell: React.FC = () => {
       window.removeEventListener('keyup', onKeyUp);
       window.removeEventListener('blur', clearInput);
     };
-  }, [handleAction, sendInputState, handleShopConfirm, setShopMockVisibility, showVariations, showViewportWarning]);
+  }, [handleAction, sendInputState, handleShopConfirm, showViewportWarning]);
 
   useEffect(() => {
     const evt = chrome.lastMatchEvent;
@@ -497,10 +487,6 @@ const AppShell: React.FC = () => {
     }
     lastMatchStatusRef.current = chrome.status;
   }, [chrome.status, gameState?.seed]);
-
-  if (showVariations) {
-    return <ShopRailVariations onClose={() => setShopMockVisibility(false)} />;
-  }
 
   return (
     <div className={`relative flex h-dvh max-h-dvh min-h-0 flex-col items-center justify-center overflow-hidden text-[var(--ss-text-primary)] ${playfieldViewportPaddingClass(layoutMode)}`}>
@@ -585,8 +571,42 @@ const AppShell: React.FC = () => {
                   ? 'Reconnecting to the match...'
                   : 'Connecting to Game Server...'}
           </p>
+          {matchDiagnostics.repeatPairing && (
+            <p
+              role="status"
+              className="rounded-lg border border-amber-400/40 bg-amber-500/10 px-3 py-1.5 text-[8px] sm:text-[9px] font-mono uppercase tracking-wider text-amber-200"
+            >
+              No fresh opponents available — rematch with your previous opponent
+            </p>
+          )}
           {matchDiagnostics.phase === 'queued' && (
-            <MatchScopePicker value={queuedSearchScope} onChange={changeSearchScope} />
+            <div className="flex flex-col items-center gap-3">
+              <MatchScopePicker value={queuedSearchScope} onChange={changeSearchScope} />
+              {queuedSearchScope === 'guild' && queuedSeconds >= 15 && (
+                <div className="flex flex-col items-center gap-1.5 rounded-xl border border-emerald-500/20 bg-emerald-950/30 p-2.5 text-center">
+                  <p className="text-[8px] sm:text-[9px] text-emerald-300 font-mono">
+                    Searching in chat for {queuedSeconds}s. No opponents yet.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => changeSearchScope('global')}
+                    className="rounded-lg border border-emerald-400/50 bg-emerald-500/20 px-3 py-1 text-[8px] sm:text-[9px] font-bold uppercase tracking-wider text-emerald-200 transition hover:bg-emerald-500/30"
+                  >
+                    Expand to Worldwide
+                  </button>
+                </div>
+              )}
+              <button
+                type="button"
+                onClick={async () => {
+                  await cancelQueueSearch();
+                  window.location.href = '/';
+                }}
+                className="mt-1 text-[8px] sm:text-[9px] font-mono font-bold uppercase tracking-[0.14em] text-zinc-400 hover:text-white transition"
+              >
+                Cancel Search
+              </button>
+            </div>
           )}
         </div>
       ) : (
@@ -727,11 +747,29 @@ const AppShell: React.FC = () => {
                     <p className="text-xl sm:text-2xl font-mono">{chrome.oppScore}</p>
                   </div>
                 </div>
-                <p className="text-xs text-zinc-600">
+                <p className="text-xs text-zinc-600 mb-4">
                   {chrome.restartTimer !== undefined
                     ? `Restarting level in ${Math.ceil(chrome.restartTimer)} seconds...`
-                    : 'Waiting for server reset...'}
+                    : 'Match completed.'}
                 </p>
+                <div className="flex flex-col sm:flex-row items-center justify-center gap-2.5">
+                  <button
+                    type="button"
+                    onClick={findNewOpponent}
+                    className="w-full sm:w-auto rounded-xl border border-emerald-400/60 bg-emerald-500/20 px-4 py-2 text-[9px] sm:text-[10px] font-bold uppercase tracking-[0.12em] text-emerald-200 transition hover:bg-emerald-500/30 shadow-md"
+                  >
+                    Find New Opponent
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      window.location.href = '/';
+                    }}
+                    className="w-full sm:w-auto rounded-xl border border-white/10 bg-white/[0.04] px-4 py-2 text-[9px] sm:text-[10px] font-bold uppercase tracking-[0.12em] text-zinc-400 transition hover:bg-white/[0.08] hover:text-zinc-200"
+                  >
+                    Return to Menu
+                  </button>
+                </div>
               </div>
             </m.div>
           )}

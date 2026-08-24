@@ -86,14 +86,27 @@ const OpponentMiniField: React.FC<OpponentMiniFieldProps> = ({
     );
   }
 
+  const opponentName =
+    player.displayName ||
+    (player.id
+      ? player.id.startsWith('Guest ') || player.id.startsWith('guest-')
+        ? player.id
+        : `Guest ${player.id.slice(0, 6)}`
+      : 'Opponent');
+
   return (
     <div className={shellClass}>
       <div className="mb-1">
-        <div className="flex items-center justify-between">
-          <p className="text-[8px] font-bold uppercase tracking-[0.18em] text-[var(--ss-opponent-muted)]">
-            Opp
-          </p>
-          <p className="font-mono text-[9px] font-bold text-[var(--ss-opponent-strong)]">{player.funds}</p>
+        <div className="flex items-center justify-between gap-1">
+          <div className="min-w-0 flex-1">
+            <p className="text-[8px] font-bold uppercase tracking-[0.18em] text-[var(--ss-opponent-muted)]">
+              Opp
+            </p>
+            <p className="truncate font-mono text-[8px] font-bold text-zinc-300">
+              {opponentName}
+            </p>
+          </div>
+          <p className="shrink-0 font-mono text-[9px] font-bold text-[var(--ss-opponent-strong)]">{player.funds}</p>
         </div>
         <IncomingGarbageReadout
           fieldTitle="Opponent Field"

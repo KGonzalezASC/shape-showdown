@@ -1,6 +1,4 @@
 import React, { useLayoutEffect, useRef, useState } from 'react';
-import { SHRINE_PAD_PX } from '../board/shrineLayout';
-import { useThemePackage } from '../presentation/ThemeProvider';
 import { CELL_SIZE } from '../types';
 import { fitDualPlayfieldCellSize } from './PlayfieldCellSizer';
 import { PlayfieldCellSizeContext } from './playfieldCellSizeContext';
@@ -12,8 +10,6 @@ interface PlayfieldLayoutProps {
 export const PlayfieldLayout: React.FC<PlayfieldLayoutProps> = ({ children }) => {
   const outerRef = useRef<HTMLDivElement>(null);
   const [cellSize, setCellSize] = useState(CELL_SIZE);
-  const theme = useThemePackage();
-  const shrinePadPx = theme.shrine === 'watching-amalgam' ? SHRINE_PAD_PX : 0;
 
   useLayoutEffect(() => {
     const outer = outerRef.current;
@@ -25,7 +21,7 @@ export const PlayfieldLayout: React.FC<PlayfieldLayoutProps> = ({ children }) =>
       const { width, height } = outerElement.getBoundingClientRect();
       if (width < 1 || height < 1) return;
 
-      const nextCellSize = fitDualPlayfieldCellSize({ width, height }, shrinePadPx);
+      const nextCellSize = fitDualPlayfieldCellSize({ width, height });
       setCellSize((previous) => (previous === nextCellSize ? previous : nextCellSize));
     };
 
@@ -33,7 +29,7 @@ export const PlayfieldLayout: React.FC<PlayfieldLayoutProps> = ({ children }) =>
     const observer = new ResizeObserver(updateCellSize);
     observer.observe(outer);
     return () => observer.disconnect();
-  }, [shrinePadPx]);
+  }, []);
 
   return (
     <div

@@ -2,7 +2,12 @@ import React, { useMemo } from 'react';
 import { BOARD_COLS, BOARD_VISIBLE_ROWS } from '../types';
 import type { FieldRole } from '../ui/shapeShowdownTheme';
 import { seededDecorationUnit } from '../presentation/decorationSeed';
-import { buildShrineLayout, SHRINE_PAD_PX, type ShrineFace } from './shrineLayout';
+import {
+  buildShrineLayout,
+  SHRINE_PAD_PX,
+  SHRINE_REFERENCE_CELL_SIZE_PX,
+  type ShrineFace,
+} from './shrineLayout';
 import {
   HORIZONTAL_GROWTH_SEGMENTS,
   SIDE_GROWTH_SEGMENTS,
@@ -134,8 +139,8 @@ export const ShrineFrameOverlay = React.memo(function ShrineFrameOverlay({
   const layout = useMemo(() => buildShrineLayout(seed), [seed]);
   const boardWidth = BOARD_COLS * cellSize;
   const boardHeight = BOARD_VISIBLE_ROWS * cellSize;
-  const pad = SHRINE_PAD_PX;
-  const scale = cellSize / 30;
+  const scale = cellSize / SHRINE_REFERENCE_CELL_SIZE_PX;
+  const pad = SHRINE_PAD_PX * scale;
   const topFace = layout.faces.find((face) => face.side === 'top');
   const rightFace = layout.faces.find((face) => face.side === 'right');
   const leftFace = layout.faces.find((face) => face.side === 'left');

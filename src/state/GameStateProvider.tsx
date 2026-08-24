@@ -38,6 +38,8 @@ export interface GameActions {
   sendAction: (action: ActionType) => void;
   sendShopOpen: () => void;
   sendShopPurchase: (itemId: string) => void;
+  cancelQueueSearch: () => Promise<boolean>;
+  findNewOpponent: () => void;
   resetClientSession: () => void;
 }
 
@@ -57,6 +59,7 @@ const initialMatchDiagnostics: MatchConnectionDiagnostics = {
   ticketState: 'none',
   ticketLength: null,
   error: null,
+  repeatPairing: false,
 };
 const MatchDiagnosticsContext = createContext<MatchConnectionDiagnostics>(initialMatchDiagnostics);
 
@@ -70,6 +73,8 @@ export function GameStateProvider({ children }: { children: React.ReactNode }) {
     sendAction,
     sendShopOpen,
     sendShopPurchase,
+    cancelQueueSearch,
+    findNewOpponent,
     resetClientSession,
   } = useGameSocket({
     onClientMatchModel: publishClientMatchModel,
@@ -85,9 +90,19 @@ export function GameStateProvider({ children }: { children: React.ReactNode }) {
       sendAction,
       sendShopOpen,
       sendShopPurchase,
+      cancelQueueSearch,
+      findNewOpponent,
       resetClientSession,
     }),
-    [sendInputState, sendAction, sendShopOpen, sendShopPurchase, resetClientSession],
+    [
+      sendInputState,
+      sendAction,
+      sendShopOpen,
+      sendShopPurchase,
+      cancelQueueSearch,
+      findNewOpponent,
+      resetClientSession,
+    ],
   );
 
   return (

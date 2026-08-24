@@ -19,6 +19,7 @@ import {
  */
 export interface PublicPlayerState {
   id: string;
+  displayName?: string;
   board: CellValue[][];
   activePiece: GamePiece | null;
   landingForecastTicksRemaining?: number;
@@ -90,6 +91,7 @@ export function normalizeHeldPiece(
 export function toPublicPlayerState(player: PlayerState): PublicPlayerState {
   return {
     id: player.id,
+    displayName: player.displayName,
     board: player.board,
     activePiece: player.activePiece,
     landingForecastTicksRemaining: player.landingForecastTicksRemaining,
@@ -269,6 +271,7 @@ export function publicPlayersEqual(a: PublicPlayerState | null, b: PublicPlayerS
   if (!a || !b) return false;
   if (
     a.id !== b.id ||
+    a.displayName !== b.displayName ||
     a.canHold !== b.canHold ||
     a.score !== b.score ||
     a.funds !== b.funds ||

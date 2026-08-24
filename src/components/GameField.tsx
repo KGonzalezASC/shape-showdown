@@ -13,7 +13,6 @@ import { BoardGridLines } from './BoardGridLines';
 import { BoardCanvasOverlay } from '../board/BoardCanvasOverlay';
 import { buildBoardVisualModel } from '../board/boardVisualModel';
 import { ShrineFieldBoundary, ShrineFrameOverlay } from '../board/ShrineFrameOverlay';
-import { SHRINE_PAD_PX } from '../board/shrineLayout';
 import type { ReplayCandidateOverlay } from '../replayCandidateOverlay';
 import { useThemePackage } from '../presentation/ThemeProvider';
 import { styleForFieldEffect } from '../shop/effectStyles';
@@ -339,7 +338,6 @@ const GameField = forwardRef<GameFieldRef, GameFieldProps>(({
   const swapZoneText = `Swap rows 0-${cutoffRow - 1}`;
   const swapLineY = cutoffRow * cellSize;
   const showSwapLine = isMe && cutoffRow > 0 && cutoffRow < BOARD_VISIBLE_ROWS;
-  const desktopShrineMargin = shrineEnabled && !boardFitRef && cellSizeProp === undefined ? SHRINE_PAD_PX : 0;
 
   const storageFrozen = isMe && activeEffects.some((e) => e.kind === 'freeze');
   const snagged = isMe && !!player.snagHardDropBlocked;
@@ -358,10 +356,20 @@ const GameField = forwardRef<GameFieldRef, GameFieldProps>(({
               ? { text: 'Past swap line', tone: 'text-rose-300' }
               : { text: 'Ready', tone: 'text-emerald-300' };
 
+  const playerName =
+    player.displayName ||
+    (player.id
+      ? player.id.startsWith('Guest ') || player.id.startsWith('guest-')
+        ? player.id
+        : `Guest ${player.id.slice(0, 6)}`
+      : isMe
+        ? 'Guest'
+        : 'Opponent');
+
   return (
     <div className={`relative flex h-full w-full flex-col ${opacityClass}`}>
       {/* ── Header row: title / active-effect pills / line counter ── */}
-      <div className="mb-2 flex items-end justify-between gap-1.5">
+      <div className="mb-1 flex items-end justify-between gap-1.5">
         <h2
           className={`shrink-0 text-sm font-bold uppercase tracking-widest ${isMe ? 'text-emerald-400' : 'text-rose-400'}`}
         >
@@ -392,6 +400,10 @@ const GameField = forwardRef<GameFieldRef, GameFieldProps>(({
           {player.linesCleared} clears
         </span>
       </div>
+      {/* ── Player Username / Guest Name between title and funds/score ── */}
+      <div className="mb-1 flex items-center font-mono text-[10px] font-bold text-zinc-300">
+        <span className="truncate tracking-wide">{playerName}</span>
+      </div>
       <div className="mb-1 flex items-center gap-3 font-mono text-[9px] font-bold uppercase tracking-wider text-zinc-500">
         <span>
           Funds <strong className={isMe ? 'text-cyan-200' : 'text-rose-200'}>{player.funds}</strong>
@@ -411,7 +423,6 @@ const GameField = forwardRef<GameFieldRef, GameFieldProps>(({
         className={boardFitRef
           ? 'relative flex min-h-0 w-full flex-1 items-center justify-center'
           : 'relative self-center'}
-        style={desktopShrineMargin > 0 ? { marginBlock: desktopShrineMargin } : undefined}
       >
         <div
           className={`game-board-shell relative ${

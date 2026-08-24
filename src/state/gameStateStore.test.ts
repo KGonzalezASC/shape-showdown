@@ -1,6 +1,8 @@
 import assert from 'node:assert/strict';
 import { afterEach, describe, it } from 'node:test';
+import { createPlayerRngChannels } from '../rng';
 import type { GameState } from '../types';
+import { makePlayer } from '../../server/puzzleEngine/engine';
 import {
   getChromeSnapshot,
   getRawGameState,
@@ -47,7 +49,10 @@ describe('authoritative recovery snapshots', () => {
 
 function createState(overrides: Partial<GameState>): GameState {
   return {
-    players: {},
+    players: {
+      me: makePlayer('me', createPlayerRngChannels(123, 'A')),
+      opponent: makePlayer('opponent', createPlayerRngChannels(123, 'B')),
+    },
     status: 'waiting',
     countdown: 0,
     winnerId: null,

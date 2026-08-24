@@ -2,6 +2,20 @@ import { describe, test } from 'node:test';
 import assert from 'node:assert/strict';
 import { fitDualPlayfieldCellSize, fitMobilePlayfieldCellSize } from './PlayfieldCellSizer';
 
+describe('playfield cell sizing', () => {
+  test('uses the full slot for the playable grid when no gutter is requested', () => {
+    const box = { width: 360, height: 500 };
+
+    assert.equal(fitMobilePlayfieldCellSize(box), 27);
+  });
+
+  test('uses the full dual-field slot when no gutter is requested', () => {
+    const box = { width: 1_000, height: 700 };
+
+    assert.equal(fitDualPlayfieldCellSize(box), 29);
+  });
+});
+
 describe('PlayfieldCellSizer shrine gutter', () => {
   test('default pad matches the no-gutter fit', () => {
     const box = { width: 390, height: 520 };
