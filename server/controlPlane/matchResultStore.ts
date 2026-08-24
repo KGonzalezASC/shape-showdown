@@ -5,6 +5,7 @@ export type MatchOutcomeReason =
   | 'forfeit_disconnect'
   | 'forfeit_resignation'
   | 'void_server_crash'
+  | 'void_rendezvous_timeout'
   | 'void_dual_disconnect'
   | 'cancelled_alloc_fail';
 

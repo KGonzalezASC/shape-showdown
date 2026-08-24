@@ -14,6 +14,7 @@ describe('control-plane migrations', () => {
       '0003_ticket_consumption_state',
       '0004_queue_search_scope',
       '0005_recent_opponent_avoidance',
+      '0006_search_attempt_lifecycle',
     ]);
     assert.match(migrations[0]?.sql ?? '', /CREATE TABLE IF NOT EXISTS players/);
     assert.match(
@@ -43,6 +44,10 @@ describe('control-plane migrations', () => {
     assert.match(
       migrations[4]?.sql ?? '',
       /ADD COLUMN IF NOT EXISTS is_repeat_pairing/,
+    );
+    assert.match(
+      migrations[5]?.sql ?? '',
+      /CREATE TABLE IF NOT EXISTS search_attempts/,
     );
   });
 });

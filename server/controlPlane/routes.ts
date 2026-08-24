@@ -205,7 +205,10 @@ export function createControlPlaneRouter(
         return;
       }
 
-      response.status(200).json({ entry });
+      response.status(200).json({
+        entry,
+        effectiveScope: resolution.scope,
+      });
     }),
   );
 
@@ -237,8 +240,88 @@ export function createControlPlaneRouter(
         return;
       }
 
-      const entryId = await queue.removeEntry(session.playerId);
-      response.status(200).json({ removed: entryId !== null });
+      const cancellation = await queue.cancelSearch(session.playerId);
+      response.status(cancellation.status === 'already-assigned' ? 409 : 200).json(cancellation);
+    }),
+  );
+
+  router.post(
+    '/queue/requeue',
+    asyncHandler(async (request, response) => {
+      const session = await authenticate(request, players);
+      if (session === null) {
+        sendClientError(response, 401, 'valid session required');
+        return;
+      }
+      const matchId = isRecord(request.body) && typeof request.body.matchId === 'string'
+        ? readUuid(request.body.matchId)
+        : null;
+      if (matchId === null) {
+        sendClientError(response, 400, 'match ID is required');
+        return;
+      }
+      const idempotencyKey = request.header('idempotency-key');
+      if (idempotencyKey !== undefined && !isValidIdempotencyKey(idempotencyKey)) {
+        sendClientError(response, 400, 'Idempotency-Key must be 1-128 valid characters');
+        return;
+      }
+
+      const hasScope = isRecord(request.body) && request.body.searchScope !== undefined;
+      const requestedResolution = hasScope
+        ? validateQueueScopeRequest(request.body, {
+            discordUserId: session.discordUserId,
+            scopedEnqueueEnabled: isScopedEnqueueEnabled(),
+          })
+        : null;
+      if (requestedResolution !== null && requestedResolution.reason !== null) {
+        sendClientError(response, 400, requestedResolution.reason);
+        return;
+      }
+
+      const result = await database.begin(async (transaction) => {
+        const terminalMatches = await transaction<{
+          status: string;
+          player_a_id: string;
+          player_b_id: string;
+          search_scope: 'global' | 'guild' | 'discord_only';
+          guild_id: string | null;
+        }[]>`
+          SELECT status, player_a_id, player_b_id, search_scope, guild_id
+          FROM matches
+          WHERE id = ${matchId}
+            AND ${session.playerId} IN (player_a_id, player_b_id)
+            AND status IN ('ended', 'voided', 'cancelled')
+          FOR UPDATE
+        `;
+        const terminalMatch = terminalMatches[0];
+        if (terminalMatch === undefined) return null;
+
+        const scope = requestedResolution?.scope ?? {
+          searchScope: terminalMatch.search_scope,
+          guildId: terminalMatch.guild_id,
+        };
+        const opponentId = terminalMatch.player_a_id === session.playerId
+          ? terminalMatch.player_b_id
+          : terminalMatch.player_a_id;
+        const entry = await new QueueStore(transaction).upsertEntry({
+          playerId: session.playerId,
+          sessionId: session.sessionId,
+          searchScope: scope.searchScope,
+          guildId: scope.guildId,
+          carryAvoidPlayerId: opponentId,
+        });
+        if (entry === null) return null;
+        return { entry, scope };
+      });
+      if (result === null) {
+        response.status(409).json({ error: 'match is not ready to requeue' });
+        return;
+      }
+      response.status(200).json({
+        status: 'searching',
+        entry: result.entry,
+        effectiveScope: result.scope,
+      });
     }),
   );
 

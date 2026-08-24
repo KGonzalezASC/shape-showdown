@@ -7,6 +7,42 @@ import type { GameState } from '../../src/types.js';
 import { MatchPacketSync } from './MatchPacketSync.js';
 
 describe('MatchPacketSync', () => {
+  it('publishes each terminal restart timer update to the client decoder', () => {
+    const local = makePlayer('local', makeRng(21));
+    const opponent = makePlayer('opponent', makeRng(22));
+    const gameState: GameState = {
+      players: { local, opponent },
+      status: 'ended',
+      countdown: 0,
+      winnerId: 'local',
+      restartTimer: 5,
+      tick: 1,
+      seed: 21,
+    };
+    const packets: ArrayBuffer[] = [];
+    const socket = {
+      emit(event: string, packet: ArrayBuffer) {
+        if (event === 'gamePacket') packets.push(packet);
+      },
+    } as unknown as Socket;
+    const sync = new MatchPacketSync({
+      netcastEveryNTicks: 1,
+      lobbyNetcastEveryNTicks: 1,
+    });
+    const decoder = new ClientPacketDecoder();
+    decoder.setMyId('local');
+
+    sync.sendImmediate(gameState, new Map([['local', socket]]));
+    const first = decoder.decode(packets.shift()!);
+    assert.equal(first?.chrome.restartTimer, 5);
+
+    gameState.restartTimer = 4;
+    gameState.tick += 1;
+    sync.onTick(gameState, new Map([['local', socket]]), []);
+    const second = decoder.decode(packets.shift()!);
+    assert.equal(second?.chrome.restartTimer, 4);
+  });
+
   it('does not create a sequence gap when an empty delta is skipped', () => {
     const local = makePlayer('local', makeRng(21));
     const opponent = makePlayer('opponent', makeRng(22));

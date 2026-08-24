@@ -31,6 +31,7 @@ export type AdvanceDurableMatchInput = {
 
 export type DurableMatchFinalization = Omit<MatchResultInput, 'matchId'> & {
   matchId: string;
+  requeuePlayerId?: string;
 };
 
 export type MatchCheckpoint = {
@@ -120,9 +121,22 @@ export class PostgresMatchPersistence implements MatchPersistence {
   public async finalizeMatch(input: DurableMatchFinalization): Promise<void> {
     await this.database.begin(async (transaction) => {
       const matches = new MatchStore(transaction);
-      await matches.finalizeActiveMatchStatus(input.matchId, 'ended');
+      if (input.requeuePlayerId !== undefined) {
+        await matches.voidRendezvousAndRequeue({
+          matchId: input.matchId,
+          playerId: input.requeuePlayerId,
+          reason: input.outcomeReason,
+        });
+      } else {
+        const terminalStatus = input.outcomeReason.startsWith('void_') ? 'voided' : 'ended';
+        await matches.finalizeActiveMatchStatus(
+          input.matchId,
+          terminalStatus,
+          input.outcomeReason,
+        );
+        await matches.revokeMatchTickets(input.matchId);
+      }
       await new MatchResultStore(transaction).insertMatchResult(input);
-      await matches.deleteMatchTickets(input.matchId);
     });
     logInfo('durable_match_finalized', {
       matchId: input.matchId,

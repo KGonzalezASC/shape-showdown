@@ -59,6 +59,8 @@ export class GameManager {
   private readonly persistence?: MatchPersistence;
   private readonly onMatchCreated?: (matchId: string) => void;
   private readonly onRecoveryReady?: () => void;
+  private readonly onTerminal?: () => void;
+  private readonly disconnectLeaseMs: number;
   private readonly durablePlayerIds = new Map<string, string>();
   private readonly runtimeIdBySocketId = new Map<string, string>();
   private readonly activeSocketByRuntimeId = new Map<string, Socket>();
@@ -76,6 +78,7 @@ export class GameManager {
   private isCheckpointWriting = false;
   private pendingCheckpoint: PendingCheckpoint | null = null;
   private coalescedCheckpointCount = 0;
+  private terminalNotified = false;
 
   constructor(
     io: Server,
@@ -83,11 +86,16 @@ export class GameManager {
     persistence?: MatchPersistence,
     onMatchCreated?: (matchId: string) => void,
     onRecoveryReady?: () => void,
+    onTerminal?: () => void,
+    preallocatedMatch?: { matchId: string; matchSeed: number },
+    disconnectLeaseMs = DISCONNECT_SEAT_LEASE_MS,
   ) {
     this.io = io;
     this.persistence = persistence;
     this.onMatchCreated = onMatchCreated;
     this.onRecoveryReady = onRecoveryReady;
+    this.onTerminal = onTerminal;
+    this.disconnectLeaseMs = Math.max(1, Math.floor(disconnectLeaseMs));
     this.replayKeyframeIntervalTicks = Math.max(1, Math.floor(replayKeyframeIntervalTicks));
 
     // Decouple the network broadcast rate from the 60Hz simulation. Emitting
@@ -109,6 +117,12 @@ export class GameManager {
       tick: 0,
       seed: this.matchSeed,
     };
+    if (preallocatedMatch !== undefined) {
+      this.durableMatchId = preallocatedMatch.matchId;
+      this.durableMatchPreallocated = true;
+      this.gameState.seed = preallocatedMatch.matchSeed;
+      this.startAllocationRendezvousTimer();
+    }
 
     this.loopHandle = this.startLoop();
   }
@@ -135,6 +149,20 @@ export class GameManager {
   public async stopAndFlush(): Promise<void> {
     this.stopLoop();
     await this.persistenceTail;
+  }
+
+  public dispose(): void {
+    this.clearAllDisconnectForfeitures();
+    this.clearAllocationRendezvousTimer();
+    if (this.loopHandle !== null) {
+      clearInterval(this.loopHandle);
+      this.loopHandle = null;
+    }
+    for (const socket of this.activeSocketByRuntimeId.values()) {
+      socket.disconnect(true);
+    }
+    this.runtimeIdBySocketId.clear();
+    this.activeSocketByRuntimeId.clear();
   }
 
   public restoreCheckpoint(input: {
@@ -199,29 +227,35 @@ export class GameManager {
       kind: 'match_voided_runtime',
       reason: 'restore_timeout',
     });
-    this.emitToMatch('error', {
+    this.emitToMatch(matchId, 'error', {
       code: 'MATCH_VOIDED',
       message: 'The server voided this match. No player won.',
+      reason: 'restore_timeout',
+      nextAction: 'user-retry',
     } satisfies SocketAuthErrorPayload);
     this.emitGameplayPackets(true);
     logInfo('match_voided_runtime', { matchId });
     logInfo('match_voided_after_restore_timeout', { matchId });
     this.enqueuePersistence(async () => {
-      await this.persistence!.finalizeMatch({
-        matchId,
-        winnerId: null,
-        loserId: null,
-        outcomeReason: 'void_server_crash',
-        durationSeconds: Math.floor(this.gameState.tick * tickSeconds()),
-        playerAStats: this.capturePlayerStats(participants[0].runtimeId),
-        playerBStats: this.capturePlayerStats(participants[1].runtimeId),
-      });
+      try {
+        await this.persistence!.finalizeMatch({
+          matchId,
+          winnerId: null,
+          loserId: null,
+          outcomeReason: 'void_server_crash',
+          durationSeconds: Math.floor(this.gameState.tick * tickSeconds()),
+          playerAStats: this.capturePlayerStats(participants[0].runtimeId),
+          playerBStats: this.capturePlayerStats(participants[1].runtimeId),
+        });
+      } finally {
+        this.notifyTerminal();
+      }
     });
   }
 
   private loopHandle: ReturnType<typeof setInterval> | null = null;
   private allocationRendezvousTimer: ReturnType<typeof setTimeout> | null = null;
-  private static readonly ALLOCATION_RENDEZVOUS_MS = 20_000;
+  private static readonly ALLOCATION_RENDEZVOUS_MS = 15_000;
 
   private startAllocationRendezvousTimer(): void {
     this.clearAllocationRendezvousTimer();
@@ -241,6 +275,9 @@ export class GameManager {
   private handleAllocationRendezvousTimeout(): void {
     if (this.gameState.status !== 'waiting' || Object.keys(this.gameState.players).length >= 2) return;
     const matchId = this.durableMatchId;
+    const requeuePlayerId = [...this.activeSocketByRuntimeId.keys()]
+      .map((runtimeId) => this.durablePlayerIds.get(runtimeId))
+      .find((playerId): playerId is string => playerId !== undefined);
     logInfo('match_allocation_rendezvous_timeout', { matchId });
     this.clearAllDisconnectForfeitures();
     this.durableMatchPreallocated = false;
@@ -250,27 +287,37 @@ export class GameManager {
     this.gameState.endReason = 'server-void';
     this.gameState.technicalVictory = false;
     this.lastHandledStatus = 'ended';
-    this.emitToMatch('error', {
-      code: 'MATCH_VOIDED',
-      message: 'Opponent failed to connect in time. Returning to queue.',
-    } satisfies SocketAuthErrorPayload);
-    this.emitGameplayPackets(true);
+    const sockets = [...this.activeSocketByRuntimeId.values()];
+    const finishRendezvous = (): void => {
+      this.emitToMatch(matchId, 'error', {
+        code: 'MATCH_VOIDED',
+        message: 'Opponent failed to connect in time. Returning to queue.',
+        reason: 'rendezvous_timeout',
+        nextAction: 'automatic-search',
+      } satisfies SocketAuthErrorPayload);
+      this.emitGameplayPackets(true);
+      for (const socket of sockets) socket.disconnect(true);
+      this.notifyTerminal();
+    };
     if (matchId !== null && this.persistence) {
       this.enqueuePersistence(async () => {
-        await this.persistence!.finalizeMatch({
-          matchId,
-          winnerId: null,
-          loserId: null,
-          outcomeReason: 'void_server_crash',
-          durationSeconds: 0,
-          playerAStats: { score: 0, linesCleared: 0, topOut: false },
-          playerBStats: { score: 0, linesCleared: 0, topOut: false },
-        });
+        try {
+          await this.persistence!.finalizeMatch({
+            matchId,
+            winnerId: null,
+            loserId: null,
+            outcomeReason: 'void_rendezvous_timeout',
+            durationSeconds: 0,
+            playerAStats: { score: 0, linesCleared: 0, topOut: false },
+            playerBStats: { score: 0, linesCleared: 0, topOut: false },
+            ...(requeuePlayerId === undefined ? {} : { requeuePlayerId }),
+          });
+        } finally {
+          finishRendezvous();
+        }
       });
-    }
-    const sockets = [...this.activeSocketByRuntimeId.values()];
-    for (const socket of sockets) {
-      socket.disconnect(true);
+    } else {
+      finishRendezvous();
     }
   }
 
@@ -570,7 +617,10 @@ export class GameManager {
       }
       this.runtimeIdBySocketId.delete(socket.id);
       this.activeSocketByRuntimeId.delete(runtimeId);
-      if (this.durableMatchId !== null && this.gameState.status !== 'ended') {
+      // Only mid-play disconnects pause the sim. Waiting/countdown (including
+      // rematch ticket handoff) must keep the loop running so seats can rebind.
+      // Top-out rematch windows also keep both seats until the rematch starts.
+      if (this.durableMatchId !== null && this.gameState.status === 'playing') {
         const budget = this.disconnectBudgets.get(runtimeId) ?? {
           episodes: 0,
           totalPausedMs: 0,
@@ -601,6 +651,25 @@ export class GameManager {
           playerId: this.durablePlayerIds.get(runtimeId) ?? runtimeId,
         });
         this.enqueueCheckpoint();
+      } else if (
+        this.gameState.status === 'ended'
+        && this.gameState.endReason === 'top-out'
+        && this.gameState.restartTimer !== undefined
+        && Object.keys(this.gameState.players).length === 2
+      ) {
+        logInfo('socket_disconnected_rematch_window', {
+          matchId: this.durableMatchId,
+          playerId: this.durablePlayerIds.get(runtimeId) ?? runtimeId,
+        });
+      } else if (
+        this.gameState.status === 'waiting'
+        || this.gameState.status === 'countdown'
+      ) {
+        logInfo('socket_disconnected_lobby', {
+          matchId: this.durableMatchId,
+          playerId: this.durablePlayerIds.get(runtimeId) ?? runtimeId,
+          status: this.gameState.status,
+        });
       } else {
         this.forfeitDisconnectedPlayer(runtimeId);
       }
@@ -678,7 +747,8 @@ export class GameManager {
     const timer = setTimeout(() => {
       this.disconnectTimers.delete(runtimeId);
       this.forfeitDisconnectedPlayer(runtimeId);
-    }, DISCONNECT_SEAT_LEASE_MS);
+      this.emitGameplayPackets(true);
+    }, this.disconnectLeaseMs);
     this.disconnectTimers.set(runtimeId, timer);
   }
 
@@ -709,16 +779,25 @@ export class GameManager {
 
   private startLoop() {
     return setInterval(() => {
-      this.packetSync.capturePreStepBoards(this.gameState);
-      this.update();
-      this.packetSync.onTick(this.gameState, this.activeSocketByRuntimeId, this.lastTickEvents);
-      this.lastTickEvents = [];
+      this.tickAndEmit();
     }, 1000 / 60);
   }
 
   /** Exposed for interface-level lifecycle harnesses. */
   public tickOnceForTests() {
     this.update();
+  }
+
+  /** Runs one complete server frame, including outgoing gameplay packets. */
+  public tickAndEmitOnceForTests() {
+    this.tickAndEmit();
+  }
+
+  private tickAndEmit(): void {
+    this.packetSync.capturePreStepBoards(this.gameState);
+    this.update();
+    this.packetSync.onTick(this.gameState, this.activeSocketByRuntimeId, this.lastTickEvents);
+    this.lastTickEvents = [];
   }
 
   private assignPlayerSlot(playerId: string): number {
@@ -773,7 +852,6 @@ export class GameManager {
     const previousStatus = this.lastHandledStatus;
     this.lastHandledStatus = status;
     this.enqueueDurableStatusTransition(status);
-
     if (status === 'waiting' || status === 'countdown') {
       if (status === 'waiting') {
         if (previousStatus === 'ended') {
@@ -839,6 +917,7 @@ export class GameManager {
         });
         this.durableMatchId = allocation.match.id;
         this.durableMatchPreallocated = true;
+        this.terminalNotified = false;
         this.onMatchCreated?.(allocation.match.id);
         await this.persistence!.advanceStatus({
           matchId: allocation.match.id,
@@ -870,12 +949,13 @@ export class GameManager {
     if (status === 'ended') {
       const finalization = this.captureDurableFinalization();
       if (finalization === null) return;
+      const matchId = this.durableMatchId;
+      if (matchId === null) return;
       this.durableMatchPreallocated = false;
 
       this.enqueuePersistence(async () => {
-        if (this.durableMatchId === null) return;
         await this.persistence!.finalizeMatch({
-          matchId: this.durableMatchId,
+          matchId,
           ...finalization,
         });
       });
@@ -1040,7 +1120,11 @@ export class GameManager {
       if (stepResult.events.length > 0) {
         for (const ev of stepResult.events) {
           if (this.packetSync.shouldEmitMatchEvent(ev)) {
-            this.emitToMatch('matchEvent', ev);
+            if (this.durableMatchId === null) {
+              this.io.emit('matchEvent', ev);
+            } else {
+              this.emitToMatch(this.durableMatchId, 'matchEvent', ev);
+            }
           }
         }
         this.lastTickEvents.push(...stepResult.events);
@@ -1059,6 +1143,8 @@ export class GameManager {
       }
       if (stepResult.matchEnded) {
         this.gameState.endReason = 'top-out';
+        this.gameState.pause = undefined;
+        this.clearAllDisconnectForfeitures();
         this.saveReplay();
       }
     } else if (this.gameState.status === 'ended') {
@@ -1066,23 +1152,32 @@ export class GameManager {
       if (this.gameState.restartTimer !== undefined) {
         this.gameState.restartTimer -= tickSeconds();
         if (this.gameState.restartTimer <= 0) {
-          this.gameState.restartTimer = undefined;
-          this.gameState.endReason = undefined;
-          this.gameState.technicalVictory = false;
-          if (Object.keys(this.gameState.players).length === 2) {
-            this.gameState.seed = initialSeed();
-            this.resetMatchRngChannels();
-            for (const id in this.gameState.players) {
-              this.gameState.players[id] = makePlayer(id, this.playerRng(id));
-            }
-            this.gameState.status = 'countdown';
-            this.gameState.countdown = COUNTDOWN_SECONDS;
-          } else {
-            this.gameState.status = 'waiting';
-          }
+          this.restartAfterTerminal();
         }
       }
     }
+  }
+
+  private restartAfterTerminal(): void {
+    this.gameState.restartTimer = undefined;
+    this.gameState.endReason = undefined;
+    this.gameState.technicalVictory = false;
+    this.gameState.pause = undefined;
+    this.clearAllDisconnectForfeitures();
+    if (Object.keys(this.gameState.players).length === 2) {
+      this.gameState.seed = initialSeed();
+      this.resetMatchRngChannels();
+      for (const id in this.gameState.players) {
+        this.gameState.players[id] = makePlayer(id, this.playerRng(id));
+      }
+      this.gameState.status = 'countdown';
+      this.gameState.countdown = COUNTDOWN_SECONDS;
+    } else {
+      this.gameState.status = 'waiting';
+    }
+    // Durable rematch tickets must enqueue on this transition, not on the next
+    // tick — clients may already be rebinding when the countdown packet lands.
+    this.handleStatusTransitions();
   }
 
   private saveReplay() {
@@ -1185,12 +1280,22 @@ export class GameManager {
     });
   }
 
-  private emitToMatch(event: string, payload: unknown): void {
-    if (this.durableMatchId !== null && typeof this.io.to === 'function') {
-      this.io.to(`match:${this.durableMatchId}`).emit(event, payload);
+  private emitToMatch(matchId: string | null, event: string, payload: unknown): void {
+    if (matchId === null) return;
+    if (typeof this.io.to === 'function') {
+      this.io.to(`match:${matchId}`).emit(event, payload);
       return;
     }
-    this.io.emit(event, payload);
+
+    for (const [runtimeId, socket] of this.activeSocketByRuntimeId) {
+      if (this.durablePlayerIds.has(runtimeId)) socket.emit(event, payload);
+    }
+  }
+
+  private notifyTerminal(): void {
+    if (this.terminalNotified) return;
+    this.terminalNotified = true;
+    this.onTerminal?.();
   }
 }
 

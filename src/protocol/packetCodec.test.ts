@@ -4,7 +4,7 @@ import { BOARD_COLS, BOARD_ROWS } from '../constants.js';
 import { encodeDeltaPacket, encodeKeyframePacket } from './encodeMatchPacket.js';
 import { decodeKeyframePacket, applyDeltaPacket } from './decodeMatchPacket.js';
 import type { SeatWireSnapshot } from './wireTypes.js';
-import { MAX_PACKET_BYTES } from './version.js';
+import { GAME_PROTOCOL_VERSION, MAX_PACKET_BYTES } from './version.js';
 import { BinaryWriter } from './binary.js';
 
 function emptySnapshot(seed = 42): SeatWireSnapshot {
@@ -69,8 +69,15 @@ function emptySnapshot(seed = 42): SeatWireSnapshot {
 }
 
 describe('binary match packet codec', () => {
+  it('keeps the staging protocol at version 3', () => {
+    assert.equal(GAME_PROTOCOL_VERSION, 3);
+  });
+
   it('round-trips a keyframe including seat ids', () => {
     const snapshot = emptySnapshot(1337);
+    const pauseStartedAt = Date.now() - 1_000;
+    snapshot.chrome.pausePlayerId = 'opp';
+    snapshot.chrome.pauseStartedAt = pauseStartedAt;
     snapshot.local.board[5][3] = 'T';
     snapshot.local.poisonBoard[5][3] = 2;
     snapshot.local.activePiece = {
@@ -110,6 +117,8 @@ describe('binary match packet codec', () => {
     const decoded = decodeKeyframePacket(buffer);
     assert.equal(decoded.tick, 10);
     assert.equal(decoded.chrome.seed, 1337);
+    assert.equal(decoded.chrome.pausePlayerId, 'opp');
+    assert.equal(decoded.chrome.pauseStartedAt, pauseStartedAt);
     assert.equal(decoded.local.id, 'local');
     assert.equal(decoded.opponent.id, 'opp');
     assert.equal(decoded.local.board[5][3], 'T');

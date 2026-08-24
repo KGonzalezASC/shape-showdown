@@ -8,6 +8,7 @@ import { GameManager } from './GameManager.js';
 import { BOARD_COLS, BOARD_ROWS } from '../src/constants.js';
 import type { PlayerState, ReplayDataV2 } from '../src/types.js';
 import { decodeKeyframePacket } from '../src/protocol/decodeMatchPacket.js';
+import { ClientPacketDecoder } from '../src/protocol/ClientPacketDecoder.js';
 import { GAME_PROTOCOL_VERSION } from '../src/protocol/version.js';
 import { makePlayer } from './puzzleEngine/engine.js';
 import { createPlayerRngChannels } from '../src/rng.js';
@@ -21,16 +22,30 @@ import type {
 class FakeSocket extends EventEmitter {
   id: string;
   disconnected = false;
+  gamePackets: ArrayBuffer[] = [];
+  matchAssignments: unknown[] = [];
 
   constructor(id: string) {
     super();
     this.id = id;
   }
 
+  emit(event: string, ...args: unknown[]): boolean {
+    if (event === 'gamePacket' && args[0] instanceof ArrayBuffer) {
+      this.gamePackets.push(args[0]);
+    }
+    if (event === 'matchAssignment') {
+      this.matchAssignments.push(args[0]);
+    }
+    return super.emit(event, ...args);
+  }
+
   disconnect() {
     this.disconnected = true;
     this.emit('disconnect');
   }
+
+  join(): void {}
 }
 
 function createFakeIo(emitted: unknown[][] = []) {
@@ -39,6 +54,12 @@ function createFakeIo(emitted: unknown[][] = []) {
       emitted.push(args);
       return true;
     },
+    to: () => ({
+      emit: (...args: unknown[]) => {
+        emitted.push(args);
+        return true;
+      },
+    }),
     on: () => undefined,
   } as unknown as Server;
 }
@@ -68,6 +89,8 @@ class RecordingMatchPersistence implements MatchPersistence {
       protocolVersion: GAME_PROTOCOL_VERSION,
       status: 'allocating',
       isRepeatPairing: false,
+      playerASearchAttemptId: null,
+      playerBSearchAttemptId: null,
     };
     const ticket = (seat: 'A' | 'B'): JoinTicket => ({
       id: `${matchId}-${seat}`,
@@ -124,6 +147,164 @@ afterEach(() => {
 });
 
 describe('GameManager lifecycle harness', () => {
+  it('publishes a decreasing game-over countdown and starts the rematch', () => {
+    let gm: GameManager | null = null;
+    gm = new GameManager(
+      createFakeIo(),
+      60,
+      undefined,
+      undefined,
+      undefined,
+      () => gm?.dispose(),
+    );
+    managers.push(gm);
+    const p1 = new FakeSocket('p1');
+    const p2 = new FakeSocket('p2');
+    gm.handleConnection(p1 as unknown as Socket, 'durable-p1');
+    gm.handleConnection(p2 as unknown as Socket, 'durable-p2');
+    gm.stopLoop();
+
+    const internal = gm as unknown as {
+      gameState: {
+        status: string;
+        restartTimer?: number;
+        players: Record<string, PlayerState>;
+      };
+      lastHandledStatus: string;
+    };
+    internal.gameState.status = 'playing';
+    internal.lastHandledStatus = 'playing';
+    internal.gameState.players['durable-p1'].topOut = true;
+
+    for (let frame = 0; frame < 310; frame += 1) {
+      gm.tickAndEmitOnceForTests();
+    }
+
+    const decoder = new ClientPacketDecoder();
+    decoder.setMyId('durable-p2');
+    const terminalTimers: number[] = [];
+    for (const packet of p2.gamePackets) {
+      const model = decoder.decode(packet);
+      if (model?.chrome.status === 'ended' && model.chrome.restartTimer !== undefined) {
+        terminalTimers.push(model.chrome.restartTimer);
+      }
+    }
+
+    assert.ok(terminalTimers.length > 1);
+    assert.equal(Math.ceil(terminalTimers[0]), 5);
+    assert.ok(Math.ceil(terminalTimers[terminalTimers.length - 1]) < 5);
+    assert.equal(internal.gameState.status, 'countdown');
+  });
+
+  it('emits rematch tickets after a durable top-out timer expires', async () => {
+    const createdMatchIds: string[] = [];
+    const persistence = new RecordingMatchPersistence();
+    const gm = new GameManager(
+      createFakeIo(),
+      60,
+      persistence,
+      (matchId) => {
+        createdMatchIds.push(matchId);
+      },
+    );
+    managers.push(gm);
+    const p1 = new FakeSocket('p1');
+    const p2 = new FakeSocket('p2');
+    const ticket = (playerId: string, seat: 'A' | 'B') => ({
+      matchId: 'match-prealloc',
+      playerId,
+      seat,
+      matchSeed: 123,
+      protocolVersion: GAME_PROTOCOL_VERSION,
+    } as const);
+
+    gm.handleConnection(p1 as unknown as Socket, 'durable-p1', ticket('durable-p1', 'A'));
+    gm.handleConnection(p2 as unknown as Socket, 'durable-p2', ticket('durable-p2', 'B'));
+    gm.stopLoop();
+
+    const internal = gm as unknown as {
+      gameState: {
+        status: string;
+        endReason?: string;
+        restartTimer?: number;
+        players: Record<string, PlayerState>;
+        pause?: { playerId: string };
+      };
+      lastHandledStatus: string;
+      durableMatchId: string | null;
+      durableMatchPreallocated: boolean;
+    };
+    internal.gameState.status = 'playing';
+    internal.lastHandledStatus = 'playing';
+    internal.durableMatchId = 'match-prealloc';
+    internal.durableMatchPreallocated = true;
+    internal.gameState.players['durable-p1'].topOut = true;
+
+    for (let frame = 0; frame < 310; frame += 1) {
+      gm.tickAndEmitOnceForTests();
+    }
+    await flushPromises();
+
+    assert.equal(internal.gameState.status, 'countdown');
+    assert.equal(internal.gameState.pause, undefined);
+    assert.equal(persistence.starts.length, 1);
+    assert.equal(createdMatchIds.length, 1);
+    assert.equal(p1.matchAssignments.length, 1);
+    assert.equal(p2.matchAssignments.length, 1);
+    assert.equal(
+      (p1.matchAssignments[0] as { matchId: string }).matchId,
+      createdMatchIds[0],
+    );
+    assert.notEqual(createdMatchIds[0], 'match-prealloc');
+  });
+
+  it('does not pause the sim when a seat disconnects during rematch countdown', async () => {
+    const persistence = new RecordingMatchPersistence();
+    const gm = new GameManager(createFakeIo(), 60, persistence);
+    managers.push(gm);
+    const p1 = new FakeSocket('p1');
+    const p2 = new FakeSocket('p2');
+    gm.handleConnection(p1 as unknown as Socket, 'durable-p1', {
+      matchId: 'match-1',
+      playerId: 'durable-p1',
+      seat: 'A',
+      matchSeed: 123,
+      protocolVersion: GAME_PROTOCOL_VERSION,
+    });
+    gm.handleConnection(p2 as unknown as Socket, 'durable-p2', {
+      matchId: 'match-1',
+      playerId: 'durable-p2',
+      seat: 'B',
+      matchSeed: 123,
+      protocolVersion: GAME_PROTOCOL_VERSION,
+    });
+    gm.stopLoop();
+
+    const internal = gm as unknown as {
+      gameState: {
+        status: string;
+        countdown: number;
+        pause?: { playerId: string };
+        players: Record<string, PlayerState>;
+      };
+      lastHandledStatus: string;
+      durableMatchId: string | null;
+    };
+    internal.gameState.status = 'countdown';
+    internal.lastHandledStatus = 'countdown';
+    internal.durableMatchId = 'match-1';
+    const countdownBefore = internal.gameState.countdown;
+
+    p1.emit('disconnect');
+    assert.equal(internal.gameState.pause, undefined);
+    assert.equal(Object.keys(internal.gameState.players).length, 2);
+
+    for (let frame = 0; frame < 5; frame += 1) {
+      gm.tickOnceForTests();
+    }
+    assert.ok(internal.gameState.countdown < countdownBefore);
+  });
+
   it('creates a new durable match for a rematch and finalizes the prior result', async () => {
     const persistence = new RecordingMatchPersistence();
     const gm = new GameManager(createFakeIo(), 60, persistence);
@@ -304,6 +485,52 @@ describe('GameManager lifecycle harness', () => {
     });
     assert.equal(internal.restoredAwaitingReconnect, false);
     assert.equal(internal.gameState.pause, undefined);
+  });
+
+  it('forfeits a disconnected seat after the lease and publishes the terminal state', async () => {
+    const gm = new GameManager(
+      createFakeIo(),
+      60,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      20,
+    );
+    managers.push(gm);
+    const p1 = new FakeSocket('p1');
+    const p2 = new FakeSocket('p2');
+    const ticket = (playerId: string, seat: 'A' | 'B') => ({
+      matchId: 'match-lease',
+      playerId,
+      seat,
+      matchSeed: 123,
+      protocolVersion: GAME_PROTOCOL_VERSION,
+    } as const);
+
+    gm.handleConnection(p1 as unknown as Socket, 'durable-p1', ticket('durable-p1', 'A'));
+    gm.handleConnection(p2 as unknown as Socket, 'durable-p2', ticket('durable-p2', 'B'));
+
+    const internal = gm as unknown as {
+      gameState: {
+        status: string;
+        pause?: { playerId: string };
+        winnerId: string | null;
+      };
+      lastHandledStatus: string;
+    };
+    internal.gameState.status = 'playing';
+    internal.lastHandledStatus = 'playing';
+    const packetsBeforeDisconnect = p1.gamePackets.length;
+
+    p2.emit('disconnect');
+    await new Promise<void>((resolve) => setTimeout(resolve, 40));
+
+    assert.equal(internal.gameState.status, 'ended');
+    assert.equal(internal.gameState.winnerId, 'durable-p1');
+    assert.equal(internal.gameState.pause, undefined);
+    assert.ok(p1.gamePackets.length > packetsBeforeDisconnect);
   });
 
   it('keeps an opponent pause when the other player refreshes', async () => {
@@ -974,7 +1201,7 @@ describe('GameManager lifecycle harness', () => {
     assert.equal(internal.gameState.endReason, 'server-void');
     assert.equal(persistence.finalizations.length, 1);
     assert.equal(persistence.finalizations[0].matchId, 'match-rendezvous-1');
-    assert.equal(persistence.finalizations[0].outcomeReason, 'void_server_crash');
+    assert.equal(persistence.finalizations[0].outcomeReason, 'void_rendezvous_timeout');
     assert.ok(p1.disconnected);
   });
 });

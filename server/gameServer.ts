@@ -266,14 +266,18 @@ export async function startGameServer(
     : setInterval(() => {
       if (allocationInFlight) return;
       allocationInFlight = true;
-      void allocator.allocateNextMatch({
+      void allocator.allocateNextMatches({
         correlationId: randomUUID(),
         matchSeed: initialSeed(),
         gameServerUrl,
         protocolVersion: GAME_PROTOCOL_VERSION,
       })
-        .then(async (allocation) => {
-          if (allocation !== null) {
+        .then(async (allocations) => {
+          for (const allocation of allocations) {
+            matchRegistry.prepareMatch(
+              allocation.match.id,
+              allocation.match.matchSeed,
+            );
             logInfo('queue_match_allocated', {
               correlationId: allocation.match.correlationId,
               matchId: allocation.match.id,
@@ -282,6 +286,7 @@ export async function startGameServer(
             });
           }
           await queueJanitor?.purgeExpiredEntries();
+          await queueJanitor?.purgeOldAvoidances();
           await matchJanitor?.cancelNeverJoinedMatches(NEVER_JOINED_MATCH_GRACE_SECONDS);
           const analyticsDate = new Date().toISOString().slice(0, 10);
           if (

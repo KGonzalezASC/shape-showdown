@@ -105,6 +105,7 @@ export type MatchConnectionDiagnostics = {
   ticketLength: number | null;
   error: string | null;
   repeatPairing: boolean;
+  effectiveSearchScope?: 'global' | 'guild' | 'discord_only';
 };
 export type SocketAuthErrorCode =
   | 'MATCH_TICKET_REQUIRED'
@@ -115,9 +116,13 @@ export type SocketAuthErrorCode =
   | 'PROTOCOL_VERSION_MISMATCH'
   | 'MATCH_RUNTIME_UNAVAILABLE'
   | 'MATCH_VOIDED';
+export type MatchVoidReason = 'rendezvous_timeout' | 'restore_timeout' | 'runtime_failure';
+export type MatchVoidNextAction = 'automatic-search' | 'user-retry';
 export type SocketAuthErrorPayload = {
   code: SocketAuthErrorCode;
   message: string;
+  reason?: MatchVoidReason;
+  nextAction?: MatchVoidNextAction;
 };
 export type ServerHealthStatus = 'unknown' | 'healthy' | 'unavailable';
 export type ServerDatabaseMode = 'unknown' | 'postgres' | 'in-memory';

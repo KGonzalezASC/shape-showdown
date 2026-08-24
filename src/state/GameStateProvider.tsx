@@ -20,6 +20,7 @@ import {
   subscribePlayfield,
 } from './gameStateStore';
 import type { ClientMatchModel } from '../protocol/wireTypes';
+import type { SearchScope } from '../matchmaking/searchScope';
 
 function publishClientMatchModel(model: ClientMatchModel | null): void {
   setClientMatchModelStore(model, getStoredMyId());
@@ -39,7 +40,8 @@ export interface GameActions {
   sendShopOpen: () => void;
   sendShopPurchase: (itemId: string) => void;
   cancelQueueSearch: () => Promise<boolean>;
-  findNewOpponent: () => void;
+  changeQueueScope: (scope: SearchScope) => Promise<SearchScope | null>;
+  findNewOpponent: () => Promise<void>;
   resetClientSession: () => void;
 }
 
@@ -74,6 +76,7 @@ export function GameStateProvider({ children }: { children: React.ReactNode }) {
     sendShopOpen,
     sendShopPurchase,
     cancelQueueSearch,
+    changeQueueScope,
     findNewOpponent,
     resetClientSession,
   } = useGameSocket({
@@ -91,6 +94,7 @@ export function GameStateProvider({ children }: { children: React.ReactNode }) {
       sendShopOpen,
       sendShopPurchase,
       cancelQueueSearch,
+      changeQueueScope,
       findNewOpponent,
       resetClientSession,
     }),
@@ -100,6 +104,7 @@ export function GameStateProvider({ children }: { children: React.ReactNode }) {
       sendShopOpen,
       sendShopPurchase,
       cancelQueueSearch,
+      changeQueueScope,
       findNewOpponent,
       resetClientSession,
     ],

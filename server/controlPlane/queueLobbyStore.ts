@@ -2,16 +2,37 @@ import { randomUUID } from 'node:crypto';
 import type { SqlExecutor } from './database.js';
 import type { SearchScope } from './queueScope.js';
 
-/** How many oldest guild-scoped rows each guild claim considers before pairing. */
-const GUILD_CANDIDATE_WINDOW = 16;
-/** How many oldest scope rows the global and discord-only claims consider. */
-const SCOPE_CANDIDATE_WINDOW = 8;
+/** Normal matching wave size. */
+export const MATCHING_WAVE_SIZE = 64;
+/** One bounded expansion is allowed before a repeat fallback. */
+export const MATCHING_EXPANDED_WAVE_SIZE = 128;
 
 export type QueueEntry = {
   id: string;
   playerId: string;
   status: 'searching' | 'matched' | 'cancelled';
   expiresAt: Date;
+  searchAttemptId: string | null;
+  generation: number;
+};
+
+export type SearchAttemptStatus = 'searching' | 'matched' | 'cancelled' | 'expired';
+
+export type SearchAttempt = {
+  id: string;
+  playerId: string;
+  sessionId: string;
+  status: SearchAttemptStatus;
+  searchScope: SearchScope;
+  guildId: string | null;
+  poolKey: string;
+  generation: number;
+  poolEnteredAt: Date;
+};
+
+export type QueueCancellation = {
+  status: 'cancelled' | 'already-assigned' | 'not-searching';
+  matchId: string | null;
 };
 
 export type QueueLease = {
@@ -23,6 +44,8 @@ export type QueueParticipant = {
   id: string;
   playerId: string;
   sessionId: string;
+  searchAttemptId: string | null;
+  generation: number;
 };
 
 export type QueuePair = [QueueParticipant, QueueParticipant];
@@ -39,6 +62,9 @@ export type QueueCandidate = {
   playerId: string;
   sessionId: string;
   avoidPlayerId: string | null;
+  avoidPlayerIds?: readonly string[];
+  searchAttemptId?: string | null;
+  generation?: number;
   createdAtMs: number;
 };
 
@@ -69,6 +95,8 @@ type QueueEntryRow = {
   player_id: string;
   status: QueueEntry['status'];
   expires_at: Date;
+  search_attempt_id: string | null;
+  generation: number;
 };
 
 type QueueCandidateRow = {
@@ -78,6 +106,9 @@ type QueueCandidateRow = {
   avoid_player_id: string | null;
   guild_id: string | null;
   created_at: Date;
+  search_attempt_id?: string | null;
+  generation?: number;
+  avoid_player_ids?: string[];
 };
 
 type QueueLeaseRow = {
@@ -119,38 +150,91 @@ export class QueueStore {
     sessionId: string;
     searchScope: SearchScope;
     guildId: string | null;
+    carryAvoidPlayerId?: string | null;
   }): Promise<QueueEntry | null> {
+    const poolKey = input.searchScope === 'guild'
+      ? `guild:${input.guildId}`
+      : input.searchScope;
     const rows = await this.database<QueueEntryRow[]>`
-      WITH latest_opponent AS (
-        SELECT CASE
-          WHEN m.player_a_id = ${input.playerId} THEN m.player_b_id
-          ELSE m.player_a_id
-        END AS opponent_id
-        FROM matches m
-        WHERE ${input.playerId} IN (m.player_a_id, m.player_b_id)
-          AND m.started_at IS NOT NULL
-        ORDER BY m.created_at DESC, m.id DESC
-        LIMIT 1
+      WITH blocked AS (
+        SELECT EXISTS (
+          SELECT 1
+          FROM matches m
+          WHERE ${input.playerId} IN (m.player_a_id, m.player_b_id)
+            AND m.status IN ('allocating', 'countdown', 'playing')
+        ) AS has_active_match
+      ),
+      attempt_upsert AS (
+        INSERT INTO search_attempts (
+          id, player_id, session_id, status,
+          requested_scope, effective_scope, guild_id, pool_key,
+          generation, pool_entered_at
+        )
+        SELECT
+          ${randomUUID()},
+          ${input.playerId},
+          ${input.sessionId},
+          'searching',
+          ${input.searchScope},
+          ${input.searchScope},
+          ${input.guildId},
+          ${poolKey},
+          1,
+          CURRENT_TIMESTAMP
+        FROM blocked
+        WHERE NOT has_active_match
+        ON CONFLICT (player_id) WHERE status = 'searching'
+        DO UPDATE SET
+          session_id = EXCLUDED.session_id,
+          requested_scope = EXCLUDED.requested_scope,
+          effective_scope = EXCLUDED.effective_scope,
+          guild_id = EXCLUDED.guild_id,
+          pool_key = EXCLUDED.pool_key,
+          generation = CASE
+            WHEN search_attempts.pool_key IS DISTINCT FROM EXCLUDED.pool_key
+            THEN search_attempts.generation + 1
+            ELSE search_attempts.generation
+          END,
+          pool_entered_at = CASE
+            WHEN search_attempts.pool_key IS DISTINCT FROM EXCLUDED.pool_key
+            THEN CURRENT_TIMESTAMP
+            ELSE search_attempts.pool_entered_at
+          END,
+          updated_at = CURRENT_TIMESTAMP
+        RETURNING id, generation, pool_entered_at
       )
       INSERT INTO queue_entries (
         id, player_id, session_id, status, search_scope, guild_id,
-        avoid_player_id, expires_at
+        avoid_player_id, created_at, expires_at, search_attempt_id, generation, pool_entered_at
       )
-      VALUES (
+      SELECT
         ${randomUUID()},
         ${input.playerId},
         ${input.sessionId},
         'searching',
         ${input.searchScope},
         ${input.guildId},
-        (SELECT opponent_id FROM latest_opponent),
-        CURRENT_TIMESTAMP + INTERVAL '10 seconds'
-      )
+        (
+          SELECT opponent_id
+          FROM search_avoidances
+          WHERE search_attempt_id = attempt_upsert.id
+          ORDER BY created_at DESC
+          LIMIT 1
+        ),
+        attempt_upsert.pool_entered_at,
+        CURRENT_TIMESTAMP + INTERVAL '10 seconds',
+        attempt_upsert.id,
+        attempt_upsert.generation,
+        attempt_upsert.pool_entered_at
+      FROM attempt_upsert
       ON CONFLICT (player_id) DO UPDATE SET
         session_id = EXCLUDED.session_id,
         status = 'searching',
         matched_match_id = NULL,
         avoid_player_id = EXCLUDED.avoid_player_id,
+        search_attempt_id = EXCLUDED.search_attempt_id,
+        generation = EXCLUDED.generation,
+        pool_entered_at = EXCLUDED.pool_entered_at,
         expires_at = CURRENT_TIMESTAMP + INTERVAL '10 seconds',
         search_scope = EXCLUDED.search_scope,
         guild_id = EXCLUDED.guild_id,
@@ -163,22 +247,70 @@ export class QueueStore {
           THEN CURRENT_TIMESTAMP
           ELSE queue_entries.created_at
         END
-      WHERE queue_entries.status <> 'matched'
-         OR queue_entries.expires_at <= CURRENT_TIMESTAMP
-      RETURNING id, player_id, status, expires_at
+      WHERE (
+        queue_entries.status <> 'matched'
+        OR queue_entries.expires_at <= CURRENT_TIMESTAMP
+      )
+      AND NOT EXISTS (
+        SELECT 1
+        FROM matches m
+        WHERE ${input.playerId} IN (m.player_a_id, m.player_b_id)
+          AND m.status IN ('allocating', 'countdown', 'playing')
+      )
+      RETURNING id, player_id, status, expires_at, search_attempt_id, generation
     `;
 
     const row = rows[0];
-    return row ? toQueueEntry(row) : null;
+    if (row === undefined) return null;
+    const latestOpponentRows = input.carryAvoidPlayerId === undefined
+      ? await this.database<{ opponent_id: string }[]>`
+          SELECT CASE
+            WHEN m.player_a_id = ${input.playerId} THEN m.player_b_id
+            ELSE m.player_a_id
+          END AS opponent_id
+          FROM matches m
+          WHERE ${input.playerId} IN (m.player_a_id, m.player_b_id)
+            AND m.started_at IS NOT NULL
+          ORDER BY m.created_at DESC, m.id DESC
+          LIMIT 1
+        `
+      : [];
+    const avoidPlayerId = input.carryAvoidPlayerId
+      ?? latestOpponentRows[0]?.opponent_id;
+    if (avoidPlayerId !== undefined && row.search_attempt_id !== null) {
+      await this.database`
+        INSERT INTO search_avoidances (search_attempt_id, opponent_id, reason)
+        VALUES (${row.search_attempt_id}, ${avoidPlayerId}, 'recent_opponent')
+        ON CONFLICT (search_attempt_id, opponent_id) DO NOTHING
+      `;
+      await this.database`
+        UPDATE queue_entries
+        SET avoid_player_id = ${avoidPlayerId}
+        WHERE id = ${row.id}
+          AND status = 'searching'
+      `;
+    }
+    return toQueueEntry(row);
   }
 
   public async heartbeatEntry(playerId: string): Promise<QueueLease | null> {
     const rows = await this.database<QueueLeaseRow[]>`
+      WITH touched_attempt AS (
+        UPDATE search_attempts
+        SET updated_at = CURRENT_TIMESTAMP
+        WHERE player_id = ${playerId}
+          AND status = 'searching'
+        RETURNING id
+      )
       UPDATE queue_entries
       SET expires_at = CURRENT_TIMESTAMP + INTERVAL '10 seconds'
       WHERE player_id = ${playerId}
         AND status = 'searching'
         AND expires_at > CURRENT_TIMESTAMP
+        AND (
+          search_attempt_id IS NULL
+          OR search_attempt_id IN (SELECT id FROM touched_attempt)
+        )
       RETURNING id, expires_at
     `;
 
@@ -205,14 +337,70 @@ export class QueueStore {
    */
   public async claimGuildPair(): Promise<ClaimedQueuePair | null> {
     const rows = await this.database<QueueCandidateRow[]>`
-      SELECT id, player_id, session_id, avoid_player_id, guild_id, created_at
-      FROM queue_entries
-      WHERE status = 'searching'
-        AND search_scope = 'guild'
-        AND guild_id IS NOT NULL
-        AND expires_at > CURRENT_TIMESTAMP
-      ORDER BY created_at ASC, id ASC
-      LIMIT ${GUILD_CANDIDATE_WINDOW}
+      SELECT q.id, q.player_id, q.session_id, q.avoid_player_id, q.guild_id, q.created_at,
+             q.search_attempt_id, q.generation,
+      ARRAY(
+        SELECT a.opponent_id
+        FROM search_avoidances a
+        WHERE a.search_attempt_id = q.search_attempt_id
+      ) AS avoid_player_ids
+      FROM queue_entries q
+      WHERE q.status = 'searching'
+        AND q.search_scope = 'guild'
+        AND q.guild_id IS NOT NULL
+        AND q.expires_at > CURRENT_TIMESTAMP
+        AND (
+          q.search_attempt_id IS NULL
+          OR EXISTS (
+            SELECT 1
+            FROM search_attempts current_attempt
+            WHERE current_attempt.id = q.search_attempt_id
+              AND current_attempt.status = 'searching'
+              AND current_attempt.generation = q.generation
+          )
+        )
+        AND (
+          q.search_attempt_id IS NULL
+          OR EXISTS (
+            SELECT 1
+            FROM search_attempts current_attempt
+            WHERE current_attempt.id = q.search_attempt_id
+              AND current_attempt.status = 'searching'
+              AND current_attempt.generation = q.generation
+          )
+        )
+        AND (
+          q.search_attempt_id IS NULL
+          OR EXISTS (
+            SELECT 1
+            FROM search_attempts current_attempt
+            WHERE current_attempt.id = q.search_attempt_id
+              AND current_attempt.status = 'searching'
+              AND current_attempt.generation = q.generation
+          )
+        )
+        AND (
+          q.search_attempt_id IS NULL
+          OR EXISTS (
+            SELECT 1
+            FROM search_attempts current_attempt
+            WHERE current_attempt.id = q.search_attempt_id
+              AND current_attempt.status = 'searching'
+              AND current_attempt.generation = q.generation
+          )
+        )
+        AND (
+          q.search_attempt_id IS NULL
+          OR EXISTS (
+            SELECT 1
+            FROM search_attempts current_attempt
+            WHERE current_attempt.id = q.search_attempt_id
+              AND current_attempt.status = 'searching'
+              AND current_attempt.generation = q.generation
+          )
+        )
+      ORDER BY q.created_at ASC, q.id ASC
+      LIMIT ${MATCHING_WAVE_SIZE}
       FOR UPDATE SKIP LOCKED
     `;
 
@@ -241,13 +429,19 @@ export class QueueStore {
     scope: Extract<SearchScope, 'global' | 'discord_only'>,
   ): Promise<ClaimedQueuePair | null> {
     const rows = await this.database<QueueCandidateRow[]>`
-      SELECT id, player_id, session_id, avoid_player_id, created_at
-      FROM queue_entries
-      WHERE status = 'searching'
-        AND search_scope = ${scope}
-        AND expires_at > CURRENT_TIMESTAMP
-      ORDER BY created_at ASC, id ASC
-      LIMIT ${SCOPE_CANDIDATE_WINDOW}
+      SELECT q.id, q.player_id, q.session_id, q.avoid_player_id, q.created_at,
+             q.search_attempt_id, q.generation,
+             ARRAY(
+               SELECT a.opponent_id
+               FROM search_avoidances a
+               WHERE a.search_attempt_id = q.search_attempt_id
+             ) AS avoid_player_ids
+      FROM queue_entries q
+      WHERE q.status = 'searching'
+        AND q.search_scope = ${scope}
+        AND q.expires_at > CURRENT_TIMESTAMP
+      ORDER BY q.created_at ASC, q.id ASC
+      LIMIT ${MATCHING_WAVE_SIZE}
       FOR UPDATE SKIP LOCKED
     `;
 
@@ -259,11 +453,193 @@ export class QueueStore {
     return toClaimedPair(picked, scope, null);
   }
 
+  public async claimGuildPairs(): Promise<ClaimedQueuePair[]> {
+    const rows = await this.database<QueueCandidateRow[]>`
+      SELECT q.id, q.player_id, q.session_id, q.avoid_player_id, q.guild_id, q.created_at,
+             q.search_attempt_id, q.generation,
+             ARRAY(
+               SELECT a.opponent_id
+               FROM search_avoidances a
+               WHERE a.search_attempt_id = q.search_attempt_id
+             ) AS avoid_player_ids
+      FROM queue_entries q
+      WHERE q.status = 'searching'
+        AND q.search_scope = 'guild'
+        AND q.guild_id IS NOT NULL
+        AND q.expires_at > CURRENT_TIMESTAMP
+        AND (
+          q.search_attempt_id IS NULL
+          OR EXISTS (
+            SELECT 1
+            FROM search_attempts current_attempt
+            WHERE current_attempt.id = q.search_attempt_id
+              AND current_attempt.status = 'searching'
+              AND current_attempt.generation = q.generation
+          )
+        )
+      ORDER BY q.created_at ASC, q.id ASC
+      LIMIT ${MATCHING_WAVE_SIZE}
+      FOR UPDATE SKIP LOCKED
+    `;
+
+    const byGuild = new Map<string, QueueCandidate[]>();
+    for (const row of rows) {
+      const list = byGuild.get(row.guild_id!) ?? [];
+      list.push(toQueueCandidate(row));
+      byGuild.set(row.guild_id!, list);
+    }
+
+    const pickGuildPairs = (): PickedPair[] => [
+      ...byGuild.values(),
+    ].flatMap((candidates) => pickAvoidingPairs(candidates));
+    let pickedPairs = pickGuildPairs();
+    if (
+      pickedPairs.some((picked) => picked.isRepeatPairing)
+      && rows.length === MATCHING_WAVE_SIZE
+    ) {
+      const expandedRows = await this.database<QueueCandidateRow[]>`
+        SELECT q.id, q.player_id, q.session_id, q.avoid_player_id, q.guild_id, q.created_at,
+               q.search_attempt_id, q.generation,
+               ARRAY(
+                 SELECT a.opponent_id
+                 FROM search_avoidances a
+                 WHERE a.search_attempt_id = q.search_attempt_id
+               ) AS avoid_player_ids
+        FROM queue_entries q
+        WHERE q.status = 'searching'
+          AND q.search_scope = 'guild'
+          AND q.guild_id IS NOT NULL
+          AND q.expires_at > CURRENT_TIMESTAMP
+          AND (
+            q.search_attempt_id IS NULL
+            OR EXISTS (
+              SELECT 1
+              FROM search_attempts current_attempt
+              WHERE current_attempt.id = q.search_attempt_id
+                AND current_attempt.status = 'searching'
+                AND current_attempt.generation = q.generation
+            )
+          )
+          AND (
+            q.search_attempt_id IS NULL
+            OR EXISTS (
+              SELECT 1
+              FROM search_attempts current_attempt
+              WHERE current_attempt.id = q.search_attempt_id
+                AND current_attempt.status = 'searching'
+                AND current_attempt.generation = q.generation
+            )
+          )
+        ORDER BY q.created_at ASC, q.id ASC
+        LIMIT ${MATCHING_EXPANDED_WAVE_SIZE - MATCHING_WAVE_SIZE}
+        OFFSET ${MATCHING_WAVE_SIZE}
+        FOR UPDATE SKIP LOCKED
+      `;
+      for (const row of expandedRows) {
+        const list = byGuild.get(row.guild_id!) ?? [];
+        list.push(toQueueCandidate(row));
+        byGuild.set(row.guild_id!, list);
+      }
+      pickedPairs = pickGuildPairs();
+    }
+
+    const claimed: ClaimedQueuePair[] = [];
+    for (const [guildId, candidates] of byGuild) {
+      const guildPairs = pickedPairs.filter((picked) =>
+        picked.pair[0].searchAttemptId === candidates[0]?.searchAttemptId
+          || candidates.some((candidate) => candidate.id === picked.pair[0].id),
+      );
+      claimed.push(...guildPairs.map((picked) => toClaimedPair(picked, 'guild', guildId)));
+    }
+    await this.deleteClaimedPairs(claimed);
+    return claimed;
+  }
+
+  public async claimScopePairs(
+    scope: Extract<SearchScope, 'global' | 'discord_only'>,
+  ): Promise<ClaimedQueuePair[]> {
+    const rows = await this.database<QueueCandidateRow[]>`
+      SELECT q.id, q.player_id, q.session_id, q.avoid_player_id, q.created_at,
+             q.search_attempt_id, q.generation,
+             ARRAY(
+               SELECT a.opponent_id
+               FROM search_avoidances a
+               WHERE a.search_attempt_id = q.search_attempt_id
+             ) AS avoid_player_ids
+      FROM queue_entries q
+      WHERE q.status = 'searching'
+        AND q.search_scope = ${scope}
+        AND q.expires_at > CURRENT_TIMESTAMP
+        AND (
+          q.search_attempt_id IS NULL
+          OR EXISTS (
+            SELECT 1
+            FROM search_attempts current_attempt
+            WHERE current_attempt.id = q.search_attempt_id
+              AND current_attempt.status = 'searching'
+              AND current_attempt.generation = q.generation
+          )
+        )
+      ORDER BY q.created_at ASC, q.id ASC
+      LIMIT ${MATCHING_WAVE_SIZE}
+      FOR UPDATE SKIP LOCKED
+    `;
+    let candidates = rows.map(toQueueCandidate);
+    let pickedPairs = pickAvoidingPairs(candidates);
+    if (
+      pickedPairs.some((picked) => picked.isRepeatPairing)
+      && rows.length === MATCHING_WAVE_SIZE
+    ) {
+      const expandedRows = await this.database<QueueCandidateRow[]>`
+        SELECT q.id, q.player_id, q.session_id, q.avoid_player_id, q.created_at,
+               q.search_attempt_id, q.generation,
+               ARRAY(
+                 SELECT a.opponent_id
+                 FROM search_avoidances a
+                 WHERE a.search_attempt_id = q.search_attempt_id
+               ) AS avoid_player_ids
+        FROM queue_entries q
+        WHERE q.status = 'searching'
+          AND q.search_scope = ${scope}
+          AND q.expires_at > CURRENT_TIMESTAMP
+          AND (
+            q.search_attempt_id IS NULL
+            OR EXISTS (
+              SELECT 1
+              FROM search_attempts current_attempt
+              WHERE current_attempt.id = q.search_attempt_id
+                AND current_attempt.status = 'searching'
+                AND current_attempt.generation = q.generation
+            )
+          )
+        ORDER BY q.created_at ASC, q.id ASC
+        LIMIT ${MATCHING_EXPANDED_WAVE_SIZE - MATCHING_WAVE_SIZE}
+        OFFSET ${MATCHING_WAVE_SIZE}
+        FOR UPDATE SKIP LOCKED
+      `;
+      candidates = candidates.concat(expandedRows.map(toQueueCandidate));
+      pickedPairs = pickAvoidingPairs(candidates);
+    }
+    const claimed = pickedPairs.map((picked) => toClaimedPair(picked, scope, null));
+    await this.deleteClaimedPairs(claimed);
+    return claimed;
+  }
+
   private async deleteClaimedCandidates(pair: [QueueCandidate, QueueCandidate]): Promise<void> {
+    await this.deleteClaimedCandidateIds(pair[0].id, pair[1].id);
+  }
+
+  private async deleteClaimedCandidateIds(firstId: string, secondId: string): Promise<void> {
     await this.database`
       DELETE FROM queue_entries
-      WHERE id IN (${pair[0].id}, ${pair[1].id})
+      WHERE id IN (${firstId}, ${secondId})
     `;
+  }
+
+  private async deleteClaimedPairs(pairs: readonly ClaimedQueuePair[]): Promise<void> {
+    for (const claimed of pairs) {
+      await this.deleteClaimedCandidateIds(claimed.pair[0].id, claimed.pair[1].id);
+    }
   }
 
   public async purgeExpiredEntries(batchSize = 500): Promise<string[]> {
@@ -279,6 +655,15 @@ export class QueueStore {
           AND expires_at <= CURRENT_TIMESTAMP
         ORDER BY expires_at ASC, id ASC
         LIMIT ${batchSize}
+      ),
+      expired_attempts AS (
+        UPDATE search_attempts
+        SET
+          status = 'expired',
+          terminal_reason = 'lease_expired',
+          updated_at = CURRENT_TIMESTAMP
+        WHERE id IN (SELECT search_attempt_id FROM queue_entries WHERE id IN (SELECT id FROM expired))
+          AND status = 'searching'
       )
       DELETE FROM queue_entries q
       USING expired
@@ -287,6 +672,15 @@ export class QueueStore {
     `;
 
     return rows.map((row) => row.id);
+  }
+
+  public async purgeOldAvoidances(olderThanDays = 30): Promise<number> {
+    const rows = await this.database<{ search_attempt_id: string; opponent_id: string }[]>`
+      DELETE FROM search_avoidances
+      WHERE created_at < CURRENT_TIMESTAMP - ${`${Math.max(1, Math.trunc(olderThanDays))} days`}::interval
+      RETURNING search_attempt_id, opponent_id
+    `;
+    return rows.length;
   }
 
   public async removeEntry(playerId: string): Promise<string | null> {
@@ -299,7 +693,71 @@ export class QueueStore {
 
     return rows[0]?.id ?? null;
   }
+
+  public async cancelSearch(playerId: string): Promise<QueueCancellation> {
+    const rows = await this.database<QueueCancellationRow[]>`
+      WITH active_match AS (
+        SELECT id
+        FROM matches
+        WHERE ${playerId} IN (player_a_id, player_b_id)
+          AND status IN ('allocating', 'countdown', 'playing')
+        ORDER BY created_at DESC, id DESC
+        LIMIT 1
+        FOR UPDATE
+      ),
+      cancelled AS (
+        UPDATE search_attempts
+        SET
+          status = 'cancelled',
+          terminal_reason = 'player_cancelled',
+          updated_at = CURRENT_TIMESTAMP
+        WHERE player_id = ${playerId}
+          AND status = 'searching'
+          AND NOT EXISTS (SELECT 1 FROM active_match)
+        RETURNING id
+      ),
+      legacy_cancelled AS (
+        UPDATE queue_entries
+        SET status = 'cancelled'
+        WHERE player_id = ${playerId}
+          AND status = 'searching'
+          AND search_attempt_id IS NULL
+          AND NOT EXISTS (SELECT 1 FROM active_match)
+        RETURNING id
+      ),
+      queue_cancelled AS (
+        UPDATE queue_entries
+        SET status = 'cancelled'
+        WHERE search_attempt_id IN (SELECT id FROM cancelled)
+          AND status = 'searching'
+        RETURNING id
+      )
+      SELECT 'already-assigned' AS status, id AS match_id
+      FROM active_match
+      UNION ALL
+      SELECT 'cancelled' AS status, NULL::uuid AS match_id
+      FROM cancelled
+      UNION ALL
+      SELECT 'cancelled' AS status, NULL::uuid AS match_id
+      FROM legacy_cancelled
+      UNION ALL
+      SELECT 'not-searching' AS status, NULL::uuid AS match_id
+      WHERE NOT EXISTS (SELECT 1 FROM active_match)
+        AND NOT EXISTS (SELECT 1 FROM cancelled)
+        AND NOT EXISTS (SELECT 1 FROM legacy_cancelled)
+      LIMIT 1
+    `;
+    const row = rows[0];
+    return row === undefined
+      ? { status: 'not-searching', matchId: null }
+      : { status: row.status, matchId: row.match_id };
+  }
 }
+
+type QueueCancellationRow = {
+  status: QueueCancellation['status'];
+  match_id: string | null;
+};
 
 export class LobbyStore {
   public constructor(private readonly database: SqlExecutor) {}
@@ -450,6 +908,8 @@ function toQueueEntry(row: QueueEntryRow): QueueEntry {
     playerId: row.player_id,
     status: row.status,
     expiresAt: row.expires_at,
+    searchAttemptId: row.search_attempt_id,
+    generation: row.generation,
   };
 }
 
@@ -459,6 +919,12 @@ function toQueueCandidate(row: QueueCandidateRow): QueueCandidate {
     playerId: row.player_id,
     sessionId: row.session_id,
     avoidPlayerId: row.avoid_player_id,
+    avoidPlayerIds: [
+      ...(row.avoid_player_ids ?? []),
+      ...(row.avoid_player_id === null ? [] : [row.avoid_player_id]),
+    ],
+    searchAttemptId: row.search_attempt_id ?? null,
+    generation: row.generation ?? 1,
     createdAtMs: row.created_at.getTime(),
   };
 }
@@ -473,18 +939,162 @@ function toQueueCandidate(row: QueueCandidateRow): QueueCandidate {
  * preserves that order for tie-breaks and does not re-sort.
  */
 export function pickAvoidingPair(candidates: readonly QueueCandidate[]): PickedPair | null {
-  if (candidates.length < 2) return null;
+  return pickAvoidingPairs(candidates)[0] ?? null;
+}
 
-  const [first] = candidates;
-  const isMutuallyAvoided = (candidate: QueueCandidate): boolean =>
-    candidate.avoidPlayerId === first.playerId
-    || first.avoidPlayerId === candidate.playerId;
+/**
+ * Finds a maximum-cardinality matching for the candidate wave. Fresh edges
+ * are visited before repeat edges, so augmenting paths can replace an early
+ * repeat or fresh choice when a better wave-wide arrangement exists.
+ */
+export function pickAvoidingPairs(candidates: readonly QueueCandidate[]): PickedPair[] {
+  if (candidates.length < 2) return [];
 
-  const freshPartner = candidates.slice(1).find((candidate) => !isMutuallyAvoided(candidate));
-  if (freshPartner !== undefined) {
-    return { pair: [first, freshPartner], isRepeatPairing: false };
+  const matcher = new GeneralMatching(candidates.length);
+  for (let left = 0; left < candidates.length; left += 1) {
+    const edges = candidates
+      .map((candidate, right) => ({
+        right,
+        fresh: isFreshPair(candidates[left], candidate),
+      }))
+      .filter(({ right }) => right > left)
+      .sort((a, b) => Number(b.fresh) - Number(a.fresh) || a.right - b.right);
+    for (const { right } of edges) {
+      matcher.addEdge(left, right);
+    }
   }
-  return { pair: [first, candidates[1]], isRepeatPairing: true };
+
+  const pairs = matcher.findMaximumMatching();
+  return pairs.map(([left, right]) => ({
+    pair: [candidates[left], candidates[right]],
+    isRepeatPairing: !isFreshPair(candidates[left], candidates[right]),
+  }));
+}
+
+function isFreshPair(left: QueueCandidate, right: QueueCandidate): boolean {
+  const leftAvoids = new Set(left.avoidPlayerIds ?? []);
+  const rightAvoids = new Set(right.avoidPlayerIds ?? []);
+  if (left.avoidPlayerId !== null) leftAvoids.add(left.avoidPlayerId);
+  if (right.avoidPlayerId !== null) rightAvoids.add(right.avoidPlayerId);
+  return !leftAvoids.has(right.playerId) && !rightAvoids.has(left.playerId);
+}
+
+class GeneralMatching {
+  private readonly graph: number[][];
+  private readonly match: number[];
+  private readonly parent: number[];
+  private readonly base: number[];
+  private readonly used: boolean[];
+  private readonly blossom: boolean[];
+
+  public constructor(private readonly size: number) {
+    this.graph = Array.from({ length: size }, () => []);
+    this.match = Array(size).fill(-1);
+    this.parent = Array(size).fill(-1);
+    this.base = Array.from({ length: size }, (_, index) => index);
+    this.used = Array(size).fill(false);
+    this.blossom = Array(size).fill(false);
+  }
+
+  public addEdge(left: number, right: number): void {
+    this.graph[left].push(right);
+    this.graph[right].push(left);
+  }
+
+  public findMaximumMatching(): Array<[number, number]> {
+    for (let root = 0; root < this.size; root += 1) {
+      if (this.match[root] === -1) {
+        const endpoint = this.findAugmentingPath(root);
+        if (endpoint !== -1) this.augment(endpoint);
+      }
+    }
+    const pairs: Array<[number, number]> = [];
+    for (let left = 0; left < this.size; left += 1) {
+      if (this.match[left] > left) pairs.push([left, this.match[left]]);
+    }
+    return pairs;
+  }
+
+  private findAugmentingPath(root: number): number {
+    this.used.fill(false);
+    this.parent.fill(-1);
+    this.base.forEach((_, index) => {
+      this.base[index] = index;
+    });
+    const queue = [root];
+    this.used[root] = true;
+
+    for (let cursor = 0; cursor < queue.length; cursor += 1) {
+      const vertex = queue[cursor];
+      for (const next of this.graph[vertex]) {
+        if (this.base[vertex] === this.base[next] || this.match[vertex] === next) continue;
+        if (
+          next === root
+          || (this.match[next] !== -1 && this.parent[this.match[next]] !== -1)
+        ) {
+          const commonBase = this.findLowestCommonAncestor(vertex, next);
+          this.blossom.fill(false);
+          this.markBlossomPath(vertex, commonBase, next);
+          this.markBlossomPath(next, commonBase, vertex);
+          for (let index = 0; index < this.size; index += 1) {
+            if (!this.blossom[this.base[index]]) continue;
+            this.base[index] = commonBase;
+            if (!this.used[index]) {
+              this.used[index] = true;
+              queue.push(index);
+            }
+          }
+        } else if (this.parent[next] === -1) {
+          this.parent[next] = vertex;
+          if (this.match[next] === -1) return next;
+          const matched = this.match[next];
+          this.used[matched] = true;
+          queue.push(matched);
+        }
+      }
+    }
+    return -1;
+  }
+
+  private findLowestCommonAncestor(left: number, right: number): number {
+    const seen = Array(this.size).fill(false);
+    let current = left;
+    while (true) {
+      current = this.base[current];
+      seen[current] = true;
+      if (this.match[current] === -1) break;
+      current = this.parent[this.match[current]];
+    }
+    current = right;
+    while (!seen[this.base[current]]) {
+      current = this.base[current];
+      if (this.match[current] === -1) break;
+      current = this.parent[this.match[current]];
+    }
+    return this.base[current];
+  }
+
+  private markBlossomPath(vertex: number, commonBase: number, child: number): void {
+    let current = vertex;
+    while (this.base[current] !== commonBase) {
+      this.blossom[this.base[current]] = true;
+      this.blossom[this.base[this.match[current]]] = true;
+      this.parent[current] = child;
+      child = this.match[current];
+      current = this.parent[this.match[current]];
+    }
+  }
+
+  private augment(endpoint: number): void {
+    let current = endpoint;
+    while (current !== -1) {
+      const previous = this.parent[current];
+      const next = previous === -1 ? -1 : this.match[previous];
+      this.match[current] = previous;
+      if (previous !== -1) this.match[previous] = current;
+      current = next;
+    }
+  }
 }
 
 function toClaimedPair(
@@ -508,5 +1118,7 @@ function toQueueParticipantFromCandidate(candidate: QueueCandidate): QueuePartic
     id: candidate.id,
     playerId: candidate.playerId,
     sessionId: candidate.sessionId,
+    searchAttemptId: candidate.searchAttemptId ?? null,
+    generation: candidate.generation ?? 1,
   };
 }

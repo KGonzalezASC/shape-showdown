@@ -12,7 +12,8 @@ import { startGameServer, type RunningGameServer } from '../gameServer.js';
 import { makePlayer } from '../puzzleEngine/engine.js';
 import { createPlayerRngChannels } from '../../src/rng.js';
 import { GAME_PROTOCOL_VERSION } from '../../src/protocol/version.js';
-import type { GameState, MatchAssignment } from '../../src/types.js';
+import { ClientPacketDecoder } from '../../src/protocol/ClientPacketDecoder.js';
+import type { MatchAssignment } from '../../src/types.js';
 
 const database = createTestDatabase();
 
@@ -106,26 +107,31 @@ function connectSocket(
   assignment: MatchAssignment,
 ): {
   socket: ClientSocket;
-  getGameState: () => GameState | null;
+  getGameState: () => { status: string; tick: number } | null;
   getIdentity: () => string | null;
   getEvents: () => unknown[];
   getErrors: () => string[];
+  getAssignments: () => MatchAssignment[];
   getDisconnectReason: () => string | null;
   isConnected: () => boolean;
 } {
-  let latestState: GameState | null = null;
+  let latestState: { status: string; tick: number } | null = null;
   let receivedIdentity: string | null = null;
   let disconnectReason: string | null = null;
   let connected = false;
   const events: unknown[] = [];
   const errors: string[] = [];
+  const assignments: MatchAssignment[] = [];
+  const decoder = new ClientPacketDecoder();
 
   const socket = ioClient(serverOrigin, {
     auth: {
       ticket: assignment.ticket,
       matchId: assignment.matchId,
       playerId: assignment.playerId,
+      seat: assignment.seat,
       protocolVersion: assignment.protocolVersion,
+      clientProtocolVersion: GAME_PROTOCOL_VERSION,
     },
     transports: ['websocket'],
     reconnection: false,
@@ -136,16 +142,27 @@ function connectSocket(
     connected = true;
   });
 
-  socket.on('gameState', (state: GameState) => {
-    latestState = state;
+  socket.on('gamePacket', (packet: ArrayBuffer) => {
+    const model = decoder.decode(packet);
+    if (model !== null) {
+      latestState = {
+        status: model.chrome.status,
+        tick: model.tick,
+      };
+    }
   });
 
   socket.on('playerIdentity', (identity: string) => {
     receivedIdentity = identity;
+    decoder.setMyId(identity);
   });
 
   socket.on('matchEvent', (event: unknown) => {
     events.push(event);
+  });
+
+  socket.on('matchAssignment', (nextAssignment: MatchAssignment) => {
+    assignments.push(nextAssignment);
   });
 
   socket.on('error', (error: unknown) => {
@@ -167,6 +184,7 @@ function connectSocket(
     getIdentity: () => receivedIdentity,
     getEvents: () => events,
     getErrors: () => errors,
+    getAssignments: () => assignments,
     getDisconnectReason: () => disconnectReason,
     isConnected: () => connected,
   };
@@ -408,6 +426,118 @@ describe('Process restart and graceful drain recovery integration', () => {
       if (player1Id !== null || player2Id !== null) {
         const ids = [player1Id, player2Id].filter((id): id is string => id !== null);
         await database`DELETE FROM players WHERE id IN ${database(ids)}`;
+      }
+    }
+  });
+
+  it('automatically rematches two connected clients with fresh tickets', { timeout: 30_000 }, async () => {
+    await runMigrations(database, path.join(process.cwd(), 'db', 'migrations'));
+
+    let server: RunningGameServer | null = null;
+    const sockets: ClientSocket[] = [];
+    const playerIds: string[] = [];
+    const matchIds: string[] = [];
+
+    try {
+      server = await startGameServer({
+        mode: 'production',
+        config: {
+          port: 0,
+          host: '127.0.0.1',
+          serveClient: false,
+          replayKeyframeIntervalTicks: 30,
+        },
+      });
+
+      const guest1 = await createGuestPlayerAndSession(server.origin, 'Rematch Player 1');
+      const guest2 = await createGuestPlayerAndSession(server.origin, 'Rematch Player 2');
+      playerIds.push(guest1.playerId, guest2.playerId);
+
+      await enqueuePlayer(server.origin, guest1.token);
+      await enqueuePlayer(server.origin, guest2.token);
+
+      const assignment1 = await pollMatchAssignment(server.origin, guest1.token);
+      const assignment2 = await pollMatchAssignment(server.origin, guest2.token);
+      matchIds.push(assignment1.matchId);
+      assert.equal(assignment2.matchId, assignment1.matchId);
+
+      const client1 = connectSocket(server.origin, assignment1);
+      const client2 = connectSocket(server.origin, assignment2);
+      sockets.push(client1.socket, client2.socket);
+      let rematchClient1: ReturnType<typeof connectSocket> | null = null;
+      let rematchClient2: ReturnType<typeof connectSocket> | null = null;
+      client1.socket.on('matchAssignment', (nextAssignment: MatchAssignment) => {
+        rematchClient1 = connectSocket(server!.origin, nextAssignment);
+        sockets.push(rematchClient1.socket);
+        rematchClient1.socket.once('connect', () => client1.socket.close());
+      });
+      client2.socket.on('matchAssignment', (nextAssignment: MatchAssignment) => {
+        rematchClient2 = connectSocket(server!.origin, nextAssignment);
+        sockets.push(rematchClient2.socket);
+        rematchClient2.socket.once('connect', () => client2.socket.close());
+      });
+
+      await waitFor(
+        () => client1.getGameState()?.status === 'playing'
+          && client2.getGameState()?.status === 'playing',
+        'initial match to start',
+      );
+
+      for (let drop = 0; drop < 300 && client1.getGameState()?.status === 'playing'; drop += 1) {
+        client1.socket.emit('action', 'hardDrop');
+        await new Promise((resolve) => setTimeout(resolve, 20));
+      }
+
+      await waitFor(
+        () => client1.getGameState()?.status === 'ended'
+          && client2.getGameState()?.status === 'ended',
+        'top-out result to reach both clients',
+      );
+      await waitFor(
+        () => client1.getAssignments().length === 1
+          && client2.getAssignments().length === 1,
+        'automatic rematch assignments',
+        10_000,
+      );
+
+      const rematchAssignment1 = client1.getAssignments()[0];
+      const rematchAssignment2 = client2.getAssignments()[0];
+      matchIds.push(rematchAssignment1.matchId);
+      assert.notEqual(rematchAssignment1.matchId, assignment1.matchId);
+      assert.equal(rematchAssignment2.matchId, rematchAssignment1.matchId);
+
+      await waitFor(
+        () => rematchClient1?.getGameState()?.status === 'playing'
+          && rematchClient2?.getGameState()?.status === 'playing',
+        'automatic rematch to start for both clients',
+        10_000,
+      );
+
+      assert.deepEqual(rematchClient1?.getErrors(), []);
+      assert.deepEqual(rematchClient2?.getErrors(), []);
+
+      let rows: Array<{ id: string; status: string }> = [];
+      await waitFor(async () => {
+        rows = await database<{ id: string; status: string }[]>`
+          SELECT id, status
+          FROM matches
+          WHERE id IN ${database(matchIds)}
+          ORDER BY created_at ASC
+        `;
+        return rows[1]?.status === 'playing';
+      }, 'durable rematch status to reach playing');
+      assert.deepEqual(
+        rows.map((row) => row.status),
+        ['ended', 'playing'],
+      );
+    } finally {
+      for (const socket of sockets) socket.disconnect();
+      if (server !== null) await server.stop();
+      if (matchIds.length > 0) {
+        await database`DELETE FROM matches WHERE id IN ${database(matchIds)}`;
+      }
+      if (playerIds.length > 0) {
+        await database`DELETE FROM players WHERE id IN ${database(playerIds)}`;
       }
     }
   });

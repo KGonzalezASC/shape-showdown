@@ -1,6 +1,6 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { pickAvoidingPair, type QueueCandidate } from './queueLobbyStore.js';
+import { pickAvoidingPair, pickAvoidingPairs, type QueueCandidate } from './queueLobbyStore.js';
 
 function candidate(
   id: string,
@@ -55,5 +55,23 @@ describe('pickAvoidingPair', () => {
     ]);
     assert.deepEqual(picked?.pair.map((c) => c.playerId), ['p1', 'p2']);
     assert.equal(picked?.isRepeatPairing, true);
+  });
+});
+
+describe('pickAvoidingPairs', () => {
+  it('rearranges an early choice to keep both matches fresh', () => {
+    const pairs = pickAvoidingPairs([
+      candidate('1', 'p1', 'p4'),
+      candidate('2', 'p2', 'p3'),
+      candidate('3', 'p3', 'p2'),
+      candidate('4', 'p4', 'p1'),
+    ]);
+
+    assert.equal(pairs.length, 2);
+    assert.equal(pairs.every((pair) => !pair.isRepeatPairing), true);
+    assert.deepEqual(
+      pairs.flatMap((pair) => pair.pair.map((entry) => entry.playerId)).sort(),
+      ['p1', 'p2', 'p3', 'p4'],
+    );
   });
 });

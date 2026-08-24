@@ -13,6 +13,7 @@ import { BackgroundPrototype } from './components/BackgroundPrototype';
 import { ThemeBackground } from './presentation/ThemeBackground';
 import { ThemeProvider } from './presentation/ThemeProvider';
 import { DEV_TOOLS_ENABLED } from './devTools';
+import { DISCONNECT_SEAT_LEASE_MS } from './constants';
 import { useLockDrill } from './hooks/useLockDrill';
 import { useShopConfirm } from './hooks/useShopConfirm';
 import {
@@ -36,7 +37,6 @@ import {
 import { mixDecorationSeed } from './presentation/decorationSeed';
 import {
   readPreferredMatchScope,
-  writePreferredMatchScope,
   type SearchScope,
 } from './matchmaking/searchScope';
 
@@ -184,17 +184,18 @@ const AppShell: React.FC = () => {
     sendInputState,
     resetClientSession,
     cancelQueueSearch,
+    changeQueueScope,
     findNewOpponent,
   } = useGameActions();
   const handleShopConfirm = useShopConfirm();
 
-  // Scope changes only apply to the next search: switching mid-wait restarts
-  // bootstrap (reload re-enqueues with the new scope; no assignment exists yet).
-  const queuedSearchScope = readPreferredMatchScope() ?? 'global';
-  const changeSearchScope = (scope: SearchScope) => {
+  const [queuedSearchScope, setQueuedSearchScope] = useState<SearchScope>(
+    () => readPreferredMatchScope() ?? 'global',
+  );
+  const changeSearchScope = async (scope: SearchScope): Promise<void> => {
     if (scope === queuedSearchScope) return;
-    writePreferredMatchScope(scope);
-    window.location.reload();
+    const effectiveScope = await changeQueueScope(scope);
+    if (effectiveScope !== null) setQueuedSearchScope(effectiveScope);
   };
 
   const [queuedSeconds, setQueuedSeconds] = useState(0);
@@ -208,6 +209,43 @@ const AppShell: React.FC = () => {
     }, 1000);
     return () => window.clearInterval(interval);
   }, [matchDiagnostics.phase]);
+  useEffect(() => {
+    if (
+      matchDiagnostics.phase === 'queued'
+      && matchDiagnostics.effectiveSearchScope !== undefined
+    ) {
+      setQueuedSearchScope(matchDiagnostics.effectiveSearchScope);
+    }
+  }, [matchDiagnostics.effectiveSearchScope, matchDiagnostics.phase]);
+
+  const [pauseSecondsRemaining, setPauseSecondsRemaining] = useState<number | null>(null);
+  const pauseReturnTriggeredRef = useRef(false);
+  useEffect(() => {
+    const pauseStartedAt = gameState?.pause?.startedAt;
+    if (pauseStartedAt === undefined || chrome.status === 'ended') {
+      setPauseSecondsRemaining(null);
+      return;
+    }
+    const updatePauseClock = () => {
+      const elapsedMs = Math.max(0, Date.now() - pauseStartedAt);
+      setPauseSecondsRemaining(
+        Math.max(0, Math.ceil((DISCONNECT_SEAT_LEASE_MS - elapsedMs) / 1_000)),
+      );
+      if (elapsedMs >= DISCONNECT_SEAT_LEASE_MS && !pauseReturnTriggeredRef.current) {
+        pauseReturnTriggeredRef.current = true;
+        window.location.replace('/');
+      }
+    };
+    updatePauseClock();
+    const interval = window.setInterval(updatePauseClock, 250);
+    return () => window.clearInterval(interval);
+  }, [chrome.status, gameState?.pause?.startedAt]);
+
+  useEffect(() => {
+    if (chrome.endReason !== 'disconnect-forfeit' || pauseReturnTriggeredRef.current) return;
+    pauseReturnTriggeredRef.current = true;
+    window.location.replace('/');
+  }, [chrome.endReason]);
 
   const stateRef = useRef({ playfield, myId });
   useLayoutEffect(() => {
@@ -599,8 +637,8 @@ const AppShell: React.FC = () => {
               <button
                 type="button"
                 onClick={async () => {
-                  await cancelQueueSearch();
-                  window.location.href = '/';
+                  const cancelled = await cancelQueueSearch();
+                  if (cancelled) window.location.href = '/';
                 }}
                 className="mt-1 text-[8px] sm:text-[9px] font-mono font-bold uppercase tracking-[0.14em] text-zinc-400 hover:text-white transition"
               >
@@ -749,7 +787,7 @@ const AppShell: React.FC = () => {
                 </div>
                 <p className="text-xs text-zinc-600 mb-4">
                   {chrome.restartTimer !== undefined
-                    ? `Restarting level in ${Math.ceil(chrome.restartTimer)} seconds...`
+                    ? `Restarting level in ${Math.max(0, Math.ceil(chrome.restartTimer))} seconds...`
                     : 'Match completed.'}
                 </p>
                 <div className="flex flex-col sm:flex-row items-center justify-center gap-2.5">
@@ -794,6 +832,20 @@ const AppShell: React.FC = () => {
                     ? 'Your seat is being reclaimed. The match will resume from the server snapshot.'
                     : 'Opponent disconnected. Waiting to reconnect.'}
                 </p>
+                {pauseSecondsRemaining !== null && (
+                  <p className="mt-3 text-[8px] uppercase tracking-[0.12em] text-amber-200/70 sm:text-[9px]">
+                    Reconnect window: {pauseSecondsRemaining}s
+                  </p>
+                )}
+                <button
+                  type="button"
+                  onClick={() => {
+                    window.location.href = '/';
+                  }}
+                  className="mt-6 rounded border border-zinc-500/70 px-5 py-2 text-[9px] font-bold uppercase tracking-[0.12em] text-zinc-300 transition hover:border-zinc-300 hover:text-white"
+                >
+                  Cancel
+                </button>
               </div>
             </m.div>
           )}

@@ -17,6 +17,8 @@ export class MatchRunner {
     onMatchCreated: (matchId: string) => void,
     matchId: string,
     recoveryVoidTimeoutMs = DISCONNECT_SEAT_LEASE_MS,
+    onTerminal: () => void = () => undefined,
+    preallocatedMatch?: { matchId: string; matchSeed: number },
   ) {
     this.recoveryVoidTimeoutMs = recoveryVoidTimeoutMs;
     this.manager = new GameManager(
@@ -30,6 +32,9 @@ export class MatchRunner {
           this.recoveryVoidTimer = null;
         }
       },
+      onTerminal,
+      preallocatedMatch,
+      recoveryVoidTimeoutMs,
     );
     this.ready = this.restore(persistence, matchId);
   }
@@ -49,6 +54,14 @@ export class MatchRunner {
       this.recoveryVoidTimer = null;
     }
     await this.manager.stopAndFlush();
+  }
+
+  public dispose(): void {
+    if (this.recoveryVoidTimer !== null) {
+      clearTimeout(this.recoveryVoidTimer);
+      this.recoveryVoidTimer = null;
+    }
+    this.manager.dispose();
   }
 
   private async restore(

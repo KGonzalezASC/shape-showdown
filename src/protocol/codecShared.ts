@@ -332,7 +332,7 @@ export function readChrome(reader: BinaryReader): MatchChromeWire {
   let pauseStartedAt: number | null = null;
   if (reader.readU8() === 1) {
     pausePlayerId = reader.readString();
-    pauseStartedAt = reader.readU32();
+    pauseStartedAt = expandWrappedTimestamp(reader.readU32());
   }
   return {
     status,
@@ -345,6 +345,16 @@ export function readChrome(reader: BinaryReader): MatchChromeWire {
     pausePlayerId,
     pauseStartedAt,
   };
+}
+
+const U32_RANGE = 0x1_0000_0000;
+
+function expandWrappedTimestamp(wrappedTimestamp: number, now = Date.now()): number {
+  const currentEpochBase = Math.floor(now / U32_RANGE) * U32_RANGE;
+  let candidate = currentEpochBase + wrappedTimestamp;
+  if (candidate - now > U32_RANGE / 2) candidate -= U32_RANGE;
+  if (now - candidate > U32_RANGE / 2) candidate += U32_RANGE;
+  return candidate;
 }
 
 export function writeFullBoard(

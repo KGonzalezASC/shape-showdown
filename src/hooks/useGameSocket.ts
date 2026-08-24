@@ -23,6 +23,7 @@ import {
   readPreferredMatchScope,
   resolveEffectiveSearchScope,
   type SearchScope,
+  writePreferredMatchScope,
 } from '../matchmaking/searchScope';
 import { ClientPacketDecoder } from '../protocol/ClientPacketDecoder';
 import type { ClientMatchModel } from '../protocol/wireTypes';
@@ -194,6 +195,9 @@ const SOCKET_AUTH_ERROR_CODES: SocketAuthErrorCode[] = [
 type InitialMatchBootstrap = {
   session: ClientSession;
   assignment: MatchAssignment;
+  guildId: string | null;
+  channelId: string | null;
+  effectiveSearchScope: SearchScope | null;
 };
 
 async function resolveInitialMatchAssignment(
@@ -206,7 +210,13 @@ async function resolveInitialMatchAssignment(
 
   const existingAssignment = await requestMatchAssignment(gameServerUrl, session, signal);
   if (existingAssignment !== null) {
-    return { session, assignment: existingAssignment };
+    return {
+      session,
+      assignment: existingAssignment,
+      guildId,
+      channelId,
+      effectiveSearchScope: null,
+    };
   }
 
   const effectiveScope = resolveEffectiveSearchScope({
@@ -242,12 +252,21 @@ async function resolveInitialMatchAssignment(
     throw new Error(`Queue request failed with status ${queueResponse.status}`);
   }
 
+  let effectiveSearchScope: SearchScope | null = null;
+  if (queueResponse.ok) {
+    const body: unknown = await queueResponse.json();
+    if (isEffectiveQueueResponse(body)) {
+      effectiveSearchScope = body.effectiveScope.searchScope;
+    }
+  }
   onProgress('queued');
   let lastHeartbeatAt = Date.now();
   const queueDeadline = Date.now() + INITIAL_QUEUE_DEADLINE_MS;
   while (Date.now() < queueDeadline) {
     const assignment = await requestMatchAssignment(gameServerUrl, session, signal);
-    if (assignment !== null) return { session, assignment };
+    if (assignment !== null) {
+      return { session, assignment, guildId, channelId, effectiveSearchScope };
+    }
 
     if (Date.now() - lastHeartbeatAt >= 4_000) {
       const heartbeat = await fetch(serverRequestUrl(gameServerUrl, '/api/queue/heartbeat'), {
@@ -393,7 +412,11 @@ async function requestMatchOutcome(
   if (!response.ok) return null;
   const body: unknown = await response.json();
   if (!isMatchOutcomeResponse(body)) return null;
-  if (body.outcomeReason === 'void_server_crash' || body.outcomeReason === 'void_dual_disconnect') {
+  if (
+    body.outcomeReason === 'void_server_crash'
+    || body.outcomeReason === 'void_rendezvous_timeout'
+    || body.outcomeReason === 'void_dual_disconnect'
+  ) {
     return 'server-void';
   }
   return body.outcomeReason === 'forfeit_disconnect' ? 'disconnect-forfeit' : null;
@@ -482,6 +505,13 @@ export const useGameSocket = ({
   onMatchDiagnostics,
 }: GameSocketCallbacks = {}) => {
   const [socket, setSocket] = useState<Socket | null>(null);
+  const [searchEpoch, setSearchEpoch] = useState(0);
+  const matchIdRef = useRef<string | null>(null);
+  const requeueRequestKeyRef = useRef<string | null>(null);
+  const searchContextRef = useRef<{ guildId: string | null; channelId: string | null }>({
+    guildId: null,
+    channelId: null,
+  });
   const callbacksRef = useRef<GameSocketCallbacks>({});
 
   useEffect(() => {
@@ -577,9 +607,18 @@ export const useGameSocket = ({
           pause_count: disconnectEpisodeCount,
         });
       };
-      const reportTerminalSocketError = (code: SocketAuthErrorCode): void => {
+      const reportTerminalSocketError = (code: SocketAuthErrorCode, value?: unknown): void => {
         void (async () => {
           if (code === 'MATCH_VOIDED') {
+            if (isAutomaticSearchVoid(value)) {
+              reportMatchDiagnostics({
+                phase: 'queued',
+                error: null,
+              });
+              matchIdRef.current = null;
+              setSearchEpoch((epoch) => epoch + 1);
+              return;
+            }
             reportMatchDiagnostics({
               phase: 'server-void',
               error: protocolRecoveryMessage(code),
@@ -693,8 +732,18 @@ export const useGameSocket = ({
       }
       if (cancelled) return;
       if (initialBootstrap !== null) {
+        if (initialBootstrap.effectiveSearchScope !== null) {
+          reportMatchDiagnostics({
+            effectiveSearchScope: initialBootstrap.effectiveSearchScope,
+          });
+        }
         clientSession = initialBootstrap.session;
+        searchContextRef.current = {
+          guildId: initialBootstrap.guildId,
+          channelId: initialBootstrap.channelId,
+        };
         expectedMatchId = initialBootstrap.assignment.matchId;
+        matchIdRef.current = initialBootstrap.assignment.matchId;
         expectedPlayerId = initialBootstrap.assignment.playerId;
         expectedSeat = initialBootstrap.assignment.seat;
         reportMatchDiagnostics({
@@ -808,7 +857,7 @@ export const useGameSocket = ({
               });
               reportReliability('protocol_mismatch', { code });
             } else {
-              reportTerminalSocketError(code);
+              reportTerminalSocketError(code, error);
             }
             return;
           }
@@ -848,7 +897,7 @@ export const useGameSocket = ({
             });
             reportReliability('protocol_mismatch', { code });
           } else {
-            reportTerminalSocketError(code);
+            reportTerminalSocketError(code, error);
           }
         });
 
@@ -858,7 +907,14 @@ export const useGameSocket = ({
             || terminalError
             || activeSocket !== nextSocket
             || ticketRebound
-            || lastGameStatus === 'ended'
+          ) {
+            return;
+          }
+          // Stay alive through the top-out rematch window so a dropped socket can
+          // pick up rematch tickets. Void/forfeit ends still skip recovery.
+          if (
+            lastGameStatus === 'ended'
+            && lastReportedEndReason !== 'top-out'
           ) {
             return;
           }
@@ -914,9 +970,13 @@ export const useGameSocket = ({
         });
 
         nextSocket.on('matchAssignment', (assignment: unknown) => {
-          if (ticketRebound || !isMatchAssignment(assignment)) return;
+          if (!isMatchAssignment(assignment)) return;
+          // Rematch can arrive while a prior rebound flag is still set. Accept a
+          // new match id; ignore duplicates for the match we already rebound to.
+          if (ticketRebound && assignment.matchId === expectedMatchId) return;
           ticketRebound = true;
           expectedMatchId = assignment.matchId;
+          matchIdRef.current = assignment.matchId;
           expectedPlayerId = assignment.playerId;
           expectedSeat = assignment.seat;
           reportMatchDiagnostics({
@@ -992,9 +1052,10 @@ export const useGameSocket = ({
             deadlineMs: Math.max(0, recoveryDeadlineAt - Date.now()),
           });
           if (assignment !== null) {
+            // Rematch allocates a new match id for the same seats. Reject only
+            // seat/player mismatches, not a newer active match id.
             if (
-              (expectedMatchId !== null && assignment.matchId !== expectedMatchId)
-              || (expectedSeat !== null && assignment.seat !== expectedSeat)
+              (expectedSeat !== null && assignment.seat !== expectedSeat)
               || (expectedPlayerId !== null && assignment.playerId !== expectedPlayerId)
               || assignment.playerId !== session.playerId
             ) {
@@ -1005,6 +1066,7 @@ export const useGameSocket = ({
               return;
             }
             expectedMatchId = assignment.matchId;
+            matchIdRef.current = assignment.matchId;
             expectedPlayerId = assignment.playerId;
             expectedSeat = assignment.seat;
             recoveryAttempts += 1;
@@ -1099,11 +1161,12 @@ export const useGameSocket = ({
     return () => {
       cancelled = true;
       activeSocket?.close();
+      setSocket(null);
       if (healthInterval !== null) window.clearInterval(healthInterval);
       bootstrapAbortController?.abort();
       healthAbortController?.abort();
     };
-  }, []);
+  }, [searchEpoch]);
 
   const sendInputState = useCallback((input: InputState) => {
     socket?.emit('inputState', input);
@@ -1133,17 +1196,85 @@ export const useGameSocket = ({
         },
         cache: 'no-store',
       });
+      if (response.status === 409) return false;
       return response.ok;
     } catch {
       return false;
     }
   }, []);
 
-  const findNewOpponent = useCallback(() => {
-    if (socket) {
-      socket.disconnect();
+  const changeQueueScope = useCallback(async (scope: SearchScope): Promise<SearchScope | null> => {
+    try {
+      const serverUrl = await resolveGameServerUrl();
+      const session = readClientSession();
+      if (!session) return null;
+      const effectiveScope = resolveEffectiveSearchScope({
+        provider: session.provider,
+        preferredScope: scope,
+        guildId: searchContextRef.current.guildId,
+        channelId: searchContextRef.current.channelId,
+      });
+      const response = await fetch(serverRequestUrl(serverUrl, '/api/queue'), {
+        method: 'POST',
+        headers: {
+          authorization: `Bearer ${session.token}`,
+          'content-type': 'application/json',
+        },
+        body: JSON.stringify(
+          effectiveScope.searchScope === 'global'
+            ? {}
+            : {
+                searchScope: effectiveScope.searchScope,
+                ...(effectiveScope.guildId === null ? {} : { guildId: effectiveScope.guildId }),
+              },
+        ),
+        cache: 'no-store',
+      });
+      if (response.status === 409) return null;
+      if (!response.ok) return null;
+      writePreferredMatchScope(scope);
+      return effectiveScope.searchScope;
+    } catch {
+      return null;
     }
-    window.location.reload();
+  }, []);
+
+  const findNewOpponent = useCallback(async () => {
+    try {
+      const serverUrl = await resolveGameServerUrl();
+      const session = readClientSession();
+      if (!session) return;
+      const effectiveScope = resolveEffectiveSearchScope({
+        provider: session.provider,
+        preferredScope: readPreferredMatchScope(),
+        guildId: searchContextRef.current.guildId,
+        channelId: searchContextRef.current.channelId,
+      });
+      const response = await fetch(serverRequestUrl(serverUrl, '/api/queue/requeue'), {
+        method: 'POST',
+        headers: {
+          authorization: `Bearer ${session.token}`,
+          'content-type': 'application/json',
+          'Idempotency-Key': requeueRequestKeyRef.current ?? (
+            requeueRequestKeyRef.current = createGuestBootstrapKey()
+          ),
+        },
+        body: JSON.stringify({
+          matchId: matchIdRef.current,
+          searchScope: effectiveScope.searchScope,
+          ...(effectiveScope.guildId === null ? {} : { guildId: effectiveScope.guildId }),
+        }),
+        cache: 'no-store',
+      });
+      if (response.ok) {
+        requeueRequestKeyRef.current = null;
+        socket?.disconnect();
+        matchIdRef.current = null;
+        setSearchEpoch((epoch) => epoch + 1);
+      }
+    } catch {
+      // The outcome dialog remains open so the player can retry.
+    }
   }, [socket]);
 
   const resetClientSession = useCallback(() => {
@@ -1164,6 +1295,7 @@ export const useGameSocket = ({
     sendShopOpen,
     sendShopPurchase,
     cancelQueueSearch,
+    changeQueueScope,
     findNewOpponent,
     resetClientSession,
   };
@@ -1203,6 +1335,13 @@ function socketAuthErrorCode(value: unknown): SocketAuthErrorCode | null {
 function isSocketAuthErrorCode(value: unknown): value is SocketAuthErrorCode {
   return typeof value === 'string'
     && SOCKET_AUTH_ERROR_CODES.some((code) => code === value);
+}
+
+function isAutomaticSearchVoid(value: unknown): boolean {
+  const payload = isRecord(value) && isRecord(value.data) ? value.data : value;
+  return isRecord(payload)
+    && payload.reason === 'rendezvous_timeout'
+    && payload.nextAction === 'automatic-search';
 }
 
 function isTerminalSocketAuthCode(
@@ -1274,6 +1413,14 @@ function isMatchAssignment(value: unknown): value is MatchAssignment {
     Number.isInteger(value.protocolVersion) &&
     (value.isRepeatPairing === undefined || typeof value.isRepeatPairing === 'boolean')
   );
+}
+
+function isEffectiveQueueResponse(value: unknown): value is {
+  effectiveScope: { searchScope: SearchScope };
+} {
+  if (!isRecord(value) || !isRecord(value.effectiveScope)) return false;
+  const scope = value.effectiveScope.searchScope;
+  return scope === 'global' || scope === 'guild' || scope === 'discord_only';
 }
 
 function isMatchOutcomeResponse(value: unknown): value is MatchOutcomeResponse {

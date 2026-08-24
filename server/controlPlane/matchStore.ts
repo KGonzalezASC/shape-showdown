@@ -23,6 +23,8 @@ export type MatchRecord = {
   protocolVersion: number;
   status: MatchStatus;
   isRepeatPairing: boolean;
+  playerASearchAttemptId: string | null;
+  playerBSearchAttemptId: string | null;
 };
 
 export type ActiveMatchForPlayer = {
@@ -76,6 +78,8 @@ type MatchRow = {
   protocol_version: number;
   status: MatchStatus;
   is_repeat_pairing: boolean;
+  player_a_search_attempt_id: string | null;
+  player_b_search_attempt_id: string | null;
 };
 
 type ActiveMatchRow = MatchRow & {
@@ -115,6 +119,24 @@ type MatchStatusChangeRow = {
   ended_at: Date | null;
 };
 
+type RendezvousMatchRow = {
+  player_a_id: string;
+  player_b_id: string;
+  player_a_search_attempt_id: string | null;
+  player_b_search_attempt_id: string | null;
+};
+
+type SearchAttemptRow = {
+  id: string;
+  player_id: string;
+  session_id: string;
+  effective_scope: SearchScope;
+  guild_id: string | null;
+  pool_key: string;
+  generation: number;
+  pool_entered_at: Date;
+};
+
 export class MatchStore {
   public constructor(private readonly database: SqlExecutor) {}
 
@@ -128,6 +150,8 @@ export class MatchStore {
     searchScope?: SearchScope;
     guildId?: string | null;
     isRepeatPairing?: boolean;
+    playerASearchAttemptId?: string | null;
+    playerBSearchAttemptId?: string | null;
   }): Promise<MatchRecord> {
     const rows = await this.database<MatchRow[]>`
       INSERT INTO matches (
@@ -141,6 +165,8 @@ export class MatchStore {
         search_scope,
         guild_id,
         is_repeat_pairing,
+        player_a_search_attempt_id,
+        player_b_search_attempt_id,
         status
       )
       VALUES (
@@ -154,6 +180,8 @@ export class MatchStore {
         ${input.searchScope ?? 'global'},
         ${input.guildId ?? null},
         ${input.isRepeatPairing ?? false},
+        ${input.playerASearchAttemptId ?? null},
+        ${input.playerBSearchAttemptId ?? null},
         'allocating'
       )
       RETURNING
@@ -166,11 +194,36 @@ export class MatchStore {
         protocol_version,
         status,
         is_repeat_pairing
+        player_a_search_attempt_id,
+        player_b_search_attempt_id
     `;
 
     const row = rows[0];
     if (!row) throw new Error('Match creation returned no row');
     return toMatchRecord(row);
+  }
+
+  public async markSearchAttemptsMatched(input: {
+    matchId: string;
+    attempts: Array<{ id: string | null; generation: number }>;
+  }): Promise<void> {
+    for (const attempt of input.attempts) {
+      if (attempt.id === null) continue;
+      const rows = await this.database<{ id: string }[]>`
+        UPDATE search_attempts
+        SET
+          status = 'matched',
+          matched_match_id = ${input.matchId},
+          updated_at = CURRENT_TIMESTAMP
+        WHERE id = ${attempt.id}
+          AND generation = ${attempt.generation}
+          AND status = 'searching'
+        RETURNING id
+      `;
+      if (rows.length !== 1) {
+        throw new Error(`Search attempt ${attempt.id} was not claimable`);
+      }
+    }
   }
 
   public async findActiveMatchForPlayer(playerId: string): Promise<ActiveMatchForPlayer | null> {
@@ -185,6 +238,8 @@ export class MatchStore {
         m.protocol_version,
         m.status,
         m.is_repeat_pairing,
+        m.player_a_search_attempt_id,
+        m.player_b_search_attempt_id,
         CASE
           WHEN m.player_a_id = ${playerId} THEN 'A'
           ELSE 'B'
@@ -284,6 +339,133 @@ export class MatchStore {
     return rows.length;
   }
 
+  public async revokeMatchTickets(matchId: string): Promise<number> {
+    const rows = await this.database<{ id: string }[]>`
+      UPDATE match_tickets
+      SET revoked = TRUE
+      WHERE match_id = ${matchId}
+        AND revoked = FALSE
+      RETURNING id
+    `;
+    return rows.length;
+  }
+
+  public async voidRendezvousAndRequeue(input: {
+    matchId: string;
+    playerId: string;
+    reason: string;
+  }): Promise<boolean> {
+    const matches = await this.database<RendezvousMatchRow[]>`
+      SELECT
+        player_a_id,
+        player_b_id,
+        player_a_search_attempt_id,
+        player_b_search_attempt_id
+      FROM matches
+      WHERE id = ${input.matchId}
+        AND status IN ('allocating', 'countdown', 'playing')
+      FOR UPDATE
+    `;
+    const match = matches[0];
+    if (match === undefined) return false;
+
+    const connectedAttemptId = match.player_a_id === input.playerId
+      ? match.player_a_search_attempt_id
+      : match.player_b_id === input.playerId
+        ? match.player_b_search_attempt_id
+        : null;
+    const opponentId = match.player_a_id === input.playerId
+      ? match.player_b_id
+      : match.player_b_id === input.playerId
+        ? match.player_a_id
+        : null;
+
+    await this.database`
+      UPDATE matches
+      SET
+        status = 'voided',
+        ended_at = COALESCE(ended_at, CURRENT_TIMESTAMP),
+        terminal_reason = ${input.reason}
+      WHERE id = ${input.matchId}
+    `;
+    await this.revokeMatchTickets(input.matchId);
+
+    const abandonedAttemptId = connectedAttemptId === match.player_a_search_attempt_id
+      ? match.player_b_search_attempt_id
+      : match.player_a_search_attempt_id;
+    if (abandonedAttemptId !== null) {
+      await this.database`
+        UPDATE search_attempts
+        SET
+          status = 'expired',
+          terminal_reason = ${input.reason},
+          updated_at = CURRENT_TIMESTAMP
+        WHERE id = ${abandonedAttemptId}
+          AND status = 'matched'
+      `;
+    }
+    if (connectedAttemptId === null || opponentId === null) return true;
+    const attempts = await this.database<SearchAttemptRow[]>`
+      SELECT id, player_id, session_id, effective_scope, guild_id,
+             pool_key, generation, pool_entered_at
+      FROM search_attempts
+      WHERE id = ${connectedAttemptId}
+      FOR UPDATE
+    `;
+    const attempt = attempts[0];
+    if (attempt === undefined || attempt.player_id !== input.playerId) return true;
+
+    await this.database`
+      INSERT INTO search_avoidances (search_attempt_id, opponent_id, reason)
+      VALUES (${attempt.id}, ${opponentId}, ${input.reason})
+      ON CONFLICT (search_attempt_id, opponent_id)
+      DO UPDATE SET reason = EXCLUDED.reason, created_at = CURRENT_TIMESTAMP
+    `;
+    await this.database`
+      UPDATE search_attempts
+      SET
+        status = 'searching',
+        generation = generation + 1,
+        matched_match_id = NULL,
+        terminal_reason = NULL,
+        updated_at = CURRENT_TIMESTAMP
+      WHERE id = ${attempt.id}
+    `;
+    await this.database`
+      INSERT INTO queue_entries (
+        id, player_id, session_id, status, search_scope, guild_id,
+        avoid_player_id, created_at, expires_at, search_attempt_id, generation, pool_entered_at
+      )
+      VALUES (
+        ${randomUUID()},
+        ${attempt.player_id},
+        ${attempt.session_id},
+        'searching',
+        ${attempt.effective_scope},
+        ${attempt.guild_id},
+        ${opponentId},
+        ${attempt.pool_entered_at},
+        CURRENT_TIMESTAMP + INTERVAL '10 seconds',
+        ${attempt.id},
+        ${attempt.generation + 1},
+        ${attempt.pool_entered_at}
+      )
+      ON CONFLICT (player_id) DO UPDATE SET
+        status = 'searching',
+        session_id = EXCLUDED.session_id,
+        search_scope = EXCLUDED.search_scope,
+        guild_id = EXCLUDED.guild_id,
+        avoid_player_id = EXCLUDED.avoid_player_id,
+        expires_at = EXCLUDED.expires_at,
+        search_attempt_id = EXCLUDED.search_attempt_id,
+        generation = EXCLUDED.generation,
+        pool_entered_at = EXCLUDED.pool_entered_at
+      WHERE queue_entries.status <> 'matched'
+         OR queue_entries.expires_at <= CURRENT_TIMESTAMP
+    `;
+    return true;
+  }
+
   public async validateJoinTicket(rawTicket: string): Promise<ValidatedJoinTicket | null> {
     const rows = await this.database<ValidatedJoinTicketRow[]>`
       SELECT
@@ -359,11 +541,13 @@ export class MatchStore {
   public async finalizeActiveMatchStatus(
     matchId: string,
     nextStatus: MatchStatus = 'ended',
+    terminalReason?: string,
   ): Promise<MatchStatusChange | null> {
     const rows = await this.database<MatchStatusChangeRow[]>`
       UPDATE matches
       SET
         status = ${nextStatus},
+        terminal_reason = COALESCE(${terminalReason ?? null}, terminal_reason),
         ended_at = CASE
           WHEN ${nextStatus} IN ('ended', 'voided', 'cancelled')
           THEN COALESCE(ended_at, CURRENT_TIMESTAMP)
@@ -405,14 +589,26 @@ export class MatchStore {
               AND t.consumed_at IS NOT NULL
           )
         LIMIT 100
+      ),
+      cancelled AS (
+        UPDATE matches m
+        SET
+          status = 'cancelled',
+          ended_at = COALESCE(m.ended_at, CURRENT_TIMESTAMP),
+          terminal_reason = 'never_joined_timeout'
+        FROM stale s
+        WHERE m.id = s.id
+        RETURNING m.id
+      ),
+      revoked AS (
+        UPDATE match_tickets t
+        SET revoked = TRUE
+        FROM cancelled c
+        WHERE t.match_id = c.id
+          AND t.revoked = FALSE
+        RETURNING t.id
       )
-      UPDATE matches m
-      SET
-        status = 'cancelled',
-        ended_at = COALESCE(m.ended_at, CURRENT_TIMESTAMP)
-      FROM stale s
-      WHERE m.id = s.id
-      RETURNING m.id
+      SELECT id FROM cancelled
     `;
     return rows.map((row) => row.id);
   }
@@ -468,6 +664,8 @@ function toMatchRecord(row: MatchRow): MatchRecord {
     protocolVersion: row.protocol_version,
     status: row.status,
     isRepeatPairing: row.is_repeat_pairing,
+    playerASearchAttemptId: row.player_a_search_attempt_id,
+    playerBSearchAttemptId: row.player_b_search_attempt_id,
   };
 }
 
