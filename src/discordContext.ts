@@ -19,6 +19,14 @@ export function isDiscordActivityContext(): boolean {
   );
 }
 
+export function isDiscordDMLaunch(): boolean {
+  if (!isDiscordActivityContext() || typeof window === 'undefined') return false;
+  const params = new URLSearchParams(window.location.search);
+  const guildId = params.get('guild_id');
+  const channelId = params.get('channel_id');
+  return (!guildId || guildId.length === 0) && typeof channelId === 'string' && channelId.length > 0;
+}
+
 export function appendDiscordFrameId(url: string): string {
   if (!isDiscordActivityContext() || typeof window === 'undefined') return url;
   const frameId = new URLSearchParams(window.location.search).get('frame_id');

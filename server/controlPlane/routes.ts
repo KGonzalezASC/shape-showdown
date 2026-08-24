@@ -293,6 +293,7 @@ export function createControlPlaneRouter(
             ticket: ticket.ticket,
             matchSeed: active.match.matchSeed,
             protocolVersion: active.match.protocolVersion,
+            ...(active.match.isRepeatPairing ? { isRepeatPairing: true } : {}),
           };
         });
       } catch (error) {

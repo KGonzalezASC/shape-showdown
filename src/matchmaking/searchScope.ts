@@ -9,12 +9,15 @@ export type EffectiveSearchScopeInput = {
   provider: ClientSessionProvider;
   preferredScope: string | null;
   guildId: string | null;
+  channelId?: string | null;
 };
 
 /**
  * Applies the client-side degrade rules:
  * - guests always search global (server enforces this too);
- * - guild scope without a launch guild id (DM/profile launch) degrades to
+ * - guild scope with a guild id isolates by server;
+ * - guild scope without a guild id but with a channel id isolates by DM channel;
+ * - guild scope without guild or channel id (profile launch) degrades to
  *   discord_only rather than silently searching the whole world.
  */
 export function resolveEffectiveSearchScope(
@@ -27,6 +30,9 @@ export function resolveEffectiveSearchScope(
   if (input.preferredScope === 'guild') {
     if (input.guildId !== null) {
       return { searchScope: 'guild', guildId: input.guildId };
+    }
+    if (input.channelId !== null && input.channelId !== undefined) {
+      return { searchScope: 'guild', guildId: input.channelId };
     }
     return { searchScope: 'discord_only', guildId: null };
   }

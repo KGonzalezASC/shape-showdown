@@ -4,6 +4,8 @@ import type { SearchScope } from './queueScope.js';
 
 /** How many oldest guild-scoped rows each guild claim considers before pairing. */
 const GUILD_CANDIDATE_WINDOW = 16;
+/** How many oldest scope rows the global and discord-only claims consider. */
+const SCOPE_CANDIDATE_WINDOW = 8;
 
 export type QueueEntry = {
   id: string;
@@ -29,6 +31,20 @@ export type ClaimedQueuePair = {
   pair: QueuePair;
   searchScope: SearchScope;
   guildId: string | null;
+  isRepeatPairing: boolean;
+};
+
+export type QueueCandidate = {
+  id: string;
+  playerId: string;
+  sessionId: string;
+  avoidPlayerId: string | null;
+  createdAtMs: number;
+};
+
+export type PickedPair = {
+  pair: [QueueCandidate, QueueCandidate];
+  isRepeatPairing: boolean;
 };
 
 export type LobbyRecord = {
@@ -55,15 +71,18 @@ type QueueEntryRow = {
   expires_at: Date;
 };
 
-type QueueLeaseRow = {
-  id: string;
-  expires_at: Date;
-};
-
-type QueueParticipantRow = {
+type QueueCandidateRow = {
   id: string;
   player_id: string;
   session_id: string;
+  avoid_player_id: string | null;
+  guild_id: string | null;
+  created_at: Date;
+};
+
+type QueueLeaseRow = {
+  id: string;
+  expires_at: Date;
 };
 
 type QueueIdRow = {
@@ -102,8 +121,20 @@ export class QueueStore {
     guildId: string | null;
   }): Promise<QueueEntry | null> {
     const rows = await this.database<QueueEntryRow[]>`
+      WITH latest_opponent AS (
+        SELECT CASE
+          WHEN m.player_a_id = ${input.playerId} THEN m.player_b_id
+          ELSE m.player_a_id
+        END AS opponent_id
+        FROM matches m
+        WHERE ${input.playerId} IN (m.player_a_id, m.player_b_id)
+          AND m.started_at IS NOT NULL
+        ORDER BY m.created_at DESC, m.id DESC
+        LIMIT 1
+      )
       INSERT INTO queue_entries (
-        id, player_id, session_id, status, search_scope, guild_id, expires_at
+        id, player_id, session_id, status, search_scope, guild_id,
+        avoid_player_id, expires_at
       )
       VALUES (
         ${randomUUID()},
@@ -112,12 +143,14 @@ export class QueueStore {
         'searching',
         ${input.searchScope},
         ${input.guildId},
+        (SELECT opponent_id FROM latest_opponent),
         CURRENT_TIMESTAMP + INTERVAL '10 seconds'
       )
       ON CONFLICT (player_id) DO UPDATE SET
         session_id = EXCLUDED.session_id,
         status = 'searching',
         matched_match_id = NULL,
+        avoid_player_id = EXCLUDED.avoid_player_id,
         expires_at = CURRENT_TIMESTAMP + INTERVAL '10 seconds',
         search_scope = EXCLUDED.search_scope,
         guild_id = EXCLUDED.guild_id,
@@ -159,81 +192,78 @@ export class QueueStore {
   }
 
   /**
-   * Claims the oldest two guild-scoped rows that share a guild id.
+   * Claims two guild-scoped searchers that share a guild id, preferring a
+   * pairing where neither player's most recent opponent is the other.
    *
-   * Considers a window of the oldest live guild searchers, picks the earliest
-   * guild id in that window having at least two candidates, and deletes its
-   * two oldest rows. The bounded window prevents a solo searcher at the head
-   * of the queue from stalling pairable guilds behind them indefinitely.
+   * Considers a window of the oldest live guild searchers. Within the earliest
+   * guild id in that window having at least two candidates, the oldest searcher
+   * is paired with the oldest partner who is not mutually avoided; when every
+   * remaining candidate is the avoided player the pair falls back to the next
+   * oldest candidate and flags the pairing as a repeat. The bounded window
+   * prevents a solo searcher at the head of the queue from stalling pairable
+   * guilds behind them indefinitely.
    */
   public async claimGuildPair(): Promise<ClaimedQueuePair | null> {
-    const rows = await this.database<QueueParticipantRow[]>`
-      WITH candidates AS MATERIALIZED (
-        SELECT id, player_id, session_id, guild_id, created_at
-        FROM queue_entries
-        WHERE status = 'searching'
-          AND search_scope = 'guild'
-          AND guild_id IS NOT NULL
-          AND expires_at > CURRENT_TIMESTAMP
-        ORDER BY created_at ASC, id ASC
-        LIMIT ${GUILD_CANDIDATE_WINDOW}
-        FOR UPDATE SKIP LOCKED
-      ),
-      eligible AS (
-        SELECT c.guild_id
-        FROM candidates c
-        GROUP BY c.guild_id
-        HAVING COUNT(*) >= 2
-      ),
-      target AS (
-        SELECT c.guild_id
-        FROM candidates c
-        JOIN eligible e ON e.guild_id = c.guild_id
-        ORDER BY c.created_at ASC, c.id ASC
-        LIMIT 1
-      ),
-      pair AS (
-        SELECT c.id
-        FROM candidates c
-        JOIN target t ON t.guild_id = c.guild_id
-        ORDER BY c.created_at ASC, c.id ASC
-        LIMIT 2
-      )
-      DELETE FROM queue_entries q
-      USING pair
-      WHERE q.id = pair.id
-      RETURNING q.id, q.player_id, q.session_id
+    const rows = await this.database<QueueCandidateRow[]>`
+      SELECT id, player_id, session_id, avoid_player_id, guild_id, created_at
+      FROM queue_entries
+      WHERE status = 'searching'
+        AND search_scope = 'guild'
+        AND guild_id IS NOT NULL
+        AND expires_at > CURRENT_TIMESTAMP
+      ORDER BY created_at ASC, id ASC
+      LIMIT ${GUILD_CANDIDATE_WINDOW}
+      FOR UPDATE SKIP LOCKED
     `;
 
-    return toClaimedPair(rows, 'guild', null);
+    const byGuild = new Map<string, QueueCandidate[]>();
+    for (const row of rows) {
+      const list = byGuild.get(row.guild_id) ?? [];
+      list.push(toQueueCandidate(row));
+      byGuild.set(row.guild_id, list);
+    }
+
+    let claimed: { guildId: string; picked: PickedPair } | null = null;
+    for (const [guildId, candidates] of byGuild) {
+      if (candidates.length < 2) continue;
+      const picked = pickAvoidingPair(candidates);
+      if (picked === null) continue;
+      claimed = { guildId, picked };
+      break;
+    }
+    if (claimed === null) return null;
+
+    await this.deleteClaimedCandidates(claimed.picked.pair);
+    return toClaimedPair(claimed.picked, 'guild', claimed.guildId);
   }
 
   public async claimScopePair(
     scope: Extract<SearchScope, 'global' | 'discord_only'>,
   ): Promise<ClaimedQueuePair | null> {
-    const rows = await this.database<QueueParticipantRow[]>`
-      WITH candidates AS MATERIALIZED (
-        SELECT id, player_id, session_id
-        FROM queue_entries
-        WHERE status = 'searching'
-          AND search_scope = ${scope}
-          AND expires_at > CURRENT_TIMESTAMP
-        ORDER BY created_at ASC, id ASC
-        LIMIT 2
-        FOR UPDATE SKIP LOCKED
-      ),
-      pair AS (
-        SELECT id
-        FROM candidates
-        WHERE (SELECT COUNT(*) FROM candidates) = 2
-      )
-      DELETE FROM queue_entries q
-      USING pair
-      WHERE q.id = pair.id
-      RETURNING q.id, q.player_id, q.session_id
+    const rows = await this.database<QueueCandidateRow[]>`
+      SELECT id, player_id, session_id, avoid_player_id, created_at
+      FROM queue_entries
+      WHERE status = 'searching'
+        AND search_scope = ${scope}
+        AND expires_at > CURRENT_TIMESTAMP
+      ORDER BY created_at ASC, id ASC
+      LIMIT ${SCOPE_CANDIDATE_WINDOW}
+      FOR UPDATE SKIP LOCKED
     `;
 
-    return toClaimedPair(rows, scope, null);
+    const candidates = rows.map(toQueueCandidate);
+    const picked = pickAvoidingPair(candidates);
+    if (picked === null) return null;
+
+    await this.deleteClaimedCandidates(picked.pair);
+    return toClaimedPair(picked, scope, null);
+  }
+
+  private async deleteClaimedCandidates(pair: [QueueCandidate, QueueCandidate]): Promise<void> {
+    await this.database`
+      DELETE FROM queue_entries
+      WHERE id IN (${pair[0].id}, ${pair[1].id})
+    `;
   }
 
   public async purgeExpiredEntries(batchSize = 500): Promise<string[]> {
@@ -423,27 +453,60 @@ function toQueueEntry(row: QueueEntryRow): QueueEntry {
   };
 }
 
-function toClaimedPair(
-  rows: QueueParticipantRow[],
-  searchScope: SearchScope,
-  guildId: string | null,
-): ClaimedQueuePair | null {
-  if (rows.length === 0) return null;
-  if (rows.length !== 2) {
-    throw new Error(`Queue pair claim returned ${rows.length} participants`);
-  }
-
-  return {
-    pair: [toQueueParticipant(rows[0]), toQueueParticipant(rows[1])],
-    searchScope,
-    guildId,
-  };
-}
-
-function toQueueParticipant(row: QueueParticipantRow): QueueParticipant {
+function toQueueCandidate(row: QueueCandidateRow): QueueCandidate {
   return {
     id: row.id,
     playerId: row.player_id,
     sessionId: row.session_id,
+    avoidPlayerId: row.avoid_player_id,
+    createdAtMs: row.created_at.getTime(),
+  };
+}
+
+/**
+ * Pairs the oldest candidate with a partner, preferring the oldest partner
+ * where neither side is the other's most recent opponent. When every remaining
+ * candidate is mutually avoided the second-oldest candidate is used and the
+ * pairing is flagged as a repeat.
+ *
+ * Candidates must arrive ordered by (createdAtMs asc, id asc); the picker
+ * preserves that order for tie-breaks and does not re-sort.
+ */
+export function pickAvoidingPair(candidates: readonly QueueCandidate[]): PickedPair | null {
+  if (candidates.length < 2) return null;
+
+  const [first] = candidates;
+  const isMutuallyAvoided = (candidate: QueueCandidate): boolean =>
+    candidate.avoidPlayerId === first.playerId
+    || first.avoidPlayerId === candidate.playerId;
+
+  const freshPartner = candidates.slice(1).find((candidate) => !isMutuallyAvoided(candidate));
+  if (freshPartner !== undefined) {
+    return { pair: [first, freshPartner], isRepeatPairing: false };
+  }
+  return { pair: [first, candidates[1]], isRepeatPairing: true };
+}
+
+function toClaimedPair(
+  picked: PickedPair,
+  searchScope: SearchScope,
+  guildId: string | null,
+): ClaimedQueuePair {
+  return {
+    pair: [
+      toQueueParticipantFromCandidate(picked.pair[0]),
+      toQueueParticipantFromCandidate(picked.pair[1]),
+    ],
+    searchScope,
+    guildId,
+    isRepeatPairing: picked.isRepeatPairing,
+  };
+}
+
+function toQueueParticipantFromCandidate(candidate: QueueCandidate): QueueParticipant {
+  return {
+    id: candidate.id,
+    playerId: candidate.playerId,
+    sessionId: candidate.sessionId,
   };
 }

@@ -67,6 +67,7 @@ class RecordingMatchPersistence implements MatchPersistence {
       gameServerUrl: 'http://localhost:3000',
       protocolVersion: GAME_PROTOCOL_VERSION,
       status: 'allocating',
+      isRepeatPairing: false,
     };
     const ticket = (seat: 'A' | 'B'): JoinTicket => ({
       id: `${matchId}-${seat}`,
@@ -946,5 +947,34 @@ describe('GameManager lifecycle harness', () => {
     assert.equal(persistence.checkpoints.length, 2);
     assert.equal(persistence.checkpoints[0].simTick, 60);
     assert.equal(persistence.checkpoints[1].simTick, 240);
+  });
+
+  it('voids match when allocation rendezvous timeout expires before second player arrives', async () => {
+    const persistence = new RecordingMatchPersistence();
+    const gm = new GameManager(createFakeIo(), 60, persistence);
+    managers.push(gm);
+
+    const p1 = new FakeSocket('p1');
+    gm.handleConnection(p1 as unknown as Socket, 'durable-p1', {
+      matchId: 'match-rendezvous-1',
+      matchSeed: 4207,
+      playerId: 'durable-p1',
+      seat: 'A',
+      protocolVersion: GAME_PROTOCOL_VERSION,
+    });
+
+    const internal = gm as unknown as {
+      handleAllocationRendezvousTimeout: () => void;
+      gameState: { status: string; endReason?: string };
+    };
+    internal.handleAllocationRendezvousTimeout();
+    await flushPromises();
+
+    assert.equal(internal.gameState.status, 'ended');
+    assert.equal(internal.gameState.endReason, 'server-void');
+    assert.equal(persistence.finalizations.length, 1);
+    assert.equal(persistence.finalizations[0].matchId, 'match-rendezvous-1');
+    assert.equal(persistence.finalizations[0].outcomeReason, 'void_server_crash');
+    assert.ok(p1.disconnected);
   });
 });

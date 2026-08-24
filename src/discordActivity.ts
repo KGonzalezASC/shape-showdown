@@ -19,12 +19,18 @@ export type DiscordActivityBootstrap = {
   playerId: string;
   token: string;
   expiresAt: string | null;
+  displayName?: string | null;
   /**
    * Frame-context launch target: the server the Activity was opened in.
    * Null on DM/profile launches. Re-read every launch — never persisted —
    * because the same user can open the Activity in different servers.
    */
   guildId: string | null;
+  /**
+   * Frame-context channel target: voice channel, text channel, or DM channel.
+   * Present on DM launches where guildId is null.
+   */
+  channelId: string | null;
 };
 
 const discordClientId =
@@ -47,6 +53,10 @@ export async function requestDiscordActivitySession(
   const rawGuildId: unknown = discordSdk.guildId;
   const guildId =
     typeof rawGuildId === 'string' && /^\d{1,64}$/.test(rawGuildId) ? rawGuildId : null;
+
+  const rawChannelId: unknown = discordSdk.channelId;
+  const channelId =
+    typeof rawChannelId === 'string' && /^\d{1,64}$/.test(rawChannelId) ? rawChannelId : null;
 
   const authorization = await discordSdk.commands.authorize({
     client_id: discordClientId,
@@ -89,10 +99,12 @@ export async function requestDiscordActivitySession(
   }
   return {
     playerId: body.player.id,
+    displayName: typeof body.player.displayName === 'string' ? body.player.displayName : null,
     token: body.session.token,
     expiresAt:
       typeof body.session.expiresAt === 'string' ? body.session.expiresAt : null,
     guildId,
+    channelId,
   };
 }
 

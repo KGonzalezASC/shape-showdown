@@ -39,6 +39,9 @@ type StartGameServerOptions = {
   mode?: ServerMode;
 };
 
+/** How long a match may sit active with zero consumed tickets before the rendezvous sweep cancels it. */
+const NEVER_JOINED_MATCH_GRACE_SECONDS = 60;
+
 export type RunningGameServer = {
   config: ServerConfig;
   mode: ServerMode;
@@ -71,6 +74,7 @@ export async function startGameServer(
   const playerStore = database === null ? null : new PlayerStore(database);
   const allocator = database === null ? null : new MatchAllocationService(database);
   const queueJanitor = database === null ? null : new QueueStore(database);
+  const matchJanitor = database === null ? null : new MatchStore(database);
   const analyticsJanitor = database === null ? null : new AnalyticsStore(database);
   const gameServerUrl = process.env.GAME_SERVER_URL?.trim() || `http://localhost:${config.port}`;
 
@@ -278,6 +282,7 @@ export async function startGameServer(
             });
           }
           await queueJanitor?.purgeExpiredEntries();
+          await matchJanitor?.cancelNeverJoinedMatches(NEVER_JOINED_MATCH_GRACE_SECONDS);
           const analyticsDate = new Date().toISOString().slice(0, 10);
           if (
             analyticsJanitor !== null

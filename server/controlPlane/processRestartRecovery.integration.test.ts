@@ -5,15 +5,16 @@ import { createServer as createNetServer } from 'node:net';
 import path from 'node:path';
 import { after, describe, it } from 'node:test';
 import { io as ioClient, type Socket as ClientSocket } from 'socket.io-client';
-import { createDatabase } from './database.js';
+import { createTestDatabase } from './testDatabase.js';
 import { MatchStore } from './matchStore.js';
 import { runMigrations } from './migrations.js';
 import { startGameServer, type RunningGameServer } from '../gameServer.js';
 import { makePlayer } from '../puzzleEngine/engine.js';
 import { createPlayerRngChannels } from '../../src/rng.js';
+import { GAME_PROTOCOL_VERSION } from '../../src/protocol/version.js';
 import type { GameState, MatchAssignment } from '../../src/types.js';
 
-const database = createDatabase();
+const database = createTestDatabase();
 
 async function getFreePort(): Promise<number> {
   return new Promise((resolve, reject) => {
@@ -173,7 +174,7 @@ function connectSocket(
 
 describe('Process restart and graceful drain recovery integration', () => {
   if (database === null) {
-    it('requires DATABASE_URL', { skip: 'DATABASE_URL is not configured' }, () => {});
+    it('requires TEST_DATABASE_URL', { skip: 'TEST_DATABASE_URL is not configured' }, () => {});
     return;
   }
 
@@ -224,7 +225,7 @@ describe('Process restart and graceful drain recovery integration', () => {
       assert.equal(assignment1.seat, 'A');
       assert.equal(assignment2.seat, 'B');
       assert.equal(assignment1.matchSeed, assignment2.matchSeed);
-      assert.equal(assignment1.protocolVersion, 2);
+      assert.equal(assignment1.protocolVersion, GAME_PROTOCOL_VERSION);
 
       const client1 = connectSocket(server1.origin, assignment1);
       const client2 = connectSocket(server1.origin, assignment2);
@@ -469,7 +470,7 @@ describe('Process restart and graceful drain recovery integration', () => {
         seat: 'A',
         ticket: ticketA.ticket,
         matchSeed: 12345,
-        protocolVersion: 2,
+        protocolVersion: GAME_PROTOCOL_VERSION,
       });
       clientSocket = client.socket;
 
@@ -600,7 +601,7 @@ describe('Process restart and graceful drain recovery integration', () => {
         seat: 'A',
         ticket: ticketA.ticket,
         matchSeed: 54321,
-        protocolVersion: 2,
+        protocolVersion: GAME_PROTOCOL_VERSION,
       });
       clientASocket = clientA.socket;
 

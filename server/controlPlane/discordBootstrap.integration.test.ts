@@ -2,16 +2,16 @@ import assert from 'node:assert/strict';
 import express from 'express';
 import { createServer, type Server as HttpServer } from 'node:http';
 import { after, describe, it } from 'node:test';
-import { createDatabase } from './database.js';
+import { createTestDatabase } from './testDatabase.js';
 import { runMigrations } from './migrations.js';
 import { createControlPlaneRouter } from './routes.js';
 import type { DiscordPlayerProfile } from './discordIdentity.js';
 
-const database = createDatabase();
+const database = createTestDatabase();
 
 describe('Discord Activity bootstrap', () => {
   if (database === null) {
-    it('requires DATABASE_URL', { skip: 'DATABASE_URL is not configured' }, () => {});
+    it('requires TEST_DATABASE_URL', { skip: 'TEST_DATABASE_URL is not configured' }, () => {});
     return;
   }
 

@@ -79,6 +79,7 @@ export type MatchAssignment = {
   ticket: string;
   matchSeed: number;
   protocolVersion: number;
+  isRepeatPairing?: boolean;
 };
 export type MatchConnectionPhase =
   | 'idle'
@@ -103,6 +104,7 @@ export type MatchConnectionDiagnostics = {
   ticketState: MatchTicketState;
   ticketLength: number | null;
   error: string | null;
+  repeatPairing: boolean;
 };
 export type SocketAuthErrorCode =
   | 'MATCH_TICKET_REQUIRED'
@@ -289,6 +291,7 @@ export interface PendingShopEffect {
 
 export interface PlayerState {
   id: string;
+  displayName?: string;
   board: CellValue[][];
   activePiece: GamePiece | null;
   /** Server-tick countdown for the temporary Landing Forecast UI. */

@@ -22,6 +22,7 @@ export type MatchRecord = {
   gameServerUrl: string;
   protocolVersion: number;
   status: MatchStatus;
+  isRepeatPairing: boolean;
 };
 
 export type ActiveMatchForPlayer = {
@@ -74,6 +75,7 @@ type MatchRow = {
   game_server_url: string;
   protocol_version: number;
   status: MatchStatus;
+  is_repeat_pairing: boolean;
 };
 
 type ActiveMatchRow = MatchRow & {
@@ -125,6 +127,7 @@ export class MatchStore {
     protocolVersion: number;
     searchScope?: SearchScope;
     guildId?: string | null;
+    isRepeatPairing?: boolean;
   }): Promise<MatchRecord> {
     const rows = await this.database<MatchRow[]>`
       INSERT INTO matches (
@@ -137,6 +140,7 @@ export class MatchStore {
         protocol_version,
         search_scope,
         guild_id,
+        is_repeat_pairing,
         status
       )
       VALUES (
@@ -149,6 +153,7 @@ export class MatchStore {
         ${input.protocolVersion},
         ${input.searchScope ?? 'global'},
         ${input.guildId ?? null},
+        ${input.isRepeatPairing ?? false},
         'allocating'
       )
       RETURNING
@@ -159,7 +164,8 @@ export class MatchStore {
         player_b_id,
         game_server_url,
         protocol_version,
-        status
+        status,
+        is_repeat_pairing
     `;
 
     const row = rows[0];
@@ -178,6 +184,7 @@ export class MatchStore {
         m.game_server_url,
         m.protocol_version,
         m.status,
+        m.is_repeat_pairing,
         CASE
           WHEN m.player_a_id = ${playerId} THEN 'A'
           ELSE 'B'
@@ -378,6 +385,38 @@ export class MatchStore {
       : null;
   }
 
+  /**
+   * Cancels matches that nobody ever joined: still active past the grace
+   * window with no consumed join ticket. Without this sweep, two players who
+   * both abandon before connecting would keep receiving the dead match from
+   * findActiveMatchForPlayer and could never requeue.
+   */
+  public async cancelNeverJoinedMatches(olderThanSeconds: number): Promise<string[]> {
+    const rows = await this.database<{ id: string }[]>`
+      WITH stale AS (
+        SELECT m.id
+        FROM matches m
+        WHERE m.status IN ('allocating', 'countdown', 'playing')
+          AND m.created_at <= CURRENT_TIMESTAMP - ${`${Math.max(0, Math.trunc(olderThanSeconds))} seconds`}::interval
+          AND NOT EXISTS (
+            SELECT 1
+            FROM match_tickets t
+            WHERE t.match_id = m.id
+              AND t.consumed_at IS NOT NULL
+          )
+        LIMIT 100
+      )
+      UPDATE matches m
+      SET
+        status = 'cancelled',
+        ended_at = COALESCE(m.ended_at, CURRENT_TIMESTAMP)
+      FROM stale s
+      WHERE m.id = s.id
+      RETURNING m.id
+    `;
+    return rows.map((row) => row.id);
+  }
+
   public async updateMatchStatus(input: {
     matchId: string;
     expectedStatus: MatchStatus;
@@ -428,6 +467,7 @@ function toMatchRecord(row: MatchRow): MatchRecord {
     gameServerUrl: row.game_server_url,
     protocolVersion: row.protocol_version,
     status: row.status,
+    isRepeatPairing: row.is_repeat_pairing,
   };
 }
 

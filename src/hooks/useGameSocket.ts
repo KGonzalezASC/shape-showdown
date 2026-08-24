@@ -44,10 +44,11 @@ type ClientSession = {
   token: string;
   expiresAt: string | null;
   provider: 'guest' | 'discord';
+  displayName?: string;
 };
 
 type GuestSessionResponse = {
-  player: { id: string };
+  player: { id: string; displayName?: string };
   session: { token: string; expiresAt?: unknown };
 };
 
@@ -201,7 +202,7 @@ async function resolveInitialMatchAssignment(
   onProgress: (phase: MatchBootstrapProgress) => void,
 ): Promise<InitialMatchBootstrap> {
   onProgress('acquiring-session');
-  const { session, guildId } = await getOrCreateClientSession(gameServerUrl, signal);
+  const { session, guildId, channelId } = await getOrCreateClientSession(gameServerUrl, signal);
 
   const existingAssignment = await requestMatchAssignment(gameServerUrl, session, signal);
   if (existingAssignment !== null) {
@@ -212,6 +213,7 @@ async function resolveInitialMatchAssignment(
     provider: session.provider,
     preferredScope: readPreferredMatchScope(),
     guildId,
+    channelId,
   });
   const queueRequestBody = effectiveScope.searchScope === 'global'
     ? '{}'
@@ -280,7 +282,7 @@ function queueTimeoutMessage(scope: SearchScope): string {
 async function getOrCreateClientSession(
   gameServerUrl: string,
   signal: AbortSignal,
-): Promise<{ session: ClientSession; guildId: string | null }> {
+): Promise<{ session: ClientSession; guildId: string | null; channelId: string | null }> {
   const stored = readClientSession();
   if (isDiscordActivityContext()) {
     const body = await requestDiscordActivitySession(gameServerUrl, signal);
@@ -292,18 +294,20 @@ async function getOrCreateClientSession(
       token: body.token,
       expiresAt: body.expiresAt,
       provider: 'discord',
+      displayName: body.displayName ?? undefined,
     };
     writeClientSession(session);
-    return { session, guildId: body.guildId };
+    return { session, guildId: body.guildId, channelId: body.channelId };
   }
   if (stored !== null && stored.provider === 'guest') {
     if (stored.expiresAt !== null && Date.parse(stored.expiresAt) <= Date.now()) {
       throw new SessionInvalidError(stored.playerId, stored.provider);
     }
-    return { session: stored, guildId: null };
+    return { session: stored, guildId: null, channelId: null };
   }
 
   const idempotencyKey = readOrCreateGuestBootstrapKey();
+  const guestDisplayName = `Guest ${Math.random().toString(36).slice(2, 8)}`;
   const response = await fetch(serverRequestUrl(gameServerUrl, '/api/players/guest'), {
     method: 'POST',
     headers: {
@@ -311,7 +315,7 @@ async function getOrCreateClientSession(
       'Idempotency-Key': idempotencyKey,
     },
     body: JSON.stringify({
-      displayName: `Guest ${Math.random().toString(36).slice(2, 8)}`,
+      displayName: guestDisplayName,
     }),
     cache: 'no-store',
     signal,
@@ -327,14 +331,15 @@ async function getOrCreateClientSession(
   if (!isGuestSessionResponse(body)) {
     throw new Error('Guest session response was malformed');
   }
-  const session = {
+  const session: ClientSession = {
     playerId: body.player.id,
     token: body.session.token,
     expiresAt: typeof body.session.expiresAt === 'string' ? body.session.expiresAt : null,
     provider: 'guest' as const,
+    displayName: body.player.displayName ?? guestDisplayName,
   };
   writeClientSession(session);
-  return { session, guildId: null };
+  return { session, guildId: null, channelId: null };
 }
 
 async function requestMatchAssignment(
@@ -405,6 +410,7 @@ function readClientSession(): ClientSession | null {
       token: value.token,
       expiresAt: typeof value.expiresAt === 'string' ? value.expiresAt : null,
       provider: value.provider === 'discord' ? 'discord' : 'guest',
+      displayName: typeof value.displayName === 'string' ? value.displayName : undefined,
     };
   } catch {
     return null;
@@ -517,6 +523,7 @@ export const useGameSocket = ({
       ticketState: 'none',
       ticketLength: null,
       error: null,
+      repeatPairing: false,
     };
     const reportMatchDiagnostics = (
       patch: Partial<MatchConnectionDiagnostics>,
@@ -699,6 +706,7 @@ export const useGameSocket = ({
           ticketState: 'received',
           ticketLength: initialBootstrap.assignment.ticket.length,
           error: null,
+          repeatPairing: initialBootstrap.assignment.isRepeatPairing === true,
         });
       }
 
@@ -890,6 +898,9 @@ export const useGameSocket = ({
                 },
               );
             }
+            if (model.myPlayer && clientSession?.displayName) {
+              model.myPlayer.displayName = clientSession.displayName;
+            }
             callbacksRef.current.onClientMatchModel?.(model);
           }
           if (packetDecoder.shouldRequestKeyframe()) {
@@ -917,6 +928,7 @@ export const useGameSocket = ({
             ticketState: 'received',
             ticketLength: assignment.ticket.length,
             error: null,
+            repeatPairing: assignment.isRepeatPairing === true,
           });
           attachSocket(
             io(socketUrl, {
@@ -1006,6 +1018,7 @@ export const useGameSocket = ({
               ticketState: 'received',
               ticketLength: assignment.ticket.length,
               error: null,
+              repeatPairing: assignment.isRepeatPairing === true,
             });
             attachSocket(
               io(socketUrl, {
@@ -1108,6 +1121,31 @@ export const useGameSocket = ({
     socket?.emit('shopPurchase', itemId);
   }, [socket]);
 
+  const cancelQueueSearch = useCallback(async (): Promise<boolean> => {
+    try {
+      const serverUrl = await resolveGameServerUrl();
+      const session = readClientSession();
+      if (!session) return false;
+      const response = await fetch(serverRequestUrl(serverUrl, '/api/queue'), {
+        method: 'DELETE',
+        headers: {
+          authorization: `Bearer ${session.token}`,
+        },
+        cache: 'no-store',
+      });
+      return response.ok;
+    } catch {
+      return false;
+    }
+  }, []);
+
+  const findNewOpponent = useCallback(() => {
+    if (socket) {
+      socket.disconnect();
+    }
+    window.location.reload();
+  }, [socket]);
+
   const resetClientSession = useCallback(() => {
     try {
       window.localStorage.removeItem(CLIENT_SESSION_STORAGE_KEY);
@@ -1125,6 +1163,8 @@ export const useGameSocket = ({
     sendAction,
     sendShopOpen,
     sendShopPurchase,
+    cancelQueueSearch,
+    findNewOpponent,
     resetClientSession,
   };
 };
@@ -1231,7 +1271,8 @@ function isMatchAssignment(value: unknown): value is MatchAssignment {
     typeof value.ticket === 'string' &&
     typeof value.matchSeed === 'number' &&
     typeof value.protocolVersion === 'number' &&
-    Number.isInteger(value.protocolVersion)
+    Number.isInteger(value.protocolVersion) &&
+    (value.isRepeatPairing === undefined || typeof value.isRepeatPairing === 'boolean')
   );
 }
 
@@ -1243,6 +1284,7 @@ function isGuestSessionResponse(value: unknown): value is GuestSessionResponse {
   if (!isRecord(value) || !isRecord(value.player) || !isRecord(value.session)) return false;
   return (
     typeof value.player.id === 'string' &&
+    (value.player.displayName === undefined || typeof value.player.displayName === 'string') &&
     typeof value.session.token === 'string' &&
     value.session.token.length > 0 &&
     (value.session.expiresAt === undefined
@@ -1256,6 +1298,7 @@ function isClientSession(value: unknown): value is ClientSession {
     typeof value.playerId === 'string' &&
     typeof value.token === 'string' &&
     value.token.length > 0 &&
+    (value.displayName === undefined || typeof value.displayName === 'string') &&
     (value.provider === undefined || value.provider === 'guest' || value.provider === 'discord') &&
     (value.expiresAt === undefined
       || value.expiresAt === null

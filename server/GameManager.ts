@@ -124,6 +124,7 @@ export class GameManager {
   /** Test / shutdown hook — stops the 60Hz interval. */
   public stopLoop() {
     this.clearAllDisconnectForfeitures();
+    this.clearAllocationRendezvousTimer();
     this.enqueueCheckpoint();
     if (this.loopHandle !== null) {
       clearInterval(this.loopHandle);
@@ -219,6 +220,59 @@ export class GameManager {
   }
 
   private loopHandle: ReturnType<typeof setInterval> | null = null;
+  private allocationRendezvousTimer: ReturnType<typeof setTimeout> | null = null;
+  private static readonly ALLOCATION_RENDEZVOUS_MS = 20_000;
+
+  private startAllocationRendezvousTimer(): void {
+    this.clearAllocationRendezvousTimer();
+    this.allocationRendezvousTimer = setTimeout(() => {
+      this.allocationRendezvousTimer = null;
+      this.handleAllocationRendezvousTimeout();
+    }, GameManager.ALLOCATION_RENDEZVOUS_MS);
+  }
+
+  private clearAllocationRendezvousTimer(): void {
+    if (this.allocationRendezvousTimer !== null) {
+      clearTimeout(this.allocationRendezvousTimer);
+      this.allocationRendezvousTimer = null;
+    }
+  }
+
+  private handleAllocationRendezvousTimeout(): void {
+    if (this.gameState.status !== 'waiting' || Object.keys(this.gameState.players).length >= 2) return;
+    const matchId = this.durableMatchId;
+    logInfo('match_allocation_rendezvous_timeout', { matchId });
+    this.clearAllDisconnectForfeitures();
+    this.durableMatchPreallocated = false;
+    this.durableMatchId = null;
+    this.gameState.status = 'ended';
+    this.gameState.winnerId = null;
+    this.gameState.endReason = 'server-void';
+    this.gameState.technicalVictory = false;
+    this.lastHandledStatus = 'ended';
+    this.emitToMatch('error', {
+      code: 'MATCH_VOIDED',
+      message: 'Opponent failed to connect in time. Returning to queue.',
+    } satisfies SocketAuthErrorPayload);
+    this.emitGameplayPackets(true);
+    if (matchId !== null && this.persistence) {
+      this.enqueuePersistence(async () => {
+        await this.persistence!.finalizeMatch({
+          matchId,
+          winnerId: null,
+          loserId: null,
+          outcomeReason: 'void_server_crash',
+          durationSeconds: 0,
+          playerAStats: { score: 0, linesCleared: 0, topOut: false },
+          playerBStats: { score: 0, linesCleared: 0, topOut: false },
+        });
+      });
+    }
+    const sockets = [...this.activeSocketByRuntimeId.values()];
+    for (const socket of sockets) {
+      socket.disconnect(true);
+    }
+  }
 
   public handleConnection(
     socket: Socket,
@@ -393,6 +447,14 @@ export class GameManager {
       this.gameState.pause = undefined;
       this.onRecoveryReady?.();
     }
+
+    if (this.durableMatchPreallocated && this.gameState.status === 'waiting') {
+      if (this.activeSocketByRuntimeId.size === 1) {
+        this.startAllocationRendezvousTimer();
+      } else if (this.activeSocketByRuntimeId.size >= 2) {
+        this.clearAllocationRendezvousTimer();
+      }
+    }
   }
 
   private isSlotAvailable(slot: number): boolean {
@@ -559,6 +621,13 @@ export class GameManager {
     const disconnectedPlayer = this.gameState.players[runtimeId];
     if (disconnectedPlayer === undefined) return;
     this.clearDisconnectForfeiture(runtimeId);
+    if (this.gameState.status === 'ended' && this.gameState.endReason === 'server-void') {
+      delete this.gameState.players[runtimeId];
+      this.rngChannelsByPlayer.delete(runtimeId);
+      this.playerSlots.delete(runtimeId);
+      this.durablePlayerIds.delete(runtimeId);
+      return;
+    }
     const remainingIds = Object.keys(this.gameState.players).filter(id => id !== runtimeId);
     if (remainingIds.length !== 1) {
       this.gameState.status = 'waiting';

@@ -44,6 +44,7 @@ export class MatchAllocationService {
         protocolVersion: input.protocolVersion,
         searchScope: claimed.searchScope,
         guildId: claimed.guildId,
+        isRepeatPairing: claimed.isRepeatPairing,
       });
       const ticketA = await matches.issueJoinTicket({
         matchId: match.id,

@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import { after, describe, it } from 'node:test';
 import { io as ioClient } from 'socket.io-client';
-import { createDatabase } from './database.js';
+import { createTestDatabase } from './testDatabase.js';
 import { MatchStore, type JoinTicket } from './matchStore.js';
 import { runMigrations } from './migrations.js';
 import { startGameServer, type RunningGameServer } from '../gameServer.js';
@@ -13,11 +13,11 @@ import type {
 } from '../../src/types.js';
 import { GAME_PROTOCOL_VERSION } from '../../src/protocol/version.js';
 
-const database = createDatabase();
+const database = createTestDatabase();
 
 describe('Socket match protocol contract', () => {
   if (database === null) {
-    it('requires DATABASE_URL', { skip: 'DATABASE_URL is not configured' }, () => {});
+    it('requires TEST_DATABASE_URL', { skip: 'TEST_DATABASE_URL is not configured' }, () => {});
     return;
   }
 

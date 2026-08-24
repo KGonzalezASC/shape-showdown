@@ -10,6 +10,8 @@ describe('MatchPacketSync', () => {
   it('does not create a sequence gap when an empty delta is skipped', () => {
     const local = makePlayer('local', makeRng(21));
     const opponent = makePlayer('opponent', makeRng(22));
+    local.landingForecastTicksRemaining = undefined;
+    opponent.landingForecastTicksRemaining = undefined;
     const gameState: GameState = {
       players: { local, opponent },
       status: 'playing',

@@ -29,12 +29,25 @@ describe('resolveEffectiveSearchScope', () => {
     );
   });
 
-  it('degrades guild scope to discord_only on DM/profile launches', () => {
+  it('uses the launch channel id for DM launches when guild id is absent', () => {
     assert.deepEqual(
       resolveEffectiveSearchScope({
         provider: 'discord',
         preferredScope: 'guild',
         guildId: null,
+        channelId: '109283746592817263',
+      }),
+      { searchScope: 'guild', guildId: '109283746592817263' },
+    );
+  });
+
+  it('degrades guild scope to discord_only on profile launches where both guild and channel are absent', () => {
+    assert.deepEqual(
+      resolveEffectiveSearchScope({
+        provider: 'discord',
+        preferredScope: 'guild',
+        guildId: null,
+        channelId: null,
       }),
       { searchScope: 'discord_only', guildId: null },
     );

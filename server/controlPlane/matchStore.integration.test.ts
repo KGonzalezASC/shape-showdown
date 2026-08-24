@@ -2,16 +2,16 @@ import { randomUUID } from 'node:crypto';
 import assert from 'node:assert/strict';
 import { after, describe, it } from 'node:test';
 import path from 'node:path';
-import { createDatabase } from './database.js';
+import { createTestDatabase } from './testDatabase.js';
 import { MatchStore } from './matchStore.js';
 import { runMigrations } from './migrations.js';
 import { GAME_PROTOCOL_VERSION } from '../../src/protocol/version.js';
 
-const database = createDatabase();
+const database = createTestDatabase();
 
 describe('MatchStore ticket refresh integration', () => {
   if (database === null) {
-    it('requires DATABASE_URL', { skip: 'DATABASE_URL is not configured' }, () => {});
+    it('requires TEST_DATABASE_URL', { skip: 'TEST_DATABASE_URL is not configured' }, () => {});
     return;
   }
 
