@@ -575,7 +575,9 @@ export const useGameSocket = ({
     (async () => {
       const url = await resolveGameServerUrl();
       if (cancelled) return;
-      const socketPath = isDiscordActivityContext() ? '/socketio' : '/socket.io';
+      const isDiscord = isDiscordActivityContext();
+      const socketPath = isDiscord ? '/socketio' : '/socket.io';
+      const socketTransports = isDiscord ? ['websocket'] : ['websocket', 'polling'];
       const socketUrl = appendDiscordFrameId(url);
       const reportReliability = (
         eventName: ReliabilityEventName,
@@ -658,6 +660,7 @@ export const useGameSocket = ({
       };
       healthAbortController = new AbortController();
       const checkServerHealth = async () => {
+        if (lastGameStatus === 'playing') return;
         try {
           const response = await fetch(serverRequestUrl(url, '/health/details'), {
             cache: 'no-store',
@@ -997,7 +1000,7 @@ export const useGameSocket = ({
                 clientProtocolVersion: GAME_PROTOCOL_VERSION,
               },
               path: socketPath,
-              transports: ['websocket', 'polling'],
+              transports: socketTransports,
             }),
             true,
             assignment,
@@ -1089,7 +1092,7 @@ export const useGameSocket = ({
                   clientProtocolVersion: GAME_PROTOCOL_VERSION,
                 },
                 path: socketPath,
-                transports: ['websocket', 'polling'],
+                transports: socketTransports,
               }),
               true,
               assignment,
@@ -1143,7 +1146,7 @@ export const useGameSocket = ({
       if (useLegacySocket) {
         attachSocket(io(socketUrl, {
           path: socketPath,
-          transports: ['websocket', 'polling'],
+          transports: socketTransports,
         }));
         return;
       }
@@ -1154,7 +1157,7 @@ export const useGameSocket = ({
           clientProtocolVersion: GAME_PROTOCOL_VERSION,
         },
         path: socketPath,
-        transports: ['websocket', 'polling'],
+        transports: socketTransports,
       }), true, initialBootstrap.assignment);
     })();
 
