@@ -47,7 +47,18 @@ export async function requestDiscordActivitySession(
   }
 
   const discordSdk = new DiscordSDK(discordClientId);
-  await discordSdk.ready();
+  const sdkInternal = discordSdk as unknown as { sourceOrigin?: string; handshake?: () => void };
+  if (sdkInternal.sourceOrigin && sdkInternal.sourceOrigin.includes('discordsays.com')) {
+    sdkInternal.sourceOrigin = '*';
+    sdkInternal.handshake?.();
+  }
+
+  await Promise.race([
+    discordSdk.ready(),
+    new Promise((_, reject) =>
+      setTimeout(() => reject(new Error('Discord SDK handshake timed out')), 6000),
+    ),
+  ]);
   if (signal.aborted) throw signal.reason;
 
   const rawGuildId: unknown = discordSdk.guildId;
