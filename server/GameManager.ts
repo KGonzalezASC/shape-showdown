@@ -717,7 +717,7 @@ export class GameManager {
       // Only mid-play disconnects pause the sim. Waiting/countdown (including
       // rematch ticket handoff) must keep the loop running so seats can rebind.
       // Top-out rematch windows also keep both seats until the rematch starts.
-      if (this.durableMatchId !== null && this.gameState.status === 'playing') {
+      if (this.gameState.status === 'playing') {
         const budget = this.disconnectBudgets.get(runtimeId) ?? {
           episodes: 0,
           totalPausedMs: 0,
@@ -1209,6 +1209,9 @@ export class GameManager {
         this.pendingReplayDiscontinuities = [];
       }
     } else if (this.gameState.status === 'playing') {
+      if (this.gameState.pause !== undefined) {
+        return;
+      }
       const stepResult = matchStep(this.gameState, (id) => this.playerRng(id));
 
       if (this.activeReplay && stepResult.events.length > 0) {
