@@ -575,7 +575,7 @@ export const useGameSocket = ({
     (async () => {
       const url = await resolveGameServerUrl();
       if (cancelled) return;
-      const socketPath = isDiscordActivityContext() ? '/socketio' : '/socket.io';
+      const socketPath = '/socket.io';
       const socketUrl = appendDiscordFrameId(url);
       const reportReliability = (
         eventName: ReliabilityEventName,

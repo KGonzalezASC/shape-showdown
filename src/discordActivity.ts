@@ -58,12 +58,21 @@ export async function requestDiscordActivitySession(
   const channelId =
     typeof rawChannelId === 'string' && /^\d{1,64}$/.test(rawChannelId) ? rawChannelId : null;
 
-  const authorization = await discordSdk.commands.authorize({
-    client_id: discordClientId,
-    response_type: 'code',
-    prompt: 'none',
-    scope: ['identify'],
-  });
+  let authorization;
+  try {
+    authorization = await discordSdk.commands.authorize({
+      client_id: discordClientId,
+      response_type: 'code',
+      prompt: 'none',
+      scope: ['identify'],
+    });
+  } catch {
+    authorization = await discordSdk.commands.authorize({
+      client_id: discordClientId,
+      response_type: 'code',
+      scope: ['identify'],
+    });
+  }
   if (
     typeof authorization.code !== 'string'
     || authorization.code.length === 0
@@ -72,6 +81,7 @@ export async function requestDiscordActivitySession(
     throw new Error('Discord Activity returned an invalid authorization code');
   }
   if (signal.aborted) throw signal.reason;
+
 
   const response = await fetch(
     appendDiscordFrameId(`${stripTrailingSlash(gameServerUrl)}/api/players/discord`),
