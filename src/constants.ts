@@ -17,6 +17,8 @@ export const RESTART_DELAY_SECONDS = 5;
 export const DISCONNECT_SEAT_LEASE_MS = 60_000;
 /** Wall-clock budget to load a checkpoint before the restore is treated as failed. */
 export const RESTORE_READY_TIMEOUT_MS = 15_000;
+/** Server ticks between automatic match state checkpoints written to persistence (5s @ 60Hz). */
+export const CHECKPOINT_INTERVAL_TICKS = 300;
 
 export const NEXT_PREVIEW_COUNT = 5;
 /** Server ticks for the temporary Landing Forecast shown after a piece spawns. */

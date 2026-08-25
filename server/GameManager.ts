@@ -3,6 +3,7 @@ import fs from 'fs';
 import path from 'path';
 import {
   ActionType,
+  CHECKPOINT_INTERVAL_TICKS,
   COUNTDOWN_SECONDS,
   GameState,
   InputState,
@@ -1238,7 +1239,7 @@ export class GameManager {
           players: JSON.parse(JSON.stringify(this.gameState.players)),
         });
       }
-      if (this.gameState.tick > 0 && this.gameState.tick % 60 === 0) {
+      if (this.gameState.tick > 0 && this.gameState.tick % CHECKPOINT_INTERVAL_TICKS === 0) {
         this.enqueueCheckpoint();
       }
       if (stepResult.matchEnded) {

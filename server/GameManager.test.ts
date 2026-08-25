@@ -5,7 +5,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { GameManager } from './GameManager.js';
-import { BOARD_COLS, BOARD_ROWS } from '../src/constants.js';
+import { BOARD_COLS, BOARD_ROWS, CHECKPOINT_INTERVAL_TICKS } from '../src/constants.js';
 import type { PlayerState, ReplayDataV2 } from '../src/types.js';
 import { decodeKeyframePacket } from '../src/protocol/decodeMatchPacket.js';
 import { ClientPacketDecoder } from '../src/protocol/ClientPacketDecoder.js';
@@ -1222,6 +1222,35 @@ describe('GameManager lifecycle harness', () => {
     assert.equal(persistence.checkpoints.length, 2);
     assert.equal(persistence.checkpoints[0].simTick, 60);
     assert.equal(persistence.checkpoints[1].simTick, 240);
+  });
+
+  it('enqueues periodic checkpoints at CHECKPOINT_INTERVAL_TICKS cadence during active play', async () => {
+    const persistence = new RecordingMatchPersistence();
+    const gm = new GameManager(createFakeIo(), 60, persistence);
+    managers.push(gm);
+
+    const p1 = new FakeSocket('p1');
+    const p2 = new FakeSocket('p2');
+    gm.handleConnection(p1 as unknown as Socket, 'durable-p1');
+    gm.handleConnection(p2 as unknown as Socket, 'durable-p2');
+
+    for (let i = 0; i < 5; i += 1) gm.tickOnceForTests();
+    await flushPromises();
+
+    const internal = gm as unknown as {
+      gameState: { status: string; tick: number };
+      lastHandledStatus: string;
+    };
+    internal.gameState.status = 'playing';
+    internal.lastHandledStatus = 'playing';
+
+    for (let tick = 1; tick <= CHECKPOINT_INTERVAL_TICKS; tick += 1) {
+      gm.tickOnceForTests();
+    }
+    await flushPromises();
+
+    assert.equal(persistence.checkpoints.length, 1);
+    assert.equal(persistence.checkpoints[0].simTick, CHECKPOINT_INTERVAL_TICKS);
   });
 
   it('voids match when allocation rendezvous timeout expires before second player arrives', async () => {

@@ -38,17 +38,30 @@ if (sortedTestFiles.length === 0) {
   throw new Error(`No ${mode} test files were found`);
 }
 
-let failed = 0;
-for (const file of sortedTestFiles) {
-  const result = Bun.spawn(['bun', 'test', file], {
+if (mode === 'integration') {
+  let failed = 0;
+  for (const file of sortedTestFiles) {
+    const result = Bun.spawn(['bun', 'test', file], {
+      env: process.env,
+      stderr: 'inherit',
+      stdout: 'inherit',
+    });
+    if (await result.exited !== 0) failed += 1;
+  }
+
+  console.log(
+    `[test:${mode}] ${sortedTestFiles.length - failed}/${sortedTestFiles.length} files passed`,
+  );
+  process.exitCode = failed === 0 ? 0 : 1;
+} else {
+  const result = Bun.spawn(['bun', 'test', ...sortedTestFiles], {
     env: process.env,
     stderr: 'inherit',
     stdout: 'inherit',
   });
-  if (await result.exited !== 0) failed += 1;
+  const exitCode = await result.exited;
+  console.log(
+    `[test:${mode}] ${exitCode === 0 ? sortedTestFiles.length : 0}/${sortedTestFiles.length} files passed`,
+  );
+  process.exitCode = exitCode;
 }
-
-console.log(
-  `[test:${mode}] ${sortedTestFiles.length - failed}/${sortedTestFiles.length} files passed`,
-);
-process.exitCode = failed === 0 ? 0 : 1;
