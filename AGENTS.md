@@ -174,7 +174,8 @@ guests continue using the guest bootstrap.
 | **Production** | `production` | `production` (`shape-showdown-production.up.railway.app`) | Production root (`shape-showdown.pages.dev`) | Production Railway Postgres |
 
 - **Branch workflow**: Active development and integration PRs land on `main`. Promoting to production requires fast-forwarding or merging `main` into the `production` branch (`git checkout production && git merge main --ff-only && git push origin production`).
-- **Discord Activity routing**: Point production Discord URL mappings (`/socket.io`, `/api`, `/health`) to `https://shape-showdown-production.up.railway.app` and `/` to `https://shape-showdown.pages.dev`.
+- **Discord Activity routing**: Point production Discord URL mappings to Railway (`/socketio` prefix mapped to target `https://shape-showdown-production.up.railway.app/socket.io`, `/api` mapped to `https://shape-showdown-production.up.railway.app/api`, `/health` mapped to `https://shape-showdown-production.up.railway.app/health`) and `/` to `https://shape-showdown.pages.dev`.
+- **DISCORD ACTIVITIES DO NOT ACCEPT SYMBOLS LIKE "." IN PREFIX**: Discord's URL Mapping validator rejects prefixes containing `.`. Use alphanumeric prefixes like `/socketio` on the Discord mapping prefix, and point the target to the server path `/socket.io`. The client automatically selects `path: '/socketio'` in Discord context.
 
 ## Hosting / ticket jargon (plain language)
 
