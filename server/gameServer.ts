@@ -93,6 +93,8 @@ export async function startGameServer(
 
   const app = express();
   const httpServer = createServer(app);
+  httpServer.keepAliveTimeout = 65_000;
+  httpServer.headersTimeout = 66_000;
   const corsOrigins = resolveCorsOrigins(mode);
   app.use(express.json({ limit: '32kb' }));
   app.use(['/health', '/health/details'], createNoStoreMiddleware());

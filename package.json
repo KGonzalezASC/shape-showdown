@@ -35,8 +35,8 @@
     "knip": "knip",
     "lint:dead-code": "knip",
     "doctor": "react-doctor --yes --offline --fail-on warning",
-    "start": "cross-env NODE_ENV=production bun dist-server/server.mjs",
-    "start:serve-client": "cross-env NODE_ENV=production SERVE_CLIENT=true bun dist-server/server.mjs"
+    "start": "cross-env NODE_ENV=production bun --smol dist-server/server.mjs",
+    "start:serve-client": "cross-env NODE_ENV=production SERVE_CLIENT=true bun --smol dist-server/server.mjs"
   },
   "dependencies": {
     "@discord/embedded-app-sdk": "^2.5.0",
