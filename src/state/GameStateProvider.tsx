@@ -40,6 +40,7 @@ export interface GameActions {
   sendShopOpen: () => void;
   sendShopPurchase: (itemId: string) => void;
   cancelQueueSearch: () => Promise<boolean>;
+  abandonMatch: () => Promise<boolean>;
   changeQueueScope: (scope: SearchScope) => Promise<SearchScope | null>;
   findNewOpponent: () => Promise<void>;
   resetClientSession: () => void;
@@ -76,6 +77,7 @@ export function GameStateProvider({ children }: { children: React.ReactNode }) {
     sendShopOpen,
     sendShopPurchase,
     cancelQueueSearch,
+    abandonMatch,
     changeQueueScope,
     findNewOpponent,
     resetClientSession,
@@ -94,6 +96,7 @@ export function GameStateProvider({ children }: { children: React.ReactNode }) {
       sendShopOpen,
       sendShopPurchase,
       cancelQueueSearch,
+      abandonMatch,
       changeQueueScope,
       findNewOpponent,
       resetClientSession,
@@ -104,6 +107,7 @@ export function GameStateProvider({ children }: { children: React.ReactNode }) {
       sendShopOpen,
       sendShopPurchase,
       cancelQueueSearch,
+      abandonMatch,
       changeQueueScope,
       findNewOpponent,
       resetClientSession,

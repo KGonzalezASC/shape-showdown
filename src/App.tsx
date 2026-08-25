@@ -184,6 +184,7 @@ const AppShell: React.FC = () => {
     sendInputState,
     resetClientSession,
     cancelQueueSearch,
+    abandonMatch,
     changeQueueScope,
     findNewOpponent,
   } = useGameActions();
@@ -839,7 +840,8 @@ const AppShell: React.FC = () => {
                 )}
                 <button
                   type="button"
-                  onClick={() => {
+                  onClick={async () => {
+                    await abandonMatch();
                     window.location.href = '/';
                   }}
                   className="mt-6 rounded border border-zinc-500/70 px-5 py-2 text-[9px] font-bold uppercase tracking-[0.12em] text-zinc-300 transition hover:border-zinc-300 hover:text-white"

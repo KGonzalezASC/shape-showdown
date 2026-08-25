@@ -74,6 +74,8 @@ export class GameManager {
     episodes: number;
     totalPausedMs: number;
   }>();
+  private abandoning = false;
+  private pendingAbandonSockets: Socket[] = [];
   private persistenceTail: Promise<void> = Promise.resolve();
   private isCheckpointWriting = false;
   private pendingCheckpoint: PendingCheckpoint | null = null;
@@ -355,6 +357,70 @@ export class GameManager {
     this.emitGameplayPackets(true);
   }
 
+  public async abandonMatch(runtimeId: string): Promise<boolean> {
+    const player = this.gameState.players[runtimeId];
+    if (player === undefined || this.gameState.status === 'ended') return false;
+
+    const matchId = this.durableMatchId;
+    if (matchId !== null && this.persistence !== undefined) {
+      const participants = this.captureDurableParticipantsForResult();
+      if (participants === null) return false;
+      await this.persistence.finalizeMatch({
+        matchId,
+        winnerId: null,
+        loserId: this.durablePlayerIds.get(runtimeId) ?? runtimeId,
+        outcomeReason: 'forfeit_resignation',
+        durationSeconds: Math.floor(this.gameState.tick * tickSeconds()),
+        playerAStats: this.capturePlayerStats(participants[0].runtimeId),
+        playerBStats: this.capturePlayerStats(participants[1].runtimeId),
+      });
+    }
+
+    const sockets = [...this.activeSocketByRuntimeId.values()];
+    this.clearAllDisconnectForfeitures();
+    this.gameState.pause = undefined;
+    this.gameState.restartTimer = undefined;
+    this.gameState.winnerId = null;
+    this.gameState.technicalVictory = false;
+    this.gameState.endReason = 'allocation-cancelled';
+    this.gameState.status = 'ended';
+    this.lastHandledStatus = 'ended';
+    this.durableMatchPreallocated = false;
+    this.abandoning = true;
+    this.recordReplayDiscontinuity({
+      tick: this.gameState.tick,
+      kind: 'forfeit_abandon',
+      playerId: this.durablePlayerIds.get(runtimeId) ?? runtimeId,
+      reason: 'player_cancelled',
+    });
+    this.emitGameplayPackets(true);
+    this.pendingAbandonSockets = sockets;
+    if (matchId === null) {
+      this.clearAllocationRendezvousTimer();
+      this.gameState = {
+        players: {},
+        status: 'waiting',
+        countdown: COUNTDOWN_SECONDS,
+        winnerId: null,
+        tick: 0,
+        seed: initialSeed(),
+      };
+      this.playerSlots.clear();
+      this.durablePlayerIds.clear();
+      this.rngChannelsByPlayer.clear();
+      this.runtimeIdBySocketId.clear();
+      this.activeSocketByRuntimeId.clear();
+      this.terminalPlayerStats.clear();
+      this.activeReplay = null;
+      this.lastTickEvents = [];
+      this.lastHandledStatus = 'waiting';
+      this.abandoning = false;
+      return true;
+    }
+    this.notifyTerminal();
+    return true;
+  }
+
   private bindTicketSocket(socket: Socket, binding: SocketSeatBinding): void {
     if (binding.protocolVersion !== GAME_PROTOCOL_VERSION) {
       this.recordReplayDiscontinuity({
@@ -575,6 +641,32 @@ export class GameManager {
       this.packetSync.handleRequestKeyframe(socket, runtimeId, this.gameState);
     });
 
+    socket.on('abandonMatch', (ack?: (result: { ok: boolean }) => void) => {
+      const runtimeId = this.runtimeIdBySocketId.get(socket.id);
+      if (runtimeId === undefined) {
+        ack?.({ ok: false });
+        return;
+      }
+      void this.abandonMatch(runtimeId)
+        .then((ok) => {
+          ack?.({ ok });
+          if (!ok) return;
+          const sockets = this.pendingAbandonSockets;
+          this.pendingAbandonSockets = [];
+          for (const activeSocket of sockets) {
+            activeSocket.disconnect(true);
+          }
+          this.abandoning = false;
+        })
+        .catch((error: unknown) => {
+          logError('match_abandon_failed', error, {
+            matchId: this.durableMatchId,
+            playerId: this.durablePlayerIds.get(runtimeId) ?? runtimeId,
+          });
+          ack?.({ ok: false });
+        });
+    });
+
     socket.on('shopPurchase', (itemId: string) => {
       const runtimeId = this.runtimeIdBySocketId.get(socket.id);
       if (runtimeId === undefined || this.gameState.status !== 'playing') return;
@@ -605,6 +697,11 @@ export class GameManager {
     socket.on('disconnect', () => {
       const runtimeId = this.runtimeIdBySocketId.get(socket.id);
       if (runtimeId === undefined || this.activeSocketByRuntimeId.get(runtimeId) !== socket) return;
+      if (this.abandoning) {
+        this.runtimeIdBySocketId.delete(socket.id);
+        this.activeSocketByRuntimeId.delete(runtimeId);
+        return;
+      }
       if (this.loopHandle === null) return;
 
       const disconnectedPlayer = this.gameState.players[runtimeId];

@@ -1203,6 +1203,24 @@ export const useGameSocket = ({
     }
   }, []);
 
+  const abandonMatch = useCallback(async (): Promise<boolean> => {
+    const currentSocket = socket;
+    if (currentSocket === null || !currentSocket.connected) return false;
+    return new Promise<boolean>((resolve) => {
+      let settled = false;
+      const finish = (ok: boolean): void => {
+        if (settled) return;
+        settled = true;
+        window.clearTimeout(timeout);
+        resolve(ok);
+      };
+      const timeout = window.setTimeout(() => finish(false), 5_000);
+      currentSocket.emit('abandonMatch', (response: unknown) => {
+        finish(isRecord(response) && response.ok === true);
+      });
+    });
+  }, [socket]);
+
   const changeQueueScope = useCallback(async (scope: SearchScope): Promise<SearchScope | null> => {
     try {
       const serverUrl = await resolveGameServerUrl();
@@ -1295,6 +1313,7 @@ export const useGameSocket = ({
     sendShopOpen,
     sendShopPurchase,
     cancelQueueSearch,
+    abandonMatch,
     changeQueueScope,
     findNewOpponent,
     resetClientSession,

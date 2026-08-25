@@ -584,6 +584,54 @@ describe('GameManager lifecycle harness', () => {
     assert.ok(internal.gameState.players['durable-p2']);
   });
 
+  it('abandons an active match before leaving the paused modal', async () => {
+    const persistence = new RecordingMatchPersistence();
+    const gm = new GameManager(createFakeIo(), 60, persistence);
+    managers.push(gm);
+    const p1 = new FakeSocket('p1');
+    const p2 = new FakeSocket('p2');
+    const ticket = (playerId: string, seat: 'A' | 'B') => ({
+      matchId: 'match-abandon',
+      playerId,
+      seat,
+      matchSeed: 123,
+      protocolVersion: GAME_PROTOCOL_VERSION,
+    } as const);
+
+    gm.handleConnection(p1 as unknown as Socket, 'durable-p1', ticket('durable-p1', 'A'));
+    gm.handleConnection(p2 as unknown as Socket, 'durable-p2', ticket('durable-p2', 'B'));
+
+    const internal = gm as unknown as {
+      gameState: {
+        status: string;
+        pause?: { playerId: string };
+        endReason?: string;
+        winnerId: string | null;
+      };
+      lastHandledStatus: string;
+    };
+    internal.gameState.status = 'playing';
+    internal.lastHandledStatus = 'playing';
+    p2.emit('disconnect');
+
+    assert.equal(internal.gameState.pause?.playerId, 'durable-p2');
+    let abandonResponse: { ok: boolean } | undefined;
+    p1.emit('abandonMatch', (response: { ok: boolean }) => {
+      abandonResponse = response;
+    });
+    await flushPromises();
+
+    assert.deepEqual(abandonResponse, { ok: true });
+    assert.equal(p1.disconnected, true);
+    assert.equal(internal.gameState.status, 'ended');
+    assert.equal(internal.gameState.endReason, 'allocation-cancelled');
+    assert.equal(internal.gameState.pause, undefined);
+    assert.equal(internal.gameState.winnerId, null);
+    assert.equal(persistence.finalizations.length, 1);
+    assert.equal(persistence.finalizations[0].matchId, 'match-abandon');
+    assert.equal(persistence.finalizations[0].outcomeReason, 'forfeit_resignation');
+  });
+
   it('keeps the remaining disconnect protected when the first player reconnects', () => {
     const gm = new GameManager(createFakeIo(), 60);
     managers.push(gm);
