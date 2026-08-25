@@ -1,35 +1,42 @@
 import React from 'react';
 import type { SearchScope } from '../matchmaking/searchScope';
-import { isDiscordDMLaunch } from '../discordContext';
+import { isDiscordActivityContext, isDiscordDMLaunch } from '../discordContext';
 
 type MatchScopePickerProps = {
   value: SearchScope;
   onChange: (scope: SearchScope) => void;
   isDm?: boolean;
+  isDiscord?: boolean;
 };
 
 /**
- * Segmented control for the matchmaking pool. Only meaningful inside a
- * Discord Activity; the server coerces guests to global regardless of what
- * gets picked here.
+ * Segmented control for the matchmaking pool. Inside a Discord Activity,
+ * provides options for server/DM, all Discord, and Worldwide. For direct
+ * web clients, only Worldwide is available.
  */
 export const MatchScopePicker: React.FC<MatchScopePickerProps> = ({
   value,
   onChange,
   isDm,
+  isDiscord,
 }) => {
+  const inDiscord = isDiscord ?? isDiscordActivityContext();
   const isDmContext = isDm ?? isDiscordDMLaunch();
-  const scopeOptions: Array<{ value: SearchScope; label: string; description: string }> = [
-    {
-      value: 'guild',
-      label: isDmContext ? 'This DM' : 'This Server',
-      description: isDmContext
-        ? 'Match with players in this direct message'
-        : 'Match with players in this Discord server',
-    },
-    { value: 'discord_only', label: 'All Discord', description: 'Match with Discord players across all servers' },
-    { value: 'global', label: 'Worldwide', description: 'Match with anyone on Web or Discord' },
-  ];
+  const scopeOptions: Array<{ value: SearchScope; label: string; description: string }> = inDiscord
+    ? [
+        {
+          value: 'guild',
+          label: isDmContext ? 'This DM' : 'This Server',
+          description: isDmContext
+            ? 'Match with players in this direct message'
+            : 'Match with players in this Discord server',
+        },
+        { value: 'discord_only', label: 'All Discord', description: 'Match with Discord players across all servers' },
+        { value: 'global', label: 'Worldwide', description: 'Match with anyone on Web or Discord' },
+      ]
+    : [
+        { value: 'global', label: 'Worldwide', description: 'Match with anyone on Web or Discord' },
+      ];
 
   const activeOption = scopeOptions.find((opt) => opt.value === value) ?? scopeOptions[0];
 
