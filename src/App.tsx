@@ -39,6 +39,8 @@ import {
   readPreferredMatchScope,
   type SearchScope,
 } from './matchmaking/searchScope';
+import { buildAppUrl } from './discordContext';
+
 
 interface DrillState {
   enabled: boolean;
@@ -234,7 +236,7 @@ const AppShell: React.FC = () => {
       );
       if (elapsedMs >= DISCONNECT_SEAT_LEASE_MS && !pauseReturnTriggeredRef.current) {
         pauseReturnTriggeredRef.current = true;
-        window.location.replace('/');
+        window.location.replace(buildAppUrl('/'));
       }
     };
     updatePauseClock();
@@ -245,7 +247,7 @@ const AppShell: React.FC = () => {
   useEffect(() => {
     if (chrome.endReason !== 'disconnect-forfeit' || pauseReturnTriggeredRef.current) return;
     pauseReturnTriggeredRef.current = true;
-    window.location.replace('/');
+    window.location.replace(buildAppUrl('/'));
   }, [chrome.endReason]);
 
   const stateRef = useRef({ playfield, myId });
@@ -639,7 +641,7 @@ const AppShell: React.FC = () => {
                 type="button"
                 onClick={async () => {
                   const cancelled = await cancelQueueSearch();
-                  if (cancelled) window.location.href = '/';
+                  if (cancelled) window.location.href = buildAppUrl('/');
                 }}
                 className="mt-1 text-[8px] sm:text-[9px] font-mono font-bold uppercase tracking-[0.14em] text-zinc-400 hover:text-white transition"
               >
@@ -802,7 +804,7 @@ const AppShell: React.FC = () => {
                   <button
                     type="button"
                     onClick={() => {
-                      window.location.href = '/';
+                      window.location.href = buildAppUrl('/');
                     }}
                     className="w-full sm:w-auto rounded-xl border border-white/10 bg-white/[0.04] px-4 py-2 text-[9px] sm:text-[10px] font-bold uppercase tracking-[0.12em] text-zinc-400 transition hover:bg-white/[0.08] hover:text-zinc-200"
                   >
@@ -842,7 +844,7 @@ const AppShell: React.FC = () => {
                   type="button"
                   onClick={async () => {
                     await abandonMatch();
-                    window.location.href = '/';
+                    window.location.href = buildAppUrl('/');
                   }}
                   className="mt-6 rounded border border-zinc-500/70 px-5 py-2 text-[9px] font-bold uppercase tracking-[0.12em] text-zinc-300 transition hover:border-zinc-300 hover:text-white"
                 >

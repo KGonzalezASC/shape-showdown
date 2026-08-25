@@ -39,3 +39,31 @@ export function appendFrameId(url: string, frameId: string | null): string {
   target.searchParams.set('frame_id', frameId);
   return target.toString();
 }
+
+/**
+ * Preserves the current window.location.search (frame_id, guild_id, channel_id, etc.)
+ * when navigating between pages (e.g. '/' and '/game/').
+ */
+export function buildAppUrl(path: string, currentSearch?: string): string {
+  const search =
+    currentSearch !== undefined
+      ? currentSearch
+      : typeof window !== 'undefined'
+        ? window.location.search
+        : '';
+  if (!search) return path;
+
+  const hasQuery = path.includes('?');
+  if (hasQuery) {
+    const [pathname, existingQuery] = path.split('?', 2);
+    const params = new URLSearchParams(search);
+    const existingParams = new URLSearchParams(existingQuery);
+    existingParams.forEach((val, key) => params.set(key, val));
+    const queryStr = params.toString();
+    return queryStr ? `${pathname}?${queryStr}` : pathname;
+  }
+
+  const cleanSearch = search.startsWith('?') ? search : `?${search}`;
+  return `${path}${cleanSearch}`;
+}
+

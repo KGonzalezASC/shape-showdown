@@ -2,7 +2,7 @@ import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { HelpCircle, Play, X } from 'lucide-react';
 import { useSetThemeId, useThemePackage } from '../presentation/ThemeProvider';
 import { THEME_IDS, type ThemeId } from '../presentation/themePackage';
-import { isDiscordActivityContext } from '../discordContext';
+import { buildAppUrl, isDiscordActivityContext } from '../discordContext';
 import {
   readPreferredMatchScope,
   writePreferredMatchScope,
@@ -420,7 +420,7 @@ const LandingShowcase: React.FC = () => {
           {/* Action Row */}
           <div className="mt-5 flex flex-wrap items-center justify-center gap-2.5 sm:mt-6 sm:flex-nowrap sm:gap-4">
             <a
-              href="/game/"
+              href={buildAppUrl('/game/')}
               style={{
                 backgroundColor: activeOption.accent,
                 boxShadow: `0 0 24px ${activeOption.accent}33`,

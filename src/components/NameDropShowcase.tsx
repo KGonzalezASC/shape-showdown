@@ -12,6 +12,8 @@ import {
   normalizeName,
   type NameDropPlan,
 } from '../nameDrop/nameDropShared';
+import { buildAppUrl } from '../discordContext';
+
 
 type RenderWorkerOut =
   | { type: 'ready' }
@@ -378,7 +380,7 @@ const NameDropShowcase: React.FC<NameDropShowcaseProps> = ({
               <ArrowUpRight className="h-3.5 w-3.5 text-zinc-500" />
             </a>
             <a
-              href="/game/"
+              href={buildAppUrl('/game/')}
               className="inline-flex h-10 items-center gap-2 rounded-full bg-emerald-300 px-5 text-xs font-black text-[#07110d] shadow-[0_0_30px_rgba(110,231,183,.18)] transition-colors hover:bg-emerald-200 sm:h-11 sm:text-sm"
             >
               <Play className="h-4 w-4 fill-current" />

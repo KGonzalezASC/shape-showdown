@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-import { appendFrameId } from './discordContext';
+import { appendFrameId, buildAppUrl } from './discordContext';
 
 describe('Discord Activity request context', () => {
   it('adds the frame id without dropping existing query parameters', () => {
@@ -20,4 +20,24 @@ describe('Discord Activity request context', () => {
       'https://activity.example/api/queue',
     );
   });
+
+  it('preserves query parameters across page navigations', () => {
+    assert.equal(
+      buildAppUrl('/game/', '?frame_id=frame-123&guild_id=987'),
+      '/game/?frame_id=frame-123&guild_id=987',
+    );
+    assert.equal(
+      buildAppUrl('/', '?frame_id=frame-123&guild_id=987'),
+      '/?frame_id=frame-123&guild_id=987',
+    );
+    assert.equal(
+      buildAppUrl('/game/', ''),
+      '/game/',
+    );
+    assert.equal(
+      buildAppUrl('/game/?theme=seasalt', '?frame_id=frame-123'),
+      '/game/?frame_id=frame-123&theme=seasalt',
+    );
+  });
 });
+
