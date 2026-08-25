@@ -6,7 +6,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { GameManager } from './GameManager.js';
 import { BOARD_COLS, BOARD_ROWS, CHECKPOINT_INTERVAL_TICKS } from '../src/constants.js';
-import type { PlayerState, ReplayDataV2 } from '../src/types.js';
+import type { GameState, PlayerState, ReplayDataV2 } from '../src/types.js';
 import { decodeKeyframePacket } from '../src/protocol/decodeMatchPacket.js';
 import { ClientPacketDecoder } from '../src/protocol/ClientPacketDecoder.js';
 import { GAME_PROTOCOL_VERSION } from '../src/protocol/version.js';
@@ -1018,7 +1018,7 @@ describe('GameManager lifecycle harness', () => {
     assert.equal(purchase.cost, 60);
   });
 
-  it('saves the terminal tick after its events and final keyframe are recorded', () => {
+  it('saves the terminal tick after its events and final keyframe are recorded', async () => {
     const replayDir = fs.mkdtempSync(path.join(os.tmpdir(), 'shape-showdown-replay-'));
     const previousReplayDir = process.env.REPLAYS_DIR;
     process.env.REPLAYS_DIR = replayDir;
@@ -1030,11 +1030,7 @@ describe('GameManager lifecycle harness', () => {
       gm.handleConnection(new FakeSocket('p2') as unknown as Socket);
 
       const internal = gm as unknown as {
-        gameState: {
-          status: string;
-          tick: number;
-          players: Record<string, PlayerState>;
-        };
+        gameState: GameState;
         lastHandledStatus: string;
         activeReplay: ReplayDataV2 | null;
       };
@@ -1051,16 +1047,17 @@ describe('GameManager lifecycle harness', () => {
         version: 2,
         date: 'terminal-tick-test',
         seed: 1,
-        initialState: JSON.parse(JSON.stringify(internal.gameState)),
+        initialState: structuredClone(internal.gameState),
         inputs: [],
         keyframes: [{
           tick: 0,
-          players: JSON.parse(JSON.stringify(internal.gameState.players)),
+          players: structuredClone(internal.gameState.players),
         }],
         events: [],
       };
 
       gm.tickOnceForTests();
+      await gm.flushPendingReplaySaveForTests();
 
       const replayPath = path.join(replayDir, 'replay_terminal-tick-test.replay');
       assert.equal(fs.existsSync(replayPath), true);

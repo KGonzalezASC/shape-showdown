@@ -1,5 +1,4 @@
 import { Server, Socket } from 'socket.io';
-import fs from 'fs';
 import path from 'path';
 import {
   ActionType,
@@ -43,6 +42,14 @@ import { DISCONNECT_SEAT_LEASE_MS } from '../src/constants.js';
 
 export type SocketSeatBinding = Omit<MatchAssignment, 'ticket'>;
 
+declare const Bun: {
+  write: (
+    destination: string,
+    data: string | Uint8Array | Blob | ArrayBuffer,
+    options?: { createPath?: boolean },
+  ) => Promise<number>;
+};
+
 export class GameManager {
   private io: Server;
   private gameState: GameState;
@@ -82,6 +89,13 @@ export class GameManager {
   private pendingCheckpoint: PendingCheckpoint | null = null;
   private coalescedCheckpointCount = 0;
   private terminalNotified = false;
+  private pendingSaveReplayPromise: Promise<number> | null = null;
+
+  public async flushPendingReplaySaveForTests(): Promise<void> {
+    if (this.pendingSaveReplayPromise !== null) {
+      await this.pendingSaveReplayPromise;
+    }
+  }
 
   constructor(
     io: Server,
@@ -1197,12 +1211,12 @@ export class GameManager {
           playerSlots: Object.fromEntries(this.playerSlots.entries()),
           keyframeIntervalTicks: this.replayKeyframeIntervalTicks,
           discontinuities: [...this.pendingReplayDiscontinuities],
-          initialState: JSON.parse(JSON.stringify(this.gameState)),
+          initialState: structuredClone(this.gameState),
           inputs: [],
           keyframes: [
             {
               tick: 0,
-              players: JSON.parse(JSON.stringify(this.gameState.players)),
+              players: structuredClone(this.gameState.players),
             },
           ],
           events: []
@@ -1236,7 +1250,7 @@ export class GameManager {
       )) {
         this.activeReplay.keyframes.push({
           tick: this.gameState.tick,
-          players: JSON.parse(JSON.stringify(this.gameState.players)),
+          players: structuredClone(this.gameState.players),
         });
       }
       if (this.gameState.tick > 0 && this.gameState.tick % CHECKPOINT_INTERVAL_TICKS === 0) {
@@ -1281,22 +1295,23 @@ export class GameManager {
     this.handleStatusTransitions();
   }
 
-  private saveReplay() {
+  private saveReplay(): void {
     if (!this.activeReplay) return;
-    try {
-      const replaysDir = process.env.REPLAYS_DIR
-        ? path.resolve(process.env.REPLAYS_DIR)
-        : path.join(process.cwd(), 'fixtures', 'replays');
-
-      if (!fs.existsSync(replaysDir)) {
-        fs.mkdirSync(replaysDir, { recursive: true });
-      }
-      const filename = `replay_${this.activeReplay.date}.replay`;
-      fs.writeFileSync(path.join(replaysDir, filename), JSON.stringify(this.activeReplay));
-    } catch (e) {
-      console.error("Failed to save replay:", e);
-    }
+    const replaysDir = process.env.REPLAYS_DIR
+      ? path.resolve(process.env.REPLAYS_DIR)
+      : path.join(process.cwd(), 'fixtures', 'replays');
+    const filename = `replay_${this.activeReplay.date}.replay`;
+    const payload = JSON.stringify(this.activeReplay);
     this.activeReplay = null;
+
+    this.pendingSaveReplayPromise = Bun.write(
+      path.join(replaysDir, filename),
+      payload,
+      { createPath: true },
+    ).catch((err: unknown) => {
+      console.error('Failed to save replay:', err);
+      return 0;
+    });
   }
 
   private recordReplayDiscontinuity(marker: ReplayDiscontinuity): void {
