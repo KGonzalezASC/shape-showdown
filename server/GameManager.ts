@@ -717,7 +717,6 @@ export class GameManager {
         this.activeSocketByRuntimeId.delete(runtimeId);
         return;
       }
-      if (this.loopHandle === null) return;
 
       const disconnectedPlayer = this.gameState.players[runtimeId];
       if (disconnectedPlayer) {
@@ -729,6 +728,10 @@ export class GameManager {
       }
       this.runtimeIdBySocketId.delete(socket.id);
       this.activeSocketByRuntimeId.delete(runtimeId);
+      if (this.loopHandle === null) {
+        this.emitGameplayPackets(true);
+        return;
+      }
       // Only mid-play disconnects pause the sim. Waiting/countdown (including
       // rematch ticket handoff) must keep the loop running so seats can rebind.
       // Top-out rematch windows also keep both seats until the rematch starts.
@@ -1001,7 +1004,7 @@ export class GameManager {
 
     if (status === 'countdown') {
       const participants = this.captureDurableParticipants();
-      if (participants === null) return;
+      if (participants === null || !this.bothSeatsHaveActiveSockets()) return;
 
       if (this.durableMatchId !== null && this.durableMatchPreallocated) {
         const matchId = this.durableMatchId;
@@ -1018,6 +1021,10 @@ export class GameManager {
       const matchSeed = this.gameState.seed;
 
       this.enqueuePersistence(async () => {
+        if (!this.bothSeatsHaveActiveSockets()) {
+          this.revertRematchToEnded();
+          return;
+        }
         this.durableMatchId = null;
         this.durableMatchPreallocated = false;
         const allocation = await this.persistence!.startMatch({
@@ -1027,15 +1034,23 @@ export class GameManager {
             B: participants.B.playerId,
           },
         });
+        if (!this.bothSeatsHaveActiveSockets()) {
+          await this.cancelUnissuedRematch(allocation.match.id);
+          return;
+        }
         this.durableMatchId = allocation.match.id;
         this.durableMatchPreallocated = true;
         this.terminalNotified = false;
-        this.onMatchCreated?.(allocation.match.id);
         await this.persistence!.advanceStatus({
           matchId: allocation.match.id,
           expectedStatus: 'allocating',
           nextStatus: 'countdown',
         });
+        if (!this.bothSeatsHaveActiveSockets()) {
+          await this.cancelUnissuedRematch(allocation.match.id);
+          return;
+        }
+        this.onMatchCreated?.(allocation.match.id);
         this.emitMatchAssignments(
           allocation.match.id,
           allocation.match.matchSeed,
@@ -1090,12 +1105,17 @@ export class GameManager {
     protocolVersion: number,
     tickets: { A: JoinTicket; B: JoinTicket },
   ): void {
+    const deliveries: Array<{ socket: Socket; ticket: JoinTicket }> = [];
     for (const ticket of [tickets.A, tickets.B]) {
       const runtimeEntry = [...this.durablePlayerIds.entries()]
         .find(([, playerId]) => playerId === ticket.playerId);
-      if (runtimeEntry === undefined) continue;
+      if (runtimeEntry === undefined) return;
       const socket = this.activeSocketByRuntimeId.get(runtimeEntry[0]);
-      if (socket === undefined) continue;
+      if (socket === undefined) return;
+      deliveries.push({ socket, ticket });
+    }
+    if (deliveries.length !== 2) return;
+    for (const { socket, ticket } of deliveries) {
       socket.emit('matchAssignment', {
         matchId,
         playerId: ticket.playerId,
@@ -1105,6 +1125,20 @@ export class GameManager {
         protocolVersion,
       } satisfies MatchAssignment);
     }
+  }
+
+  private async cancelUnissuedRematch(matchId: string): Promise<void> {
+    const emptyStats = { score: 0, linesCleared: 0, topOut: false };
+    await this.persistence!.finalizeMatch({
+      matchId,
+      winnerId: null,
+      loserId: null,
+      outcomeReason: 'cancelled_alloc_fail',
+      durationSeconds: 0,
+      playerAStats: emptyStats,
+      playerBStats: emptyStats,
+    });
+    this.revertRematchToEnded();
   }
 
   private captureDurableParticipants(): {
@@ -1273,13 +1307,42 @@ export class GameManager {
     }
   }
 
+  private bothSeatsHaveActiveSockets(): boolean {
+    const runtimeIds = Object.keys(this.gameState.players);
+    if (runtimeIds.length !== 2) return false;
+    return runtimeIds.every((runtimeId) => this.activeSocketByRuntimeId.has(runtimeId));
+  }
+
+  private revertRematchToEnded(): void {
+    const matchId = this.durableMatchId;
+    this.gameState.status = 'ended';
+    this.gameState.endReason ??= 'top-out';
+    this.gameState.restartTimer = undefined;
+    this.lastHandledStatus = 'ended';
+    this.durableMatchId = null;
+    this.durableMatchPreallocated = false;
+    logInfo('rematch_aborted_seat_left', {
+      matchId,
+      connectedSeats: this.activeSocketByRuntimeId.size,
+    });
+    this.emitGameplayPackets(true);
+  }
+
   private restartAfterTerminal(): void {
     this.gameState.restartTimer = undefined;
-    this.gameState.endReason = undefined;
-    this.gameState.technicalVictory = false;
     this.gameState.pause = undefined;
     this.clearAllDisconnectForfeitures();
-    if (Object.keys(this.gameState.players).length === 2) {
+    const seatedCount = Object.keys(this.gameState.players).length;
+    if (seatedCount === 2 && !this.bothSeatsHaveActiveSockets()) {
+      logInfo('rematch_aborted_seat_left', {
+        matchId: this.durableMatchId,
+        connectedSeats: this.activeSocketByRuntimeId.size,
+      });
+      return;
+    }
+    this.gameState.endReason = undefined;
+    this.gameState.technicalVictory = false;
+    if (seatedCount === 2) {
       this.gameState.seed = initialSeed();
       this.resetMatchRngChannels();
       for (const id in this.gameState.players) {

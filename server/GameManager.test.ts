@@ -72,11 +72,15 @@ class RecordingMatchPersistence implements MatchPersistence {
     winnerId: string | null;
     outcomeReason: string;
   }> = [];
+  startMatchDelayMs = 0;
 
   async startMatch(input: StartDurableMatchInput): Promise<{
     match: MatchRecord;
     tickets: { A: JoinTicket; B: JoinTicket };
   }> {
+    if (this.startMatchDelayMs > 0) {
+      await new Promise<void>((resolve) => setTimeout(resolve, this.startMatchDelayMs));
+    }
     this.starts.push(input);
     const matchId = `match-${this.starts.length}`;
     const match: MatchRecord = {
@@ -256,6 +260,128 @@ describe('GameManager lifecycle harness', () => {
       createdMatchIds[0],
     );
     assert.notEqual(createdMatchIds[0], 'match-prealloc');
+  });
+
+  it('does not issue rematch tickets when a seat leaves during the rematch window', async () => {
+    const createdMatchIds: string[] = [];
+    const persistence = new RecordingMatchPersistence();
+    const gm = new GameManager(
+      createFakeIo(),
+      60,
+      persistence,
+      (matchId) => {
+        createdMatchIds.push(matchId);
+      },
+    );
+    managers.push(gm);
+    const p1 = new FakeSocket('p1');
+    const p2 = new FakeSocket('p2');
+    const ticket = (playerId: string, seat: 'A' | 'B') => ({
+      matchId: 'match-prealloc',
+      playerId,
+      seat,
+      matchSeed: 123,
+      protocolVersion: GAME_PROTOCOL_VERSION,
+    } as const);
+
+    gm.handleConnection(p1 as unknown as Socket, 'durable-p1', ticket('durable-p1', 'A'));
+    gm.handleConnection(p2 as unknown as Socket, 'durable-p2', ticket('durable-p2', 'B'));
+    gm.stopLoop();
+
+    const internal = gm as unknown as {
+      gameState: {
+        status: string;
+        endReason?: string;
+        restartTimer?: number;
+        players: Record<string, PlayerState>;
+      };
+      lastHandledStatus: string;
+      durableMatchId: string | null;
+      durableMatchPreallocated: boolean;
+    };
+    internal.gameState.status = 'playing';
+    internal.lastHandledStatus = 'playing';
+    internal.durableMatchId = 'match-prealloc';
+    internal.durableMatchPreallocated = true;
+    internal.gameState.players['durable-p1'].topOut = true;
+
+    for (let frame = 0; frame < 10; frame += 1) {
+      gm.tickAndEmitOnceForTests();
+    }
+    assert.equal(internal.gameState.status, 'ended');
+    assert.ok((internal.gameState.restartTimer ?? 0) > 0);
+
+    p1.disconnect();
+    assert.equal(Object.keys(internal.gameState.players).length, 2);
+
+    for (let frame = 0; frame < 310; frame += 1) {
+      gm.tickAndEmitOnceForTests();
+    }
+    await flushPromises();
+
+    assert.equal(internal.gameState.status, 'ended');
+    assert.equal(internal.gameState.restartTimer, undefined);
+    assert.equal(persistence.starts.length, 0);
+    assert.equal(createdMatchIds.length, 0);
+    assert.equal(p2.matchAssignments.length, 0);
+  });
+
+  it('does not hand out rematch tickets if a seat leaves while the rematch match is being created', async () => {
+    const createdMatchIds: string[] = [];
+    const persistence = new RecordingMatchPersistence();
+    persistence.startMatchDelayMs = 40;
+    const gm = new GameManager(
+      createFakeIo(),
+      60,
+      persistence,
+      (matchId) => {
+        createdMatchIds.push(matchId);
+      },
+    );
+    managers.push(gm);
+    const p1 = new FakeSocket('p1');
+    const p2 = new FakeSocket('p2');
+    const ticket = (playerId: string, seat: 'A' | 'B') => ({
+      matchId: 'match-prealloc',
+      playerId,
+      seat,
+      matchSeed: 123,
+      protocolVersion: GAME_PROTOCOL_VERSION,
+    } as const);
+
+    gm.handleConnection(p1 as unknown as Socket, 'durable-p1', ticket('durable-p1', 'A'));
+    gm.handleConnection(p2 as unknown as Socket, 'durable-p2', ticket('durable-p2', 'B'));
+    gm.stopLoop();
+
+    const internal = gm as unknown as {
+      gameState: {
+        status: string;
+        endReason?: string;
+        restartTimer?: number;
+        players: Record<string, PlayerState>;
+      };
+      lastHandledStatus: string;
+      durableMatchId: string | null;
+      durableMatchPreallocated: boolean;
+    };
+    internal.gameState.status = 'playing';
+    internal.lastHandledStatus = 'playing';
+    internal.durableMatchId = 'match-prealloc';
+    internal.durableMatchPreallocated = true;
+    internal.gameState.players['durable-p1'].topOut = true;
+
+    for (let frame = 0; frame < 310; frame += 1) {
+      gm.tickAndEmitOnceForTests();
+    }
+    assert.equal(internal.gameState.status, 'countdown');
+    p1.disconnect();
+    await new Promise<void>((resolve) => setTimeout(resolve, 80));
+    await flushPromises();
+
+    assert.equal(p1.matchAssignments.length, 0);
+    assert.equal(p2.matchAssignments.length, 0);
+    assert.equal(createdMatchIds.length, 0);
+    assert.equal(internal.gameState.status, 'ended');
   });
 
   it('does not pause the sim when a seat disconnects during rematch countdown', async () => {
