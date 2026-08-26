@@ -1,5 +1,28 @@
 export type AppRoute = 'landing' | 'game';
 
+function stripTrailingSlash(pathname: string): string {
+  if (pathname === '/') return pathname;
+  return pathname.replace(/\/$/, '');
+}
+
+function isLegacyGamePathname(pathname: string): boolean {
+  return stripTrailingSlash(pathname).toLowerCase().endsWith('/game');
+}
+
+function toLandingPathname(pathname: string): string {
+  const trimmed = stripTrailingSlash(pathname);
+  if (!trimmed.toLowerCase().endsWith('/game')) return pathname;
+  const parent = trimmed.slice(0, -'/game'.length);
+  return parent === '' ? '/' : `${parent}/`;
+}
+
+function routeFromLocation(pathname: string, hash: string): AppRoute {
+  const normalizedHash = hash.toLowerCase().replace(/^#\/?/, '');
+  if (normalizedHash === 'game' || normalizedHash === 'play') return 'game';
+  if (isLegacyGamePathname(pathname)) return 'game';
+  return 'landing';
+}
+
 /**
  * Reads the active SPA route from location hash or legacy pathname.
  * - #game or #play -> 'game'
@@ -8,42 +31,30 @@ export type AppRoute = 'landing' | 'game';
  */
 export function getAppRoute(): AppRoute {
   if (typeof window === 'undefined') return 'landing';
-
-  const hash = window.location.hash.toLowerCase().replace(/^#\/?/, '');
-  if (hash === 'game' || hash === 'play') {
-    return 'game';
-  }
-
-  const pathname = window.location.pathname.toLowerCase().replace(/\/$/, '');
-  if (pathname.endsWith('/game')) {
-    return 'game';
-  }
-
-  return 'landing';
+  return routeFromLocation(window.location.pathname, window.location.hash);
 }
 
 /**
  * Updates the SPA route in-place without triggering an HTML document reload.
  * Preserves all search parameters (e.g. ?frame_id=..., ?guild_id=...).
+ * Legacy `/game/` documents are rewritten to `/` via history.pushState.
  */
 export function setAppRoute(route: AppRoute): void {
   if (typeof window === 'undefined') return;
 
+  const url = new URL(window.location.href);
   if (route === 'game') {
-    if (window.location.hash !== '#game') {
-      window.location.hash = '#game';
-    }
+    url.hash = 'game';
   } else {
-    if (
-      window.location.hash
-      && window.location.hash !== '#'
-      && window.location.hash !== '#landing'
-    ) {
-      const url = new URL(window.location.href);
-      url.hash = '';
-      window.history.pushState(null, '', url.toString());
-      window.dispatchEvent(new Event('popstate'));
-      window.dispatchEvent(new Event('hashchange'));
+    url.hash = '';
+    if (isLegacyGamePathname(url.pathname)) {
+      url.pathname = toLandingPathname(url.pathname);
     }
   }
+
+  const next = url.toString();
+  if (next === window.location.href && getAppRoute() === route) return;
+
+  window.history.pushState(null, '', next);
+  window.dispatchEvent(new Event('popstate'));
 }

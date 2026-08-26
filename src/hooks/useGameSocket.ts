@@ -1298,6 +1298,10 @@ export const useGameSocket = ({
     }
   }, [socket]);
 
+  const retryConnection = useCallback(() => {
+    setSearchEpoch((epoch) => epoch + 1);
+  }, []);
+
   const resetClientSession = useCallback(() => {
     try {
       window.localStorage.removeItem(CLIENT_SESSION_STORAGE_KEY);
@@ -1306,7 +1310,7 @@ export const useGameSocket = ({
       // A blocked store must not prevent starting a new page session.
     }
     inMemoryGuestBootstrapKey = null;
-    window.location.reload();
+    setSearchEpoch((epoch) => epoch + 1);
   }, []);
 
   return {
@@ -1320,6 +1324,7 @@ export const useGameSocket = ({
     changeQueueScope,
     findNewOpponent,
     resetClientSession,
+    retryConnection,
   };
 };
 

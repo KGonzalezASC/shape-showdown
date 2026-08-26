@@ -40,6 +40,8 @@ import {
   type SearchScope,
 } from './matchmaking/searchScope';
 import { setAppRoute } from './appRoute';
+import { isDiscordActivityContext } from './discordContext';
+import { relaunchForClientUpdate } from './discordActivity';
 
 
 interface DrillState {
@@ -189,6 +191,7 @@ export const GameView: React.FC<GameViewProps> = ({ onExitToLanding }) => {
     sendAction,
     sendInputState,
     resetClientSession,
+    retryConnection,
     cancelQueueSearch,
     abandonMatch,
     changeQueueScope,
@@ -596,10 +599,18 @@ export const GameView: React.FC<GameViewProps> = ({ onExitToLanding }) => {
               {matchDiagnostics.phase !== 'session-invalid' && (
                 <button
                   type="button"
-                  onClick={() => window.location.reload()}
+                  onClick={() => {
+                    if (matchDiagnostics.phase === 'protocol-mismatch') {
+                      void relaunchForClientUpdate();
+                      return;
+                    }
+                    retryConnection();
+                  }}
                   className="mt-6 rounded border border-amber-300/60 px-4 py-2 text-[9px] uppercase tracking-[0.12em] text-amber-200 transition hover:bg-amber-300/10"
                 >
-                  {matchDiagnostics.phase === 'protocol-mismatch' ? 'Reload to update' : 'Retry connection'}
+                  {matchDiagnostics.phase === 'protocol-mismatch'
+                    ? (isDiscordActivityContext() ? 'Close Activity to update' : 'Reload to update')
+                    : 'Retry connection'}
                 </button>
               )}
             </div>
@@ -940,10 +951,18 @@ export const GameView: React.FC<GameViewProps> = ({ onExitToLanding }) => {
                   || matchDiagnostics.phase === 'service-unavailable') && (
                   <button
                     type="button"
-                    onClick={() => window.location.reload()}
+                    onClick={() => {
+                      if (matchDiagnostics.phase === 'protocol-mismatch') {
+                        void relaunchForClientUpdate();
+                        return;
+                      }
+                      retryConnection();
+                    }}
                     className="mt-6 rounded border border-amber-300/60 px-4 py-2 text-[9px] uppercase tracking-[0.12em] text-amber-200 transition hover:bg-amber-300/10"
                   >
-                    {matchDiagnostics.phase === 'protocol-mismatch' ? 'Reload to update' : 'Retry connection'}
+                    {matchDiagnostics.phase === 'protocol-mismatch'
+                      ? (isDiscordActivityContext() ? 'Close Activity to update' : 'Reload to update')
+                      : 'Retry connection'}
                   </button>
                 )}
               </div>

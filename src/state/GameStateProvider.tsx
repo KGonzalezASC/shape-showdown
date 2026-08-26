@@ -44,6 +44,7 @@ export interface GameActions {
   changeQueueScope: (scope: SearchScope) => Promise<SearchScope | null>;
   findNewOpponent: () => Promise<void>;
   resetClientSession: () => void;
+  retryConnection: () => void;
 }
 
 const GameActionsContext = createContext<GameActions | null>(null);
@@ -81,6 +82,7 @@ export function GameStateProvider({ children }: { children: React.ReactNode }) {
     changeQueueScope,
     findNewOpponent,
     resetClientSession,
+    retryConnection,
   } = useGameSocket({
     onClientMatchModel: publishClientMatchModel,
     onMyId: publishMyId,
@@ -100,6 +102,7 @@ export function GameStateProvider({ children }: { children: React.ReactNode }) {
       changeQueueScope,
       findNewOpponent,
       resetClientSession,
+      retryConnection,
     }),
     [
       sendInputState,
@@ -111,6 +114,7 @@ export function GameStateProvider({ children }: { children: React.ReactNode }) {
       changeQueueScope,
       findNewOpponent,
       resetClientSession,
+      retryConnection,
     ],
   );
 

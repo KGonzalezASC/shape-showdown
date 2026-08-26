@@ -1,4 +1,4 @@
-import { DiscordSDK } from '@discord/embedded-app-sdk';
+import { DiscordSDK, RPCCloseCodes } from '@discord/embedded-app-sdk';
 
 export { isDiscordActivityContext } from './discordContext';
 import { appendDiscordFrameId, isDiscordActivityContext } from './discordContext';
@@ -58,6 +58,24 @@ export function getOrCreateDiscordSdk(): Promise<DiscordSDK> {
   })();
 
   return cachedDiscordSdkPromise;
+}
+
+export async function relaunchForClientUpdate(): Promise<void> {
+  if (typeof window === 'undefined') return;
+  if (!isDiscordActivityContext()) {
+    window.location.reload();
+    return;
+  }
+
+  try {
+    const discordSdk = await getOrCreateDiscordSdk();
+    discordSdk.close(
+      RPCCloseCodes.INVALID_VERSION,
+      'Close and reopen the Activity to receive the current game protocol.',
+    );
+  } catch (err) {
+    console.warn('[Discord] Failed to close Activity for client update:', err);
+  }
 }
 
 export async function openExternalUrl(url: string): Promise<void> {
