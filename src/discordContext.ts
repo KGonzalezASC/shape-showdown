@@ -67,3 +67,23 @@ export function buildAppUrl(path: string, currentSearch?: string): string {
   return `${path}${cleanSearch}`;
 }
 
+/**
+ * Opens an external URL safely across platforms.
+ * In Discord Activity context, dynamically loads and uses discordSdk.commands.openExternalLink.
+ * In direct web browser context, opens via window.open without bundling or executing the SDK.
+ */
+export async function openExternalUrl(url: string): Promise<void> {
+  if (typeof window === 'undefined') return;
+  if (!isDiscordActivityContext()) {
+    window.open(url, '_blank', 'noopener,noreferrer');
+    return;
+  }
+  try {
+    const { openExternalUrl: openInDiscord } = await import('./discordActivity');
+    await openInDiscord(url);
+  } catch (err) {
+    console.warn('[Discord] Could not open external link via activity helper:', err);
+    window.open(url, '_blank', 'noopener,noreferrer');
+  }
+}
+

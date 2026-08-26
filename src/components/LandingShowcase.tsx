@@ -2,7 +2,7 @@ import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { HelpCircle, Play, X } from 'lucide-react';
 import { useSetThemeId, useThemePackage } from '../presentation/ThemeProvider';
 import { THEME_IDS, type ThemeId } from '../presentation/themePackage';
-import { buildAppUrl, isDiscordActivityContext } from '../discordContext';
+import { buildAppUrl, isDiscordActivityContext, openExternalUrl } from '../discordContext';
 import {
   readPreferredMatchScope,
   writePreferredMatchScope,
@@ -492,6 +492,10 @@ const LandingShowcase: React.FC = () => {
             href="https://keithgonzalez.vercel.app/"
             target="_blank"
             rel="noreferrer"
+            onClick={(e) => {
+              e.preventDefault();
+              void openExternalUrl('https://keithgonzalez.vercel.app/');
+            }}
             className="font-bold text-zinc-300 underline decoration-zinc-600 underline-offset-2 transition-colors hover:text-white hover:decoration-zinc-400"
           >
             Keith Gonzalez

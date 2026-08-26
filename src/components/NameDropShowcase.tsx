@@ -12,7 +12,7 @@ import {
   normalizeName,
   type NameDropPlan,
 } from '../nameDrop/nameDropShared';
-import { buildAppUrl } from '../discordContext';
+import { buildAppUrl, openExternalUrl } from '../discordContext';
 
 
 type RenderWorkerOut =
@@ -309,7 +309,7 @@ const NameDropShowcase: React.FC<NameDropShowcaseProps> = ({
       </div>
 
       <header className="relative z-10 mx-auto flex w-full max-w-7xl shrink-0 items-center justify-between gap-4 px-4 py-4 sm:px-8 sm:py-6">
-        <a href="/" className="group flex min-w-0 items-center gap-3 sm:gap-4" aria-label="Shape Showdown home">
+        <a href={buildAppUrl('/')} className="group flex min-w-0 items-center gap-3 sm:gap-4" aria-label="Shape Showdown home">
           <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-emerald-300/20 bg-emerald-300/10 text-emerald-300 shadow-[0_0_24px_rgba(52,211,153,0.16)] transition-colors group-hover:bg-emerald-300/15 sm:h-12 sm:w-12">
             <Swords className="h-5 w-5 sm:h-6 sm:w-6" />
           </span>
@@ -373,6 +373,10 @@ const NameDropShowcase: React.FC<NameDropShowcaseProps> = ({
               href="https://github.com/KGonzalezASC/shape-showdown"
               target="_blank"
               rel="noreferrer"
+              onClick={(e) => {
+                e.preventDefault();
+                void openExternalUrl('https://github.com/KGonzalezASC/shape-showdown');
+              }}
               className="inline-flex h-10 items-center gap-2 rounded-full border border-white/10 bg-white/[0.04] px-4 text-xs font-bold text-zinc-300 transition-colors hover:border-white/20 hover:bg-white/[0.08] hover:text-white sm:h-11 sm:text-sm"
             >
               <Github className="h-4 w-4" />

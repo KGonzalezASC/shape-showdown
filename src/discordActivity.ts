@@ -38,6 +38,53 @@ const discordClientId =
     ? import.meta.env.VITE_DISCORD_CLIENT_ID.trim()
     : '';
 
+let cachedDiscordSdkPromise: Promise<DiscordSDK> | null = null;
+
+export function getOrCreateDiscordSdk(): Promise<DiscordSDK> {
+  if (!isDiscordActivityContext()) {
+    return Promise.reject(new Error('Discord SDK is not available outside Activity context'));
+  }
+  if (cachedDiscordSdkPromise) return cachedDiscordSdkPromise;
+
+  cachedDiscordSdkPromise = (async () => {
+    const discordSdk = new DiscordSDK(discordClientId);
+    const sdkInternal = discordSdk as unknown as { sourceOrigin?: string; handshake?: () => void };
+    if (sdkInternal.sourceOrigin && sdkInternal.sourceOrigin.includes('discordsays.com')) {
+      sdkInternal.sourceOrigin = '*';
+      sdkInternal.handshake?.();
+    }
+
+    await Promise.race([
+      discordSdk.ready(),
+      new Promise((_, reject) =>
+        setTimeout(() => reject(new Error('Discord SDK handshake timed out')), 6000),
+      ),
+    ]);
+    return discordSdk;
+  })();
+
+  return cachedDiscordSdkPromise;
+}
+
+export async function openExternalUrl(url: string): Promise<void> {
+  if (!isDiscordActivityContext() || typeof window === 'undefined') {
+    if (typeof window !== 'undefined') {
+      window.open(url, '_blank', 'noopener,noreferrer');
+    }
+    return;
+  }
+
+  try {
+    const discordSdk = await getOrCreateDiscordSdk();
+    await discordSdk.commands.openExternalLink({ url });
+  } catch (err) {
+    console.warn('[Discord] Failed to open external link via SDK:', err);
+    if (typeof window !== 'undefined') {
+      window.open(url, '_blank', 'noopener,noreferrer');
+    }
+  }
+}
+
 export async function requestDiscordActivitySession(
   gameServerUrl: string,
   signal: AbortSignal,
@@ -46,19 +93,7 @@ export async function requestDiscordActivitySession(
     throw new Error('Discord Activity authentication is not available in this context');
   }
 
-  const discordSdk = new DiscordSDK(discordClientId);
-  const sdkInternal = discordSdk as unknown as { sourceOrigin?: string; handshake?: () => void };
-  if (sdkInternal.sourceOrigin && sdkInternal.sourceOrigin.includes('discordsays.com')) {
-    sdkInternal.sourceOrigin = '*';
-    sdkInternal.handshake?.();
-  }
-
-  await Promise.race([
-    discordSdk.ready(),
-    new Promise((_, reject) =>
-      setTimeout(() => reject(new Error('Discord SDK handshake timed out')), 6000),
-    ),
-  ]);
+  const discordSdk = await getOrCreateDiscordSdk();
   if (signal.aborted) throw signal.reason;
 
   const rawGuildId: unknown = discordSdk.guildId;
