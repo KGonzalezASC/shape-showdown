@@ -87,3 +87,22 @@ export async function openExternalUrl(url: string): Promise<void> {
   }
 }
 
+/**
+ * Navigate to an internal app route (e.g. '/game/') safely across platforms.
+ *
+ * On Android Discord the WebView intercepts anchor-click navigations via
+ * shouldOverrideUrlLoading and kills the Activity with "disallowed page."
+ * Programmatic location.assign() bypasses that interception. On open-web
+ * browsers, anchor clicks work fine, but location.assign is equally correct,
+ * so we use it unconditionally in Discord context.
+ *
+ * Attach this as an onClick handler on any internal `<a>` that crosses
+ * HTML entry points (e.g. landing → game).
+ */
+export function navigateInApp(e: { preventDefault(): void }, path: string): void {
+  if (typeof window === 'undefined') return;
+  if (!isDiscordActivityContext()) return; // let the anchor work normally
+  e.preventDefault();
+  window.location.assign(buildAppUrl(path));
+}
+

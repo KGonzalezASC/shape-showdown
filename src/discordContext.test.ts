@@ -53,7 +53,6 @@ describe('Discord Activity request context', () => {
       },
     };
     mockWin.parent = mockWin;
-    // @ts-expect-error Mocking window for node test environment
     globalThis.window = mockWin;
 
     try {
