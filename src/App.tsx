@@ -39,7 +39,7 @@ import {
   readPreferredMatchScope,
   type SearchScope,
 } from './matchmaking/searchScope';
-import { buildAppUrl } from './discordContext';
+import { setAppRoute } from './appRoute';
 
 
 interface DrillState {
@@ -132,7 +132,11 @@ function appShellReducer(state: AppShellState, action: AppShellAction): AppShell
   }
 }
 
-const AppShell: React.FC = () => {
+export interface GameViewProps {
+  onExitToLanding?: () => void;
+}
+
+export const GameView: React.FC<GameViewProps> = ({ onExitToLanding }) => {
   const connected = useIsConnected();
   const serverHealth = useServerHealth();
   const matchDiagnostics = useMatchDiagnostics();
@@ -236,19 +240,21 @@ const AppShell: React.FC = () => {
       );
       if (elapsedMs >= DISCONNECT_SEAT_LEASE_MS && !pauseReturnTriggeredRef.current) {
         pauseReturnTriggeredRef.current = true;
-        window.location.replace(buildAppUrl('/'));
+        if (onExitToLanding) onExitToLanding();
+        else setAppRoute('landing');
       }
     };
     updatePauseClock();
     const interval = window.setInterval(updatePauseClock, 250);
     return () => window.clearInterval(interval);
-  }, [chrome.status, gameState?.pause?.startedAt]);
+  }, [chrome.status, gameState?.pause?.startedAt, onExitToLanding]);
 
   useEffect(() => {
     if (chrome.endReason !== 'disconnect-forfeit' || pauseReturnTriggeredRef.current) return;
     pauseReturnTriggeredRef.current = true;
-    window.location.replace(buildAppUrl('/'));
-  }, [chrome.endReason]);
+    if (onExitToLanding) onExitToLanding();
+    else setAppRoute('landing');
+  }, [chrome.endReason, onExitToLanding]);
 
   const stateRef = useRef({ playfield, myId });
   useLayoutEffect(() => {
@@ -641,7 +647,10 @@ const AppShell: React.FC = () => {
                 type="button"
                 onClick={async () => {
                   const cancelled = await cancelQueueSearch();
-                  if (cancelled) window.location.href = buildAppUrl('/');
+                  if (cancelled) {
+                    if (onExitToLanding) onExitToLanding();
+                    else setAppRoute('landing');
+                  }
                 }}
                 className="mt-1 text-[8px] sm:text-[9px] font-mono font-bold uppercase tracking-[0.14em] text-zinc-400 hover:text-white transition"
               >
@@ -804,7 +813,8 @@ const AppShell: React.FC = () => {
                   <button
                     type="button"
                     onClick={() => {
-                      window.location.href = buildAppUrl('/');
+                      if (onExitToLanding) onExitToLanding();
+                      else setAppRoute('landing');
                     }}
                     className="w-full sm:w-auto rounded-xl border border-white/10 bg-white/[0.04] px-4 py-2 text-[9px] sm:text-[10px] font-bold uppercase tracking-[0.12em] text-zinc-400 transition hover:bg-white/[0.08] hover:text-zinc-200"
                   >
@@ -844,7 +854,8 @@ const AppShell: React.FC = () => {
                   type="button"
                   onClick={async () => {
                     await abandonMatch();
-                    window.location.href = buildAppUrl('/');
+                    if (onExitToLanding) onExitToLanding();
+                    else setAppRoute('landing');
                   }}
                   className="mt-6 rounded border border-zinc-500/70 px-5 py-2 text-[9px] font-bold uppercase tracking-[0.12em] text-zinc-300 transition hover:border-zinc-300 hover:text-white"
                 >
@@ -947,9 +958,10 @@ const AppShell: React.FC = () => {
   );
 };
 
-const App: React.FC = () => {
+const App: React.FC<GameViewProps> = (props) => {
   if (
     DEV_TOOLS_ENABLED
+    && typeof window !== 'undefined'
     && new URLSearchParams(window.location.search).get('prototype') === 'background'
   ) {
     return <BackgroundPrototype />;
@@ -957,7 +969,7 @@ const App: React.FC = () => {
   return (
     <ThemeProvider>
       <GameStateProvider>
-        <AppShell />
+        <GameView {...props} />
       </GameStateProvider>
     </ThemeProvider>
   );

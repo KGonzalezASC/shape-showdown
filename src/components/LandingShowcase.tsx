@@ -2,7 +2,8 @@ import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { HelpCircle, Play, X } from 'lucide-react';
 import { useSetThemeId, useThemePackage } from '../presentation/ThemeProvider';
 import { THEME_IDS, type ThemeId } from '../presentation/themePackage';
-import { buildAppUrl, isDiscordActivityContext, navigateInApp, openExternalUrl } from '../discordContext';
+import { isDiscordActivityContext, openExternalUrl } from '../discordContext';
+import { setAppRoute } from '../appRoute';
 import {
   readPreferredMatchScope,
   writePreferredMatchScope,
@@ -224,7 +225,11 @@ function traceCrispVoronoiPolygon(
   ctx.closePath();
 }
 
-const LandingShowcase: React.FC = () => {
+export interface LandingShowcaseProps {
+  onPlayGame?: () => void;
+}
+
+const LandingShowcase: React.FC<LandingShowcaseProps> = ({ onPlayGame }) => {
   const theme = useThemePackage();
   const setThemeId = useSetThemeId();
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -420,8 +425,12 @@ const LandingShowcase: React.FC = () => {
           {/* Action Row */}
           <div className="mt-5 flex flex-wrap items-center justify-center gap-2.5 sm:mt-6 sm:flex-nowrap sm:gap-4">
             <a
-              href={buildAppUrl('/game/')}
-              onClick={(e) => navigateInApp(e, '/game/')}
+              href="#game"
+              onClick={(e) => {
+                e.preventDefault();
+                if (onPlayGame) onPlayGame();
+                else setAppRoute('game');
+              }}
               style={{
                 backgroundColor: activeOption.accent,
                 boxShadow: `0 0 24px ${activeOption.accent}33`,

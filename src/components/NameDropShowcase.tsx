@@ -12,7 +12,8 @@ import {
   normalizeName,
   type NameDropPlan,
 } from '../nameDrop/nameDropShared';
-import { buildAppUrl, navigateInApp, openExternalUrl } from '../discordContext';
+import { openExternalUrl } from '../discordContext';
+import { setAppRoute } from '../appRoute';
 
 
 type RenderWorkerOut =
@@ -309,7 +310,7 @@ const NameDropShowcase: React.FC<NameDropShowcaseProps> = ({
       </div>
 
       <header className="relative z-10 mx-auto flex w-full max-w-7xl shrink-0 items-center justify-between gap-4 px-4 py-4 sm:px-8 sm:py-6">
-        <a href={buildAppUrl('/')} onClick={(e) => navigateInApp(e, '/')} className="group flex min-w-0 items-center gap-3 sm:gap-4" aria-label="Shape Showdown home">
+        <a href="#" onClick={(e) => { e.preventDefault(); setAppRoute('landing'); }} className="group flex min-w-0 items-center gap-3 sm:gap-4" aria-label="Shape Showdown home">
           <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-emerald-300/20 bg-emerald-300/10 text-emerald-300 shadow-[0_0_24px_rgba(52,211,153,0.16)] transition-colors group-hover:bg-emerald-300/15 sm:h-12 sm:w-12">
             <Swords className="h-5 w-5 sm:h-6 sm:w-6" />
           </span>
@@ -384,8 +385,11 @@ const NameDropShowcase: React.FC<NameDropShowcaseProps> = ({
               <ArrowUpRight className="h-3.5 w-3.5 text-zinc-500" />
             </a>
             <a
-              href={buildAppUrl('/game/')}
-              onClick={(e) => navigateInApp(e, '/game/')}
+              href="#game"
+              onClick={(e) => {
+                e.preventDefault();
+                setAppRoute('game');
+              }}
               className="inline-flex h-10 items-center gap-2 rounded-full bg-emerald-300 px-5 text-xs font-black text-[#07110d] shadow-[0_0_30px_rgba(110,231,183,.18)] transition-colors hover:bg-emerald-200 sm:h-11 sm:text-sm"
             >
               <Play className="h-4 w-4 fill-current" />

@@ -48,12 +48,6 @@ export function getOrCreateDiscordSdk(): Promise<DiscordSDK> {
 
   cachedDiscordSdkPromise = (async () => {
     const discordSdk = new DiscordSDK(discordClientId);
-    const sdkInternal = discordSdk as unknown as { sourceOrigin?: string; handshake?: () => void };
-    if (sdkInternal.sourceOrigin && sdkInternal.sourceOrigin.includes('discordsays.com')) {
-      sdkInternal.sourceOrigin = '*';
-      sdkInternal.handshake?.();
-    }
-
     await Promise.race([
       discordSdk.ready(),
       new Promise((_, reject) =>
