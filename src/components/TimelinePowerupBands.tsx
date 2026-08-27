@@ -1,5 +1,6 @@
 import React, { useMemo } from 'react';
 import type { ReplayDataV2 } from '../types';
+import { extractReplayEffectSpans } from '../../server/testHarness/replayDriver';
 
 interface TimelinePowerupBandsProps {
   replay: ReplayDataV2;
@@ -29,53 +30,6 @@ const EFFECT_COLORS: Record<string, string> = {
   'tax-siphon': 'bg-red-500/30 border-red-300/70',
 };
 
-interface EffectSpan {
-  id: string;
-  kind: string;
-  label: string;
-  startTick: number;
-  endTick: number;
-}
-
-function buildEffectSpans(replay: ReplayDataV2, playerId: string, totalTicks: number): EffectSpan[] {
-  const spans: EffectSpan[] = [];
-  const active = new Map<string, EffectSpan>();
-  const interval = Math.max(1, replay.keyframeIntervalTicks ?? 1);
-
-  for (const frame of replay.keyframes) {
-    const effects = frame.players?.[playerId]?.activeEffects ?? [];
-    const activeIds = new Set<string>();
-
-    for (const effect of effects) {
-      const effectKey = `${effect.id}:${effect.kind}`;
-      activeIds.add(effectKey);
-      const knownEnd = effect.expiresAtTick ?? Math.min(totalTicks, frame.tick + interval);
-      const existing = active.get(effectKey);
-      if (existing) {
-        existing.endTick = Math.max(existing.endTick, knownEnd, frame.tick + interval);
-      } else {
-        active.set(effectKey, {
-          id: effect.id,
-          kind: effect.kind,
-          label: effect.label,
-          startTick: frame.tick,
-          endTick: Math.min(totalTicks, Math.max(frame.tick + interval, knownEnd)),
-        });
-      }
-    }
-
-    for (const [effectKey, span] of active) {
-      if (!activeIds.has(effectKey)) {
-        spans.push(span);
-        active.delete(effectKey);
-      }
-    }
-  }
-
-  spans.push(...active.values());
-  return spans;
-}
-
 function purchaseMarkers(replay: ReplayDataV2, playerId: string) {
   return replay.inputs
     .flatMap((input) => {
@@ -91,13 +45,18 @@ export const TimelinePowerupBands: React.FC<TimelinePowerupBandsProps> = ({
   currentTick,
   playerLabel = (playerId) => playerId,
 }) => {
+  const allSpans = useMemo(() => {
+    if (!replay || totalTicks <= 0) return {};
+    return extractReplayEffectSpans(replay, totalTicks);
+  }, [replay, totalTicks]);
+
   const rows = useMemo(
     () => playerIds.map((playerId) => ({
       playerId,
-      spans: buildEffectSpans(replay, playerId, totalTicks),
+      spans: allSpans[playerId] ?? [],
       purchases: purchaseMarkers(replay, playerId),
     })),
-    [playerIds, replay, totalTicks],
+    [allSpans, playerIds, replay],
   );
 
   if (!replay || !replay.keyframes || totalTicks <= 0 || rows.length === 0) return null;

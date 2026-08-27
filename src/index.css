@@ -618,13 +618,163 @@ html[data-page='landing'] #root {
 
 [data-theme="seasalt"] .ss-match-chrome-status--waiting {
   color: var(--ss-waiting-text);
-  -webkit-text-stroke: 2px #05060b;
-  paint-order: stroke fill;
-  text-shadow: none;
+  text-shadow:
+    -1px -1px 0 #05060b,
+    1px -1px 0 #05060b,
+    -1px 1px 0 #05060b,
+    1px 1px 0 #05060b,
+    0 0 6px rgba(252, 226, 91, 0.45);
+}
+
+[data-theme="seasalt"] .ss-opponent-waiting-text {
+  color: var(--ss-waiting-text);
+  text-shadow:
+    -1px -1px 0 #05060b,
+    1px -1px 0 #05060b,
+    -1px 1px 0 #05060b,
+    1px 1px 0 #05060b,
+    0 1px 2px rgba(0, 0, 0, 0.9);
 }
 
 [data-theme="seasalt"] .ss-opponent-waiting-text.animate-pulse {
   animation: invincible-waiting-pulse 2.2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+/* Matchmaking Searching Screen */
+.ss-searching-card {
+  border: 1px solid var(--ss-stroke-secondary);
+  background-color: rgba(18, 20, 20, 0.88);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(12px);
+  min-inline-size: min(100%, 20rem);
+}
+
+.ss-searching-status {
+  color: var(--ss-waiting-text);
+  font-family: var(--ss-font-ui);
+  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.95);
+  letter-spacing: 0.14em;
+  text-align: center;
+}
+
+.ss-match-scope-radiogroup {
+  border: 1px solid var(--ss-stroke-secondary);
+  background-color: var(--ss-fill-tertiary);
+}
+
+.ss-match-scope-btn--active {
+  background-color: rgb(52 211 153 / 0.9);
+  color: #07110d;
+  font-weight: 800;
+  box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+}
+
+.ss-match-scope-btn--inactive {
+  color: var(--ss-text-tertiary);
+}
+
+.ss-match-scope-btn--inactive:hover {
+  background-color: rgba(255, 255, 255, 0.06);
+  color: var(--ss-text-secondary);
+}
+
+.ss-match-scope-description {
+  color: var(--ss-text-tertiary);
+}
+
+.ss-search-cancel-btn {
+  color: var(--ss-text-tertiary);
+  transition: color 0.15s ease, border-color 0.15s ease, background-color 0.15s ease;
+}
+
+.ss-search-cancel-btn:hover {
+  color: var(--ss-text-primary);
+}
+
+/* Seasalt Theme Matchmaking Overrides */
+[data-theme="seasalt"] .ss-searching-card {
+  border: 2px solid #085f9c;
+  background-color: rgba(5, 6, 11, 0.92);
+  box-shadow:
+    0 0 0 1px rgba(42, 174, 245, 0.5),
+    0 12px 36px rgba(2, 15, 26, 0.8);
+}
+
+[data-theme="seasalt"] .ss-searching-status {
+  color: var(--ss-waiting-text);
+  text-shadow:
+    0 0 10px rgba(252, 226, 91, 0.45),
+    0 2px 4px rgba(0, 0, 0, 0.9);
+}
+
+[data-theme="seasalt"] .ss-match-scope-radiogroup {
+  border-color: #085f9c;
+  background-color: rgba(6, 23, 35, 0.9);
+  box-shadow:
+    0 0 0 1px rgba(42, 174, 245, 0.35);
+}
+
+[data-theme="seasalt"] .ss-match-scope-btn--active {
+  background-color: var(--ss-shop-accent) !important;
+  color: #05060b !important;
+  font-weight: 900 !important;
+  box-shadow: 0 0 12px rgba(249, 254, 14, 0.6) !important;
+  text-shadow: none !important;
+}
+
+[data-theme="seasalt"] .ss-match-scope-btn--inactive {
+  color: #8edaff !important;
+  background-color: transparent !important;
+}
+
+[data-theme="seasalt"] .ss-match-scope-btn--inactive:hover {
+  color: #fff9c2 !important;
+  background-color: rgba(42, 174, 245, 0.2) !important;
+}
+
+[data-theme="seasalt"] .ss-match-scope-description {
+  color: var(--ss-shop-meta) !important;
+  font-weight: 600;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.95);
+}
+
+[data-theme="seasalt"] .ss-search-cancel-btn {
+  color: var(--ss-text-secondary) !important;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.95);
+}
+
+[data-theme="seasalt"] .ss-search-cancel-btn:hover {
+  color: var(--ss-text-primary) !important;
+  text-shadow: 0 0 8px rgba(252, 226, 91, 0.7);
+}
+
+[data-theme="seasalt"] .ss-repeat-pairing-banner {
+  border-color: rgba(252, 226, 91, 0.6) !important;
+  background-color: rgba(5, 6, 11, 0.9) !important;
+  color: #fce25b !important;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.95) !important;
+}
+
+[data-theme="seasalt"] .ss-search-expand-callout {
+  border-color: #2aaef5 !important;
+  background-color: rgba(5, 6, 11, 0.9) !important;
+  box-shadow: 0 4px 12px rgba(2, 15, 26, 0.5) !important;
+}
+
+[data-theme="seasalt"] .ss-search-expand-text {
+  color: var(--ss-text-secondary) !important;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.95) !important;
+}
+
+[data-theme="seasalt"] .ss-search-expand-btn {
+  border-color: var(--ss-shop-accent) !important;
+  background-color: rgba(249, 254, 14, 0.15) !important;
+  color: var(--ss-shop-accent) !important;
+}
+
+[data-theme="seasalt"] .ss-search-expand-btn:hover {
+  background-color: rgba(249, 254, 14, 0.3) !important;
+  color: #fff9c2 !important;
 }
 
 @keyframes invincible-waiting-pulse {

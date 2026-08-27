@@ -9,6 +9,8 @@ import { TimelinePowerupBands } from './components/TimelinePowerupBands';
 import { analyzeReplayDiagnostics, type ReplayDiagnosticReport } from './replayDiagnostics';
 import { projectCandidatePlacement, type ReplayCandidateOverlay } from './replayCandidateOverlay';
 import { deriveReplayDecisionOutcome } from './replayDecisionOutcome';
+import { getReplayTotalTicks, replayToTick, type ReplayCursor } from '../server/testHarness/replayDriver';
+import { decodeReplayFile } from './replayCodec';
 
 function winnerText(p1: PlayerState | null, p2: PlayerState | null): string {
   if (!p1 || !p2) return 'Unknown winner';
@@ -104,8 +106,18 @@ export default function ReplayApp() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const rafRef = useRef<number>(0);
   const lastTimeRef = useRef<number>(0);
+  const cursorRef = useRef<ReplayCursor | null>(null);
+  const lastReplayRef = useRef<ReplayDataV2 | null>(null);
 
-  const totalTicks = useMemo(() => replay?.keyframes[replay.keyframes.length - 1]?.tick ?? 1, [replay]);
+  if (lastReplayRef.current !== replay) {
+    lastReplayRef.current = replay;
+    cursorRef.current = null;
+  }
+
+  const totalTicks = useMemo(() => {
+    if (!replay) return 1;
+    return Math.max(1, getReplayTotalTicks(replay));
+  }, [replay]);
 
   const diagnosticReport: ReplayDiagnosticReport | null = useMemo(() => {
     if (!replay) return null;
@@ -128,26 +140,27 @@ export default function ReplayApp() {
     };
   }, [playing, replay, speed, totalTicks]);
 
+  const targetTick = Math.max(0, Math.min(totalTicks, Math.floor(tick)));
+
+  const viewState = useMemo((): GameState | null => {
+    if (!replay) return null;
+    const result = replayToTick(replay, targetTick, {
+      fromCursor: cursorRef.current ?? undefined,
+    });
+    cursorRef.current = result.cursor;
+    return result.gameState;
+  }, [replay, targetTick]);
+
   const viewFrame = useMemo(() => {
     if (!replay) return null;
     const frames = replay.keyframes;
-    let nearest = frames[0];
+    let nearest = frames[0] ?? null;
     for (const frame of frames) {
-      if (frame.tick <= tick) nearest = frame;
+      if (frame.tick <= targetTick) nearest = frame;
       else break;
     }
     return nearest;
-  }, [replay, tick]);
-
-  const viewState = useMemo((): GameState | null => {
-    if (!replay || !viewFrame) return null;
-    return {
-      ...replay.initialState,
-      tick: viewFrame.tick,
-      players: viewFrame.players,
-      status: 'playing',
-    };
-  }, [replay, viewFrame]);
+  }, [replay, targetTick]);
 
   const playerIds = useMemo(
     () => (viewState ? orderedPlayerIds(replay, viewState.players) : []),
@@ -223,20 +236,26 @@ export default function ReplayApp() {
     return deriveReplayDecisionOutcome(replay, currentDecisionTrace);
   }, [currentDecisionTrace, replay]);
 
+  const applyLoadedReplay = (raw: ReplayData) => {
+    const normalized = normalizeReplay(raw);
+    if (normalized) {
+      dispatch({ type: 'LOAD_SUCCESS', payload: normalized });
+    } else {
+      dispatch({ type: 'LOAD_ERROR', payload: 'Replay viewer currently supports v2 replay files only.' });
+    }
+  };
+
   const loadReplayFromUrl = (url: string) => {
-    fetch(url)
-      .then((res) => res.json())
-      .then((raw: ReplayData) => {
-        const normalized = normalizeReplay(raw);
-        if (normalized) {
-          dispatch({ type: 'LOAD_SUCCESS', payload: normalized });
-        } else {
-          dispatch({ type: 'LOAD_ERROR', payload: 'Replay viewer currently supports v2 replay files only.' });
-        }
-      })
-      .catch(() => {
-        // Silent fallback if default demo replay file is not found
-      });
+    // `.replay` files may be gzip-compressed on disk; decode through the shared
+    // seam. Demo `.json` files stay plain JSON.
+    const load = /\.replay(\?|$)/.test(url)
+      ? fetch(url)
+        .then((res) => res.arrayBuffer())
+        .then((bytes) => decodeReplayFile(bytes))
+      : fetch(url).then((res) => res.json()) as Promise<ReplayData>;
+    load.then(applyLoadedReplay).catch(() => {
+      // Silent fallback if default demo replay file is not found
+    });
   };
 
   useEffect(() => {
@@ -251,21 +270,13 @@ export default function ReplayApp() {
   const onFile = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      try {
-        const raw = JSON.parse(event.target?.result as string) as ReplayData;
-        const normalized = normalizeReplay(raw);
-        if (!normalized) {
-          dispatch({ type: 'LOAD_ERROR', payload: 'Replay viewer currently supports v2 replay files only.' });
-          return;
-        }
-        dispatch({ type: 'LOAD_SUCCESS', payload: normalized });
-      } catch {
-        dispatch({ type: 'LOAD_ERROR', payload: 'Invalid replay file.' });
-      }
-    };
-    reader.readAsText(file);
+    // Read raw bytes so both legacy JSON and gzip `.replay` files load.
+    file.arrayBuffer()
+      .then((buffer) => decodeReplayFile(buffer))
+      .then(applyLoadedReplay)
+      .catch((err: unknown) => {
+        dispatch({ type: 'LOAD_ERROR', payload: err instanceof Error ? err.message : 'Invalid replay file.' });
+      });
   };
 
   const stepTimelineTick = (direction: -1 | 1) => {
@@ -332,8 +343,8 @@ export default function ReplayApp() {
           {error && <div className="absolute z-30 left-3 top-3 text-xs text-rose-300 bg-rose-950/50 px-2 py-1 rounded">{error}</div>}
           <div className="flex-1 min-h-0 relative">
             <GameFieldsLayout>
-              {p1 && <GameField player={p1} isMe={false} title={playerLabel(playerIds[0])} fieldRole="self" hatchingEnabled={false} showEffectPills effectTick={viewFrame?.tick} suppressBomberExplosionAnimation replayCandidateOverlay={activeInspectedPlayerId === playerIds[0] ? replayCandidateOverlay : null} />}
-              {p2 && <GameField player={p2} isMe={false} title={playerLabel(playerIds[1])} fieldRole="opponent" hatchingEnabled={false} showEffectPills effectTick={viewFrame?.tick} suppressBomberExplosionAnimation replayCandidateOverlay={activeInspectedPlayerId === playerIds[1] ? replayCandidateOverlay : null} />}
+              {p1 && <GameField player={p1} isMe={false} title={playerLabel(playerIds[0])} fieldRole="self" hatchingEnabled={false} showEffectPills effectTick={viewState?.tick} suppressBomberExplosionAnimation replayCandidateOverlay={activeInspectedPlayerId === playerIds[0] ? replayCandidateOverlay : null} />}
+              {p2 && <GameField player={p2} isMe={false} title={playerLabel(playerIds[1])} fieldRole="opponent" hatchingEnabled={false} showEffectPills effectTick={viewState?.tick} suppressBomberExplosionAnimation replayCandidateOverlay={activeInspectedPlayerId === playerIds[1] ? replayCandidateOverlay : null} />}
             </GameFieldsLayout>
             {replay && tick >= totalTicks - 1 && (
               <div className="absolute inset-0 z-40 bg-[#0a0a0f]/40 flex items-center justify-center">

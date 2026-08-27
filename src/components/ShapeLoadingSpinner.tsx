@@ -51,6 +51,41 @@ export const ShapeLoadingSpinner: React.FC<ShapeLoadingSpinnerProps> = ({
       const cy = height / 2;
       const radius = width * 0.32;
 
+      // In Seasalt theme, draw a dark comic ink annular ring behind the rotating pieces
+      if (theme.id === 'seasalt') {
+        const ringThickness = cellSize * 4.4;
+        const innerRadius = radius - ringThickness / 2;
+        const outerRadius = radius + ringThickness / 2;
+
+        ctx.save();
+        // Dark ink ring fill
+        ctx.beginPath();
+        ctx.arc(cx, cy, radius, 0, Math.PI * 2);
+        ctx.lineWidth = ringThickness;
+        ctx.strokeStyle = 'rgba(5, 6, 11, 0.92)';
+        ctx.shadowColor = 'rgba(2, 15, 26, 0.8)';
+        ctx.shadowBlur = 12;
+        ctx.stroke();
+
+        // Subtle cyan border lines matching Seasalt theme
+        ctx.shadowColor = 'transparent';
+        ctx.shadowBlur = 0;
+        ctx.strokeStyle = 'rgba(42, 174, 245, 0.45)';
+        ctx.lineWidth = 1.5;
+
+        // Inner rim
+        ctx.beginPath();
+        ctx.arc(cx, cy, innerRadius, 0, Math.PI * 2);
+        ctx.stroke();
+
+        // Outer rim
+        ctx.beginPath();
+        ctx.arc(cx, cy, outerRadius, 0, Math.PI * 2);
+        ctx.stroke();
+
+        ctx.restore();
+      }
+
       // Draw each orbiting shape piece
       const count = PIECE_SEQUENCE.length;
       for (let i = 0; i < count; i++) {

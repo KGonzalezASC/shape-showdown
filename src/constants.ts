@@ -100,7 +100,7 @@ export const GRAVITY_TICKS_PER_CELL = 30;
 export const SOFT_DROP_CELLS_PER_TICK = 1;
 export const DAS_TICKS = 10;
 export const ARR_TICKS = 2;
-export const REPLAY_KEYFRAME_INTERVAL_TICKS = 30;
+export const REPLAY_KEYFRAME_INTERVAL_TICKS = 300;
 export const HORIZONTAL_SPEED_THRESHOLDS = [
   { minScore: 0, dasTicks: 16, arrTicks: 6 },
   { minScore: 600, dasTicks: 14, arrTicks: 5 },

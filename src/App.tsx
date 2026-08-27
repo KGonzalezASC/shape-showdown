@@ -620,55 +620,57 @@ export const GameView: React.FC<GameViewProps> = ({ onExitToLanding }) => {
       {!connected ? (
         <div className="relative z-10 flex flex-1 flex-col items-center justify-center gap-6 p-4">
           <ShapeLoadingSpinner cellSize={11} orbitDurationMs={4200} />
-          <p className="text-[9px] uppercase tracking-[0.14em] text-white drop-shadow-[0_2px_8px_rgba(0,0,0,0.9)] animate-pulse">
-            {matchDiagnostics.phase === 'queued'
-              ? 'Searching for an opponent...'
-              : matchDiagnostics.phase === 'assigned' || matchDiagnostics.phase === 'connecting'
-                ? 'Match assigned — connecting...'
-                : matchDiagnostics.phase === 'reconnecting'
-                  ? 'Reconnecting to the match...'
-                  : 'Connecting to Game Server...'}
-          </p>
-          {matchDiagnostics.repeatPairing && (
-            <p
-              role="status"
-              className="rounded-lg border border-amber-400/40 bg-amber-500/10 px-3 py-1.5 text-[8px] sm:text-[9px] font-mono uppercase tracking-wider text-amber-200"
-            >
-              No fresh opponents available — rematch with your previous opponent
+          <div className="ss-searching-card flex flex-col items-center gap-4 rounded-2xl p-5 shadow-2xl backdrop-blur-md">
+            <p className="ss-searching-status text-[9px] uppercase tracking-[0.14em] animate-pulse">
+              {matchDiagnostics.phase === 'queued'
+                ? 'Searching for an opponent...'
+                : matchDiagnostics.phase === 'assigned' || matchDiagnostics.phase === 'connecting'
+                  ? 'Match assigned — connecting...'
+                  : matchDiagnostics.phase === 'reconnecting'
+                    ? 'Reconnecting to the match...'
+                    : 'Connecting to Game Server...'}
             </p>
-          )}
-          {matchDiagnostics.phase === 'queued' && (
-            <div className="flex flex-col items-center gap-3">
-              <MatchScopePicker value={queuedSearchScope} onChange={changeSearchScope} />
-              {queuedSearchScope === 'guild' && queuedSeconds >= 15 && (
-                <div className="flex flex-col items-center gap-1.5 rounded-xl border border-emerald-500/20 bg-emerald-950/30 p-2.5 text-center">
-                  <p className="text-[8px] sm:text-[9px] text-emerald-300 font-mono">
-                    Searching in chat for {queuedSeconds}s. No opponents yet.
-                  </p>
-                  <button
-                    type="button"
-                    onClick={() => changeSearchScope('global')}
-                    className="rounded-lg border border-emerald-400/50 bg-emerald-500/20 px-3 py-1 text-[8px] sm:text-[9px] font-bold uppercase tracking-wider text-emerald-200 transition hover:bg-emerald-500/30"
-                  >
-                    Expand to Worldwide
-                  </button>
-                </div>
-              )}
-              <button
-                type="button"
-                onClick={async () => {
-                  const cancelled = await cancelQueueSearch();
-                  if (cancelled) {
-                    if (onExitToLanding) onExitToLanding();
-                    else setAppRoute('landing');
-                  }
-                }}
-                className="mt-1 text-[8px] sm:text-[9px] font-mono font-bold uppercase tracking-[0.14em] text-zinc-400 hover:text-white transition"
+            {matchDiagnostics.repeatPairing && (
+              <p
+                role="status"
+                className="ss-repeat-pairing-banner rounded-lg border border-amber-400/40 bg-amber-500/10 px-3 py-1.5 text-[8px] sm:text-[9px] font-mono uppercase tracking-wider text-amber-200"
               >
-                Cancel Search
-              </button>
-            </div>
-          )}
+                No fresh opponents available — rematch with your previous opponent
+              </p>
+            )}
+            {matchDiagnostics.phase === 'queued' && (
+              <div className="flex flex-col items-center gap-3">
+                <MatchScopePicker value={queuedSearchScope} onChange={changeSearchScope} />
+                {queuedSearchScope === 'guild' && queuedSeconds >= 15 && (
+                  <div className="ss-search-expand-callout flex flex-col items-center gap-1.5 rounded-xl border border-emerald-500/20 bg-emerald-950/30 p-2.5 text-center">
+                    <p className="ss-search-expand-text text-[8px] sm:text-[9px] text-emerald-300 font-mono">
+                      Searching in chat for {queuedSeconds}s. No opponents yet.
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => changeSearchScope('global')}
+                      className="ss-search-expand-btn rounded-lg border border-emerald-400/50 bg-emerald-500/20 px-3 py-1 text-[8px] sm:text-[9px] font-bold uppercase tracking-wider text-emerald-200 transition hover:bg-emerald-500/30"
+                    >
+                      Expand to Worldwide
+                    </button>
+                  </div>
+                )}
+                <button
+                  type="button"
+                  onClick={async () => {
+                    const cancelled = await cancelQueueSearch();
+                    if (cancelled) {
+                      if (onExitToLanding) onExitToLanding();
+                      else setAppRoute('landing');
+                    }
+                  }}
+                  className="ss-search-cancel-btn text-[8px] sm:text-[9px] font-mono font-bold uppercase tracking-[0.14em]"
+                >
+                  Cancel Search
+                </button>
+              </div>
+            )}
+          </div>
         </div>
       ) : (
         <>

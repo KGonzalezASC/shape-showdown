@@ -41,11 +41,11 @@ export const MatchScopePicker: React.FC<MatchScopePickerProps> = ({
   const activeOption = scopeOptions.find((opt) => opt.value === value) ?? scopeOptions[0];
 
   return (
-    <div className="flex flex-col items-center gap-1.5">
+    <div className="ss-match-scope flex flex-col items-center gap-1.5">
       <div
         role="radiogroup"
         aria-label="Opponent search scope"
-        className="flex items-center gap-1 rounded-xl border border-white/10 bg-white/[0.04] p-1"
+        className="ss-match-scope-radiogroup flex items-center gap-1 rounded-xl p-1 backdrop-blur-sm"
       >
         {scopeOptions.map((option) => {
           const isActive = option.value === value;
@@ -57,10 +57,10 @@ export const MatchScopePicker: React.FC<MatchScopePickerProps> = ({
               aria-checked={isActive}
               onClick={() => onChange(option.value)}
               className={
-                'rounded-lg px-2.5 py-1.5 text-[8px] font-bold uppercase tracking-[0.12em] transition-colors sm:text-[9px] '
+                'ss-match-scope-btn rounded-lg px-2.5 py-1.5 text-[8px] font-bold uppercase tracking-[0.12em] transition-colors sm:text-[9px] '
                 + (isActive
-                  ? 'bg-emerald-400/90 text-[#07110d] font-extrabold shadow-sm'
-                  : 'text-zinc-400 hover:bg-white/[0.06] hover:text-zinc-200')
+                  ? 'ss-match-scope-btn--active'
+                  : 'ss-match-scope-btn--inactive')
               }
             >
               {option.label}
@@ -68,7 +68,7 @@ export const MatchScopePicker: React.FC<MatchScopePickerProps> = ({
           );
         })}
       </div>
-      <p className="text-center font-mono text-[9px] font-medium tracking-wide text-zinc-400">
+      <p className="ss-match-scope-description text-center font-mono text-[9px] font-medium tracking-wide">
         {activeOption.description}
       </p>
     </div>
