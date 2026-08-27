@@ -37,6 +37,7 @@ import type {
   MatchResultStats,
 } from './controlPlane/matchResultStore.js';
 import { GAME_PROTOCOL_VERSION } from '../src/protocol/version.js';
+import { encodeReplayFile } from '../src/replayCodec.js';
 import { MatchPacketSync } from './sync/MatchPacketSync.js';
 import { DISCONNECT_SEAT_LEASE_MS } from '../src/constants.js';
 
@@ -942,6 +943,14 @@ export class GameManager {
     this.rngChannelsByPlayer = next;
   }
 
+  private clonePlayerRngChannels(): Record<string, RngChannels> {
+    const cloned: Record<string, RngChannels> = {};
+    for (const [id, channels] of this.rngChannelsByPlayer.entries()) {
+      cloned[id] = structuredClone(channels);
+    }
+    return cloned;
+  }
+
   private recordReplayInput(frame: ReplayInputFrame): void {
     if (this.activeReplay) {
       // Socket events received between simulation ticks take effect on the
@@ -1251,6 +1260,7 @@ export class GameManager {
             {
               tick: 0,
               players: structuredClone(this.gameState.players),
+              rng: this.clonePlayerRngChannels(),
             },
           ],
           events: []
@@ -1285,6 +1295,7 @@ export class GameManager {
         this.activeReplay.keyframes.push({
           tick: this.gameState.tick,
           players: structuredClone(this.gameState.players),
+          rng: this.clonePlayerRngChannels(),
         });
       }
       if (this.gameState.tick > 0 && this.gameState.tick % CHECKPOINT_INTERVAL_TICKS === 0) {
@@ -1367,17 +1378,22 @@ export class GameManager {
     }
     const replaysDir = path.resolve(rawReplaysDir);
     const filename = `replay_${this.activeReplay.date}.replay`;
-    const payload = JSON.stringify(this.activeReplay);
+    const replay = this.activeReplay;
     this.activeReplay = null;
 
-    this.pendingSaveReplayPromise = Bun.write(
-      path.join(replaysDir, filename),
-      payload,
-      { createPath: true },
-    ).catch((err: unknown) => {
-      console.error('Failed to save replay:', err);
-      return 0;
-    });
+    // Encode (stringify + gzip) and write on the async save path, off the
+    // 60 Hz tick. The file on disk is gzip-compressed JSON; readers sniff the
+    // gzip magic via decodeReplayFile.
+    this.pendingSaveReplayPromise = encodeReplayFile(replay)
+      .then((bytes) => Bun.write(
+        path.join(replaysDir, filename),
+        bytes,
+        { createPath: true },
+      ))
+      .catch((err: unknown) => {
+        console.error('Failed to save replay:', err);
+        return 0;
+      });
   }
 
   private recordReplayDiscontinuity(marker: ReplayDiscontinuity): void {

@@ -1,4 +1,5 @@
 import { BOARD_COLS, BOARD_ROWS, BOARD_VISIBLE_ROWS } from '../constants.js';
+import type { GamePiece } from '../types.js';
 import { BinaryWriter, toArrayBuffer } from './binary.js';
 import {
   writeChrome,
@@ -8,16 +9,19 @@ import {
   writeLocalMeta,
   writeLocalShop,
   writeOpponentMeta,
+  writePieceCompact,
   writeTectonicMoves,
 } from './codecShared.js';
 import {
   DELTA_SECTION_CHROME,
   DELTA_SECTION_LOCAL_BOARD,
   DELTA_SECTION_LOCAL_META,
+  DELTA_SECTION_LOCAL_PIECE,
   DELTA_SECTION_LOCAL_POISON,
   DELTA_SECTION_LOCAL_SHOP,
   DELTA_SECTION_OPPONENT_BOARD,
   DELTA_SECTION_OPPONENT_META,
+  DELTA_SECTION_OPPONENT_PIECE,
   DELTA_SECTION_OPPONENT_POISON,
   type SeatWireSnapshot,
   type TectonicCompleteWire,
@@ -54,6 +58,30 @@ function writeHeader(
   writer.writeU32(tick >>> 0);
 }
 
+const pieceScratch = new BinaryWriter(64);
+
+function encodePieceToScratch(piece: GamePiece | null): ArrayBuffer {
+  pieceScratch.reset();
+  writePieceCompact(pieceScratch, piece);
+  return pieceScratch.finish();
+}
+
+/**
+ * Piece dirtiness is decided by comparing canonical wire bytes so the diff can
+ * never disagree with what the codec actually round-trips (loop-proof).
+ */
+function pieceWireDiffers(a: GamePiece | null, b: GamePiece | null): boolean {
+  const aBytes = encodePieceToScratch(a);
+  const bBytes = encodePieceToScratch(b);
+  if (aBytes.byteLength !== bBytes.byteLength) return true;
+  const viewA = new Uint8Array(aBytes);
+  const viewB = new Uint8Array(bBytes);
+  for (let i = 0; i < viewA.length; i += 1) {
+    if (viewA[i] !== viewB[i]) return true;
+  }
+  return false;
+}
+
 export function encodeKeyframePacket(
   snapshot: SeatWireSnapshot,
   sequence: number,
@@ -65,8 +93,10 @@ export function encodeKeyframePacket(
   writeFullBoard(writer, snapshot.local.board, snapshot.local.poisonBoard, BOARD_ROWS);
   writeLocalMeta(writer, snapshot.local, true);
   writeLocalShop(writer, snapshot.local.shop);
+  writePieceCompact(writer, snapshot.local.activePiece);
   writeFullBoard(writer, snapshot.opponent.board, snapshot.opponent.poisonBoard, BOARD_VISIBLE_ROWS);
   writeOpponentMeta(writer, snapshot.opponent, true);
+  writePieceCompact(writer, snapshot.opponent.activePiece);
   return writer.finish();
 }
 
@@ -90,13 +120,17 @@ export function encodeDeltaPacket(
   if (JSON.stringify(snapshot.local.poisonBoard) !== JSON.stringify(baseline.local.poisonBoard)) {
     sections |= DELTA_SECTION_LOCAL_POISON;
   }
-  const localMetaBaseline = { ...baseline.local, board: [], poisonBoard: [], shop: baseline.local.shop };
-  const localMetaSnapshot = { ...snapshot.local, board: [], poisonBoard: [], shop: snapshot.local.shop };
-  if (JSON.stringify(localMetaSnapshot) !== JSON.stringify({ ...localMetaBaseline, shop: snapshot.local.shop })) {
+  // Board, shop, and the active piece travel in their own sections.
+  const localMetaBaseline = { ...baseline.local, board: [], poisonBoard: [], shop: null, activePiece: null };
+  const localMetaSnapshot = { ...snapshot.local, board: [], poisonBoard: [], shop: null, activePiece: null };
+  if (JSON.stringify(localMetaSnapshot) !== JSON.stringify(localMetaBaseline)) {
     sections |= DELTA_SECTION_LOCAL_META;
   }
   if (JSON.stringify(snapshot.local.shop) !== JSON.stringify(baseline.local.shop)) {
     sections |= DELTA_SECTION_LOCAL_SHOP;
+  }
+  if (pieceWireDiffers(snapshot.local.activePiece, baseline.local.activePiece)) {
+    sections |= DELTA_SECTION_LOCAL_PIECE;
   }
   if (JSON.stringify(snapshot.opponent.board) !== JSON.stringify(baseline.opponent.board)) {
     sections |= DELTA_SECTION_OPPONENT_BOARD;
@@ -104,10 +138,13 @@ export function encodeDeltaPacket(
   if (JSON.stringify(snapshot.opponent.poisonBoard) !== JSON.stringify(baseline.opponent.poisonBoard)) {
     sections |= DELTA_SECTION_OPPONENT_POISON;
   }
-  const oppMetaBaseline = { ...baseline.opponent, board: [] };
-  const oppMetaSnapshot = { ...snapshot.opponent, board: [] };
+  const oppMetaBaseline = { ...baseline.opponent, board: [], activePiece: null };
+  const oppMetaSnapshot = { ...snapshot.opponent, board: [], activePiece: null };
   if (JSON.stringify(oppMetaSnapshot) !== JSON.stringify(oppMetaBaseline)) {
     sections |= DELTA_SECTION_OPPONENT_META;
+  }
+  if (pieceWireDiffers(snapshot.opponent.activePiece, baseline.opponent.activePiece)) {
+    sections |= DELTA_SECTION_OPPONENT_PIECE;
   }
 
   if (sections === 0) return null;
@@ -134,6 +171,8 @@ export function encodeDeltaPacket(
     );
   }
   if (sections & DELTA_SECTION_OPPONENT_META) writeOpponentMeta(writer, snapshot.opponent, false);
+  if (sections & DELTA_SECTION_LOCAL_PIECE) writePieceCompact(writer, snapshot.local.activePiece);
+  if (sections & DELTA_SECTION_OPPONENT_PIECE) writePieceCompact(writer, snapshot.opponent.activePiece);
 
   if (writer.position <= bodyStart + 2) return null;
   return writer.finish();

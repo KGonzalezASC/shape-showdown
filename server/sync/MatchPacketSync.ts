@@ -102,12 +102,43 @@ export class MatchPacketSync {
     return moves;
   }
 
-  private emitPacket(socket: Socket, runtimeId: string, buffer: ArrayBuffer, updateBaseline: SeatWireSnapshot): void {
+  /**
+   * Unified seat packet emitter.
+   *
+   * Correctness & Extensibility invariants:
+   * 1. If `forceKeyframe` is true or `state.baseline === null` (e.g. fresh connection,
+   *    reconnect, or status change), sends a full keyframe snapshot.
+   * 2. Otherwise diffs the projected seat snapshot against `state.baseline`.
+   * 3. If zero sections changed, skips emission without advancing sequence numbers
+   *    (preventing sequence gaps on the client decoder).
+   * 4. When a delta is emitted, advances `state.sequence`, updates `state.baseline`,
+   *    and increments `state.generation` in lockstep with the client decoder.
+   *
+   * Adding new powerups / mechanics:
+   * This function is entirely decoupled from gameplay mechanics. Powerups that modify
+   * boards, pieces, shop state, active effect pills, or player meta are detected
+   * automatically by `encodeDeltaPacket` diffing `snapshot` vs `state.baseline`.
+   */
+  private sendSeatUpdate(
+    socket: Socket,
+    runtimeId: string,
+    gameState: GameState,
+    forceKeyframe: boolean,
+  ): void {
+    const snapshot = buildSeatWireSnapshot(gameState, runtimeId);
+    if (!snapshot) return;
     const state = this.stateFor(runtimeId);
-    state.sequence = (state.sequence + 1) >>> 0;
-    state.baseline = cloneSeatSnapshot(updateBaseline);
+    if (forceKeyframe || state.baseline === null) {
+      this.sendKeyframe(socket, runtimeId, gameState);
+      return;
+    }
+    const nextSequence = (state.sequence + 1) >>> 0;
+    const delta = encodeDeltaPacket(snapshot, state.baseline, nextSequence, state.generation);
+    if (delta === null) return;
+    state.sequence = nextSequence;
+    state.baseline = cloneSeatSnapshot(snapshot);
     state.generation = (state.generation + 1) >>> 0;
-    socket.emit('gamePacket', buffer);
+    socket.emit('gamePacket', delta);
   }
 
   sendKeyframe(socket: Socket, runtimeId: string, gameState: GameState): void {
@@ -122,10 +153,18 @@ export class MatchPacketSync {
     socket.emit('gamePacket', buffer);
   }
 
-  sendImmediate(gameState: GameState, sockets: Map<string, Socket>): void {
+  /**
+   * Immediate event flush path.
+   * Called on discrete events (piece locks, line clears, hold, shop purchases).
+   * Sends delta-first to minimize egress, falling back to keyframe on status changes
+   * or when a seat lacks a baseline.
+   */
+  sendImmediate(gameState: GameState, sockets: Map<string, Socket>, forceKeyframe = false): void {
     this.sinceEmit = 0;
+    const statusChanged = gameState.status !== this.lastStatus;
+    this.lastStatus = gameState.status;
     for (const [runtimeId, socket] of sockets.entries()) {
-      this.sendKeyframe(socket, runtimeId, gameState);
+      this.sendSeatUpdate(socket, runtimeId, gameState, forceKeyframe || statusChanged);
     }
   }
 
@@ -187,20 +226,7 @@ export class MatchPacketSync {
 
     this.sinceEmit = 0;
     for (const [runtimeId, socket] of sockets.entries()) {
-      const snapshot = buildSeatWireSnapshot(gameState, runtimeId);
-      if (!snapshot) continue;
-      const state = this.stateFor(runtimeId);
-      if (statusChanged || keyframeDue || state.baseline === null) {
-        this.sendKeyframe(socket, runtimeId, gameState);
-        continue;
-      }
-      const nextSequence = (state.sequence + 1) >>> 0;
-      const delta = encodeDeltaPacket(snapshot, state.baseline, nextSequence, state.generation);
-      if (delta === null) continue;
-      state.sequence = nextSequence;
-      state.baseline = cloneSeatSnapshot(snapshot);
-      state.generation = (state.generation + 1) >>> 0;
-      socket.emit('gamePacket', delta);
+      this.sendSeatUpdate(socket, runtimeId, gameState, statusChanged || keyframeDue);
     }
   }
 

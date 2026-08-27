@@ -1,3 +1,4 @@
+import { SHOP_CATALOG } from '../shop/shopCatalog.js';
 import type {
   ActiveFieldEffect,
   CellValue,
@@ -12,6 +13,30 @@ import type {
   GamePiece,
   ShapeType,
 } from '../types.js';
+
+/**
+ * Powerup & Protocol Extension Guide:
+ *
+ * 1. Standard Shop Item (Mechanic already exists or only affects board/shop/pills):
+ *    - Append the new item to `SHOP_CATALOG` in `src/shop/shopCatalog.ts`.
+ *    - `U8_TO_SHOP_ITEM_ID` and `SHOP_ITEM_ID_TO_U8` update automatically.
+ *    - Register the purchase handler in `server/shop.ts`.
+ *
+ * 2. Visual Active Field Effect Pill (Buff/Debuff/Timer):
+ *    - Add the kind name to `FieldEffectKind` in `src/types.ts`.
+ *    - Append the kind name to `FIELD_EFFECT_KINDS` below.
+ *    - Add Tailwind styling in `src/shop/effectStyles.ts`.
+ *    - (Optional) Append static labels/icons to `EFFECT_LABEL_INTERN`/`EFFECT_ICON_INTERN`
+ *      for varint byte optimization. Un-interned labels/icons fall back to literal strings safely.
+ *
+ * 3. New Persistent State Variable on PlayerState:
+ *    - Add property to `PlayerState` in `src/types.ts`.
+ *    - Add property to `LocalPlayerWire` below (and `OpponentPlayerWire` if visible to opponent).
+ *    - Project it in `server/sync/seatProjection.ts`.
+ *    - Add presence bitmask flag in `src/protocol/codecShared.ts` (`PRESENCE_*`) and write/read in meta codec.
+ *    - Map it in `src/protocol/clientMatchModel.ts`.
+ *    - `encodeDeltaPacket()` detects the change automatically via meta diffing.
+ */
 
 /**
  * Wire garbage entry. All tick fields are ABSOLUTE simulation ticks; decoders
@@ -232,3 +257,58 @@ export const DELTA_SECTION_LOCAL_SHOP = 1 << 4;
 export const DELTA_SECTION_OPPONENT_BOARD = 1 << 5;
 export const DELTA_SECTION_OPPONENT_META = 1 << 6;
 export const DELTA_SECTION_OPPONENT_POISON = 1 << 7;
+export const DELTA_SECTION_LOCAL_PIECE = 1 << 8;
+export const DELTA_SECTION_OPPONENT_PIECE = 1 << 9;
+
+/** Canonical shop item id ↔ byte enum, ordered by {@link SHOP_CATALOG}. */
+export const U8_TO_SHOP_ITEM_ID: readonly string[] = SHOP_CATALOG.map((item) => item.id);
+export const SHOP_ITEM_ID_TO_U8: ReadonlyMap<string, number> = new Map(
+  U8_TO_SHOP_ITEM_ID.map((id, index) => [id, index]),
+);
+
+/** Code for a literal length-prefixed string in the effect label/id streams. */
+export const EFFECT_STRING_LITERAL = 0;
+/** Base code for templated (numeric-argument) effect labels. */
+export const EFFECT_LABEL_TEMPLATE_BASE = 200;
+/** Code for a literal length-prefixed effect icon; 0 means absent. */
+export const EFFECT_ICON_LITERAL = 255;
+
+/**
+ * Fixed effect label strings interned on the wire (encoded as index + 1).
+ * Order is wire-stable; only append.
+ */
+export const EFFECT_LABEL_INTERN: readonly string[] = [
+  'Retrimmed',
+  'Curtain incoming',
+  'Curtain',
+  'Poisoned',
+  'Storage poisoned',
+  'Purged',
+  'Frozen',
+  'Snagged',
+  'Sticky',
+  'Satellite',
+  'Satellite armed',
+  'Bomber',
+  'Wildcard +4',
+  'Tectonic Shift',
+] as const;
+
+/** Fixed effect icon strings interned on the wire (encoded as index + 1). */
+export const EFFECT_ICON_INTERN: readonly string[] = [
+  '🛡️',
+  '✂️',
+  '🎭',
+  '🧪',
+  '🦠',
+  '🃏',
+  '❄️',
+  '🧲',
+  '🪝',
+  '⏱️',
+  '🛰️',
+  '💣',
+  '💸',
+  '🧩',
+  '🪐',
+] as const;

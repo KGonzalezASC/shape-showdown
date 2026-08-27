@@ -6,8 +6,8 @@
  */
 import { createPlayerRngChannels, type RngChannels } from '../src/rng.js';
 import type { GameState, MatchEvent } from '../src/types.js';
-import { makePlayer, tickSeconds } from '../server/tetris/engine.js';
-import { matchStep } from '../server/tetris/matchStep.js';
+import { makePlayer, tickSeconds } from '../server/puzzleEngine/engine.js';
+import { matchStep } from '../server/puzzleEngine/matchStep.js';
 import { MatchPacketSync } from '../server/sync/MatchPacketSync.js';
 import { RulesBot } from '../server/testHarness/rulesBot.js';
 import { defaultObservationProjector } from '../server/testHarness/observationProjector.js';

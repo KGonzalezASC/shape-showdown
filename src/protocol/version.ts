@@ -1,5 +1,11 @@
-/** Shared gameplay transport protocol version (client + server). */
-export const GAME_PROTOCOL_VERSION = 3;
+/**
+ * Shared gameplay transport protocol version (client + server).
+ *
+ * v4: piece deltas split out of meta sections (section bits 8/9), compact piece
+ * encoding, catalog-indexed shop item ids, interned effect ids/labels/icons,
+ * presence bitmasks + LEB128 varints in meta, and packed dirty-cell nibbles.
+ */
+export const GAME_PROTOCOL_VERSION = 4;
 
 export const PACKET_KIND_KEYFRAME = 1;
 export const PACKET_KIND_DELTA = 2;

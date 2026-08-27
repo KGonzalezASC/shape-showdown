@@ -5,7 +5,7 @@ import { encodeDeltaPacket, encodeKeyframePacket } from './encodeMatchPacket.js'
 import { decodeKeyframePacket, applyDeltaPacket } from './decodeMatchPacket.js';
 import type { SeatWireSnapshot } from './wireTypes.js';
 import { GAME_PROTOCOL_VERSION, MAX_PACKET_BYTES } from './version.js';
-import { BinaryWriter } from './binary.js';
+import { BinaryReader, BinaryWriter } from './binary.js';
 
 function emptySnapshot(seed = 42): SeatWireSnapshot {
   return {
@@ -38,7 +38,7 @@ function emptySnapshot(seed = 42): SeatWireSnapshot {
       curtainDefenseLevel: 0,
       poisonSpread: null,
       shop: {
-        offerIds: ['freeze'],
+        offerIds: ['frost-shift'],
         phase: 'ready',
         cycleIndex: 0,
         lastPurchasedItemId: null,
@@ -69,8 +69,8 @@ function emptySnapshot(seed = 42): SeatWireSnapshot {
 }
 
 describe('binary match packet codec', () => {
-  it('keeps the staging protocol at version 3', () => {
-    assert.equal(GAME_PROTOCOL_VERSION, 3);
+  it('keeps the protocol at the v4 wire layout', () => {
+    assert.equal(GAME_PROTOCOL_VERSION, 4);
   });
 
   it('round-trips a keyframe including seat ids', () => {
@@ -134,7 +134,7 @@ describe('binary match packet codec', () => {
     assert.equal(decoded.opponent.activeEffects[0]?.expiresAtTick, 80);
     assert.equal(decoded.opponent.magnetPermanentStacks, 3);
     assert.equal(decoded.opponent.magnetPieceBoost, 1);
-    assert.equal(decoded.local.shop.offerIds[0], 'freeze');
+    assert.equal(decoded.local.shop.offerIds[0], 'frost-shift');
     assert.equal(decoded.opponent.score, 50);
   });
 
@@ -224,5 +224,126 @@ describe('binary match packet codec', () => {
       writer.writeU32(i);
     }
     assert.throws(() => writer.writeU32(0xffffffff));
+  });
+
+  it('sends a compact piece-only delta when only pieces move', () => {
+    const baseline = emptySnapshot();
+    baseline.local.activePiece = { type: 'T', rotation: 0, x: 3, y: 2 };
+    baseline.opponent.activePiece = { type: 'L', rotation: 1, x: 4, y: 5 };
+    const changed = structuredClone(baseline) as SeatWireSnapshot;
+    changed.local.activePiece!.y += 1;
+    changed.opponent.activePiece!.x -= 1;
+    const delta = encodeDeltaPacket(changed, baseline, 2, 1);
+    assert.ok(delta);
+    // 14-byte header + 2-byte mask + two ≤6-byte compact pieces.
+    assert.ok(delta.byteLength <= 32, `piece delta too large: ${delta.byteLength}`);
+    const applied = applyDeltaPacket(baseline, delta!);
+    assert.equal(applied.local.activePiece?.y, 3);
+    assert.equal(applied.opponent.activePiece?.x, 3);
+  });
+
+  it('keeps meta sections out of piece-move deltas', () => {
+    const baseline = emptySnapshot();
+    baseline.local.activeEffects = [
+      { id: 'poison-500', kind: 'poison', label: 'Poisoned', icon: '🧪', expiresAtTick: 600 },
+    ];
+    const changed = structuredClone(baseline) as SeatWireSnapshot;
+    changed.local.activePiece = { type: 'I', rotation: 0, x: 0, y: 1 };
+    const delta = encodeDeltaPacket(changed, baseline, 2, 1);
+    assert.ok(delta);
+    assert.ok(delta.byteLength < 30, `delta should carry only the piece: ${delta.byteLength}`);
+    const applied = applyDeltaPacket(baseline, delta!);
+    assert.deepEqual(applied.local.activeEffects, baseline.local.activeEffects);
+    assert.equal(applied.local.activePiece?.type, 'I');
+  });
+
+  it('round-trips wildcard pieces with offsets and rotation nonce', () => {
+    const snapshot = emptySnapshot();
+    snapshot.local.activePiece = {
+      type: 'T',
+      rotation: 2,
+      x: 3,
+      y: 0,
+      isWildcard: true,
+      customOffsets: [[0, 0], [1, 0], [2, 0], [1, 1]],
+      rotationBlockedNonce: 7,
+    };
+    snapshot.opponent.activePiece = {
+      type: 'Z',
+      rotation: 0,
+      x: 4,
+      y: 3,
+      poisoned: true,
+      poisonVariant: 2,
+    };
+    const buffer = encodeKeyframePacket(snapshot, 1, 1);
+    const decoded = decodeKeyframePacket(buffer);
+    assert.deepEqual(decoded.local.activePiece, snapshot.local.activePiece);
+    assert.deepEqual(decoded.opponent.activePiece, snapshot.opponent.activePiece);
+  });
+
+  it('round-trips shop state through the catalog enum', () => {
+    const snapshot = emptySnapshot();
+    snapshot.local.shop = {
+      offerIds: ['frost-shift', 'nova-charge', 'bounty-tax', 'tectonic-shift', 'retrim'],
+      phase: 'cycling',
+      cycleIndex: 2,
+      lastPurchasedItemId: 'elixir-pulse',
+      activeSynergySeeds: ['nova-charge'],
+      pricing: {
+        'nova-charge': { level: 2, purchasesInWindow: 1, windowStartedAtTick: 5 },
+        retrim: { level: 0, purchasesInWindow: 0, windowStartedAtTick: null, lastWindowClosedBy: 'timer' },
+      },
+    };
+    const buffer = encodeKeyframePacket(snapshot, 1, 1);
+    const decoded = decodeKeyframePacket(buffer);
+    assert.deepEqual(decoded.local.shop, snapshot.local.shop);
+  });
+
+  it('round-trips interned effect labels, icons, and structured ids', () => {
+    const snapshot = emptySnapshot();
+    snapshot.local.activeEffects = [
+      { id: 'magnet-4100', kind: 'magnet', label: 'Magnet ×2 (+5)', icon: '🧲', expiresAtTick: 500 },
+      { id: 'curtain-def-4200', kind: 'curtain-def', label: 'Curtain Def +3', icon: '🛡️' },
+      { id: 'custom-thing', kind: 'sticky', label: 'Some Future Label', icon: '🧪' },
+      { id: 'taxed-4300', kind: 'taxed', label: 'Taxed (-12)', icon: '💸', expiresAtTick: 4420 },
+    ];
+    const buffer = encodeKeyframePacket(snapshot, 1, 1);
+    const decoded = decodeKeyframePacket(buffer);
+    assert.deepEqual(decoded.local.activeEffects, [
+      { id: 'magnet-4100', kind: 'magnet', label: 'Magnet ×2 (+5)', icon: '🧲', expiresAtTick: 490 },
+      { id: 'curtain-def-4200', kind: 'curtain-def', label: 'Curtain Def +3', icon: '🛡️' },
+      { id: 'custom-thing', kind: 'sticky', label: 'Some Future Label', icon: '🧪' },
+      { id: 'taxed-4300', kind: 'taxed', label: 'Taxed (-12)', icon: '💸', expiresAtTick: 4410 },
+    ]);
+  });
+
+  it('packs dirty board nibbles two per byte on odd cell counts', () => {
+    const baseline = emptySnapshot();
+    const changed = structuredClone(baseline) as SeatWireSnapshot;
+    changed.local.board[7][0] = 'I';
+    changed.local.board[9][3] = 'T';
+    changed.local.board[9][4] = 'Z';
+    changed.local.board[9][5] = 'L';
+    const delta = encodeDeltaPacket(changed, baseline, 2, 1);
+    assert.ok(delta);
+    const applied = applyDeltaPacket(baseline, delta!);
+    assert.equal(applied.local.board[7]?.[0], 'I');
+    assert.equal(applied.local.board[9]?.[3], 'T');
+    assert.equal(applied.local.board[9]?.[4], 'Z');
+    assert.equal(applied.local.board[9]?.[5], 'L');
+  });
+
+  it('round-trips LEB128 varint boundaries', () => {
+    for (const value of [0, 1, 127, 128, 16383, 16384, 0xffffffff]) {
+      const writer = new BinaryWriter();
+      writer.writeVarint(value);
+      const reader = new BinaryReader(writer.finish());
+      assert.equal(reader.readVarint(), value >>> 0);
+    }
+    assert.throws(() => {
+      const writer = new BinaryWriter();
+      writer.writeVarint(-1);
+    });
   });
 });

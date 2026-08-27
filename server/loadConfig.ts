@@ -14,7 +14,7 @@ const defaults: ServerConfig = {
   port: 3000,
   host: "0.0.0.0",
   serveClient: false,
-  replayKeyframeIntervalTicks: 30,
+  replayKeyframeIntervalTicks: 300,
   recoveryVoidTimeoutMs: DISCONNECT_SEAT_LEASE_MS,
 };
 

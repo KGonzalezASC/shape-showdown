@@ -9,7 +9,7 @@ import type {
   GamePiece,
   ShapeType,
 } from '../types.js';
-import { BinaryReader, BinaryWriter } from './binary.js';
+import { BinaryReader, BinaryWriter, PacketSizeError } from './binary.js';
 import {
   cellToNibble,
   nibbleToCell,
@@ -21,7 +21,13 @@ import {
   unpackPoisonRow,
 } from './cellCodec.js';
 import {
+  EFFECT_ICON_INTERN,
+  EFFECT_ICON_LITERAL,
+  EFFECT_LABEL_INTERN,
+  EFFECT_LABEL_TEMPLATE_BASE,
+  EFFECT_STRING_LITERAL,
   FIELD_EFFECT_KINDS,
+  SHOP_ITEM_ID_TO_U8,
   type DecodedLocalPlayerWire,
   type DecodedOpponentPlayerWire,
   type LocalPlayerWire,
@@ -32,9 +38,10 @@ import {
   type TectonicCellMove,
   U8_TO_END_REASON,
   U8_TO_MATCH_STATUS,
+  U8_TO_SHOP_ITEM_ID,
   U8_TO_SHOP_PHASE,
-  MATCH_STATUS_TO_U8,
   END_REASON_TO_U8,
+  MATCH_STATUS_TO_U8,
 } from './wireTypes.js';
 
 export function writeOptionalU32(writer: BinaryWriter, value: number | null | undefined): void {
@@ -58,45 +65,66 @@ export function readShape(reader: BinaryReader): ShapeType {
   return nibbleToShape(reader.readU8());
 }
 
-export function writePiece(writer: BinaryWriter, piece: GamePiece | null): void {
+/**
+ * Compact piece encoding for the dedicated piece delta sections: 4 bytes for a
+ * plain piece (header byte packs present/shape/rotation, then x/y/flags as
+ * I8/I8/U8) with optional tail bytes for poison variant, wildcard offsets, and
+ * the rotation-blocked nonce. Decodes to exactly the same object shape as the
+ * v3 meta-embedded piece encoding.
+ */
+export function writePieceCompact(writer: BinaryWriter, piece: GamePiece | null): void {
   if (piece === null) {
     writer.writeU8(0);
     return;
   }
-  writer.writeU8(1);
-  writeShape(writer, piece.type);
-  writer.writeU8(piece.rotation);
-  writer.writeI16(piece.x);
-  writer.writeI16(piece.y);
+  const shapeNibble = shapeToNibble(piece.type);
+  if (shapeNibble > 0x0f) {
+    throw new PacketSizeError(`Piece shape does not fit the wire nibble: ${piece.type}`);
+  }
+  // bit 7: present | bits 6-3: shape nibble | bits 2-1: rotation | bit 0: spare
+  writer.writeU8(0x80 | (shapeNibble << 3) | ((piece.rotation & 0x03) << 1));
+  writer.writeI8(piece.x);
+  writer.writeI8(piece.y);
+  const offsets = piece.customOffsets ?? [];
   writer.writeU8(
     (piece.poisoned ? 1 : 0)
     | (piece.bomber ? 2 : 0)
-    | (piece.isWildcard ? 4 : 0),
+    | (piece.isWildcard ? 4 : 0)
+    | (piece.poisoned && piece.poisonVariant ? 8 : 0)
+    | (offsets.length > 0 ? 16 : 0)
+    | (piece.rotationBlockedNonce ? 32 : 0),
   );
-  writer.writeU8(piece.poisonVariant ?? 0);
-  const offsets = piece.customOffsets ?? [];
-  writer.writeU8(offsets.length);
-  for (const [ox, oy] of offsets) {
-    writer.writeI16(ox);
-    writer.writeI16(oy);
+  if (piece.poisoned && piece.poisonVariant) writer.writeU8(piece.poisonVariant);
+  if (offsets.length > 0) {
+    writer.writeU8(offsets.length);
+    for (const [ox, oy] of offsets) {
+      writer.writeI8(ox);
+      writer.writeI8(oy);
+    }
   }
-  writer.writeU8(piece.rotationBlockedNonce ?? 0);
+  if (piece.rotationBlockedNonce) writer.writeU8(piece.rotationBlockedNonce);
 }
 
-export function readPiece(reader: BinaryReader): GamePiece | null {
-  if (reader.readU8() === 0) return null;
-  const type = readShape(reader);
-  const rotation = reader.readU8() as GamePiece['rotation'];
-  const x = reader.readI16();
-  const y = reader.readI16();
+export function readPieceCompact(reader: BinaryReader): GamePiece | null {
+  const header = reader.readU8();
+  if (header === 0) return null;
+  const type = nibbleToShape((header >> 3) & 0x0f);
+  const rotation = ((header >> 1) & 0x03) as GamePiece['rotation'];
+  const x = reader.readI8();
+  const y = reader.readI8();
   const flags = reader.readU8();
-  const poisonVariant = reader.readU8();
-  const offsetCount = reader.readU8();
+  const hasVariant = (flags & 8) !== 0;
+  const hasOffsets = (flags & 16) !== 0;
+  const hasNonce = (flags & 32) !== 0;
+  const poisonVariant = hasVariant ? reader.readU8() : 0;
   const customOffsets: [number, number][] = [];
-  for (let i = 0; i < offsetCount; i += 1) {
-    customOffsets.push([reader.readI16(), reader.readI16()]);
+  if (hasOffsets) {
+    const offsetCount = reader.readU8();
+    for (let i = 0; i < offsetCount; i += 1) {
+      customOffsets.push([reader.readI8(), reader.readI8()]);
+    }
   }
-  const rotationBlockedNonce = reader.readU8();
+  const rotationBlockedNonce = hasNonce ? reader.readU8() : 0;
   return {
     type,
     rotation,
@@ -135,19 +163,112 @@ export function readHeldPiece(reader: BinaryReader): HeldPiece | null {
   };
 }
 
+function writeEffectId(writer: BinaryWriter, id: string, kindName: string): void {
+  // Runtime ids are `${kind}-${activationTick}` (see pushFieldEffect); encode
+  // the structured form as a varint tick and fall back to a literal string.
+  const match = new RegExp(`^${kindName}-(\\d+)$`).exec(id);
+  if (match) {
+    writer.writeU8(1);
+    writer.writeVarint(Number(match[1]));
+    return;
+  }
+  writer.writeU8(EFFECT_STRING_LITERAL);
+  writer.writeString(id);
+}
+
+function readEffectId(reader: BinaryReader, kindName: string): string {
+  if (reader.readU8() === 1) return `${kindName}-${reader.readVarint()}`;
+  return reader.readString();
+}
+
+function writeEffectLabel(writer: BinaryWriter, label: string): void {
+  const interned = EFFECT_LABEL_INTERN.indexOf(label);
+  if (interned >= 0) {
+    writer.writeU8(interned + 1);
+    return;
+  }
+  let match = /^Curtain Def \+(\d+)$/.exec(label);
+  if (match) {
+    writer.writeU8(EFFECT_LABEL_TEMPLATE_BASE);
+    writer.writeVarint(Number(match[1]));
+    return;
+  }
+  match = /^Taxed \(-(\d+)\)$/.exec(label);
+  if (match) {
+    writer.writeU8(EFFECT_LABEL_TEMPLATE_BASE + 1);
+    writer.writeVarint(Number(match[1]));
+    return;
+  }
+  match = /^Siphoned \(\+(\d+)\)$/.exec(label);
+  if (match) {
+    writer.writeU8(EFFECT_LABEL_TEMPLATE_BASE + 2);
+    writer.writeVarint(Number(match[1]));
+    return;
+  }
+  match = /^Magnet \+(\d+)$/.exec(label);
+  if (match) {
+    writer.writeU8(EFFECT_LABEL_TEMPLATE_BASE + 3);
+    writer.writeVarint(Number(match[1]));
+    return;
+  }
+  match = /^Magnet ×(\d+) \(\+(\d+)\)$/.exec(label);
+  if (match) {
+    writer.writeU8(EFFECT_LABEL_TEMPLATE_BASE + 4);
+    writer.writeVarint(Number(match[1]));
+    writer.writeVarint(Number(match[2]));
+    return;
+  }
+  writer.writeU8(EFFECT_STRING_LITERAL);
+  writer.writeString(label);
+}
+
+function readEffectLabel(reader: BinaryReader): string {
+  const code = reader.readU8();
+  if (code === EFFECT_STRING_LITERAL) return reader.readString();
+  if (code >= EFFECT_LABEL_TEMPLATE_BASE) {
+    switch (code - EFFECT_LABEL_TEMPLATE_BASE) {
+      case 0: return `Curtain Def +${reader.readVarint()}`;
+      case 1: return `Taxed (-${reader.readVarint()})`;
+      case 2: return `Siphoned (+${reader.readVarint()})`;
+      case 3: return `Magnet +${reader.readVarint()}`;
+      case 4: {
+        const permanent = reader.readVarint();
+        const pull = reader.readVarint();
+        return `Magnet ×${permanent} (+${pull})`;
+      }
+      default: throw new Error(`Unknown effect label template code: ${code}`);
+    }
+  }
+  const label = EFFECT_LABEL_INTERN[code - 1];
+  if (label === undefined) throw new Error(`Unknown effect label code: ${code}`);
+  return label;
+}
+
 export function writeEffects(writer: BinaryWriter, effects: readonly ActiveFieldEffect[]): void {
   writer.writeU8(effects.length);
   for (const effect of effects) {
-    writer.writeString(effect.id);
     const kindIndex = FIELD_EFFECT_KINDS.indexOf(effect.kind);
-    writer.writeU8(kindIndex < 0 ? 0 : kindIndex);
-    writer.writeString(effect.label);
-    writeOptionalU32(writer, effect.expiresAtTick);
-    if (effect.icon) {
-      writer.writeU8(1);
-      writer.writeString(effect.icon);
-    } else {
+    const resolvedIndex = kindIndex < 0 ? 0 : kindIndex;
+    writer.writeU8(resolvedIndex);
+    const kindName = FIELD_EFFECT_KINDS[resolvedIndex];
+    writeEffectId(writer, effect.id, kindName);
+    writeEffectLabel(writer, effect.label);
+    if (effect.expiresAtTick === undefined) {
       writer.writeU8(0);
+    } else {
+      writer.writeU8(1);
+      writer.writeVarint(effect.expiresAtTick);
+    }
+    if (!effect.icon) {
+      writer.writeU8(0);
+    } else {
+      const iconIndex = EFFECT_ICON_INTERN.indexOf(effect.icon);
+      if (iconIndex >= 0) {
+        writer.writeU8(iconIndex + 1);
+      } else {
+        writer.writeU8(EFFECT_ICON_LITERAL);
+        writer.writeString(effect.icon);
+      }
     }
   }
 }
@@ -157,12 +278,18 @@ export function readEffects(reader: BinaryReader, headerTick: number): ActiveFie
   const count = reader.readU8();
   const effects: ActiveFieldEffect[] = [];
   for (let i = 0; i < count; i += 1) {
-    const id = reader.readString();
-    const kind = FIELD_EFFECT_KINDS[reader.readU8()] ?? 'retrim';
-    const label = reader.readString();
-    const expiresAtTickAbs = readOptionalU32(reader);
-    const hasIcon = reader.readU8() === 1;
-    const icon = hasIcon ? reader.readString() : undefined;
+    const kindIndex = reader.readU8();
+    const kind = FIELD_EFFECT_KINDS[kindIndex] ?? 'retrim';
+    const id = readEffectId(reader, kind);
+    const label = readEffectLabel(reader);
+    const hasExpiry = reader.readU8() === 1;
+    const expiresAtTickAbs = hasExpiry ? reader.readVarint() : null;
+    const iconCode = reader.readU8();
+    const icon = iconCode === 0
+      ? undefined
+      : iconCode === EFFECT_ICON_LITERAL
+        ? reader.readString()
+        : EFFECT_ICON_INTERN[iconCode - 1];
     effects.push({
       id,
       kind,
@@ -178,7 +305,12 @@ export function writeGarbage(writer: BinaryWriter, packets: readonly PendingGarb
   writer.writeU8(packets.length);
   for (const packet of packets) {
     writer.writeU8(packet.lines);
-    writeOptionalU32(writer, packet.arrivalTick ?? null);
+    if (packet.arrivalTick == null) {
+      writer.writeU8(0);
+    } else {
+      writer.writeU8(1);
+      writer.writeVarint(packet.arrivalTick);
+    }
   }
 }
 
@@ -188,7 +320,8 @@ export function readGarbage(reader: BinaryReader, headerTick: number): PendingGa
   const packets: PendingGarbagePacket[] = [];
   for (let i = 0; i < count; i += 1) {
     const lines = reader.readU8();
-    const arrivalTick = readOptionalU32(reader);
+    const hasArrival = reader.readU8() === 1;
+    const arrivalTick = hasArrival ? reader.readVarint() : null;
     packets.push({
       lines,
       ...(arrivalTick === null ? {} : { ticksUntilArrival: Math.max(0, arrivalTick - headerTick) }),
@@ -204,14 +337,14 @@ export function writePoisonSpread(writer: BinaryWriter, spread: PoisonSpreadStat
   }
   writer.writeU8(1);
   writer.writeU8(spread.generationsRemaining);
-  writer.writeU32(spread.nextSpreadTick);
+  writer.writeVarint(spread.nextSpreadTick);
   writer.writeU8(spread.variant);
 }
 
 /** Relativizes the absolute wire spread tick against the packet header tick. */
 export function readPoisonSpread(reader: BinaryReader, headerTick: number): PoisonSpreadState | null {
   if (reader.readU8() === 0) return null;
-  const nextSpreadTickAbs = reader.readU32();
+  const nextSpreadTickAbs = reader.readVarint();
   return {
     generationsRemaining: reader.readU8(),
     nextSpreadTick: Math.max(0, nextSpreadTickAbs - headerTick),
@@ -219,19 +352,39 @@ export function readPoisonSpread(reader: BinaryReader, headerTick: number): Pois
   };
 }
 
+function shopItemCode(itemId: string): number {
+  const code = SHOP_ITEM_ID_TO_U8.get(itemId);
+  if (code === undefined) {
+    throw new PacketSizeError(`Shop item id is not in the wire catalog: ${itemId}`);
+  }
+  return code;
+}
+
+function shopItemIdFromCode(code: number): string {
+  const itemId = U8_TO_SHOP_ITEM_ID[code];
+  if (itemId === undefined) throw new Error(`Unknown shop item code on wire: ${code}`);
+  return itemId;
+}
+
 export function writePricing(writer: BinaryWriter, pricing: Record<string, ItemPricingState>): void {
   const ids = Object.keys(pricing);
   writer.writeU8(ids.length);
   for (const itemId of ids) {
     const state = pricing[itemId];
-    writer.writeString(itemId);
+    writer.writeU8(shopItemCode(itemId));
     writer.writeU8(state.level);
     writer.writeU8(state.purchasesInWindow);
-    writeOptionalU32(writer, state.windowStartedAtTick);
+    if (state.windowStartedAtTick == null) {
+      writer.writeU8(0);
+    } else {
+      writer.writeU8(1);
+      writer.writeVarint(state.windowStartedAtTick);
+    }
     const closedBy = state.lastWindowClosedBy;
     if (closedBy === 'allowance') writer.writeU8(1);
     else if (closedBy === 'timer') writer.writeU8(2);
     else writer.writeU8(0);
+    writer.writeU8(state.freePurchases ?? 0);
   }
 }
 
@@ -239,17 +392,20 @@ export function readPricing(reader: BinaryReader): Record<string, ItemPricingSta
   const count = reader.readU8();
   const pricing: Record<string, ItemPricingState> = {};
   for (let i = 0; i < count; i += 1) {
-    const itemId = reader.readString();
+    const itemId = shopItemIdFromCode(reader.readU8());
     const level = reader.readU8();
     const purchasesInWindow = reader.readU8();
-    const windowStartedAtTick = readOptionalU32(reader);
+    const hasWindow = reader.readU8() === 1;
+    const windowStartedAtTick = hasWindow ? reader.readVarint() : null;
     const closedFlag = reader.readU8();
+    const freePurchases = reader.readU8();
     pricing[itemId] = {
       level,
       purchasesInWindow,
       windowStartedAtTick,
       ...(closedFlag === 1 ? { lastWindowClosedBy: 'allowance' as const } : {}),
       ...(closedFlag === 2 ? { lastWindowClosedBy: 'timer' as const } : {}),
+      ...(freePurchases > 0 ? { freePurchases } : {}),
     };
   }
   return pricing;
@@ -258,16 +414,16 @@ export function readPricing(reader: BinaryReader): Record<string, ItemPricingSta
 export function writeLocalShop(writer: BinaryWriter, shop: LocalPlayerWire['shop']): void {
   writer.writeU8(SHOP_PHASE_TO_U8[shop.phase]);
   writer.writeU8(shop.offerIds.length);
-  for (const offerId of shop.offerIds) writer.writeString(offerId);
+  for (const offerId of shop.offerIds) writer.writeU8(shopItemCode(offerId));
   writer.writeI16(shop.cycleIndex);
   if (shop.lastPurchasedItemId) {
     writer.writeU8(1);
-    writer.writeString(shop.lastPurchasedItemId);
+    writer.writeU8(shopItemCode(shop.lastPurchasedItemId));
   } else {
     writer.writeU8(0);
   }
   writer.writeU8(shop.activeSynergySeeds.length);
-  for (const seed of shop.activeSynergySeeds) writer.writeString(seed);
+  for (const seed of shop.activeSynergySeeds) writer.writeU8(shopItemCode(seed));
   writePricing(writer, shop.pricing);
 }
 
@@ -275,12 +431,12 @@ export function readLocalShop(reader: BinaryReader): LocalPlayerWire['shop'] {
   const phase = U8_TO_SHOP_PHASE[reader.readU8()] ?? 'waiting';
   const offerCount = reader.readU8();
   const offerIds: string[] = [];
-  for (let i = 0; i < offerCount; i += 1) offerIds.push(reader.readString());
+  for (let i = 0; i < offerCount; i += 1) offerIds.push(shopItemIdFromCode(reader.readU8()));
   const cycleIndex = reader.readI16();
-  const lastPurchasedItemId = reader.readU8() === 1 ? reader.readString() : null;
+  const lastPurchasedItemId = reader.readU8() === 1 ? shopItemIdFromCode(reader.readU8()) : null;
   const seedCount = reader.readU8();
   const activeSynergySeeds: string[] = [];
-  for (let i = 0; i < seedCount; i += 1) activeSynergySeeds.push(reader.readString());
+  for (let i = 0; i < seedCount; i += 1) activeSynergySeeds.push(shopItemIdFromCode(reader.readU8()));
   const pricing = readPricing(reader);
   return {
     offerIds,
@@ -360,7 +516,7 @@ function expandWrappedTimestamp(wrappedTimestamp: number, now = Date.now()): num
 export function writeFullBoard(
   writer: BinaryWriter,
   board: readonly (readonly CellValue[])[],
-  poisonBoard: readonly (readonly number[])[] | undefined,
+  poisonBoard: readonly (readonly number[])[],
   rows: number,
 ): void {
   writer.writeU8(rows);
@@ -382,6 +538,48 @@ export function readFullBoard(
     poisonBoard.push(unpackPoisonRow(reader.readBytes(Math.ceil(cols / 2)), cols));
   }
   return { board, poisonBoard };
+}
+
+/** Dirty-cell nibbles are packed two per byte (low nibble first). */
+function writeDirtyNibbleRows(
+  writer: BinaryWriter,
+  dirtyRows: { y: number; colMask: number; cells: number[] }[],
+): void {
+  for (const row of dirtyRows) {
+    writer.writeU8(row.y);
+    writer.writeU16(row.colMask);
+    const cells = row.cells;
+    for (let i = 0; i < cells.length; i += 2) {
+      writer.writeU8((cells[i] & 0x0f) | ((cells[i + 1] ?? 0) << 4));
+    }
+  }
+}
+
+/** Applies packed dirty nibble rows using the caller's per-cell setter. */
+function applyDirtyNibbleRows(
+  reader: BinaryReader,
+  setValue: (rowY: number, x: number, nibble: number) => void,
+): void {
+  const rowMask = reader.readU32();
+  for (let y = 0; y < 32; y += 1) {
+    if ((rowMask & (1 << y)) === 0) continue;
+    const rowY = reader.readU8();
+    const colMask = reader.readU16();
+    let pendingNibble = -1;
+    for (let x = 0; x < BOARD_COLS; x += 1) {
+      if ((colMask & (1 << x)) === 0) continue;
+      let nibble: number;
+      if (pendingNibble >= 0) {
+        nibble = pendingNibble;
+        pendingNibble = -1;
+      } else {
+        const byte = reader.readU8();
+        nibble = byte & 0x0f;
+        pendingNibble = (byte >> 4) & 0x0f;
+      }
+      setValue(rowY, x, nibble);
+    }
+  }
 }
 
 export function writeDirtyBoard(
@@ -409,29 +607,17 @@ export function writeDirtyBoard(
     }
   }
   writer.writeU32(rowMask >>> 0);
-  for (const row of dirtyRows) {
-    writer.writeU8(row.y);
-    writer.writeU16(row.colMask);
-    for (const nibble of row.cells) writer.writeU8(nibble);
-  }
+  writeDirtyNibbleRows(writer, dirtyRows);
 }
 
 export function applyDirtyBoard(
   board: CellValue[][],
   reader: BinaryReader,
 ): void {
-  const rowMask = reader.readU32();
-  for (let y = 0; y < 32; y += 1) {
-    if ((rowMask & (1 << y)) === 0) continue;
-    const rowY = reader.readU8();
-    const colMask = reader.readU16();
-    for (let x = 0; x < BOARD_COLS; x += 1) {
-      if ((colMask & (1 << x)) === 0) continue;
-      const nibble = reader.readU8();
-      if (!board[rowY]) board[rowY] = Array.from({ length: BOARD_COLS }, () => null);
-      board[rowY][x] = nibbleToCell(nibble);
-    }
-  }
+  applyDirtyNibbleRows(reader, (rowY, x, nibble) => {
+    if (!board[rowY]) board[rowY] = Array.from({ length: BOARD_COLS }, () => null);
+    board[rowY][x] = nibbleToCell(nibble);
+  });
 }
 
 export function writeDirtyPoison(
@@ -459,44 +645,46 @@ export function writeDirtyPoison(
     }
   }
   writer.writeU32(rowMask >>> 0);
-  for (const row of dirtyRows) {
-    writer.writeU8(row.y);
-    writer.writeU16(row.colMask);
-    for (const nibble of row.cells) writer.writeU8(nibble);
-  }
+  writeDirtyNibbleRows(writer, dirtyRows);
 }
 
 export function applyDirtyPoison(
   poison: number[][],
   reader: BinaryReader,
 ): void {
-  const rowMask = reader.readU32();
-  for (let y = 0; y < 32; y += 1) {
-    if ((rowMask & (1 << y)) === 0) continue;
-    const rowY = reader.readU8();
-    const colMask = reader.readU16();
-    for (let x = 0; x < BOARD_COLS; x += 1) {
-      if ((colMask & (1 << x)) === 0) continue;
-      const nibble = reader.readU8();
-      if (!poison[rowY]) poison[rowY] = Array.from({ length: BOARD_COLS }, () => 0);
-      poison[rowY][x] = nibble;
-    }
-  }
+  applyDirtyNibbleRows(reader, (rowY, x, nibble) => {
+    if (!poison[rowY]) poison[rowY] = Array.from({ length: BOARD_COLS }, () => 0);
+    poison[rowY][x] = nibble;
+  });
 }
 
-export type LocalMetaDecoded = Omit<DecodedLocalPlayerWire, 'board' | 'poisonBoard' | 'shop'>;
+export type LocalMetaDecoded = Omit<
+  DecodedLocalPlayerWire,
+  'board' | 'poisonBoard' | 'shop' | 'activePiece'
+>;
+
+/** Presence-mask bits for optional local meta fields (values are varints). */
+const LOCAL_OPT_LANDING_FORECAST = 1 << 0;
+const LOCAL_OPT_HOLD_FROZEN = 1 << 1;
+const LOCAL_OPT_MAGNET_STACKS = 1 << 2;
+const LOCAL_OPT_MAGNET_BOOST = 1 << 3;
+const LOCAL_OPT_HARD_DROPPED = 1 << 4;
+const LOCAL_OPT_LAST_HARD_DROP = 1 << 5;
+const LOCAL_OPT_SNAG_BLOCKED = 1 << 6;
+const LOCAL_OPT_SATELLITE_ARMED = 1 << 7;
+const LOCAL_OPT_SATELLITE_DELAY = 1 << 8;
+const LOCAL_OPT_TECTONIC = 1 << 9;
+const LOCAL_OPT_CUSTOM_SOURCES = 1 << 10;
 
 export function writeLocalMeta(writer: BinaryWriter, local: LocalPlayerWire, includeId: boolean): void {
   if (includeId) writer.writeString(local.id);
-  writePiece(writer, local.activePiece);
-  writeOptionalU32(writer, local.landingForecastAtTick ?? null);
   writeHeldPiece(writer, local.holdPiece);
   writer.writeBool(local.canHold);
   writer.writeU8(local.nextQueue.length);
   for (const piece of local.nextQueue) writeShape(writer, piece);
-  writer.writeU32(local.score >>> 0);
-  writer.writeU32(local.funds >>> 0);
-  writer.writeU32(local.linesCleared >>> 0);
+  writer.writeVarint(local.score >>> 0);
+  writer.writeVarint(local.funds >>> 0);
+  writer.writeVarint(local.linesCleared >>> 0);
   writer.writeU8(local.combo);
   writer.writeBool(local.backToBack);
   writeGarbage(writer, local.pendingGarbage);
@@ -505,27 +693,43 @@ export function writeLocalMeta(writer: BinaryWriter, local: LocalPlayerWire, inc
   writer.writeU8(local.swapCutoffRow);
   writer.writeU8(local.curtainDefenseLevel);
   writePoisonSpread(writer, local.poisonSpread);
-  writeOptionalU32(writer, local.holdFrozenUntilTick ?? null);
-  writeOptionalU32(writer, local.magnetPermanentStacks ?? null);
-  writeOptionalU32(writer, local.magnetPieceBoost ?? null);
-  writer.writeBool(!!local.pieceHasHardDropped);
-  writeOptionalU32(writer, local.lastHardDropTick ?? null);
-  writer.writeBool(!!local.snagHardDropBlocked);
-  writer.writeBool(!!local.satelliteArmed);
-  writeOptionalU32(writer, local.satelliteDelayUntilTick ?? null);
-  writeOptionalU32(writer, local.tectonicShiftNextStepTick ?? null);
+
+  let mask = 0;
+  if (local.landingForecastAtTick != null) mask |= LOCAL_OPT_LANDING_FORECAST;
+  if (local.holdFrozenUntilTick != null) mask |= LOCAL_OPT_HOLD_FROZEN;
+  if (local.magnetPermanentStacks != null) mask |= LOCAL_OPT_MAGNET_STACKS;
+  if (local.magnetPieceBoost != null) mask |= LOCAL_OPT_MAGNET_BOOST;
+  if (local.pieceHasHardDropped) mask |= LOCAL_OPT_HARD_DROPPED;
+  if (local.lastHardDropTick != null) mask |= LOCAL_OPT_LAST_HARD_DROP;
+  if (local.snagHardDropBlocked) mask |= LOCAL_OPT_SNAG_BLOCKED;
+  if (local.satelliteArmed) mask |= LOCAL_OPT_SATELLITE_ARMED;
+  if (local.satelliteDelayUntilTick != null) mask |= LOCAL_OPT_SATELLITE_DELAY;
+  if (local.tectonicShiftNextStepTick != null) mask |= LOCAL_OPT_TECTONIC;
   const sources = local.customNextPieceSourceCells ?? [];
-  writer.writeU8(sources.length);
-  for (const [sx, sy] of sources) {
-    writer.writeU8(sx);
-    writer.writeU8(sy);
+  if (sources.length > 0) mask |= LOCAL_OPT_CUSTOM_SOURCES;
+  writer.writeU16(mask);
+
+  if (mask & LOCAL_OPT_LANDING_FORECAST) writer.writeVarint(local.landingForecastAtTick!);
+  if (mask & LOCAL_OPT_HOLD_FROZEN) writer.writeVarint(local.holdFrozenUntilTick!);
+  if (mask & LOCAL_OPT_MAGNET_STACKS) writer.writeVarint(local.magnetPermanentStacks!);
+  if (mask & LOCAL_OPT_MAGNET_BOOST) writer.writeVarint(local.magnetPieceBoost!);
+  if (mask & LOCAL_OPT_LAST_HARD_DROP) writer.writeVarint(local.lastHardDropTick!);
+  if (mask & LOCAL_OPT_SATELLITE_DELAY) writer.writeVarint(local.satelliteDelayUntilTick!);
+  if (mask & LOCAL_OPT_TECTONIC) writer.writeVarint(local.tectonicShiftNextStepTick!);
+  if (mask & LOCAL_OPT_CUSTOM_SOURCES) {
+    writer.writeU8(sources.length);
+    for (const [sx, sy] of sources) {
+      writer.writeU8(sx);
+      writer.writeU8(sy);
+    }
   }
 }
 
 /**
  * Decodes local meta relativized against `headerTick`. With `includeId` the
  * seat id is part of the payload (keyframes); otherwise it is omitted and the
- * caller's existing snapshot keeps its id.
+ * caller's existing snapshot keeps its id. The active piece travels in its own
+ * section since v4 and is not part of this payload.
  */
 export function readLocalMeta(reader: BinaryReader, includeId: true, headerTick: number): LocalMetaDecoded;
 export function readLocalMeta(
@@ -539,16 +743,14 @@ export function readLocalMeta(
   headerTick: number,
 ): LocalMetaDecoded | Omit<LocalMetaDecoded, 'id'> {
   const id = includeId ? reader.readString() : undefined;
-  const activePiece = readPiece(reader);
-  const landingForecastAtTick = readOptionalU32(reader);
   const holdPiece = readHeldPiece(reader);
   const canHold = reader.readBool();
   const queueCount = reader.readU8();
   const nextQueue: ShapeType[] = [];
   for (let i = 0; i < queueCount; i += 1) nextQueue.push(readShape(reader));
-  const score = reader.readU32();
-  const funds = reader.readU32();
-  const linesCleared = reader.readU32();
+  const score = reader.readVarint();
+  const funds = reader.readVarint();
+  const linesCleared = reader.readVarint();
   const combo = reader.readU8();
   const backToBack = reader.readBool();
   const pendingGarbage = readGarbage(reader, headerTick);
@@ -557,26 +759,29 @@ export function readLocalMeta(
   const swapCutoffRow = reader.readU8();
   const curtainDefenseLevel = reader.readU8();
   const poisonSpread = readPoisonSpread(reader, headerTick);
-  const holdFrozenAbs = readOptionalU32(reader);
-  const magnetPermanentStacks = readOptionalU32(reader);
-  const magnetPieceBoost = readOptionalU32(reader);
-  const pieceHasHardDropped = reader.readBool() || undefined;
-  const lastHardDropTick = readOptionalU32(reader) ?? undefined;
-  const snagHardDropBlocked = reader.readBool() || undefined;
-  const satelliteArmed = reader.readBool() || undefined;
-  const satelliteDelayAbs = readOptionalU32(reader);
-  const tectonicShiftNextStepAbs = readOptionalU32(reader);
-  const sourceCount = reader.readU8();
-  const customNextPieceSourceCells: [number, number][] = [];
-  for (let i = 0; i < sourceCount; i += 1) {
-    customNextPieceSourceCells.push([reader.readU8(), reader.readU8()]);
+  const mask = reader.readU16();
+
+  const landingForecastAbs = (mask & LOCAL_OPT_LANDING_FORECAST) !== 0 ? reader.readVarint() : null;
+  const holdFrozenAbs = (mask & LOCAL_OPT_HOLD_FROZEN) !== 0 ? reader.readVarint() : null;
+  const magnetPermanentStacks = (mask & LOCAL_OPT_MAGNET_STACKS) !== 0 ? reader.readVarint() : null;
+  const magnetPieceBoost = (mask & LOCAL_OPT_MAGNET_BOOST) !== 0 ? reader.readVarint() : null;
+  const lastHardDropTick = (mask & LOCAL_OPT_LAST_HARD_DROP) !== 0 ? reader.readVarint() : null;
+  const satelliteDelayAbs = (mask & LOCAL_OPT_SATELLITE_DELAY) !== 0 ? reader.readVarint() : null;
+  const tectonicShiftNextStepAbs = (mask & LOCAL_OPT_TECTONIC) !== 0 ? reader.readVarint() : null;
+  let customNextPieceSourceCells: [number, number][] | undefined;
+  if ((mask & LOCAL_OPT_CUSTOM_SOURCES) !== 0) {
+    const sourceCount = reader.readU8();
+    customNextPieceSourceCells = [];
+    for (let i = 0; i < sourceCount; i += 1) {
+      customNextPieceSourceCells.push([reader.readU8(), reader.readU8()]);
+    }
   }
+
   return {
     ...(id === undefined ? {} : { id }),
-    activePiece,
-    landingForecastTicksRemaining: landingForecastAtTick === null
+    landingForecastTicksRemaining: landingForecastAbs === null
       ? undefined
-      : Math.max(0, landingForecastAtTick - headerTick),
+      : Math.max(0, landingForecastAbs - headerTick),
     holdPiece,
     canHold,
     nextQueue,
@@ -594,26 +799,30 @@ export function readLocalMeta(
     holdFrozenUntilTick: holdFrozenAbs === null ? undefined : Math.max(0, holdFrozenAbs - headerTick),
     magnetPermanentStacks: magnetPermanentStacks ?? undefined,
     magnetPieceBoost: magnetPieceBoost ?? undefined,
-    pieceHasHardDropped,
-    lastHardDropTick,
-    snagHardDropBlocked,
-    satelliteArmed,
+    pieceHasHardDropped: (mask & LOCAL_OPT_HARD_DROPPED) !== 0 || undefined,
+    lastHardDropTick: lastHardDropTick ?? undefined,
+    snagHardDropBlocked: (mask & LOCAL_OPT_SNAG_BLOCKED) !== 0 || undefined,
+    satelliteArmed: (mask & LOCAL_OPT_SATELLITE_ARMED) !== 0 || undefined,
     satelliteDelayUntilTick: satelliteDelayAbs === null ? undefined : Math.max(0, satelliteDelayAbs - headerTick),
     tectonicShiftNextStepTick: tectonicShiftNextStepAbs === null
       ? null
       : Math.max(0, tectonicShiftNextStepAbs - headerTick),
-    customNextPieceSourceCells: sourceCount > 0 ? customNextPieceSourceCells : undefined,
+    customNextPieceSourceCells,
   };
 }
 
-export type OpponentMetaDecoded = Omit<DecodedOpponentPlayerWire, 'board' | 'poisonBoard'>;
+export type OpponentMetaDecoded = Omit<DecodedOpponentPlayerWire, 'board' | 'poisonBoard' | 'activePiece'>;
+
+/** Presence-mask bits for optional opponent meta fields (values are varints). */
+const OPP_OPT_TECTONIC = 1 << 0;
+const OPP_OPT_MAGNET_STACKS = 1 << 1;
+const OPP_OPT_MAGNET_BOOST = 1 << 2;
 
 export function writeOpponentMeta(writer: BinaryWriter, opponent: OpponentPlayerWire, includeId: boolean): void {
   if (includeId) writer.writeString(opponent.id);
-  writePiece(writer, opponent.activePiece);
-  writer.writeU32(opponent.score >>> 0);
-  writer.writeU32(opponent.funds >>> 0);
-  writer.writeU32(opponent.linesCleared >>> 0);
+  writer.writeVarint(opponent.score >>> 0);
+  writer.writeVarint(opponent.funds >>> 0);
+  writer.writeVarint(opponent.linesCleared >>> 0);
   writer.writeU8(opponent.combo);
   writer.writeBool(opponent.backToBack);
   writeGarbage(writer, opponent.pendingGarbage);
@@ -622,9 +831,16 @@ export function writeOpponentMeta(writer: BinaryWriter, opponent: OpponentPlayer
   writer.writeU8(opponent.swapCutoffRow);
   writer.writeU8(opponent.curtainDefenseLevel);
   writePoisonSpread(writer, opponent.poisonSpread);
-  writeOptionalU32(writer, opponent.tectonicShiftNextStepTick ?? null);
-  writeOptionalU32(writer, opponent.magnetPermanentStacks ?? null);
-  writeOptionalU32(writer, opponent.magnetPieceBoost ?? null);
+
+  let mask = 0;
+  if (opponent.tectonicShiftNextStepTick != null) mask |= OPP_OPT_TECTONIC;
+  if (opponent.magnetPermanentStacks != null) mask |= OPP_OPT_MAGNET_STACKS;
+  if (opponent.magnetPieceBoost != null) mask |= OPP_OPT_MAGNET_BOOST;
+  writer.writeU8(mask);
+  if (mask & OPP_OPT_TECTONIC) writer.writeVarint(opponent.tectonicShiftNextStepTick!);
+  if (mask & OPP_OPT_MAGNET_STACKS) writer.writeVarint(opponent.magnetPermanentStacks!);
+  if (mask & OPP_OPT_MAGNET_BOOST) writer.writeVarint(opponent.magnetPieceBoost!);
+
   writer.writeBool(opponent.hasHold);
   writer.writeBool(opponent.hasPoison);
 }
@@ -632,7 +848,7 @@ export function writeOpponentMeta(writer: BinaryWriter, opponent: OpponentPlayer
 /**
  * Decodes opponent meta relativized against `headerTick`. With `includeId` the
  * seat id is part of the payload (keyframes); otherwise the caller's existing
- * snapshot keeps its id.
+ * snapshot keeps its id. The active piece travels in its own section since v4.
  */
 export function readOpponentMeta(reader: BinaryReader, includeId: true, headerTick: number): OpponentMetaDecoded;
 export function readOpponentMeta(
@@ -646,10 +862,9 @@ export function readOpponentMeta(
   headerTick: number,
 ): OpponentMetaDecoded | Omit<OpponentMetaDecoded, 'id'> {
   const id = includeId ? reader.readString() : undefined;
-  const activePiece = readPiece(reader);
-  const score = reader.readU32();
-  const funds = reader.readU32();
-  const linesCleared = reader.readU32();
+  const score = reader.readVarint();
+  const funds = reader.readVarint();
+  const linesCleared = reader.readVarint();
   const combo = reader.readU8();
   const backToBack = reader.readBool();
   const pendingGarbage = readGarbage(reader, headerTick);
@@ -658,14 +873,16 @@ export function readOpponentMeta(
   const swapCutoffRow = reader.readU8();
   const curtainDefenseLevel = reader.readU8();
   const poisonSpread = readPoisonSpread(reader, headerTick);
-  const tectonicShiftNextStepAbs = readOptionalU32(reader);
-  const magnetPermanentStacks = readOptionalU32(reader);
-  const magnetPieceBoost = readOptionalU32(reader);
+  const mask = reader.readU8();
+
+  const tectonicShiftNextStepAbs = (mask & OPP_OPT_TECTONIC) !== 0 ? reader.readVarint() : null;
+  const magnetPermanentStacks = (mask & OPP_OPT_MAGNET_STACKS) !== 0 ? reader.readVarint() : null;
+  const magnetPieceBoost = (mask & OPP_OPT_MAGNET_BOOST) !== 0 ? reader.readVarint() : null;
+
   const hasHold = reader.readBool();
   const hasPoison = reader.readBool();
   return {
     ...(id === undefined ? {} : { id }),
-    activePiece,
     score,
     funds,
     linesCleared,

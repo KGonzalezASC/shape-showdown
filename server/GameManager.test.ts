@@ -10,6 +10,7 @@ import type { GameState, PlayerState, ReplayDataV2 } from '../src/types.js';
 import { decodeKeyframePacket } from '../src/protocol/decodeMatchPacket.js';
 import { ClientPacketDecoder } from '../src/protocol/ClientPacketDecoder.js';
 import { GAME_PROTOCOL_VERSION } from '../src/protocol/version.js';
+import { decodeReplayFile } from '../src/replayCodec.js';
 import { makePlayer } from './puzzleEngine/engine.js';
 import { createPlayerRngChannels } from '../src/rng.js';
 import type { Server, Socket } from 'socket.io';
@@ -1187,7 +1188,7 @@ describe('GameManager lifecycle harness', () => {
 
       const replayPath = path.join(replayDir, 'replay_terminal-tick-test.replay');
       assert.equal(fs.existsSync(replayPath), true);
-      const saved = JSON.parse(fs.readFileSync(replayPath, 'utf8')) as ReplayDataV2;
+      const saved = await decodeReplayFile(fs.readFileSync(replayPath)) as ReplayDataV2;
       assert.ok(saved.events.some((event) => event.type === 'topOut' && event.playerId === 'p1'));
       assert.ok(saved.keyframes.some((keyframe) => keyframe.tick === 1));
       assert.equal(internal.activeReplay, null);
@@ -1316,7 +1317,7 @@ describe('GameManager lifecycle harness', () => {
     const emittedEveryTick: unknown[][] = [];
     const emittedSparse: unknown[][] = [];
     const gmEveryTick = new GameManager(createFakeIo(emittedEveryTick), 1);
-    const gmSparse = new GameManager(createFakeIo(emittedSparse), 30);
+    const gmSparse = new GameManager(createFakeIo(emittedSparse));
     managers.push(gmEveryTick, gmSparse);
 
     (gmEveryTick as unknown as { gameState: { seed: number } }).gameState.seed = 4242;
@@ -1327,7 +1328,7 @@ describe('GameManager lifecycle harness', () => {
       gm.handleConnection(new FakeSocket('p2') as unknown as Socket);
     }
 
-    for (let i = 0; i < 240; i += 1) {
+    for (let i = 0; i < 500; i += 1) {
       gmEveryTick.tickOnceForTests();
       gmSparse.tickOnceForTests();
     }
@@ -1353,7 +1354,18 @@ describe('GameManager lifecycle harness', () => {
     assert.ok(everyTick.activeReplay);
     assert.ok(sparse.activeReplay);
     assert.ok((everyTick.activeReplay?.keyframes.length ?? 0) > (sparse.activeReplay?.keyframes.length ?? 0));
-    assert.equal(sparse.activeReplay?.keyframeIntervalTicks, 30);
+    assert.equal(sparse.activeReplay?.keyframeIntervalTicks, 300);
+
+    // Tick 0 keyframe carries cloned RNG channels
+    assert.equal(sparse.activeReplay?.keyframes[0]?.tick, 0);
+    assert.ok(sparse.activeReplay?.keyframes[0]?.rng?.p1?.pieces);
+    assert.ok(sparse.activeReplay?.keyframes[0]?.rng?.p2?.pieces);
+
+    // Cadence keyframe at tick 300 carries cloned RNG channels
+    const tick300Keyframe = sparse.activeReplay?.keyframes.find((k) => k.tick === 300);
+    assert.ok(tick300Keyframe);
+    assert.ok(tick300Keyframe?.rng?.p1?.pieces);
+    assert.ok(tick300Keyframe?.rng?.p2?.pieces);
   });
 
   it('coalesces intermediate checkpoints when database writes are delayed', async () => {

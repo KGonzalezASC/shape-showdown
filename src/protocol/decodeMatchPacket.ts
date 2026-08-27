@@ -8,6 +8,7 @@ import {
   readLocalMeta,
   readLocalShop,
   readOpponentMeta,
+  readPieceCompact,
   readTectonicMoves,
 } from './codecShared.js';
 import { readPacketHeader } from './encodeMatchPacket.js';
@@ -15,10 +16,12 @@ import {
   DELTA_SECTION_CHROME,
   DELTA_SECTION_LOCAL_BOARD,
   DELTA_SECTION_LOCAL_META,
+  DELTA_SECTION_LOCAL_PIECE,
   DELTA_SECTION_LOCAL_POISON,
   DELTA_SECTION_LOCAL_SHOP,
   DELTA_SECTION_OPPONENT_BOARD,
   DELTA_SECTION_OPPONENT_META,
+  DELTA_SECTION_OPPONENT_PIECE,
   DELTA_SECTION_OPPONENT_POISON,
   type DecodedLocalPlayerWire,
   type DecodedOpponentPlayerWire,
@@ -114,19 +117,23 @@ export function decodeKeyframePacket(buffer: ArrayBuffer): DecodedSeatSnapshot {
   const localBoard = readFullBoard(reader, BOARD_COLS);
   const localMeta = readLocalMeta(reader, true, header.tick);
   const shop = readLocalShop(reader);
+  const localPiece = readPieceCompact(reader);
   const opponentBoard = readFullBoard(reader, BOARD_COLS);
   const opponentMeta = readOpponentMeta(reader, true, header.tick);
+  const opponentPiece = readPieceCompact(reader);
   return {
     tick: header.tick,
     chrome,
     local: {
       ...localMeta,
+      activePiece: localPiece,
       board: localBoard.board,
       poisonBoard: localBoard.poisonBoard,
       shop,
     },
     opponent: {
       ...opponentMeta,
+      activePiece: opponentPiece,
       board: opponentBoard.board,
       poisonBoard: opponentBoard.poisonBoard,
     },
@@ -167,6 +174,8 @@ export function applyDeltaPacket(
     const meta = readOpponentMeta(reader, false, header.tick);
     next.opponent = { ...next.opponent, ...meta };
   }
+  if (sections & DELTA_SECTION_LOCAL_PIECE) next.local.activePiece = readPieceCompact(reader);
+  if (sections & DELTA_SECTION_OPPONENT_PIECE) next.opponent.activePiece = readPieceCompact(reader);
   return next;
 }
 
