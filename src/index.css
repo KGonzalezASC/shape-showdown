@@ -800,19 +800,19 @@ html[data-page='landing'] #root {
   }
 
   .mobile-touch-controls-inner {
-    min-height: 108px;
-    max-width: 460px;
-    gap: 12px;
-    padding: 10px 6px max(8px, env(safe-area-inset-bottom));
+    min-height: 120px;
+    max-width: 500px;
+    gap: 16px;
+    padding: 8px 10px max(12px, env(safe-area-inset-bottom));
   }
 
   .mobile-touch-control-grid {
-    gap: 6px;
+    gap: 8px;
   }
 
   .mobile-touch-control-button {
-    width: 52px;
-    height: 52px;
+    width: 58px;
+    height: 58px;
   }
 }
 

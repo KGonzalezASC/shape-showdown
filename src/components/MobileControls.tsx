@@ -21,115 +21,168 @@ const MobileControls: React.FC<MobileControlsProps> = ({ onInput, onAction, onSh
     return () => ro.disconnect();
   }, [onHeightChange]);
 
-  const stop = (e: React.TouchEvent) => {
+  const stop = (e: React.TouchEvent | React.PointerEvent) => {
     e.preventDefault();
   };
 
-  const holdInput = (input: { left: boolean; right: boolean; softDrop: boolean }) => (e: React.TouchEvent) => {
+  const holdInput = (input: { left: boolean; right: boolean; softDrop: boolean }) => (e: React.TouchEvent | React.PointerEvent) => {
     stop(e);
     onInput(input);
   };
 
-  const releaseInput = (e: React.TouchEvent) => {
+  const releaseInput = (e: React.TouchEvent | React.PointerEvent) => {
     stop(e);
     onInput({ left: false, right: false, softDrop: false });
   };
 
-  const tapAction = (action: 'rotateCW' | 'rotateCCW' | 'hardDrop' | 'hold') => (e: React.TouchEvent) => {
+  const isPalmOrEdgeContact = (e: React.PointerEvent | React.TouchEvent): boolean => {
+    if ('width' in e && 'height' in e) {
+      const pe = e as React.PointerEvent;
+      const w = pe.width || 0;
+      const h = pe.height || 0;
+      // Large contact area (> 45px width/height or > 2000px² footprint) is palm or knuckle flat
+      if (w > 45 || h > 45 || (w > 0 && h > 0 && w * h > 2000)) return true;
+    }
+    return false;
+  };
+
+  const isGlancingEdgeContact = (e: React.PointerEvent | React.TouchEvent, target: HTMLElement): boolean => {
+    if (!('clientX' in e)) return false;
+    const rect = target.getBoundingClientRect();
+    const x = e.clientX;
+    const y = e.clientY;
+    // Inner 85% safe zone: rejects glancing brushes on outer 7.5% perimeter
+    const padX = rect.width * 0.075;
+    const padY = rect.height * 0.075;
+    return x < rect.left + padX || x > rect.right - padX || y < rect.top + padY || y > rect.bottom - padY;
+  };
+
+  const tapHardDrop = (e: React.TouchEvent | React.PointerEvent) => {
     stop(e);
+    if (isPalmOrEdgeContact(e)) return;
+    if (e.currentTarget instanceof HTMLElement && isGlancingEdgeContact(e, e.currentTarget)) {
+      return;
+    }
+    onAction('hardDrop');
+  };
+
+  const tapAction = (action: 'rotateCW' | 'rotateCCW' | 'hold') => (e: React.TouchEvent | React.PointerEvent) => {
+    stop(e);
+    if (isPalmOrEdgeContact(e)) return;
     onAction(action);
   };
 
-  const tapShop = (e: React.TouchEvent) => {
+  const tapShop = (e: React.TouchEvent | React.PointerEvent) => {
     stop(e);
+    if (isPalmOrEdgeContact(e)) return;
     onShopPress?.();
   };
 
-  const controlButtonClass =
-    'mobile-touch-control-button inline-flex h-[52px] w-[52px] shrink-0 select-none touch-none items-center justify-center rounded-full border border-[var(--ss-control-border)] bg-[var(--ss-control-fill)] text-[var(--ss-control-text)] [-webkit-touch-callout:none] [-webkit-tap-highlight-color:transparent] active:bg-[var(--ss-control-fill-active)] min-[661px]:h-[58px] min-[661px]:w-[58px]';
-  const controlIconClass = 'h-5 w-5 min-[661px]:h-6 min-[661px]:w-6';
+  const controlButtonBase =
+    'mobile-touch-control-button inline-flex h-[56px] w-[56px] min-[380px]:h-[62px] min-[380px]:w-[62px] min-[661px]:h-[68px] min-[661px]:w-[68px] shrink-0 select-none touch-none items-center justify-center rounded-2xl border bg-[var(--ss-control-fill)] text-[var(--ss-control-text)] [-webkit-touch-callout:none] [-webkit-tap-highlight-color:transparent] active:scale-95 active:brightness-125 transition-transform duration-75 shadow-md active:bg-[var(--ss-control-fill-active)]';
+  const controlIconClass = 'h-6 w-6 min-[661px]:h-7 min-[661px]:w-7 pointer-events-none';
 
   return (
     <div
       ref={rootRef}
       onContextMenu={(e) => e.preventDefault()}
-      className="mobile-touch-controls relative z-10 mt-auto shrink-0 select-none touch-none [-webkit-touch-callout:none] [-webkit-tap-highlight-color:transparent]"
+      className="mobile-touch-controls relative z-10 mt-auto w-full shrink-0 select-none touch-none [-webkit-touch-callout:none] [-webkit-tap-highlight-color:transparent]"
     >
-      <div className="mobile-touch-controls-inner mx-auto flex min-h-[108px] w-full max-w-[460px] items-end justify-between gap-3 px-1.5 pt-2.5 pb-[max(0.5rem,env(safe-area-inset-bottom))] min-[661px]:min-h-[164px] min-[661px]:max-w-[660px] min-[661px]:gap-5 min-[661px]:px-6 min-[661px]:pt-3.5">
-        <div className="mobile-touch-control-grid grid grid-cols-3 grid-rows-2 gap-[6px] min-[661px]:gap-[10px]">
+      <div className="mobile-touch-controls-inner mx-auto flex min-h-[120px] w-full max-w-[500px] items-end justify-between gap-3 px-2 sm:px-4 pt-2 pb-[max(0.75rem,env(safe-area-inset-bottom))] min-[661px]:min-h-[164px] min-[661px]:max-w-[660px] min-[661px]:gap-6 min-[661px]:px-6 min-[661px]:pt-3.5">
+        {/* Left Thumb Cluster: Movement (D-Pad style) */}
+        <div className="mobile-touch-control-grid grid grid-cols-3 grid-rows-2 gap-2 min-[380px]:gap-2.5 min-[661px]:gap-3">
           <div />
           <button
             type="button"
             aria-label="Hard drop"
-            className={`${controlButtonClass} border-[#748e86] text-emerald-100`}
-            onTouchStart={tapAction('hardDrop')}
+            className={`${controlButtonBase} border-[#748e86] text-emerald-300 active:border-emerald-400`}
+            onTouchStart={tapHardDrop}
+            onPointerDown={tapHardDrop}
           >
-            <ArrowUp className={controlIconClass} strokeWidth={2.5} />
+            <ArrowUp className={controlIconClass} strokeWidth={2.75} />
           </button>
           <div />
           <button
             type="button"
             aria-label="Move left"
-            className={controlButtonClass}
+            className={`${controlButtonBase} border-[var(--ss-control-border)] active:border-zinc-300`}
             onTouchStart={holdInput({ left: true, right: false, softDrop: false })}
             onTouchEnd={releaseInput}
             onTouchCancel={releaseInput}
+            onPointerDown={holdInput({ left: true, right: false, softDrop: false })}
+            onPointerUp={releaseInput}
+            onPointerCancel={releaseInput}
+            onPointerLeave={releaseInput}
           >
-            <ArrowLeft className={controlIconClass} strokeWidth={2.5} />
+            <ArrowLeft className={controlIconClass} strokeWidth={2.75} />
           </button>
           <button
             type="button"
             aria-label="Soft drop"
-            className={`${controlButtonClass} border-[#748e86] text-cyan-100`}
+            className={`${controlButtonBase} border-[#748e86] text-cyan-300 active:border-cyan-400`}
             onTouchStart={holdInput({ left: false, right: false, softDrop: true })}
             onTouchEnd={releaseInput}
             onTouchCancel={releaseInput}
+            onPointerDown={holdInput({ left: false, right: false, softDrop: true })}
+            onPointerUp={releaseInput}
+            onPointerCancel={releaseInput}
+            onPointerLeave={releaseInput}
           >
-            <ArrowDown className={controlIconClass} strokeWidth={2.5} />
+            <ArrowDown className={controlIconClass} strokeWidth={2.75} />
           </button>
           <button
             type="button"
             aria-label="Move right"
-            className={controlButtonClass}
+            className={`${controlButtonBase} border-[var(--ss-control-border)] active:border-zinc-300`}
             onTouchStart={holdInput({ left: false, right: true, softDrop: false })}
             onTouchEnd={releaseInput}
             onTouchCancel={releaseInput}
+            onPointerDown={holdInput({ left: false, right: true, softDrop: false })}
+            onPointerUp={releaseInput}
+            onPointerCancel={releaseInput}
+            onPointerLeave={releaseInput}
           >
-            <ArrowRight className={controlIconClass} strokeWidth={2.5} />
+            <ArrowRight className={controlIconClass} strokeWidth={2.75} />
           </button>
         </div>
-        <div className="mobile-touch-control-grid grid grid-cols-2 gap-[6px] min-[661px]:gap-[10px]">
+
+        {/* Right Thumb Cluster: Actions & Rotations */}
+        <div className="mobile-touch-control-grid grid grid-cols-2 gap-2 min-[380px]:gap-2.5 min-[661px]:gap-3">
           <button
             type="button"
             aria-label="Storage"
-            className={`${controlButtonClass} border-[#745d7d] text-fuchsia-100`}
+            className={`${controlButtonBase} border-[#745d7d] text-fuchsia-300 active:border-fuchsia-400`}
             onTouchStart={tapAction('hold')}
+            onPointerDown={tapAction('hold')}
           >
-            <Archive className={controlIconClass} strokeWidth={2.25} />
+            <Archive className={controlIconClass} strokeWidth={2.5} />
           </button>
           <button
             type="button"
             aria-label="Shop"
-            className={`${controlButtonClass} border-[#557984] text-sky-100`}
+            className={`${controlButtonBase} border-[#557984] text-sky-300 active:border-sky-400`}
             onTouchStart={tapShop}
+            onPointerDown={tapShop}
           >
-            <ShoppingBag className={controlIconClass} strokeWidth={2.25} />
+            <ShoppingBag className={controlIconClass} strokeWidth={2.5} />
           </button>
           <button
             type="button"
             aria-label="Rotate counter-clockwise"
-            className={`${controlButtonClass} border-[#907b59] text-amber-100`}
+            className={`${controlButtonBase} border-[#907b59] text-amber-300 active:border-amber-400`}
             onTouchStart={tapAction('rotateCCW')}
+            onPointerDown={tapAction('rotateCCW')}
           >
-            <RotateCcw className={controlIconClass} strokeWidth={2.25} />
+            <RotateCcw className={controlIconClass} strokeWidth={2.5} />
           </button>
           <button
             type="button"
             aria-label="Rotate clockwise"
-            className={`${controlButtonClass} border-[#907b59] text-amber-100`}
+            className={`${controlButtonBase} border-[#907b59] text-amber-300 active:border-amber-400`}
             onTouchStart={tapAction('rotateCW')}
+            onPointerDown={tapAction('rotateCW')}
           >
-            <RotateCw className={controlIconClass} strokeWidth={2.25} />
+            <RotateCw className={controlIconClass} strokeWidth={2.5} />
           </button>
         </div>
       </div>

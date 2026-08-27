@@ -49,13 +49,13 @@ export function playfieldViewportPaddingClass(mode: PlayfieldLayoutMode): string
 
 export function playfieldScreenClass(mode: PlayfieldLayoutMode): string {
   const heightAndPadding = mode === 'phone'
-    ? 'h-[min(820px,calc(100dvh-10px))] p-1.5'
+    ? 'h-[min(920px,calc(100dvh-8px))] p-1'
     : 'h-[min(820px,calc(100dvh-24px))] p-2.5';
   const maxWidth = mode === 'desktop'
     ? 'max-w-[1180px]'
     : mode === 'tablet'
       ? 'max-w-[820px]'
-      : 'max-w-[430px]';
+      : 'max-w-[480px]';
   return `shape-showdown-screen relative z-10 flex ${heightAndPadding} min-h-[500px] w-full ${maxWidth} flex-col overflow-hidden border-0 bg-transparent shadow-none`;
 }
 
