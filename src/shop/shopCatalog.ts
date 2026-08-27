@@ -20,18 +20,18 @@ import {
  * Canonical shop catalog — single source of truth for cost, target, and purchasability.
  * Non-purchasable stubs must set `purchasable: false` so they never enter rolls.
  */
-const SHOP_CATALOG: ShopItem[] = [
+export const SHOP_CATALOG: ShopItem[] = [
   {
     id: 'bounty-tax',
-    name: 'Tax Siphon',
+    name: 'Tax Evasion',
     icon: '💸',
     cost: BOUNTY_TAX_COST,
-    tier: 2,
-    baseWeight: 2.25,
+    tier: 1,
+    baseWeight: 1.25,
     purchasable: true,
-    target: 'opponent',
+    target: 'self',
     description:
-      "Steals 30% of the opponent's current funds (only works if they have more funds than you).",
+      'Reverts all item pricing curves by 2 levels (or grants a free purchase if already at base price).',
   },
   {
     id: 'retrim',
@@ -39,7 +39,7 @@ const SHOP_CATALOG: ShopItem[] = [
     icon: '✂️',
     cost: RETRIM_COST,
     tier: 2,
-    baseWeight: 2.25,
+    baseWeight: 2.0,
     purchasable: true,
     target: 'opponent',
     description:
@@ -51,7 +51,7 @@ const SHOP_CATALOG: ShopItem[] = [
     icon: '🎭',
     cost: CURTAIN_COST,
     tier: 2,
-    baseWeight: 2.25,
+    baseWeight: 1.5,
     purchasable: true,
     target: 'opponent',
     description: "Frosts the opponent's field below their swap line for 4 seconds.",
@@ -64,7 +64,7 @@ const SHOP_CATALOG: ShopItem[] = [
     icon: '💣',
     cost: BOMBER_COST,
     tier: 2,
-    baseWeight: 2.25,
+    baseWeight: 2.5,
     purchasable: true,
     target: 'self',
     description:
@@ -87,8 +87,8 @@ const SHOP_CATALOG: ShopItem[] = [
     name: 'Freeze',
     icon: '❄️',
     cost: FREEZE_COST,
-    tier: 2,
-    baseWeight: 2.25,
+    tier: 1,
+    baseWeight: 2.5,
     purchasable: true,
     target: 'opponent',
     description:
@@ -99,8 +99,8 @@ const SHOP_CATALOG: ShopItem[] = [
     name: 'Elixir',
     icon: '🧪',
     cost: POISON_COST,
-    tier: 2,
-    baseWeight: 2.25,
+    tier: 1,
+    baseWeight: 2.75,
     purchasable: true,
     target: 'opponent',
     description:
@@ -111,8 +111,8 @@ const SHOP_CATALOG: ShopItem[] = [
     name: 'Contagion',
     icon: '🦠',
     cost: STORAGE_POISON_COST,
-    tier: 2,
-    baseWeight: 2.25,
+    tier: 1,
+    baseWeight: 1.5,
     purchasable: true,
     target: 'opponent',
     description:
@@ -123,8 +123,8 @@ const SHOP_CATALOG: ShopItem[] = [
     name: 'Wild Purge',
     icon: '🃏',
     cost: POISON_PURGE_COST,
-    tier: 2,
-    baseWeight: 2.25,
+    tier: 1,
+    baseWeight: 1.75,
     purchasable: true,
     target: 'opponent',
     description:
@@ -138,7 +138,7 @@ const SHOP_CATALOG: ShopItem[] = [
     icon: '🧩',
     cost: WILDCARD_FOUR_COST,
     tier: 2,
-    baseWeight: 2.25,
+    baseWeight: 1.5,
     purchasable: true,
     target: 'opponent',
     description:
@@ -151,7 +151,7 @@ const SHOP_CATALOG: ShopItem[] = [
     name: 'Snag',
     icon: '🪝',
     cost: SNAG_COST,
-    tier: 2,
+    tier: 1,
     baseWeight: 2.25,
     purchasable: true,
     target: 'opponent',
@@ -163,7 +163,7 @@ const SHOP_CATALOG: ShopItem[] = [
     name: 'Sticky',
     icon: '⏱️',
     cost: STICKY_COST,
-    tier: 2,
+    tier: 1,
     baseWeight: 2.25,
     purchasable: true,
     target: 'opponent',
@@ -175,7 +175,7 @@ const SHOP_CATALOG: ShopItem[] = [
     icon: '🛰️',
     cost: SATELLITE_COST,
     tier: 2,
-    baseWeight: 2.25,
+    baseWeight: 2.5,
     purchasable: true,
     target: 'self',
     description:
@@ -187,7 +187,7 @@ const SHOP_CATALOG: ShopItem[] = [
     icon: '🪐',
     cost: TECTONIC_SHIFT_COST,
     tier: 2,
-    baseWeight: 2.25,
+    baseWeight: 2.0,
     purchasable: true,
     target: 'self',
     description:

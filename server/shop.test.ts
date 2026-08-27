@@ -11,7 +11,7 @@ import {
 import { SHOP_ROLL_POOL, SHOP_ITEM_BY_ID } from '../src/shop/shopCatalog.js';
 import { createInitialShopRoll, drawWeightedShopOffers, SHOP_VISIBLE_COUNT } from '../src/shop/shopRoll.js';
 import { BOARD_HIDDEN_ROWS } from '../src/constants.js';
-import type { GameState } from '../src/types.js';
+import type { GameState, ShopItem } from '../src/types.js';
 import {
   getPricingView,
   priceForLevel,
@@ -77,6 +77,49 @@ describe('shop catalog seam', () => {
       r1.offers.map((o) => o.id),
       r2.offers.map((o) => o.id),
     );
+  });
+
+  it('baseWeight skews within-tier draws toward heavier items', () => {
+    const base: Omit<ShopItem, 'id' | 'baseWeight'> = {
+      name: 'x',
+      icon: 'x',
+      cost: 10,
+      tier: 2,
+      purchasable: true,
+      target: 'self',
+      description: '',
+    };
+    const heavy: ShopItem = { ...base, id: 'heavy', baseWeight: 100 };
+    const light: ShopItem = { ...base, id: 'light', baseWeight: 1 };
+
+    let heavyFirst = 0;
+    const trials = 2000;
+    for (let seed = 1; seed <= trials; seed += 1) {
+      const rolled = createInitialShopRoll([heavy, light], 2, makeRng(seed));
+      if (rolled.offers[0]?.id === 'heavy') heavyFirst += 1;
+    }
+    // First offer is the weighted draw; with 100:1 weights it lands on heavy
+    // ~99% of the time. Anything below 85% means weights are being ignored.
+    assert.ok(heavyFirst > trials * 0.85, `heavy drawn first only ${heavyFirst}/${trials} times`);
+  });
+
+  it('zero-weight items are never drawn while a positive-weight sibling exists', () => {
+    const base: Omit<ShopItem, 'id' | 'baseWeight'> = {
+      name: 'x',
+      icon: 'x',
+      cost: 10,
+      tier: 2,
+      purchasable: true,
+      target: 'self',
+      description: '',
+    };
+    const positive: ShopItem = { ...base, id: 'positive', baseWeight: 10 };
+    const zero: ShopItem = { ...base, id: 'zero', baseWeight: 0 };
+
+    for (let seed = 1; seed <= 500; seed += 1) {
+      const rolled = createInitialShopRoll([positive, zero], 2, makeRng(seed));
+      assert.equal(rolled.offers[0]?.id, 'positive', `seed ${seed} drew zero-weight item first`);
+    }
   });
 });
 
@@ -307,18 +350,41 @@ describe('shop purchase / phase harness', () => {
     assert.equal(buyer.shop.phase, 'expired');
   });
 
-  it('rejects bounty tax when buyer is not behind', () => {
+  it('reverts pricing curves by 2 levels or grants free purchase on Tax Evasion', () => {
     const { game, rng } = blankGame();
     const buyer = game.players.buyer;
     const opponent = game.players.opponent;
     buyer.score = 9999;
-    buyer.funds = 9999;
-    opponent.score = 10;
-    opponent.funds = 10;
+    buyer.funds = 1000;
+    buyer.shop.pricing.curtain = { level: 3, purchasesInWindow: 1, windowStartedAtTick: game.tick };
+    buyer.shop.pricing['nova-charge'] = { level: 1, purchasesInWindow: 2, windowStartedAtTick: game.tick };
+    buyer.shop.pricing['frost-shift'] = { level: 0, purchasesInWindow: 0, windowStartedAtTick: null };
+
     buyer.shop.offerIds = ['bounty-tax'];
     buyer.shop.phase = 'cycling';
     buyer.shop.cycleIndex = 0;
-    assert.equal(applyShopPurchase(game, buyer, opponent, 'bounty-tax', rng), false);
+
+    assert.equal(applyShopPurchase(game, buyer, opponent, 'bounty-tax', rng), true);
+    assert.equal(buyer.funds, 950); // 1000 - 50 cost
+    assert.equal(buyer.shop.pricing.curtain.level, 1);
+    assert.equal(buyer.shop.pricing.curtain.freePurchases, undefined);
+
+    assert.equal(buyer.shop.pricing['nova-charge'].level, 0);
+    assert.equal(buyer.shop.pricing['nova-charge'].freePurchases, 1);
+
+    assert.equal(buyer.shop.pricing['frost-shift'].level, 0);
+    assert.equal(buyer.shop.pricing['frost-shift'].freePurchases, 1);
+
+    assert.equal(getPricingView('frost-shift', buyer.shop.pricing['frost-shift'], game.tick).currentPrice, 0);
+
+    // Buy frost-shift with 0 funds cost
+    buyer.shop.offerIds = ['frost-shift'];
+    buyer.shop.phase = 'cycling';
+    buyer.shop.cycleIndex = 0;
+    assert.equal(applyShopPurchase(game, buyer, opponent, 'frost-shift', rng), true);
+    assert.equal(buyer.funds, 950); // unchanged because purchase was free!
+    assert.equal(buyer.shop.pricing['frost-shift'].freePurchases, undefined);
+    assert.equal(getPricingView('frost-shift', buyer.shop.pricing['frost-shift'], game.tick).currentPrice, 45);
   });
 
   it('gates storage-toxin on non-empty hold and poisons storage', () => {

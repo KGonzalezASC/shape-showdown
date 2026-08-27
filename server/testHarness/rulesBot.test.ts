@@ -864,9 +864,9 @@ describe('RulesBot Adapter & Attack Preview', () => {
       assert.equal(report.scenarioReport.gameState.players.p2.topOut, false);
     });
 
-    it('keeps the Curtain recipient alive on full-catalog garbage seed 910060', { timeout: 30000 }, () => {
+    it('keeps the Curtain recipient alive on full-catalog garbage seed 1001', { timeout: 30000 }, () => {
       const runner = new PairedRunner({
-        seed: 910060,
+        seed: 1001,
         enableShop: true,
         enableGarbage: true,
         botModes: { p1: 'player-limited', p2: 'player-limited' },

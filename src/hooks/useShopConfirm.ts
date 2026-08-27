@@ -25,7 +25,6 @@ export function useShopConfirm() {
       if (chrome.availableFunds < pricingView.currentPrice) return;
       const opponent = playfield.opponentPlayer;
       if (pickedId === 'storage-toxin' && !opponent?.opponentHasHold) return;
-      if (pickedId === 'bounty-tax' && chrome.oppFunds <= chrome.myFunds) return;
       if (pickedId === 'wildcard-four' && !opponent?.opponentHasPoison) return;
       sendShopPurchase(pickedId);
     }

@@ -320,14 +320,26 @@ const SHOP_HANDLERS: Record<string, ShopHandler> = {
     },
   },
   'bounty-tax': {
-    canPurchase: ({ buyer, opponent }) => !!opponent && opponent.funds > buyer.funds,
-    onPurchase: ({ buyer, opponent, tick }) => {
-      if (!opponent) return;
-      const stolen = Math.floor(opponent.funds * BOUNTY_TAX_PERCENT);
-      opponent.funds -= stolen;
-      buyer.funds += stolen;
-      pushFieldEffect(opponent, 'taxed', tick, `Taxed (-${stolen})`, '💸', tick + 120);
-      pushFieldEffect(buyer, 'tax-siphon', tick, `Siphoned (+${stolen})`, '💸', tick + 120);
+    onPurchase: ({ buyer, tick }) => {
+      ensurePlayerShopPricing(buyer, tick);
+      for (const itemId of Object.keys(buyer.shop.pricing)) {
+        const current = buyer.shop.pricing[itemId];
+        if (current) {
+          if (current.level === 0) {
+            current.freePurchases = (current.freePurchases ?? 0) + 1;
+          } else if (current.level === 1) {
+            current.level = 0;
+            current.freePurchases = (current.freePurchases ?? 0) + 1;
+            current.purchasesInWindow = 0;
+            current.windowStartedAtTick = null;
+          } else {
+            current.level -= 2;
+            current.purchasesInWindow = 0;
+            current.windowStartedAtTick = null;
+          }
+        }
+      }
+      pushFieldEffect(buyer, 'tax-siphon', tick, 'Tax Evasion (Free / -2 Levels)', '💸', tick + 180);
     },
   },
   'wildcard-four': {

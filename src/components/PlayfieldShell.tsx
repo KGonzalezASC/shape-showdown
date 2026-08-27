@@ -23,12 +23,12 @@ function WaitingForOpponentBoard() {
     <div className="relative shrink-0">
       <div className="mb-1">
         <h2 className={`text-sm font-bold uppercase tracking-widest ${fieldTitleClass('opponent')}`}>Opponent Field</h2>
-        <div className="mb-1 flex items-center font-mono text-[10px] font-bold text-zinc-500">
+        <div className="mb-1 flex items-center font-mono text-[10px] font-bold text-[var(--ss-text-tertiary)]">
           <span className="truncate tracking-wide">Searching for opponent…</span>
         </div>
-        <div className="mb-1 flex items-center gap-3 font-mono text-[9px] font-bold uppercase tracking-wider text-zinc-500">
-          <span>Funds <strong className="text-rose-200">0</strong></span>
-          <span>Score <strong className="text-rose-200">0</strong></span>
+        <div className="mb-1 flex items-center gap-3 font-mono text-[9px] font-bold uppercase tracking-wider text-[var(--ss-text-tertiary)]">
+          <span>Funds <strong className="text-[var(--ss-opponent-strong)]">0</strong></span>
+          <span>Score <strong className="text-[var(--ss-opponent-strong)]">0</strong></span>
         </div>
         <IncomingGarbageReadout fieldTitle="Opponent Field" lines={0} />
       </div>
@@ -83,12 +83,11 @@ export const PlayfieldShell: React.FC<PlayfieldShellProps> = ({
 
   const isItemDisabled = useMemo(() => (item: (typeof shopOffers)[number]) => {
     if (item.id === 'storage-toxin') return !opponentPlayer?.holdPiece;
-    if (item.id === 'bounty-tax') return chrome.oppFunds <= chrome.myFunds;
     if (item.id === 'wildcard-four') {
       return !opponentPlayer?.poisonBoard?.some((row) => row.some((cell) => cell > 0));
     }
     return false;
-  }, [chrome.myFunds, chrome.oppFunds, opponentPlayer]);
+  }, [opponentPlayer]);
 
   const shopCanPurchase = chrome.shopPhase === 'cycling' || chrome.shopPhase === 'ready';
   const isPlaying = playfield.status === 'playing';

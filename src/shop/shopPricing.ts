@@ -116,6 +116,7 @@ function normalizePricingState(
   const windowStartedAtTick = source.windowStartedAtTick === null || source.windowStartedAtTick === undefined
     ? null
     : clampInteger(source.windowStartedAtTick, 0);
+  const freePurchases = source.freePurchases && source.freePurchases > 0 ? source.freePurchases : undefined;
 
   if (windowStartedAtTick === null) {
     return {
@@ -123,6 +124,7 @@ function normalizePricingState(
       purchasesInWindow: 0,
       windowStartedAtTick: null,
       ...(source.lastWindowClosedBy ? { lastWindowClosedBy: source.lastWindowClosedBy } : {}),
+      ...(freePurchases ? { freePurchases } : {}),
     };
   }
 
@@ -132,6 +134,7 @@ function normalizePricingState(
       purchasesInWindow: 0,
       windowStartedAtTick: null,
       lastWindowClosedBy: 'allowance',
+      ...(freePurchases ? { freePurchases } : {}),
     };
   }
 
@@ -141,6 +144,7 @@ function normalizePricingState(
       purchasesInWindow: 0,
       windowStartedAtTick: null,
       lastWindowClosedBy: 'timer',
+      ...(freePurchases ? { freePurchases } : {}),
     };
   }
 
@@ -149,6 +153,7 @@ function normalizePricingState(
     purchasesInWindow,
     windowStartedAtTick,
     ...(source.lastWindowClosedBy ? { lastWindowClosedBy: source.lastWindowClosedBy } : {}),
+    ...(freePurchases ? { freePurchases } : {}),
   };
 }
 
@@ -167,9 +172,12 @@ export function getPricingView(
     ? null
     : Math.max(0, Math.ceil((windowExpiresAtTick - currentTick) / GAME_TICK_RATE));
 
+  const rawPrice = priceForLevel(itemId, normalized.level);
+  const currentPrice = (normalized.freePurchases && normalized.freePurchases > 0) ? 0 : rawPrice;
+
   return {
     ...normalized,
-    currentPrice: priceForLevel(itemId, normalized.level),
+    currentPrice,
     nextPrice: priceForLevel(itemId, normalized.level + 1),
     allowance: curve.allowance,
     purchasesRemaining: Math.max(0, curve.allowance - normalized.purchasesInWindow),
@@ -188,6 +196,13 @@ export function advancePricingAfterPurchase(
   purchaseTick: number,
 ): ItemPricingState {
   const normalized = normalizePricingState(itemId, state, purchaseTick);
+  if (normalized.freePurchases && normalized.freePurchases > 0) {
+    const remaining = normalized.freePurchases - 1;
+    return {
+      ...normalized,
+      freePurchases: remaining > 0 ? remaining : undefined,
+    };
+  }
   const next: ItemPricingState = {
     level: normalized.level,
     purchasesInWindow: normalized.purchasesInWindow + 1,

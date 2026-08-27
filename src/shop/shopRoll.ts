@@ -40,37 +40,54 @@ function chooseTierByWeight(
   return rngNext(rng) < tier1Weight / total ? 1 : 2;
 }
 
+function pickWeightedItem(
+  candidates: ShopItem[],
+  effWeight: (item: ShopItem) => number,
+  rng: MutableRng,
+): ShopItem | null {
+  if (candidates.length === 0) return null;
+  let total = 0;
+  for (const item of candidates) total += effWeight(item);
+  if (total <= 0) return candidates[rngInt(rng, candidates.length)];
+  let roll = rngNext(rng) * total;
+  for (const item of candidates) {
+    roll -= effWeight(item);
+    if (roll < 0) return item;
+  }
+  return candidates[candidates.length - 1];
+}
+
 function drawIdFromTierBag(
   pool: ShopItem[],
   tier: 1 | 2,
   bagState: ShopBagState,
   excludedIds: Set<string>,
+  activeSynergySeeds: Set<string>,
   rng: MutableRng,
 ): { itemId: string | null; nextBagState: ShopBagState } {
   const key = tier === 1 ? 'tier1Bag' : 'tier2Bag';
-  const tierPoolIds = pool.filter((item) => item.tier === tier).map((item) => item.id);
-  let bag = bagState[key].length ? [...bagState[key]] : shuffleStrings(tierPoolIds, rng);
+  const byId = new Map(pool.map((item) => [item.id, item]));
+  const effWeight = (item: ShopItem) => item.baseWeight * synergyMultiplier(item, activeSynergySeeds);
+  // The bag is an order-independent membership set: each draw removes the
+  // picked id until it is exhausted, then refills with every tier id.
+  let bag = bagState[key].length
+    ? [...bagState[key]]
+    : pool.filter((item) => item.tier === tier).map((item) => item.id);
 
-  while (bag.length > 0) {
-    const nextId = bag.pop();
-    if (!nextId) break;
-    if (excludedIds.has(nextId)) continue;
-    return {
-      itemId: nextId,
-      nextBagState: { ...bagState, [key]: bag },
-    };
-  }
-
-  const fallback = shuffleStrings(
-    tierPoolIds.filter((id) => !excludedIds.has(id)),
-    rng,
-  );
-  if (fallback.length > 0) {
-    const [itemId, ...remaining] = fallback;
-    return {
-      itemId,
-      nextBagState: { ...bagState, [key]: remaining },
-    };
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    const candidates = bag
+      .map((id) => byId.get(id))
+      .filter((item): item is ShopItem => !!item && !excludedIds.has(item.id));
+    if (candidates.length > 0) {
+      const picked = pickWeightedItem(candidates, effWeight, rng);
+      if (picked) {
+        return {
+          itemId: picked.id,
+          nextBagState: { ...bagState, [key]: bag.filter((id) => id !== picked.id) },
+        };
+      }
+    }
+    bag = pool.filter((item) => item.tier === tier).map((item) => item.id);
   }
 
   return { itemId: null, nextBagState: { ...bagState, [key]: bag } };
@@ -129,14 +146,14 @@ function drawOneWeightedShopItem(
       (it) => it.tier === tier && !excludedIds.has(it.id) && synergyMultiplier(it, activeSynergySeeds) > 1,
     );
     if (synergyItems.length > 0) {
-      const synergyItem = synergyItems[rngInt(rng, synergyItems.length)];
-      if (rngNext(rng) < 1 - 1 / synergyMultiplier(synergyItem, activeSynergySeeds)) {
+      const synergyItem = pickWeightedItem(synergyItems, effWeight, rng);
+      if (synergyItem && rngNext(rng) < 1 - 1 / synergyMultiplier(synergyItem, activeSynergySeeds)) {
         nextState = removeIdFromTierBag(nextState, tier, synergyItem.id);
         return { item: synergyItem, nextBagState: nextState };
       }
     }
 
-    const drawn = drawIdFromTierBag(pool, tier, nextState, excludedIds, rng);
+    const drawn = drawIdFromTierBag(pool, tier, nextState, excludedIds, activeSynergySeeds, rng);
     nextState = drawn.nextBagState;
     if (drawn.itemId) {
       return { item: byId.get(drawn.itemId) ?? null, nextBagState: nextState };

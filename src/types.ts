@@ -65,6 +65,7 @@ import {
   SOFT_DROP_CELLS_PER_TICK,
   ARR_TICKS,
 } from './constants';
+import type { RngChannels } from './rng.js';
 
 export type MatchStatus = 'waiting' | 'countdown' | 'playing' | 'ended';
 export type MatchSeat = 'A' | 'B';
@@ -192,6 +193,7 @@ export interface ItemPricingState {
   purchasesInWindow: number;
   windowStartedAtTick: number | null;
   lastWindowClosedBy?: 'allowance' | 'timer';
+  freePurchases?: number;
 }
 
 /** Authoritative per-player shop state (rolled and advanced on the server). */
@@ -540,6 +542,7 @@ export interface BotDecisionTrace {
 export interface ReplayKeyframe {
   tick: number;
   players: Record<string, PlayerState>;
+  rng?: Record<string, RngChannels>;
   decisionTraces?: Record<string, BotDecisionTrace>;
 }
 
