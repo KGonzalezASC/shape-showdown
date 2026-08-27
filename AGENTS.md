@@ -36,6 +36,7 @@ src/
   constants.ts                 # Board sizes, speeds, shop costs, attack tables
   types.ts                     # GameState, PlayerState, semantic ActiveFieldEffect
   rng.ts                       # Seeded MutableRng (sim + shop rolls)
+  replayCodec.ts               # Shared .replay encode (gzip) + sniff decode for server & viewer
   puzzleEngine/shapes.ts       # Shared piece SHAPES for server + client
   shop/
     shopCatalog.ts             # Canonical item catalog (cost, target, purchasable)
