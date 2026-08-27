@@ -64,13 +64,24 @@ describe('resolveEffectiveSearchScope', () => {
     );
   });
 
-  it('defaults unknown and unset preferences to global', () => {
-    for (const preferredScope of [null, 'bogus', '', 'GLOBAL']) {
+  it('defaults unset or unknown preferences on Discord to guild scope when guild id is present', () => {
+    for (const preferredScope of [null, 'bogus', '', 'GUILD']) {
       assert.deepEqual(
         resolveEffectiveSearchScope({ provider: 'discord', preferredScope, guildId: '42' }),
-        { searchScope: 'global', guildId: null },
+        { searchScope: 'guild', guildId: '42' },
       );
     }
+  });
+
+  it('honors global preference explicitly on Discord', () => {
+    assert.deepEqual(
+      resolveEffectiveSearchScope({
+        provider: 'discord',
+        preferredScope: 'global',
+        guildId: '42',
+      }),
+      { searchScope: 'global', guildId: null },
+    );
   });
 });
 

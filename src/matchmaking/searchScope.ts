@@ -15,9 +15,11 @@ export type EffectiveSearchScopeInput = {
 /**
  * Applies the client-side degrade rules:
  * - guests always search global (server enforces this too);
- * - guild scope with a guild id isolates by server;
- * - guild scope without a guild id but with a channel id isolates by DM channel;
- * - guild scope without guild or channel id (profile launch) degrades to
+ * - explicit global preference searches global;
+ * - explicit discord_only preference searches discord_only;
+ * - guild scope (or default/unset preference for Discord users) with a guild id isolates by server;
+ * - guild scope (or default/unset preference for Discord users) without a guild id but with a channel id isolates by DM channel;
+ * - guild scope (or default/unset preference for Discord users) without guild or channel id (profile launch) degrades to
  *   discord_only rather than silently searching the whole world.
  */
 export function resolveEffectiveSearchScope(
@@ -27,21 +29,21 @@ export function resolveEffectiveSearchScope(
     return { searchScope: 'global', guildId: null };
   }
 
-  if (input.preferredScope === 'guild') {
-    if (input.guildId !== null) {
-      return { searchScope: 'guild', guildId: input.guildId };
-    }
-    if (input.channelId !== null && input.channelId !== undefined) {
-      return { searchScope: 'guild', guildId: input.channelId };
-    }
-    return { searchScope: 'discord_only', guildId: null };
+  if (input.preferredScope === 'global') {
+    return { searchScope: 'global', guildId: null };
   }
 
   if (input.preferredScope === 'discord_only') {
     return { searchScope: 'discord_only', guildId: null };
   }
 
-  return { searchScope: 'global', guildId: null };
+  if (input.guildId !== null) {
+    return { searchScope: 'guild', guildId: input.guildId };
+  }
+  if (input.channelId !== null && input.channelId !== undefined) {
+    return { searchScope: 'guild', guildId: input.channelId };
+  }
+  return { searchScope: 'discord_only', guildId: null };
 }
 
 /** Null when unset or when storage holds an unrecognized value. */

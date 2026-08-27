@@ -108,11 +108,12 @@ export async function requestDiscordActivitySession(
   const discordSdk = await getOrCreateDiscordSdk();
   if (signal.aborted) throw signal.reason;
 
-  const rawGuildId: unknown = discordSdk.guildId;
+  const searchParams = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null;
+  const rawGuildId: unknown = discordSdk.guildId ?? searchParams?.get('guild_id');
   const guildId =
     typeof rawGuildId === 'string' && /^\d{1,64}$/.test(rawGuildId) ? rawGuildId : null;
 
-  const rawChannelId: unknown = discordSdk.channelId;
+  const rawChannelId: unknown = discordSdk.channelId ?? searchParams?.get('channel_id');
   const channelId =
     typeof rawChannelId === 'string' && /^\d{1,64}$/.test(rawChannelId) ? rawChannelId : null;
 

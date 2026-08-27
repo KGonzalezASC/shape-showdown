@@ -200,7 +200,7 @@ export const GameView: React.FC<GameViewProps> = ({ onExitToLanding }) => {
   const handleShopConfirm = useShopConfirm();
 
   const [queuedSearchScope, setQueuedSearchScope] = useState<SearchScope>(
-    () => readPreferredMatchScope() ?? 'global',
+    () => readPreferredMatchScope() ?? (isDiscordActivityContext() ? 'guild' : 'global'),
   );
   const changeSearchScope = async (scope: SearchScope): Promise<void> => {
     if (scope === queuedSearchScope) return;

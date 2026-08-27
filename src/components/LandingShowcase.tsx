@@ -242,7 +242,7 @@ const LandingShowcase: React.FC<LandingShowcaseProps> = ({ onPlayGame }) => {
 
   const inDiscordActivity = isDiscordActivityContext();
   const [matchScope, setMatchScope] = useState<SearchScope>(
-    () => readPreferredMatchScope() ?? 'global',
+    () => readPreferredMatchScope() ?? (inDiscordActivity ? 'guild' : 'global'),
   );
 
   const changeMatchScope = (scope: SearchScope) => {

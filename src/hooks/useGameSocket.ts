@@ -203,10 +203,15 @@ type InitialMatchBootstrap = {
 async function resolveInitialMatchAssignment(
   gameServerUrl: string,
   signal: AbortSignal,
-  onProgress: (phase: MatchBootstrapProgress) => void,
+  onProgress: (
+    phase: MatchBootstrapProgress,
+    extra?: Partial<MatchConnectionDiagnostics>,
+  ) => void,
+  onContextAcquired?: (context: { guildId: string | null; channelId: string | null }) => void,
 ): Promise<InitialMatchBootstrap> {
   onProgress('acquiring-session');
   const { session, guildId, channelId } = await getOrCreateClientSession(gameServerUrl, signal);
+  onContextAcquired?.({ guildId, channelId });
 
   const existingAssignment = await requestMatchAssignment(gameServerUrl, session, signal);
   if (existingAssignment !== null) {
@@ -259,7 +264,9 @@ async function resolveInitialMatchAssignment(
       effectiveSearchScope = body.effectiveScope.searchScope;
     }
   }
-  onProgress('queued');
+  onProgress('queued', {
+    effectiveSearchScope: effectiveSearchScope ?? effectiveScope.searchScope,
+  });
   let lastHeartbeatAt = Date.now();
   const queueDeadline = Date.now() + INITIAL_QUEUE_DEADLINE_MS;
   while (Date.now() < queueDeadline) {
@@ -701,7 +708,10 @@ export const useGameSocket = ({
         initialBootstrap = await resolveInitialMatchAssignment(
           url,
           bootstrapAbortController.signal,
-          (phase) => reportMatchDiagnostics({ phase }),
+          (phase, extra) => reportMatchDiagnostics({ phase, ...extra }),
+          (context) => {
+            searchContextRef.current = context;
+          },
         );
       } catch (error: unknown) {
         if (error instanceof ControlPlaneUnavailableError) {
@@ -1254,7 +1264,16 @@ export const useGameSocket = ({
       if (response.status === 409) return null;
       if (!response.ok) return null;
       writePreferredMatchScope(scope);
-      return effectiveScope.searchScope;
+      let confirmedScope = effectiveScope.searchScope;
+      try {
+        const body: unknown = await response.json();
+        if (isEffectiveQueueResponse(body)) {
+          confirmedScope = body.effectiveScope.searchScope;
+        }
+      } catch {
+        // Fall back to client calculated effective scope
+      }
+      return confirmedScope;
     } catch {
       return null;
     }
