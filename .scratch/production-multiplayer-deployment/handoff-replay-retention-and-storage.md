@@ -9,6 +9,7 @@ This handoff is for the next smart agent. Grill the owner one decision at a time
 ## Decided
 
 - Launch topology remains **Cloudflare Pages + Railway Virginia game service + Railway Postgres**. Do not reopen Edgegap or Fly.
+- **Storage Isolation Rule**: `main` (the staging environment) must NEVER connect to production object storage (e.g. Cloudflare R2 / S3). Staging must use local disk or an isolated test bucket/sandbox.
 - Matches have **no wall-clock timeout**. A match continues until a player tops out or disconnects.
 - Full replay capture is desired for now. Do not silently truncate a replay merely to fit a memory budget.
 - Replay checkpoints use `replayKeyframeIntervalTicks: 30`.

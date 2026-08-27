@@ -1360,9 +1360,12 @@ export class GameManager {
 
   private saveReplay(): void {
     if (!this.activeReplay) return;
-    const replaysDir = process.env.REPLAYS_DIR
-      ? path.resolve(process.env.REPLAYS_DIR)
-      : path.join(process.cwd(), 'fixtures', 'replays');
+    const rawReplaysDir = process.env.REPLAYS_DIR?.trim();
+    if (!rawReplaysDir || rawReplaysDir === 'none' || rawReplaysDir === 'disabled') {
+      this.activeReplay = null;
+      return;
+    }
+    const replaysDir = path.resolve(rawReplaysDir);
     const filename = `replay_${this.activeReplay.date}.replay`;
     const payload = JSON.stringify(this.activeReplay);
     this.activeReplay = null;

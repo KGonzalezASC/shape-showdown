@@ -1198,6 +1198,55 @@ describe('GameManager lifecycle harness', () => {
     }
   });
 
+  it('does not write replay to disk when REPLAYS_DIR is unset', async () => {
+    const previousReplayDir = process.env.REPLAYS_DIR;
+    delete process.env.REPLAYS_DIR;
+
+    try {
+      const gm = new GameManager(createFakeIo(), 60);
+      managers.push(gm);
+      gm.handleConnection(new FakeSocket('p1') as unknown as Socket);
+      gm.handleConnection(new FakeSocket('p2') as unknown as Socket);
+
+      const internal = gm as unknown as {
+        gameState: GameState;
+        lastHandledStatus: string;
+        activeReplay: ReplayDataV2 | null;
+      };
+      internal.gameState.status = 'playing';
+      internal.lastHandledStatus = 'playing';
+      internal.gameState.tick = 0;
+
+      const p1 = internal.gameState.players.p1;
+      p1.activePiece = null;
+      for (let y = 0; y < 2; y += 1) {
+        for (let x = 0; x < BOARD_COLS; x += 1) p1.board[y][x] = 'I';
+      }
+      internal.activeReplay = {
+        version: 2,
+        date: 'unset-replay-dir-test',
+        seed: 1,
+        initialState: structuredClone(internal.gameState),
+        inputs: [],
+        keyframes: [{
+          tick: 0,
+          players: structuredClone(internal.gameState.players),
+        }],
+        events: [],
+      };
+
+      gm.tickOnceForTests();
+      await gm.flushPendingReplaySaveForTests();
+
+      assert.equal(internal.activeReplay, null);
+      const fixturesReplayPath = path.join(process.cwd(), 'fixtures', 'replays', 'replay_unset-replay-dir-test.replay');
+      assert.equal(fs.existsSync(fixturesReplayPath), false);
+    } finally {
+      if (previousReplayDir !== undefined) process.env.REPLAYS_DIR = previousReplayDir;
+      else delete process.env.REPLAYS_DIR;
+    }
+  });
+
   it('derives player RNG channels from match seed and player slot, not socket id', () => {
     const gm1 = new GameManager(createFakeIo(), 60);
     managers.push(gm1);

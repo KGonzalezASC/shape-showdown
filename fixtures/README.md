@@ -14,4 +14,4 @@ This tree holds QA / developer assets that must **not** ship with `dist/client`.
 
 ## Regenerating replays
 
-Scripts under `scripts/generate-*-replays.mts` and `scripts/generate-demo-replay.mts` write here. The server defaults `saveReplay()` to `fixtures/replays` (override with `REPLAYS_DIR`).
+Scripts under `scripts/generate-*-replays.mts` and `scripts/generate-demo-replay.mts` write here. The server only saves replays to disk when `REPLAYS_DIR` is explicitly set in the environment (e.g. `REPLAYS_DIR=fixtures/replays`).
