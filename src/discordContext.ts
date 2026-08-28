@@ -13,10 +13,7 @@ const discordClientId =
  */
 export function isDiscordActivityContext(): boolean {
   if (discordClientId.length === 0 || typeof window === 'undefined') return false;
-  return (
-    window.location.hostname.toLowerCase().endsWith('.discordsays.com')
-    || window.parent !== window
-  );
+  return window.location.hostname.toLowerCase().endsWith('.discordsays.com');
 }
 
 export function isDiscordDMLaunch(): boolean {
