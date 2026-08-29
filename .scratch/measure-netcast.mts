@@ -16,6 +16,7 @@ import { cloneSeatSnapshot } from '../src/protocol/decodeMatchPacket.js';
 import { buildSeatWireSnapshot } from '../server/sync/seatProjection.js';
 import type { SeatWireSnapshot } from '../src/protocol/wireTypes.js';
 import {
+  KEYFRAME_INTERVAL_TICKS,
   PACKET_KIND_DELTA,
   PACKET_KIND_KEYFRAME,
   PACKET_KIND_TECTONIC_COMPLETE,
@@ -242,7 +243,7 @@ function runWhatIfStream(
 ): void {
   state.sinceEmit += 1;
   const interval = NETCAST_EVERY_N_TICKS;
-  const keyframeDue = gameState.tick > 0 && gameState.tick % 120 === 0;
+  const keyframeDue = gameState.tick > 0 && gameState.tick % KEYFRAME_INTERVAL_TICKS === 0;
   if (!keyframeDue && state.sinceEmit < interval) return;
   state.sinceEmit = 0;
   const snapshot = buildSeatWireSnapshot(gameState, runtimeId);

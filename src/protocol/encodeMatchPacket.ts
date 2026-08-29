@@ -1,5 +1,11 @@
 import { BOARD_COLS, BOARD_ROWS, BOARD_VISIBLE_ROWS } from '../constants.js';
-import type { GamePiece } from '../types.js';
+import type {
+  ActiveFieldEffect,
+  GamePiece,
+  HeldPiece,
+  ItemPricingState,
+  PoisonSpreadState,
+} from '../types.js';
 import { BinaryWriter, toArrayBuffer } from './binary.js';
 import {
   writeChrome,
@@ -23,6 +29,10 @@ import {
   DELTA_SECTION_OPPONENT_META,
   DELTA_SECTION_OPPONENT_PIECE,
   DELTA_SECTION_OPPONENT_POISON,
+  type LocalPlayerWire,
+  type MatchChromeWire,
+  type OpponentPlayerWire,
+  type PendingGarbageWire,
   type SeatWireSnapshot,
   type TectonicCompleteWire,
   type TectonicStepWire,
@@ -58,28 +68,196 @@ function writeHeader(
   writer.writeU32(tick >>> 0);
 }
 
-const pieceScratch = new BinaryWriter(64);
+/** Allocation-free board/poison equality; avoids JSON.stringify on 10×N grids. */
+function gridEquals<T>(
+  a: readonly (readonly T[])[],
+  b: readonly (readonly T[])[],
+  rows: number,
+): boolean {
+  for (let y = 0; y < rows; y += 1) {
+    const rowA = a[y];
+    const rowB = b[y];
+    for (let x = 0; x < BOARD_COLS; x += 1) {
+      if (rowA[x] !== rowB[x]) return false;
+    }
+  }
+  return true;
+}
 
-function encodePieceToScratch(piece: GamePiece | null): ArrayBuffer {
-  pieceScratch.reset();
-  writePieceCompact(pieceScratch, piece);
-  return pieceScratch.finish();
+function stringArrayEquals(a: readonly string[], b: readonly string[]): boolean {
+  if (a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i += 1) {
+    if (a[i] !== b[i]) return false;
+  }
+  return true;
+}
+
+function offsetsEquals(
+  a: readonly [number, number][] | undefined,
+  b: readonly [number, number][] | undefined,
+): boolean {
+  if (a === b) return true;
+  if (!a || !b || a.length !== b.length) return !a && !b;
+  for (let i = 0; i < a.length; i += 1) {
+    if (a[i][0] !== b[i][0] || a[i][1] !== b[i][1]) return false;
+  }
+  return true;
+}
+
+function heldPieceEquals(a: HeldPiece | null, b: HeldPiece | null): boolean {
+  if (a === b) return true;
+  if (!a || !b) return false;
+  return a.type === b.type
+    && a.poisoned === b.poisoned
+    && a.poisonVariant === b.poisonVariant
+    && a.bomber === b.bomber;
+}
+
+function poisonSpreadEquals(a: PoisonSpreadState | null, b: PoisonSpreadState | null): boolean {
+  if (a === b) return true;
+  if (!a || !b) return false;
+  return a.generationsRemaining === b.generationsRemaining
+    && a.nextSpreadTick === b.nextSpreadTick
+    && a.variant === b.variant;
+}
+
+function garbageEquals(a: readonly PendingGarbageWire[], b: readonly PendingGarbageWire[]): boolean {
+  if (a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i += 1) {
+    if (a[i].lines !== b[i].lines || a[i].arrivalTick !== b[i].arrivalTick) return false;
+  }
+  return true;
+}
+
+function effectsEquals(a: readonly ActiveFieldEffect[], b: readonly ActiveFieldEffect[]): boolean {
+  if (a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i += 1) {
+    const left = a[i];
+    const right = b[i];
+    if (
+      left.id !== right.id
+      || left.kind !== right.kind
+      || left.label !== right.label
+      || left.icon !== right.icon
+      || left.expiresAtTick !== right.expiresAtTick
+    ) {
+      return false;
+    }
+  }
+  return true;
 }
 
 /**
- * Piece dirtiness is decided by comparing canonical wire bytes so the diff can
- * never disagree with what the codec actually round-trips (loop-proof).
+ * Piece dirtiness matches the compact wire fields so encode and dirty agree.
+ * Field compare avoids allocating scratch buffers on every netcast.
  */
 function pieceWireDiffers(a: GamePiece | null, b: GamePiece | null): boolean {
-  const aBytes = encodePieceToScratch(a);
-  const bBytes = encodePieceToScratch(b);
-  if (aBytes.byteLength !== bBytes.byteLength) return true;
-  const viewA = new Uint8Array(aBytes);
-  const viewB = new Uint8Array(bBytes);
-  for (let i = 0; i < viewA.length; i += 1) {
-    if (viewA[i] !== viewB[i]) return true;
+  if (a === b) return false;
+  if (!a || !b) return true;
+  return a.type !== b.type
+    || a.rotation !== b.rotation
+    || a.x !== b.x
+    || a.y !== b.y
+    || a.poisoned !== b.poisoned
+    || a.poisonVariant !== b.poisonVariant
+    || a.bomber !== b.bomber
+    || a.isWildcard !== b.isWildcard
+    || a.rotationBlockedNonce !== b.rotationBlockedNonce
+    || !offsetsEquals(a.customOffsets, b.customOffsets);
+}
+
+function chromeDiffers(a: MatchChromeWire, b: MatchChromeWire): boolean {
+  return a.status !== b.status
+    || a.countdown !== b.countdown
+    || a.seed !== b.seed
+    || a.winnerId !== b.winnerId
+    || a.endReason !== b.endReason
+    || a.technicalVictory !== b.technicalVictory
+    || a.restartTimer !== b.restartTimer
+    || a.pausePlayerId !== b.pausePlayerId
+    || a.pauseStartedAt !== b.pauseStartedAt;
+}
+
+function pricingEntryEquals(a: ItemPricingState, b: ItemPricingState): boolean {
+  return a.level === b.level
+    && a.purchasesInWindow === b.purchasesInWindow
+    && a.windowStartedAtTick === b.windowStartedAtTick
+    && a.lastWindowClosedBy === b.lastWindowClosedBy
+    && a.freePurchases === b.freePurchases;
+}
+
+function shopDiffers(
+  a: LocalPlayerWire['shop'],
+  b: LocalPlayerWire['shop'],
+): boolean {
+  if (a.phase !== b.phase
+    || a.cycleIndex !== b.cycleIndex
+    || a.lastPurchasedItemId !== b.lastPurchasedItemId
+    || !stringArrayEquals(a.offerIds, b.offerIds)
+    || !stringArrayEquals(a.activeSynergySeeds, b.activeSynergySeeds)
+  ) {
+    return true;
+  }
+  const aKeys = Object.keys(a.pricing);
+  const bKeys = Object.keys(b.pricing);
+  if (aKeys.length !== bKeys.length) return true;
+  for (const key of aKeys) {
+    const left = a.pricing[key];
+    const right = b.pricing[key];
+    if (!right || !pricingEntryEquals(left, right)) return true;
   }
   return false;
+}
+
+/** Local meta excludes board / poison / shop / activePiece (own sections). */
+function localMetaDiffers(a: LocalPlayerWire, b: LocalPlayerWire): boolean {
+  return a.id !== b.id
+    || a.landingForecastAtTick !== b.landingForecastAtTick
+    || !heldPieceEquals(a.holdPiece, b.holdPiece)
+    || a.canHold !== b.canHold
+    || !stringArrayEquals(a.nextQueue, b.nextQueue)
+    || a.score !== b.score
+    || a.funds !== b.funds
+    || a.linesCleared !== b.linesCleared
+    || a.combo !== b.combo
+    || a.backToBack !== b.backToBack
+    || !garbageEquals(a.pendingGarbage, b.pendingGarbage)
+    || !effectsEquals(a.activeEffects, b.activeEffects)
+    || a.topOut !== b.topOut
+    || a.swapCutoffRow !== b.swapCutoffRow
+    || a.curtainDefenseLevel !== b.curtainDefenseLevel
+    || !poisonSpreadEquals(a.poisonSpread, b.poisonSpread)
+    || !offsetsEquals(a.customNextPieceSourceCells, b.customNextPieceSourceCells)
+    || a.holdFrozenUntilTick !== b.holdFrozenUntilTick
+    || a.magnetPermanentStacks !== b.magnetPermanentStacks
+    || a.magnetPieceBoost !== b.magnetPieceBoost
+    || a.pieceHasHardDropped !== b.pieceHasHardDropped
+    || a.lastHardDropTick !== b.lastHardDropTick
+    || a.snagHardDropBlocked !== b.snagHardDropBlocked
+    || a.satelliteArmed !== b.satelliteArmed
+    || a.satelliteDelayUntilTick !== b.satelliteDelayUntilTick
+    || a.tectonicShiftNextStepTick !== b.tectonicShiftNextStepTick;
+}
+
+/** Opponent meta excludes board / poison / activePiece (own sections). */
+function opponentMetaDiffers(a: OpponentPlayerWire, b: OpponentPlayerWire): boolean {
+  return a.id !== b.id
+    || a.score !== b.score
+    || a.funds !== b.funds
+    || a.linesCleared !== b.linesCleared
+    || a.combo !== b.combo
+    || a.backToBack !== b.backToBack
+    || !garbageEquals(a.pendingGarbage, b.pendingGarbage)
+    || !effectsEquals(a.activeEffects, b.activeEffects)
+    || a.topOut !== b.topOut
+    || a.swapCutoffRow !== b.swapCutoffRow
+    || a.curtainDefenseLevel !== b.curtainDefenseLevel
+    || !poisonSpreadEquals(a.poisonSpread, b.poisonSpread)
+    || a.tectonicShiftNextStepTick !== b.tectonicShiftNextStepTick
+    || a.magnetPermanentStacks !== b.magnetPermanentStacks
+    || a.magnetPieceBoost !== b.magnetPieceBoost
+    || a.hasHold !== b.hasHold
+    || a.hasPoison !== b.hasPoison;
 }
 
 export function encodeKeyframePacket(
@@ -111,36 +289,31 @@ export function encodeDeltaPacket(
   const bodyStart = PACKET_HEADER_BYTES;
   writeHeader(writer, PACKET_KIND_DELTA, sequence, generation, snapshot.tick);
 
-  if (JSON.stringify(snapshot.chrome) !== JSON.stringify(baseline.chrome)) {
+  if (chromeDiffers(snapshot.chrome, baseline.chrome)) {
     sections |= DELTA_SECTION_CHROME;
   }
-  if (JSON.stringify(snapshot.local.board) !== JSON.stringify(baseline.local.board)) {
+  if (!gridEquals(snapshot.local.board, baseline.local.board, BOARD_ROWS)) {
     sections |= DELTA_SECTION_LOCAL_BOARD;
   }
-  if (JSON.stringify(snapshot.local.poisonBoard) !== JSON.stringify(baseline.local.poisonBoard)) {
+  if (!gridEquals(snapshot.local.poisonBoard, baseline.local.poisonBoard, BOARD_ROWS)) {
     sections |= DELTA_SECTION_LOCAL_POISON;
   }
-  // Board, shop, and the active piece travel in their own sections.
-  const localMetaBaseline = { ...baseline.local, board: [], poisonBoard: [], shop: null, activePiece: null };
-  const localMetaSnapshot = { ...snapshot.local, board: [], poisonBoard: [], shop: null, activePiece: null };
-  if (JSON.stringify(localMetaSnapshot) !== JSON.stringify(localMetaBaseline)) {
+  if (localMetaDiffers(snapshot.local, baseline.local)) {
     sections |= DELTA_SECTION_LOCAL_META;
   }
-  if (JSON.stringify(snapshot.local.shop) !== JSON.stringify(baseline.local.shop)) {
+  if (shopDiffers(snapshot.local.shop, baseline.local.shop)) {
     sections |= DELTA_SECTION_LOCAL_SHOP;
   }
   if (pieceWireDiffers(snapshot.local.activePiece, baseline.local.activePiece)) {
     sections |= DELTA_SECTION_LOCAL_PIECE;
   }
-  if (JSON.stringify(snapshot.opponent.board) !== JSON.stringify(baseline.opponent.board)) {
+  if (!gridEquals(snapshot.opponent.board, baseline.opponent.board, BOARD_VISIBLE_ROWS)) {
     sections |= DELTA_SECTION_OPPONENT_BOARD;
   }
-  if (JSON.stringify(snapshot.opponent.poisonBoard) !== JSON.stringify(baseline.opponent.poisonBoard)) {
+  if (!gridEquals(snapshot.opponent.poisonBoard, baseline.opponent.poisonBoard, BOARD_VISIBLE_ROWS)) {
     sections |= DELTA_SECTION_OPPONENT_POISON;
   }
-  const oppMetaBaseline = { ...baseline.opponent, board: [], activePiece: null };
-  const oppMetaSnapshot = { ...snapshot.opponent, board: [], activePiece: null };
-  if (JSON.stringify(oppMetaSnapshot) !== JSON.stringify(oppMetaBaseline)) {
+  if (opponentMetaDiffers(snapshot.opponent, baseline.opponent)) {
     sections |= DELTA_SECTION_OPPONENT_META;
   }
   if (pieceWireDiffers(snapshot.opponent.activePiece, baseline.opponent.activePiece)) {

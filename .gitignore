@@ -20,4 +20,16 @@ fixtures/replays/
 
 # Match load test and smoke test screenshots
 .scratch/match-screenshots/
+.scratch/playtest-screenshots/
+.scratch/playtest-profiles/
+
+# Local scratch investigations, logs, and diagnostic queries
+.scratch/*.json
+.scratch/*.gql
+.scratch/analyze-*.mts
+.scratch/bench-*.mts
+.scratch/compare-*.mts
+.scratch/measure-idle-*.mts
+.scratch/playtest-*.mts
+
 

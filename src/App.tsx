@@ -12,6 +12,8 @@ import { GameFieldRef } from './components/GameField';
 import { BackgroundPrototype } from './components/BackgroundPrototype';
 import { ThemeBackground } from './presentation/ThemeBackground';
 import { ThemeProvider } from './presentation/ThemeProvider';
+import { KeyBindingsProvider, useKeyBindings } from './input/KeyBindingsProvider';
+import { actionForCode } from './input/keyBindings';
 import { DEV_TOOLS_ENABLED } from './devTools';
 import { DISCONNECT_SEAT_LEASE_MS } from './constants';
 import { useLockDrill } from './hooks/useLockDrill';
@@ -145,6 +147,9 @@ export const GameView: React.FC<GameViewProps> = ({ onExitToLanding }) => {
   const gameState = useGameState();
   const myId = useMyId();
   const playfield = usePlayfieldSnapshot();
+  const bindings = useKeyBindings();
+  const bindingsRef = useRef(bindings);
+  bindingsRef.current = bindings;
   const layoutMode = usePlayfieldLayoutMode();
   const hasLocalPlayer = Boolean(playfield.myPlayer);
   const [appShellState, appShellDispatch] = useReducer(
@@ -399,47 +404,47 @@ export const GameView: React.FC<GameViewProps> = ({ onExitToLanding }) => {
       }
       const { playfield: pf, myId: id } = stateRef.current;
       if (pf.status !== 'playing' || !id || !pf.myPlayer) return;
-      if (e.key === 'ArrowLeft') {
-        e.preventDefault();
+
+      const action = actionForCode(bindingsRef.current, e.code);
+      if (!action) return;
+
+      e.preventDefault();
+      if (action === 'moveLeft') {
         if (heldKeysRef.current.left) return;
         heldKeysRef.current = { ...heldKeysRef.current, left: true };
         sendInputState({ ...heldKeysRef.current });
-      } else if (e.key === 'ArrowRight') {
-        e.preventDefault();
+      } else if (action === 'moveRight') {
         if (heldKeysRef.current.right) return;
         heldKeysRef.current = { ...heldKeysRef.current, right: true };
         sendInputState({ ...heldKeysRef.current });
-      } else if (e.key === 'ArrowDown') {
-        e.preventDefault();
+      } else if (action === 'softDrop') {
         if (heldKeysRef.current.softDrop) return;
         heldKeysRef.current = { ...heldKeysRef.current, softDrop: true };
         sendInputState({ ...heldKeysRef.current });
-      } else if (e.key === 'ArrowUp' || e.key === ' ') {
-        e.preventDefault();
+      } else if (action === 'hardDrop') {
         handleAction('hardDrop');
-      } else if (e.key.toLowerCase() === 'x') {
-        e.preventDefault();
+      } else if (action === 'rotateCW') {
+        if (e.repeat) return;
         handleAction('rotateCW');
-      } else if (e.key.toLowerCase() === 'z' || e.key === 'Control') {
-        e.preventDefault();
+      } else if (action === 'rotateCCW') {
+        if (e.repeat) return;
         handleAction('rotateCCW');
-      } else if (e.key === 'Shift') {
-        e.preventDefault();
+      } else if (action === 'hold') {
         handleAction('hold');
-      } else if (e.key.toLowerCase() === 'c') {
-        e.preventDefault();
+      } else if (action === 'shop') {
         handleShopConfirm();
       }
     };
     const onKeyUp = (e: KeyboardEvent) => {
       if (showViewportWarning) return;
-      if (e.key === 'ArrowLeft') {
+      const action = actionForCode(bindingsRef.current, e.code);
+      if (action === 'moveLeft') {
         heldKeysRef.current = { ...heldKeysRef.current, left: false };
         sendInputState({ ...heldKeysRef.current });
-      } else if (e.key === 'ArrowRight') {
+      } else if (action === 'moveRight') {
         heldKeysRef.current = { ...heldKeysRef.current, right: false };
         sendInputState({ ...heldKeysRef.current });
-      } else if (e.key === 'ArrowDown') {
+      } else if (action === 'softDrop') {
         heldKeysRef.current = { ...heldKeysRef.current, softDrop: false };
         sendInputState({ ...heldKeysRef.current });
       }
@@ -989,9 +994,11 @@ const App: React.FC<GameViewProps> = (props) => {
   }
   return (
     <ThemeProvider>
-      <GameStateProvider>
-        <GameView {...props} />
-      </GameStateProvider>
+      <KeyBindingsProvider>
+        <GameStateProvider>
+          <GameView {...props} />
+        </GameStateProvider>
+      </KeyBindingsProvider>
     </ThemeProvider>
   );
 };

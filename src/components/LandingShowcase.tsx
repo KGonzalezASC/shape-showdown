@@ -1,5 +1,5 @@
 import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { HelpCircle, Play, X } from 'lucide-react';
+import { HelpCircle, Keyboard, Play, X } from 'lucide-react';
 import { useSetThemeId, useThemePackage } from '../presentation/ThemeProvider';
 import { THEME_IDS, type ThemeId } from '../presentation/themePackage';
 import { isDiscordActivityContext, openExternalUrl } from '../discordContext';
@@ -9,7 +9,20 @@ import {
   writePreferredMatchScope,
   type SearchScope,
 } from '../matchmaking/searchScope';
+import {
+  useKeyBindings,
+  useRebindKey,
+  useResetKeyBindings,
+} from '../input/KeyBindingsProvider';
+import {
+  ACTION_LABELS,
+  BINDABLE_ACTIONS,
+  formatKeyCode,
+  formatMovePair,
+  type BindableAction,
+} from '../input/keyBindings';
 import { MatchScopePicker } from './MatchScopePicker';
+import { HowToPlayModal } from './HowToPlayModal';
 
 type PieceKey = 'I' | 'J' | 'L' | 'O' | 'S' | 'T' | 'Z';
 
@@ -225,6 +238,47 @@ function traceCrispVoronoiPolygon(
   ctx.closePath();
 }
 
+function useHasPhysicalInputDevice(): boolean {
+  const [hasInput, setHasInput] = useState<boolean>(() => {
+    if (typeof window === 'undefined') return true;
+    const hasFinePointer = window.matchMedia?.('(pointer: fine)').matches;
+    if (hasFinePointer) return true;
+    const gamepads = typeof navigator !== 'undefined' && navigator.getGamepads ? navigator.getGamepads() : [];
+    for (let i = 0; i < gamepads.length; i++) {
+      if (gamepads[i] !== null) return true;
+    }
+    return false;
+  });
+
+  useEffect(() => {
+    if (hasInput) return;
+
+    const onGamepadConnect = () => setHasInput(true);
+    const onKeyDown = () => setHasInput(true);
+
+    window.addEventListener('gamepadconnected', onGamepadConnect);
+    window.addEventListener('keydown', onKeyDown);
+
+    const checkGamepads = () => {
+      const gamepads = navigator.getGamepads ? navigator.getGamepads() : [];
+      for (let i = 0; i < gamepads.length; i++) {
+        if (gamepads[i] !== null) {
+          setHasInput(true);
+          break;
+        }
+      }
+    };
+    checkGamepads();
+
+    return () => {
+      window.removeEventListener('gamepadconnected', onGamepadConnect);
+      window.removeEventListener('keydown', onKeyDown);
+    };
+  }, [hasInput]);
+
+  return hasInput;
+}
+
 export interface LandingShowcaseProps {
   onPlayGame?: () => void;
 }
@@ -232,12 +286,19 @@ export interface LandingShowcaseProps {
 const LandingShowcase: React.FC<LandingShowcaseProps> = ({ onPlayGame }) => {
   const theme = useThemePackage();
   const setThemeId = useSetThemeId();
+  const bindings = useKeyBindings();
+  const rebind = useRebindKey();
+  const resetBindings = useResetKeyBindings();
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const controlsPanelRef = useRef<HTMLDivElement>(null);
   const themeRef = useRef(theme);
   themeRef.current = theme;
 
+  const hasPhysicalInput = useHasPhysicalInputDevice();
   const [showHowToPlay, setShowHowToPlay] = useState(false);
+  const [showControls, setShowControls] = useState(false);
+  const [listeningAction, setListeningAction] = useState<BindableAction | null>(null);
   const elapsedRef = useRef(0);
 
   const inDiscordActivity = isDiscordActivityContext();
@@ -385,6 +446,45 @@ const LandingShowcase: React.FC<LandingShowcaseProps> = ({ onPlayGame }) => {
     };
   }, []);
 
+  useEffect(() => {
+    if (!showControls) return;
+    controlsPanelRef.current?.focus();
+  }, [showControls]);
+
+  useEffect(() => {
+    if (!showControls) {
+      setListeningAction(null);
+      return;
+    }
+
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (listeningAction) {
+        if (e.code === 'Escape') {
+          e.preventDefault();
+          setListeningAction(null);
+          return;
+        }
+        e.preventDefault();
+        rebind(listeningAction, e.code);
+        setListeningAction(null);
+        return;
+      }
+
+      if (e.code === 'Escape') {
+        e.preventDefault();
+        setShowControls(false);
+      }
+    };
+
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [showControls, listeningAction, rebind]);
+
+  const closeControls = () => {
+    setListeningAction(null);
+    setShowControls(false);
+  };
+
   const activeOption = THEME_OPTIONS.find((t) => t.id === theme.id) ?? THEME_OPTIONS[0];
 
   return (
@@ -449,6 +549,17 @@ const LandingShowcase: React.FC<LandingShowcaseProps> = ({ onPlayGame }) => {
               <HelpCircle className="h-3.5 w-3.5 text-zinc-400 sm:h-4 sm:w-4" />
               <span>How To Play</span>
             </button>
+
+            {hasPhysicalInput && (
+              <button
+                type="button"
+                onClick={() => setShowControls(true)}
+                className="inline-flex h-10 shrink-0 whitespace-nowrap items-center justify-center gap-1.5 rounded-xl border border-white/10 bg-white/[0.04] px-4 text-[9px] font-bold uppercase tracking-wider text-zinc-200 transition-colors hover:border-white/20 hover:bg-white/[0.08] hover:text-white sm:h-12 sm:gap-2 sm:px-6 sm:text-xs"
+              >
+                <Keyboard className="h-3.5 w-3.5 text-zinc-400 sm:h-4 sm:w-4" />
+                <span>Controls</span>
+              </button>
+            )}
           </div>
 
           {/* Opponent search scope — only meaningful inside a Discord Activity */}
@@ -514,58 +625,82 @@ const LandingShowcase: React.FC<LandingShowcaseProps> = ({ onPlayGame }) => {
       </footer>
 
       {/* How To Play Modal */}
-      {showHowToPlay && (
+      <HowToPlayModal
+        isOpen={showHowToPlay}
+        onClose={() => setShowHowToPlay(false)}
+        bindings={bindings}
+        accentColor={activeOption.accent}
+      />
+
+      {showControls && (
         <div
           role="dialog"
           aria-modal="true"
-          aria-label="How to play Shape Showdown"
+          aria-label="Controls"
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm"
         >
-          <div className="relative w-full max-w-md rounded-2xl border border-white/15 bg-[#10121a] p-5 shadow-2xl sm:p-6">
+          <div
+            ref={controlsPanelRef}
+            tabIndex={-1}
+            className="relative w-full max-w-md rounded-2xl border border-white/15 bg-[#10121a] p-5 shadow-2xl outline-none sm:p-6"
+          >
             <button
               type="button"
-              onClick={() => setShowHowToPlay(false)}
+              onClick={closeControls}
               className="absolute right-4 top-4 rounded-lg p-1 text-zinc-400 hover:bg-white/10 hover:text-white"
             >
               <X className="h-5 w-5" />
             </button>
 
             <h2 className="mb-4 text-sm font-black uppercase tracking-wider text-white sm:text-base">
-              How To Play
+              Controls
             </h2>
 
-            <div className="space-y-3 text-[10px] text-zinc-300 sm:text-xs">
-              <div className="rounded-xl border border-white/[0.08] bg-white/[0.02] p-3">
-                <p className="font-bold text-white">Controls</p>
-                <p className="mt-1 leading-relaxed text-zinc-400">
-                  <span className="font-mono text-zinc-200">← / →</span> Move •{' '}
-                  <span className="font-mono text-zinc-200">↓</span> Soft Drop •{' '}
-                  <span className="font-mono text-zinc-200">↑ / Space</span> Hard Drop •{' '}
-                  <span className="font-mono text-zinc-200">Z / X</span> Rotate •{' '}
-                  <span className="font-mono text-zinc-200">Shift</span> Storage •{' '}
-                  <span className="font-mono text-zinc-200">C</span> Shop
-                </p>
-              </div>
-
-              <div className="rounded-xl border border-white/[0.08] bg-white/[0.02] p-3">
-                <p className="font-bold text-white">Line Clears &amp; Shop</p>
-                <p className="mt-1 leading-relaxed text-zinc-400">
-                  Clear rows to earn cash and roll powers in your shop rail. Buy offensive abilities to poison, freeze, or disrupt your opponent's board.
-                </p>
-              </div>
-
-              <div className="rounded-xl border border-white/[0.08] bg-white/[0.02] p-3">
-                <p className="font-bold text-white">Victory</p>
-                <p className="mt-1 leading-relaxed text-zinc-400">
-                  Survive the attacks. The first player to top out above the visible board loses.
-                </p>
-              </div>
+            <div className="max-h-[min(70dvh,28rem)] space-y-2 overflow-y-auto pr-1">
+              {BINDABLE_ACTIONS.map((action) => {
+                const isListening = listeningAction === action;
+                return (
+                  <div
+                    key={action}
+                    className="flex items-center justify-between gap-3 rounded-xl border border-white/[0.08] bg-white/[0.02] px-3 py-2.5"
+                  >
+                    <span className="min-w-0 truncate text-[10px] font-bold uppercase tracking-wider text-zinc-300 sm:text-xs">
+                      {ACTION_LABELS[action]}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setListeningAction(isListening ? null : action)
+                      }
+                      className={`min-w-[7.5rem] shrink-0 whitespace-nowrap rounded-lg border px-3 py-1.5 text-center font-mono text-[10px] font-bold uppercase tracking-wide transition-colors sm:min-w-[8.5rem] sm:text-xs ${
+                        isListening
+                          ? 'border-white/30 bg-white/10 text-white'
+                          : 'border-white/10 bg-white/[0.04] text-zinc-200 hover:border-white/20 hover:bg-white/[0.08]'
+                      }`}
+                    >
+                      {isListening
+                        ? 'Press a key…'
+                        : formatKeyCode(bindings[action])}
+                    </button>
+                  </div>
+                );
+              })}
             </div>
 
-            <div className="mt-5 flex justify-end">
+            <div className="mt-5 flex flex-wrap items-center justify-end gap-2">
               <button
                 type="button"
-                onClick={() => setShowHowToPlay(false)}
+                onClick={() => {
+                  resetBindings();
+                  setListeningAction(null);
+                }}
+                className="rounded-xl border border-white/10 bg-white/[0.04] px-4 py-2 text-xs font-bold uppercase tracking-wider text-zinc-300 transition-colors hover:border-white/20 hover:bg-white/[0.08] hover:text-white"
+              >
+                Reset defaults
+              </button>
+              <button
+                type="button"
+                onClick={closeControls}
                 style={{ backgroundColor: activeOption.accent }}
                 className="rounded-xl px-5 py-2 text-xs font-black uppercase tracking-wider text-[#07110d]"
               >

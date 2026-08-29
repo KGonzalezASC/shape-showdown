@@ -96,7 +96,6 @@ const MobileControls: React.FC<MobileControlsProps> = ({ onInput, onAction, onSh
             type="button"
             aria-label="Hard drop"
             className={`${controlButtonBase} border-[#748e86] text-emerald-300 active:border-emerald-400`}
-            onTouchStart={tapHardDrop}
             onPointerDown={tapHardDrop}
           >
             <ArrowUp className={controlIconClass} strokeWidth={2.75} />
@@ -106,9 +105,6 @@ const MobileControls: React.FC<MobileControlsProps> = ({ onInput, onAction, onSh
             type="button"
             aria-label="Move left"
             className={`${controlButtonBase} border-[var(--ss-control-border)] active:border-zinc-300`}
-            onTouchStart={holdInput({ left: true, right: false, softDrop: false })}
-            onTouchEnd={releaseInput}
-            onTouchCancel={releaseInput}
             onPointerDown={holdInput({ left: true, right: false, softDrop: false })}
             onPointerUp={releaseInput}
             onPointerCancel={releaseInput}
@@ -120,9 +116,6 @@ const MobileControls: React.FC<MobileControlsProps> = ({ onInput, onAction, onSh
             type="button"
             aria-label="Soft drop"
             className={`${controlButtonBase} border-[#748e86] text-cyan-300 active:border-cyan-400`}
-            onTouchStart={holdInput({ left: false, right: false, softDrop: true })}
-            onTouchEnd={releaseInput}
-            onTouchCancel={releaseInput}
             onPointerDown={holdInput({ left: false, right: false, softDrop: true })}
             onPointerUp={releaseInput}
             onPointerCancel={releaseInput}
@@ -134,9 +127,6 @@ const MobileControls: React.FC<MobileControlsProps> = ({ onInput, onAction, onSh
             type="button"
             aria-label="Move right"
             className={`${controlButtonBase} border-[var(--ss-control-border)] active:border-zinc-300`}
-            onTouchStart={holdInput({ left: false, right: true, softDrop: false })}
-            onTouchEnd={releaseInput}
-            onTouchCancel={releaseInput}
             onPointerDown={holdInput({ left: false, right: true, softDrop: false })}
             onPointerUp={releaseInput}
             onPointerCancel={releaseInput}
@@ -152,7 +142,6 @@ const MobileControls: React.FC<MobileControlsProps> = ({ onInput, onAction, onSh
             type="button"
             aria-label="Storage"
             className={`${controlButtonBase} border-[#745d7d] text-fuchsia-300 active:border-fuchsia-400`}
-            onTouchStart={tapAction('hold')}
             onPointerDown={tapAction('hold')}
           >
             <Archive className={controlIconClass} strokeWidth={2.5} />
@@ -161,7 +150,6 @@ const MobileControls: React.FC<MobileControlsProps> = ({ onInput, onAction, onSh
             type="button"
             aria-label="Shop"
             className={`${controlButtonBase} border-[#557984] text-sky-300 active:border-sky-400`}
-            onTouchStart={tapShop}
             onPointerDown={tapShop}
           >
             <ShoppingBag className={controlIconClass} strokeWidth={2.5} />
@@ -170,7 +158,6 @@ const MobileControls: React.FC<MobileControlsProps> = ({ onInput, onAction, onSh
             type="button"
             aria-label="Rotate counter-clockwise"
             className={`${controlButtonBase} border-[#907b59] text-amber-300 active:border-amber-400`}
-            onTouchStart={tapAction('rotateCCW')}
             onPointerDown={tapAction('rotateCCW')}
           >
             <RotateCcw className={controlIconClass} strokeWidth={2.5} />
@@ -179,7 +166,6 @@ const MobileControls: React.FC<MobileControlsProps> = ({ onInput, onAction, onSh
             type="button"
             aria-label="Rotate clockwise"
             className={`${controlButtonBase} border-[#907b59] text-amber-300 active:border-amber-400`}
-            onTouchStart={tapAction('rotateCW')}
             onPointerDown={tapAction('rotateCW')}
           >
             <RotateCw className={controlIconClass} strokeWidth={2.5} />

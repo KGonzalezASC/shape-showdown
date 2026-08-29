@@ -2,10 +2,17 @@ import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { BOARD_COLS, BOARD_ROWS } from '../constants.js';
 import { encodeDeltaPacket, encodeKeyframePacket } from './encodeMatchPacket.js';
-import { decodeKeyframePacket, applyDeltaPacket } from './decodeMatchPacket.js';
+import { cloneSeatSnapshot, decodeKeyframePacket, applyDeltaPacket } from './decodeMatchPacket.js';
 import type { SeatWireSnapshot } from './wireTypes.js';
 import { GAME_PROTOCOL_VERSION, MAX_PACKET_BYTES } from './version.js';
 import { BinaryReader, BinaryWriter } from './binary.js';
+import { createPlayerRngChannels } from '../rng.js';
+import { makePlayer } from '../../server/puzzleEngine/engine.js';
+import { matchStep } from '../../server/puzzleEngine/matchStep.js';
+import { RulesBot } from '../../server/testHarness/rulesBot.js';
+import { defaultObservationProjector } from '../../server/testHarness/observationProjector.js';
+import { buildSeatWireSnapshot } from '../../server/sync/seatProjection.js';
+import type { GameState } from '../types.js';
 
 function emptySnapshot(seed = 42): SeatWireSnapshot {
   return {
@@ -345,5 +352,106 @@ describe('binary match packet codec', () => {
       const writer = new BinaryWriter();
       writer.writeVarint(-1);
     });
+  });
+
+  it('structural dirty checks match JSON.stringify section masks on live play', () => {
+    // Reference dirty bits: the pre-optimization JSON path. Keep this only as a
+    // correctness oracle for the allocation-free compares in encodeDeltaPacket.
+    function jsonSections(snapshot: SeatWireSnapshot, baseline: SeatWireSnapshot): number {
+      let sections = 0;
+      if (JSON.stringify(snapshot.chrome) !== JSON.stringify(baseline.chrome)) sections |= 1 << 0;
+      if (JSON.stringify(snapshot.local.board) !== JSON.stringify(baseline.local.board)) sections |= 1 << 1;
+      if (JSON.stringify(snapshot.local.poisonBoard) !== JSON.stringify(baseline.local.poisonBoard)) {
+        sections |= 1 << 2;
+      }
+      const localMetaBaseline = {
+        ...baseline.local,
+        board: [],
+        poisonBoard: [],
+        shop: null,
+        activePiece: null,
+      };
+      const localMetaSnapshot = {
+        ...snapshot.local,
+        board: [],
+        poisonBoard: [],
+        shop: null,
+        activePiece: null,
+      };
+      if (JSON.stringify(localMetaSnapshot) !== JSON.stringify(localMetaBaseline)) sections |= 1 << 3;
+      if (JSON.stringify(snapshot.local.shop) !== JSON.stringify(baseline.local.shop)) sections |= 1 << 4;
+      if (JSON.stringify(snapshot.opponent.board) !== JSON.stringify(baseline.opponent.board)) {
+        sections |= 1 << 5;
+      }
+      if (JSON.stringify(snapshot.opponent.poisonBoard) !== JSON.stringify(baseline.opponent.poisonBoard)) {
+        sections |= 1 << 7;
+      }
+      const oppMetaBaseline = { ...baseline.opponent, board: [], activePiece: null };
+      const oppMetaSnapshot = { ...snapshot.opponent, board: [], activePiece: null };
+      if (JSON.stringify(oppMetaSnapshot) !== JSON.stringify(oppMetaBaseline)) sections |= 1 << 6;
+      // Piece sections use the same field semantics as encodePieceCompact.
+      const pieceJson = (p: SeatWireSnapshot['local']['activePiece']) => JSON.stringify(p);
+      if (pieceJson(snapshot.local.activePiece) !== pieceJson(baseline.local.activePiece)) {
+        sections |= 1 << 8;
+      }
+      if (pieceJson(snapshot.opponent.activePiece) !== pieceJson(baseline.opponent.activePiece)) {
+        sections |= 1 << 9;
+      }
+      return sections;
+    }
+
+    const idA = '0f14d0ab-9605-4a62-a9e4-5ed26688389b';
+    const idB = '7c9e6679-7425-40de-944b-e07fc1f90ae7';
+    const rngChannelsByPlayer = new Map();
+    const players: GameState['players'] = {};
+    for (const [id, slot] of [[idA, 0], [idB, 1]] as const) {
+      const channels = createPlayerRngChannels(4101, slot);
+      rngChannelsByPlayer.set(id, channels);
+      players[id] = makePlayer(id, channels);
+    }
+    const gameState: GameState = {
+      players,
+      status: 'playing',
+      countdown: 0,
+      winnerId: null,
+      tick: 0,
+      seed: 4101,
+    };
+    const drivers = {
+      [idA]: new RulesBot({ mode: 'omniscient', topology: 'none', garbageEnabled: true }),
+      [idB]: new RulesBot({ mode: 'omniscient', topology: 'none', garbageEnabled: true }),
+    };
+
+    let baseline = buildSeatWireSnapshot(gameState, idA);
+    assert.ok(baseline);
+    baseline = cloneSeatSnapshot(baseline);
+    let compared = 0;
+    for (let tick = 0; tick < 900; tick += 1) {
+      for (const id of [idA, idB]) {
+        const obs = defaultObservationProjector.project(gameState, id, 'omniscient');
+        const cmd = drivers[id].next({ tick: gameState.tick, replayTick: gameState.tick, player: obs });
+        const raw = gameState.players[id];
+        if (cmd.inputState) {
+          raw.inputState = {
+            left: !!cmd.inputState.left,
+            right: !!cmd.inputState.right,
+            softDrop: !!cmd.inputState.softDrop,
+          };
+        }
+        if (cmd.actions?.length) raw.actionQueue.push(...cmd.actions);
+      }
+      const res = matchStep(gameState, rngChannelsByPlayer, { enableShop: true, enableGarbage: true });
+      const snapshot = buildSeatWireSnapshot(gameState, idA);
+      if (snapshot) {
+        const expected = jsonSections(snapshot, baseline);
+        const delta = encodeDeltaPacket(snapshot, baseline, compared + 1, 1);
+        const actual = delta === null ? 0 : new DataView(delta).getUint16(14, true);
+        assert.equal(actual, expected, `section mismatch at tick ${gameState.tick}`);
+        baseline = cloneSeatSnapshot(snapshot);
+        compared += 1;
+      }
+      if (res.matchEnded || gameState.status !== 'playing') break;
+    }
+    assert.ok(compared > 100);
   });
 });

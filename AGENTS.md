@@ -91,7 +91,7 @@ fixtures/                      # QA / internal only — NOT copied into dist/cli
 | `bun run test:all` | Runs the unit suite, then the integration suite when its test database is configured |
 | `bun run clean` | Remove build artifacts |
 
-**Two clients locally:** two browsers/tabs on the same origin.
+**Local playtest (two seats):** see [PLAYTEST.md](./PLAYTEST.md). Helium, two profiles, localhost vs 127.0.0.1, Docker Postgres. Not two tabs on the same origin.
 
 **Integration test database:** set `TEST_DATABASE_URL` to a disposable Postgres database before
 running `bun run test:integration`. Integration tests ignore the normal `DATABASE_URL`, so a

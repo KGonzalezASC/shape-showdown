@@ -3,6 +3,7 @@ import LandingShowcase from './components/LandingShowcase';
 import { GameView } from './App';
 import { BackgroundPrototype } from './components/BackgroundPrototype';
 import { ThemeProvider } from './presentation/ThemeProvider';
+import { KeyBindingsProvider } from './input/KeyBindingsProvider';
 import { GameStateProvider } from './state/GameStateProvider';
 import { DEV_TOOLS_ENABLED } from './devTools';
 import { getAppRoute, setAppRoute, type AppRoute } from './appRoute';
@@ -37,13 +38,15 @@ export const RootApp: React.FC = () => {
 
   return (
     <ThemeProvider>
-      {route === 'landing' ? (
-        <LandingShowcase onPlayGame={() => setAppRoute('game')} />
-      ) : (
-        <GameStateProvider>
-          <GameView onExitToLanding={() => setAppRoute('landing')} />
-        </GameStateProvider>
-      )}
+      <KeyBindingsProvider>
+        {route === 'landing' ? (
+          <LandingShowcase onPlayGame={() => setAppRoute('game')} />
+        ) : (
+          <GameStateProvider>
+            <GameView onExitToLanding={() => setAppRoute('landing')} />
+          </GameStateProvider>
+        )}
+      </KeyBindingsProvider>
     </ThemeProvider>
   );
 };
