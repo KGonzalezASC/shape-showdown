@@ -6,6 +6,7 @@ import { clonePlayer, type InputDriver } from '../testHarness/inputDriver.js';
 import { defaultObservationProjector } from '../testHarness/observationProjector.js';
 import type { HazardKind, PuzzleGoal, PuzzleLevel, PuzzleAttempt, TimelineEvent } from './puzzleTypes.js';
 import { assertSupportedPuzzleTimeline } from './puzzleHazards.js';
+import { pushFieldEffect } from '../../src/shop/fieldEffects.js';
 
 /**
  * Single-player puzzle session: a deterministic scenario with one player, a
@@ -72,6 +73,8 @@ function applyHazard(player: PlayerState, kind: HazardKind, params: Record<strin
     case 'freeze': {
       const until = tick + (typeof p.durationTicks === 'number' ? p.durationTicks : 600);
       player.holdFrozenUntilTick = Math.max(player.holdFrozenUntilTick ?? 0, until);
+      // Same presentation seam multiplayer uses for the hold-box frozen indicator.
+      pushFieldEffect(player, 'freeze', tick, 'Frozen', '❄️', until);
       break;
     }
     case 'magnet': {

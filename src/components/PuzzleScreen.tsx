@@ -31,6 +31,8 @@ interface PuzzleWireState {
   canHold: boolean;
   swapCutoffRow?: number;
   allowHold?: boolean;
+  holdFrozenUntilTick?: number;
+  activeEffects?: PublicPlayerState['activeEffects'];
   nextQueue: string[];
   score: number;
   linesCleared: number;
@@ -99,6 +101,8 @@ function toPublicPlayerState(snap: PuzzleWireState, myId: string): PublicPlayerS
     activePiece: snap.activePiece as PublicPlayerState['activePiece'],
     holdPiece: (snap.holdPiece ?? null) as PublicPlayerState['holdPiece'],
     canHold: allowHold && snap.canHold,
+    holdFrozenUntilTick: snap.holdFrozenUntilTick,
+    activeEffects: snap.activeEffects ?? [],
     nextQueue: (Array.isArray(snap.nextQueue) ? snap.nextQueue : []) as PublicPlayerState['nextQueue'],
     score: snap.score,
     funds: 0,
@@ -132,10 +136,8 @@ const goalLabel = (goal: PuzzleStarted['goal']): string => {
   }
 };
 
-const baselinePrimaryLabel = (benchmark?: PuzzleBenchmarkWire): string => {
-  if (!benchmark) return 'Beat baseline';
-  const verb = benchmark.direction === 'maximize' ? 'Beat' : 'Stay under';
-  return `${verb} ${benchmark.metric}`;
+const baselinePrimaryLabel = (_benchmark?: PuzzleBenchmarkWire): string => {
+  return 'Record to beat';
 };
 
 export const PuzzleScreen: React.FC = () => {

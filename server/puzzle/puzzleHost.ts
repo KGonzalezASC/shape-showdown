@@ -81,6 +81,8 @@ export interface PuzzleStateSnapshot {
   activePiece: unknown;
   holdPiece: unknown;
   canHold: boolean;
+  activeEffects?: unknown[];
+  holdFrozenUntilTick?: number;
   swapCutoffRow: number;
   allowHold: boolean;
   nextQueue: string[];
@@ -218,6 +220,8 @@ export class PuzzleHost {
       activePiece: p.activePiece,
       holdPiece: p.holdPiece,
       canHold: p.canHold,
+      activeEffects: p.activeEffects ?? [],
+      holdFrozenUntilTick: p.holdFrozenUntilTick,
       swapCutoffRow: p.swapCutoffRow,
       allowHold: this.level.allowHold ?? true,
       nextQueue: p.nextQueue.slice(0, visibleNextQueueCount(this.level.visibilityPolicy)),
