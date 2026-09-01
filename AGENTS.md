@@ -89,6 +89,7 @@ fixtures/                      # QA / internal only — NOT copied into dist/cli
 | `bun run test` | Fast unit and deterministic suite; does not require Postgres |
 | `bun run test:integration` | Postgres-backed integration suite; uses `TEST_DATABASE_URL` |
 | `bun run test:all` | Runs the unit suite, then the integration suite when its test database is configured |
+| `bun run validate:puzzles` | Emit curated-puzzle validation artifacts under `fixtures/puzzle-validation/` (RulesBot/server only) |
 | `bun run clean` | Remove build artifacts |
 
 **Local playtest (two seats):** see [PLAYTEST.md](./PLAYTEST.md). Helium, two profiles, localhost vs 127.0.0.1, Docker Postgres. Not two tabs on the same origin.
@@ -106,6 +107,7 @@ Use the smallest relevant verification command for each change. `bun run test` i
 | Markdown, docs, or comments | No tests; run `git diff --check` when useful |
 | Board model or canvas rendering | `bun run test:board` |
 | Puzzle engine | `bun run test:engine`; add `bun run test:poison` or `bun run test:shop` when those seams are touched |
+| Curated puzzle baseline / validation artifact | `bun test server/puzzle/`; `bun run validate:puzzles`; `bun run lint` |
 | Shop catalog, handlers, or rolls | `bun run test:shop`; add `bun run test:poison` for poison effects |
 | GameManager or socket contract | `bun run test:manager`; use the full suite for broad protocol changes |
 | Name-drop planner or playback | `bun run test:name-drop` |

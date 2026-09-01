@@ -60,3 +60,13 @@ A per-puzzle presentation choice controlling how much future puzzle information 
 
 ### Reference Baseline
 The recorded outcome of the best qualifying RulesBot run from a configured validation batch for a puzzle, including the final game score and supporting performance measures used for comparison. The selection metric is defined by the puzzle's scoring policy, and the baseline is distinct from the bot's internal placement heuristic scores.
+
+### RulesBot Candidate Profile
+A versioned configuration identity for one RulesBot validation candidate: profile id, policy version, observation mode, topology mode, garbage policy, and optional deterministic variation seed. Identical profile identity must reproduce the same commands and metrics.
+
+### Puzzle Benchmark Policy
+The declared metric and direction used to select a Reference Baseline from qualifying solved candidates (for example maximize score, or minimize ticks or pieces), plus optional tie-breakers. It is not hard-coded to highest score for every puzzle.
+
+### Validation Artifact
+An immutable build/staging record for one curated puzzle content hash: engine/protocol version, candidate batch outcomes, selected Reference Baseline metrics, allowed mechanics, scripted events, visibility policy placeholder, and solution references without embedding hidden solution command traces. Produced by `bun run validate:puzzles` under `fixtures/puzzle-validation/`.
+
