@@ -14,6 +14,10 @@ import {
   BoardMetricVisibility,
   PlacementPlan,
   RulesBot,
+  DEFAULT_RULES_BOT_PROFILE,
+  createRulesBotFromProfile,
+  serializeRulesBotProfileIdentity,
+  type RulesBotCandidateProfile,
 } from './rulesBot.js';
 import { Scenario } from './scenario.js';
 import { createSimpleShopPolicy, PairedRunner } from './pairedRunner.js';
@@ -876,5 +880,66 @@ describe('RulesBot Adapter & Attack Preview', () => {
 
       assert.equal(report.scenarioReport.gameState.players.p2.topOut, false);
     });
+  });
+});
+
+describe('RulesBot candidate profiles', () => {
+  it('maps new RulesBot() to the default profile identity', () => {
+    const bot = new RulesBot();
+    assert.deepEqual(bot.profile, DEFAULT_RULES_BOT_PROFILE);
+    assert.equal(bot.mode, 'omniscient');
+    assert.equal(bot.topology, 'none');
+    assert.equal(
+      serializeRulesBotProfileIdentity(bot.profile),
+      'default|v1|omniscient|topology=none|garbage=0|seed=0',
+    );
+  });
+
+  it('createRulesBotFromProfile preserves modes and serializes identity', () => {
+    const profile: RulesBotCandidateProfile = {
+      id: 'player-limited-surface',
+      policyVersion: 1,
+      observationMode: 'player-limited',
+      topology: 'surface',
+      garbageEnabled: true,
+      variationSeed: 7,
+    };
+    const bot = createRulesBotFromProfile(profile);
+    assert.equal(bot.mode, 'player-limited');
+    assert.equal(bot.topology, 'surface');
+    assert.deepEqual(bot.profile, profile);
+    assert.equal(
+      serializeRulesBotProfileIdentity(profile),
+      'player-limited-surface|v1|player-limited|topology=surface|garbage=1|seed=7',
+    );
+  });
+
+  it('loose options without a profile get an ephemeral identity', () => {
+    const bot = new RulesBot({ mode: 'player-limited', garbageEnabled: true });
+    assert.equal(bot.profile.id, 'ephemeral');
+    assert.equal(bot.profile.observationMode, 'player-limited');
+    assert.equal(bot.profile.garbageEnabled, true);
+    assert.equal(bot.profile.policyVersion, 1);
+  });
+
+  it('profile option wins over conflicting loose mode fields', () => {
+    const profile: RulesBotCandidateProfile = {
+      id: 'override',
+      policyVersion: 2,
+      observationMode: 'player-limited',
+      topology: 'surface',
+      garbageEnabled: true,
+      variationSeed: 1,
+    };
+    const bot = new RulesBot({
+      mode: 'omniscient',
+      topology: 'none',
+      garbageEnabled: false,
+      profile,
+    });
+    assert.equal(bot.mode, 'player-limited');
+    assert.equal(bot.topology, 'surface');
+    assert.equal(bot.profile.id, 'override');
+    assert.equal(bot.profile.policyVersion, 2);
   });
 });

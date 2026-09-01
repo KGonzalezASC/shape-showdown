@@ -30,6 +30,96 @@ export interface RulesBotOptions {
   topology?: RulesBotTopologyMode;
   /** Match rule known to both players; used to select Curtain recovery policy. */
   garbageEnabled?: boolean;
+  /**
+   * Versioned candidate identity. When set, observation/topology/garbage come from
+   * the profile (not the loose option fields).
+   */
+  profile?: RulesBotCandidateProfile;
+}
+
+/**
+ * Versioned RulesBot candidate used for curated-puzzle baseline batches.
+ * Identity must be rich enough to reproduce the run exactly later.
+ */
+export interface RulesBotCandidateProfile {
+  /** Stable profile id recorded in validation artifacts. */
+  id: string;
+  /** Schema/policy version for this profile shape. */
+  policyVersion: number;
+  observationMode: ObservationMode;
+  topology: RulesBotTopologyMode;
+  garbageEnabled: boolean;
+  /**
+   * Deterministic variation identity. Same puzzle + profile + seed must reproduce.
+   * Unused by heuristics until a profile deliberately varies behavior.
+   */
+  variationSeed?: number;
+}
+
+/** Matches historical `new RulesBot()` defaults. */
+export const DEFAULT_RULES_BOT_PROFILE: RulesBotCandidateProfile = {
+  id: 'default',
+  policyVersion: 1,
+  observationMode: 'omniscient',
+  topology: 'none',
+  garbageEnabled: false,
+  variationSeed: 0,
+};
+
+export function rulesBotOptionsFromProfile(
+  profile: RulesBotCandidateProfile,
+): RulesBotOptions {
+  return {
+    mode: profile.observationMode,
+    topology: profile.topology,
+    garbageEnabled: profile.garbageEnabled,
+    profile,
+  };
+}
+
+export function createRulesBotFromProfile(
+  profile: RulesBotCandidateProfile,
+): RulesBot {
+  return new RulesBot(rulesBotOptionsFromProfile(profile));
+}
+
+/** Compact reproducible identity for validation artifacts. */
+export function serializeRulesBotProfileIdentity(
+  profile: RulesBotCandidateProfile,
+): string {
+  const seed = profile.variationSeed ?? 0;
+  return [
+    profile.id,
+    `v${profile.policyVersion}`,
+    profile.observationMode,
+    `topology=${profile.topology}`,
+    `garbage=${profile.garbageEnabled ? 1 : 0}`,
+    `seed=${seed}`,
+  ].join('|');
+}
+
+function resolveRulesBotProfile(
+  options: RulesBotOptions | undefined,
+  mode: ObservationMode,
+  topology: RulesBotTopologyMode,
+  garbageEnabled: boolean,
+): RulesBotCandidateProfile {
+  if (options?.profile) return options.profile;
+  if (
+    mode === DEFAULT_RULES_BOT_PROFILE.observationMode &&
+    topology === DEFAULT_RULES_BOT_PROFILE.topology &&
+    garbageEnabled === DEFAULT_RULES_BOT_PROFILE.garbageEnabled
+  ) {
+    return DEFAULT_RULES_BOT_PROFILE;
+  }
+  return {
+    id: 'ephemeral',
+    policyVersion: 1,
+    observationMode: mode,
+    topology,
+    garbageEnabled,
+    variationSeed: 0,
+  };
 }
 
 export interface PlacementPlan {
@@ -668,6 +758,8 @@ export class RulesBot implements InputDriver {
   public readonly mode: ObservationMode;
   public readonly observationMode: ObservationMode;
   public readonly topology: RulesBotTopologyMode;
+  /** Candidate profile identity for baseline validation / reproducibility. */
+  public readonly profile: RulesBotCandidateProfile;
   public lastDecisionTrace: BotDecisionTrace | null = null;
 
   private currentPlan: PlacementPlan | null = null;
@@ -689,10 +781,17 @@ export class RulesBot implements InputDriver {
   private readonly garbageEnabled: boolean;
 
   constructor(options?: RulesBotOptions) {
-    this.mode = options?.mode ?? 'omniscient';
+    const profile = options?.profile;
+    this.mode = profile?.observationMode ?? options?.mode ?? 'omniscient';
     this.observationMode = this.mode;
-    this.topology = options?.topology ?? 'none';
-    this.garbageEnabled = options?.garbageEnabled ?? false;
+    this.topology = profile?.topology ?? options?.topology ?? 'none';
+    this.garbageEnabled = profile?.garbageEnabled ?? options?.garbageEnabled ?? false;
+    this.profile = resolveRulesBotProfile(
+      options,
+      this.mode,
+      this.topology,
+      this.garbageEnabled,
+    );
   }
 
   public next(observation: DriverObservation): PlayerCommand {
