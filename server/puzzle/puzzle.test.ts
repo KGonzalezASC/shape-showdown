@@ -128,6 +128,8 @@ describe('puzzleSession', () => {
     assert.deepEqual(a.commandRecords, b.commandRecords);
     assert.equal(a.ticksUsed, b.ticksUsed);
     assert.equal(a.piecesUsed, b.piecesUsed);
+    assert.equal(a.score, b.score);
+    assert.equal(typeof a.score, 'number');
     assert.equal(a.solved, b.solved);
   });
 

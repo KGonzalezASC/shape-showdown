@@ -64,7 +64,32 @@ export interface PuzzleLevel {
   allowHold?: boolean;
   /** Par values for star thresholds (optional in v1). */
   par?: { pieces?: number; ticks?: number };
+  /**
+   * How Reference Baseline selection compares qualifying solved runs.
+   * Omit to use DEFAULT_PUZZLE_BENCHMARK (maximize engine score).
+   */
+  benchmark?: PuzzleBenchmarkPolicy;
 }
+
+/** Metric used when selecting a Reference Baseline from a candidate batch. */
+export type PuzzleBenchmarkMetric = 'score' | 'ticks' | 'pieces';
+
+/** Declared comparison policy for a puzzle's Reference Baseline. */
+export interface PuzzleBenchmarkPolicy {
+  metric: PuzzleBenchmarkMetric;
+  direction: 'maximize' | 'minimize';
+  tieBreakers?: Array<{ metric: PuzzleBenchmarkMetric; direction: 'maximize' | 'minimize' }>;
+}
+
+/** Default when a level omits `benchmark`: maximize final PlayerState.score. */
+export const DEFAULT_PUZZLE_BENCHMARK: PuzzleBenchmarkPolicy = {
+  metric: 'score',
+  direction: 'maximize',
+  tieBreakers: [
+    { metric: 'ticks', direction: 'minimize' },
+    { metric: 'pieces', direction: 'minimize' },
+  ],
+};
 
 /** A derived reference solution: the RulesBot's play of the level. */
 export interface PuzzleSolution {
@@ -77,6 +102,8 @@ export interface PuzzleSolution {
   ticksUsed?: number;
   /** Piece locks the bot used (set when solved). */
   piecesUsed?: number;
+  /** Final authoritative PlayerState.score from the engine (not heuristic). */
+  score: number;
 }
 
 /** Outcome of one attempt at a puzzle level. */
@@ -92,4 +119,6 @@ export interface PuzzleAttempt {
   linesCleared: number;
   /** Perfect clear reached (for perfect-clear goals). */
   perfectClear: boolean;
+  /** Final authoritative PlayerState.score from the engine (not heuristic). */
+  score: number;
 }

@@ -307,6 +307,7 @@ export class PuzzleSession {
       topOut: this.topOut,
       linesCleared: player.linesCleared,
       perfectClear,
+      score: player.score,
       seed: this.gameState.seed,
       finalTick: this.gameState.tick,
       events: [...this.events],

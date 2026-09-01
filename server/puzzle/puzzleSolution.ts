@@ -29,5 +29,6 @@ export function derivePuzzleSolution(
     solved: report.solved,
     ticksUsed: report.ticksUsed,
     piecesUsed: report.piecesUsed,
+    score: report.score,
   };
 }

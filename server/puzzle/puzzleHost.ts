@@ -185,6 +185,7 @@ export class PuzzleHost {
         piecesUsed: report.piecesUsed,
         linesCleared: report.linesCleared,
         perfectClear: report.perfectClear,
+        score: report.score,
       });
       this.stop();
     }
