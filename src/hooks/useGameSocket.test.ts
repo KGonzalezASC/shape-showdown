@@ -4,6 +4,7 @@ import {
   gameConfigUrl,
   isProtocolMismatchError,
   isRetryableTicketConnectError,
+  resolveGameServerUrl,
 } from './useGameSocket';
 
 describe('game client request routing', () => {
@@ -12,6 +13,34 @@ describe('game client request routing', () => {
       gameConfigUrl('https://main.shape-showdown.pages.dev/game/'),
       'https://main.shape-showdown.pages.dev/game-config.json',
     );
+  });
+
+  it('uses the configured game server when the page is hosted separately', async () => {
+    const originalWindow = globalThis.window;
+    const originalFetch = globalThis.fetch;
+    (globalThis as { window: unknown }).window = {
+      location: {
+        origin: 'https://shape-showdown.pages.dev',
+        hostname: 'shape-showdown.pages.dev',
+        protocol: 'https:',
+      },
+    };
+    globalThis.fetch = (async () => new Response(JSON.stringify({
+      gameServerUrl: 'https://shape-showdown-production.up.railway.app',
+    }), {
+      status: 200,
+      headers: { 'content-type': 'application/json' },
+    })) as typeof fetch;
+
+    try {
+      assert.equal(
+        await resolveGameServerUrl(),
+        'https://shape-showdown-production.up.railway.app',
+      );
+    } finally {
+      (globalThis as { window: unknown }).window = originalWindow;
+      globalThis.fetch = originalFetch;
+    }
   });
 });
 

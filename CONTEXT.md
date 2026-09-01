@@ -28,3 +28,35 @@ Aggregated time-axis visualization with one row per misstep category, where colo
 
 ### Small Multiples Seed Matrix
 Expandable per-seed horizontal timeline strips (one per benchmark seed) with pressure-gradient coloring and misstep markers. Used as drill-down beneath the Emergent Hotspot Heatmap to identify which specific seeds contributed to an aggregate hotspot.
+
+## Curated Puzzle Library
+
+### Curated Puzzle
+A deliberately authored and published challenge with a stable identity, defined objective, intended mechanics, and a recorded validation state. A curated puzzle is distinct from an arbitrary procedural run.
+
+### Daily Challenge
+A puzzle instance selected by calendar date from the published puzzle content. All players receive the same content, rules, and scoring inputs for that day.
+
+### Puzzle Attempt
+One playthrough of a puzzle. Attempts may be repeated without changing the identity or definition of the underlying puzzle.
+
+### Intended Solution
+A canonical route that demonstrates how the author expects the puzzle objective to be achieved. It is guidance and a baseline, not automatically the only valid solution.
+
+### Solution Alternative
+A distinct route that also satisfies the puzzle objective and its allowed mechanics. Alternatives may differ in placement order, timing, or resource use while remaining valid.
+
+### Star Threshold
+A measurable performance target used to award a puzzle rating, such as piece count, elapsed ticks, score, or another puzzle-specific criterion.
+
+### Allowed Mechanics
+The explicit set of game actions or systems a puzzle permits, requires, or excludes, including hold, powerups, shop interactions, and hazard responses.
+
+### Validation Status
+The recorded content-quality state of a puzzle: which mechanical, solver, and human-play checks have passed, and whether the puzzle is eligible for publication.
+
+### Puzzle Visibility Policy
+A per-puzzle presentation choice controlling how much future puzzle information is revealed to the player, including solution steps and scheduled hazards. Visibility does not alter the puzzle outcome and is not a security boundary.
+
+### Reference Baseline
+The recorded outcome of the best qualifying RulesBot run from a configured validation batch for a puzzle, including the final game score and supporting performance measures used for comparison. The selection metric is defined by the puzzle's scoring policy, and the baseline is distinct from the bot's internal placement heuristic scores.

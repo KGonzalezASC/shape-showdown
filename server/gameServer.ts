@@ -20,6 +20,7 @@ import { QueueStore } from './controlPlane/queueLobbyStore.js';
 import type { SocketSeatBinding } from './GameManager.js';
 import { loadServerConfig, type ServerConfig } from './loadConfig.js';
 import { MatchRegistry } from './matchRuntime/MatchRegistry.js';
+import { PuzzleHost } from './puzzle/puzzleHost.js';
 import { logError, logInfo } from './observability/logger.js';
 import { initialSeed } from './puzzleEngine/engine.js';
 import { GAME_PROTOCOL_VERSION } from '../src/protocol/version.js';
@@ -209,6 +210,32 @@ export async function startGameServer(
     config.recoveryVoidTimeoutMs,
   );
   io.on('connection', (socket) => {
+    // Single-player puzzle sessions: one host per socket, lazily created.
+    const puzzleHost = new PuzzleHost(socket);
+    socket.on('puzzle:start', (payload?: { seed?: number; level?: string }) => {
+      try {
+        puzzleHost.start(payload);
+      } catch (error) {
+        logError('puzzle_start_failed', error);
+        socket.emit('puzzle:error', { message: 'failed to start puzzle session' });
+      }
+    });
+    socket.on('puzzle:input', (input: { left?: boolean; right?: boolean; softDrop?: boolean }) => {
+      puzzleHost.setInput(input ?? {});
+    });
+    socket.on('puzzle:action', (action: string) => {
+      if (['rotateCW', 'rotateCCW', 'hardDrop', 'hold'].includes(action)) {
+        puzzleHost.pushAction(action as never);
+      }
+    });
+    socket.on('puzzle:stop', () => puzzleHost.stop());
+    socket.on('disconnect', () => puzzleHost.stop());
+
+    const purpose = readAuthString(socket.handshake.auth, 'purpose');
+    if (purpose === 'puzzle') {
+      return;
+    }
+
     void resolveDurablePlayerId(socket, playerStore)
       .then((durablePlayerId) => {
         if (!socket.connected) return;
@@ -345,6 +372,11 @@ async function authorizeSocket(
   matches: MatchStore,
   requireMatchTickets: boolean,
 ): Promise<void> {
+  const purpose = readAuthString(socket.handshake.auth, 'purpose');
+  if (purpose === 'puzzle') {
+    return;
+  }
+
   const ticket = readAuthString(socket.handshake.auth, 'ticket');
   if (ticket === null) {
     if (requireMatchTickets) {

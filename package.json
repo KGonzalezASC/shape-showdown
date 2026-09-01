@@ -39,6 +39,7 @@
     "start:serve-client": "cross-env NODE_ENV=production SERVE_CLIENT=true bun --smol dist-server/server.mjs"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.1121.0",
     "@discord/embedded-app-sdk": "^2.5.0",
     "dotenv": "^17.2.3",
     "express": "^4.21.2",

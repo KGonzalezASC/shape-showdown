@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import LandingShowcase from './components/LandingShowcase';
+import { PuzzleScreen } from './components/PuzzleScreen';
 import { GameView } from './App';
 import { BackgroundPrototype } from './components/BackgroundPrototype';
 import { ThemeProvider } from './presentation/ThemeProvider';
@@ -40,7 +41,9 @@ export const RootApp: React.FC = () => {
     <ThemeProvider>
       <KeyBindingsProvider>
         {route === 'landing' ? (
-          <LandingShowcase onPlayGame={() => setAppRoute('game')} />
+          <LandingShowcase onPlayGame={() => setAppRoute('puzzles')} />
+        ) : route === 'puzzles' ? (
+          <PuzzleScreen />
         ) : (
           <GameStateProvider>
             <GameView onExitToLanding={() => setAppRoute('landing')} />

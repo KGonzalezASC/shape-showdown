@@ -1,5 +1,5 @@
 import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { HelpCircle, Keyboard, Play, X } from 'lucide-react';
+import { HelpCircle, Keyboard, Play, Puzzle, X } from 'lucide-react';
 import { useSetThemeId, useThemePackage } from '../presentation/ThemeProvider';
 import { THEME_IDS, type ThemeId } from '../presentation/themePackage';
 import { isDiscordActivityContext, openExternalUrl } from '../discordContext';
@@ -539,6 +539,22 @@ const LandingShowcase: React.FC<LandingShowcaseProps> = ({ onPlayGame }) => {
             >
               <Play className="h-3.5 w-3.5 fill-current sm:h-4 sm:w-4" />
               <span>Play Game</span>
+            </a>
+
+            <a
+              href="#puzzles"
+              onClick={(e) => {
+                e.preventDefault();
+                setAppRoute('puzzles');
+              }}
+              style={{
+                backgroundColor: activeOption.accent,
+                boxShadow: `0 0 24px ${activeOption.accent}33`,
+              }}
+              className="inline-flex h-10 shrink-0 whitespace-nowrap items-center justify-center gap-1.5 rounded-xl px-4 text-[9px] font-black uppercase tracking-wider text-[#07110d] transition-all hover:brightness-110 active:scale-[0.98] sm:h-12 sm:gap-2 sm:px-8 sm:text-xs"
+            >
+              <Puzzle className="h-3.5 w-3.5 fill-current sm:h-4 sm:w-4" />
+              <span>Puzzles</span>
             </a>
 
             <button

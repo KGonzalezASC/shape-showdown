@@ -38,6 +38,8 @@ import type {
 } from './controlPlane/matchResultStore.js';
 import { GAME_PROTOCOL_VERSION } from '../src/protocol/version.js';
 import { encodeReplayFile } from '../src/replayCodec.js';
+import { getDefaultR2ReplayStore } from './storage/r2ReplayStore.js';
+import { isRecordingActive, onRecordingToggleChange } from './controlPlane/recordingControl.js';
 import { MatchPacketSync } from './sync/MatchPacketSync.js';
 import { DISCONNECT_SEAT_LEASE_MS } from '../src/constants.js';
 
@@ -90,7 +92,8 @@ export class GameManager {
   private pendingCheckpoint: PendingCheckpoint | null = null;
   private coalescedCheckpointCount = 0;
   private terminalNotified = false;
-  private pendingSaveReplayPromise: Promise<number> | null = null;
+  private pendingSaveReplayPromise: Promise<void> | null = null;
+  private readonly unsubscribeRecordingToggle?: () => void;
 
   public async flushPendingReplaySaveForTests(): Promise<void> {
     if (this.pendingSaveReplayPromise !== null) {
@@ -115,6 +118,13 @@ export class GameManager {
     this.onTerminal = onTerminal;
     this.disconnectLeaseMs = Math.max(1, Math.floor(disconnectLeaseMs));
     this.replayKeyframeIntervalTicks = Math.max(1, Math.floor(replayKeyframeIntervalTicks));
+
+    this.unsubscribeRecordingToggle = onRecordingToggleChange((active) => {
+      if (!active) {
+        this.activeReplay = null;
+        this.pendingReplayDiscontinuities = [];
+      }
+    });
 
     // Decouple the network broadcast rate from the 60Hz simulation. Emitting
     // full state 60x/sec is brutal on phones (radio wake-ups, JSON.parse,
@@ -155,6 +165,7 @@ export class GameManager {
 
   /** Test / shutdown hook — stops the 60Hz interval. */
   public stopLoop() {
+    this.unsubscribeRecordingToggle?.();
     this.clearAllDisconnectForfeitures();
     this.clearAllocationRendezvousTimer();
     this.enqueueCheckpoint();
@@ -170,6 +181,7 @@ export class GameManager {
   }
 
   public dispose(): void {
+    this.unsubscribeRecordingToggle?.();
     this.clearAllDisconnectForfeitures();
     this.clearAllocationRendezvousTimer();
     if (this.loopHandle !== null) {
@@ -1246,25 +1258,29 @@ export class GameManager {
         this.gameState.status = 'playing';
         this.gameState.tick = 0;
         this.resetMatchRngChannels();
-        this.activeReplay = {
-          version: 2,
-          date: replayDateLabel(),
-          seed: this.gameState.seed,
-          pricingPolicyVersion: PRICING_POLICY_VERSION,
-          playerSlots: Object.fromEntries(this.playerSlots.entries()),
-          keyframeIntervalTicks: this.replayKeyframeIntervalTicks,
-          discontinuities: [...this.pendingReplayDiscontinuities],
-          initialState: structuredClone(this.gameState),
-          inputs: [],
-          keyframes: [
-            {
-              tick: 0,
-              players: structuredClone(this.gameState.players),
-              rng: this.clonePlayerRngChannels(),
-            },
-          ],
-          events: []
-        };
+        if (isRecordingActive()) {
+          this.activeReplay = {
+            version: 2,
+            date: replayDateLabel(),
+            seed: this.gameState.seed,
+            pricingPolicyVersion: PRICING_POLICY_VERSION,
+            playerSlots: Object.fromEntries(this.playerSlots.entries()),
+            keyframeIntervalTicks: this.replayKeyframeIntervalTicks,
+            discontinuities: [...this.pendingReplayDiscontinuities],
+            initialState: structuredClone(this.gameState),
+            inputs: [],
+            keyframes: [
+              {
+                tick: 0,
+                players: structuredClone(this.gameState.players),
+                rng: this.clonePlayerRngChannels(),
+              },
+            ],
+            events: [],
+          };
+        } else {
+          this.activeReplay = null;
+        }
         this.pendingReplayDiscontinuities = [];
       }
     } else if (this.gameState.status === 'playing') {
@@ -1371,32 +1387,68 @@ export class GameManager {
 
   private saveReplay(): void {
     if (!this.activeReplay) return;
+    const r2Store = getDefaultR2ReplayStore();
+    const isR2Enabled = r2Store.isConfigured();
     const rawReplaysDir = process.env.REPLAYS_DIR?.trim();
-    if (!rawReplaysDir || rawReplaysDir === 'none' || rawReplaysDir === 'disabled') {
+    const isLocalEnabled = Boolean(rawReplaysDir && rawReplaysDir !== 'none' && rawReplaysDir !== 'disabled');
+
+    if (!isR2Enabled && !isLocalEnabled) {
       this.activeReplay = null;
       return;
     }
-    const replaysDir = path.resolve(rawReplaysDir);
+
     const filename = `replay_${this.activeReplay.date}.replay`;
     const replay = this.activeReplay;
+    const durableMatchId = this.durableMatchId;
     this.activeReplay = null;
 
-    // Encode (stringify + gzip) and write on the async save path, off the
-    // 60 Hz tick. The file on disk is gzip-compressed JSON; readers sniff the
+    // Encode (stringify + gzip) and write/upload on the async save path, off the
+    // 60 Hz tick. The payload is gzip-compressed JSON; readers sniff the
     // gzip magic via decodeReplayFile.
     this.pendingSaveReplayPromise = encodeReplayFile(replay)
-      .then((bytes) => Bun.write(
-        path.join(replaysDir, filename),
-        bytes,
-        { createPath: true },
-      ))
+      .then(async (bytes) => {
+        const tasks: Promise<unknown>[] = [];
+
+        if (isLocalEnabled && rawReplaysDir) {
+          const replaysDir = path.resolve(rawReplaysDir);
+          tasks.push(
+            Bun.write(
+              path.join(replaysDir, filename),
+              bytes,
+              { createPath: true },
+            ).catch((err: unknown) => {
+              logError('local_replay_save_failed', err, { filename });
+              return 0;
+            }),
+          );
+        }
+
+        if (isR2Enabled) {
+          const metadata: Record<string, string> = {
+            date: replay.date,
+            seed: String(replay.seed),
+            version: String(replay.version),
+          };
+          if (durableMatchId) {
+            metadata.matchId = durableMatchId;
+          }
+          tasks.push(
+            r2Store.uploadReplay(filename, bytes, metadata).catch((err: unknown) => {
+              logError('r2_replay_upload_failed', err, { filename });
+              return { success: false, key: filename, bucket: '' };
+            }),
+          );
+        }
+
+        await Promise.all(tasks);
+      })
       .catch((err: unknown) => {
-        console.error('Failed to save replay:', err);
-        return 0;
+        logError('encode_replay_failed', err, { filename });
       });
   }
 
   private recordReplayDiscontinuity(marker: ReplayDiscontinuity): void {
+    if (!isRecordingActive()) return;
     if (this.activeReplay === null) {
       this.pendingReplayDiscontinuities.push(marker);
       return;

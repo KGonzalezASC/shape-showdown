@@ -22,6 +22,7 @@ import {
   PlayerStore,
   type ValidatedSession,
 } from './playerStore.js';
+import { isRecordingActive, setRecordingActive } from './recordingControl.js';
 
 type RouteHandler = (
   request: Request,
@@ -495,6 +496,35 @@ export function createControlPlaneRouter(
     }),
   );
 
+  router.get(
+    '/admin/recording',
+    asyncHandler(async (request, response) => {
+      if (!authenticateAdmin(request)) {
+        sendClientError(response, 401, 'admin authorization required');
+        return;
+      }
+      response.status(200).json({ enabled: isRecordingActive() });
+    }),
+  );
+
+  router.post(
+    '/admin/recording',
+    asyncHandler(async (request, response) => {
+      if (!authenticateAdmin(request)) {
+        sendClientError(response, 401, 'admin authorization required');
+        return;
+      }
+
+      if (!isRecord(request.body) || typeof request.body.enabled !== 'boolean') {
+        sendClientError(response, 400, 'enabled boolean field is required');
+        return;
+      }
+
+      setRecordingActive(request.body.enabled);
+      response.status(200).json({ enabled: isRecordingActive() });
+    }),
+  );
+
   return router;
 }
 
@@ -504,6 +534,19 @@ async function authenticate(
 ): Promise<ValidatedSession | null> {
   const rawToken = readBearerToken(request);
   return rawToken === null ? null : players.validateSession(hashSecret(rawToken));
+}
+
+function authenticateAdmin(request: Request): boolean {
+  const adminSecret = process.env.ADMIN_SECRET?.trim();
+  if (!adminSecret) return false;
+
+  const headerSecret = request.header('x-admin-secret')?.trim();
+  if (headerSecret === adminSecret) return true;
+
+  const bearerSecret = readBearerToken(request);
+  if (bearerSecret === adminSecret) return true;
+
+  return false;
 }
 
 function readBearerToken(request: Request): string | null {

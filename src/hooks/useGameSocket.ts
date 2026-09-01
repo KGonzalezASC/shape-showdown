@@ -101,7 +101,7 @@ function parseEnvPort(raw: string | undefined): number | null {
  * 4) VITE_GAME_SERVER_PORT (+ optional VITE_GAME_SERVER_HOST)
  * 5) window.location.origin
  */
-async function resolveGameServerUrl(): Promise<string> {
+export async function resolveGameServerUrl(): Promise<string> {
   const localDevelopmentUrl = localDevelopmentGameServerUrl(
     window.location.origin,
     window.location.hostname,

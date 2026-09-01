@@ -11,6 +11,9 @@ import { decodeKeyframePacket } from '../src/protocol/decodeMatchPacket.js';
 import { ClientPacketDecoder } from '../src/protocol/ClientPacketDecoder.js';
 import { GAME_PROTOCOL_VERSION } from '../src/protocol/version.js';
 import { decodeReplayFile } from '../src/replayCodec.js';
+import { R2ReplayStore, setDefaultR2ReplayStoreForTests } from './storage/r2ReplayStore.js';
+import { resetRecordingControlForTests, setRecordingActive } from './controlPlane/recordingControl.js';
+import type { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
 import { makePlayer } from './puzzleEngine/engine.js';
 import { createPlayerRngChannels } from '../src/rng.js';
 import type { Server, Socket } from 'socket.io';
@@ -146,6 +149,8 @@ async function flushPromises(): Promise<void> {
 const managers: GameManager[] = [];
 
 afterEach(() => {
+  setDefaultR2ReplayStoreForTests(null);
+  resetRecordingControlForTests(true);
   while (managers.length > 0) {
     managers.pop()!.stopLoop();
   }
@@ -1246,6 +1251,193 @@ describe('GameManager lifecycle harness', () => {
       if (previousReplayDir !== undefined) process.env.REPLAYS_DIR = previousReplayDir;
       else delete process.env.REPLAYS_DIR;
     }
+  });
+
+  it('uploads compressed replay to R2 when R2 is configured', async () => {
+    let uploadedKey: string | null = null;
+    let uploadedBody: Uint8Array | null = null;
+    let uploadedMetadata: Record<string, string> | undefined;
+
+    const fakeClient = {
+      send: async (command: PutObjectCommand) => {
+        uploadedKey = command.input.Key as string;
+        uploadedBody = command.input.Body as Uint8Array;
+        uploadedMetadata = command.input.Metadata;
+        return {};
+      },
+    } as unknown as S3Client;
+
+    const store = new R2ReplayStore({
+      bucketName: 'shape-showdown-production-replays',
+      endpoint: 'https://test.r2.cloudflarestorage.com',
+      accessKeyId: 'test-key',
+      secretAccessKey: 'test-secret',
+    }, fakeClient);
+    setDefaultR2ReplayStoreForTests(store);
+
+    const previousReplayDir = process.env.REPLAYS_DIR;
+    delete process.env.REPLAYS_DIR;
+
+    try {
+      const gm = new GameManager(createFakeIo(), 60);
+      managers.push(gm);
+      gm.handleConnection(new FakeSocket('p1') as unknown as Socket);
+      gm.handleConnection(new FakeSocket('p2') as unknown as Socket);
+
+      const internal = gm as unknown as {
+        gameState: GameState;
+        lastHandledStatus: string;
+        activeReplay: ReplayDataV2 | null;
+        durableMatchId: string | null;
+      };
+      internal.gameState.status = 'playing';
+      internal.lastHandledStatus = 'playing';
+      internal.gameState.tick = 0;
+      internal.durableMatchId = 'durable-match-456';
+
+      const p1 = internal.gameState.players.p1;
+      p1.activePiece = null;
+      for (let y = 0; y < 2; y += 1) {
+        for (let x = 0; x < BOARD_COLS; x += 1) p1.board[y][x] = 'I';
+      }
+      internal.activeReplay = {
+        version: 2,
+        date: 'r2-upload-test',
+        seed: 999,
+        initialState: structuredClone(internal.gameState),
+        inputs: [],
+        keyframes: [{
+          tick: 0,
+          players: structuredClone(internal.gameState.players),
+        }],
+        events: [],
+      };
+
+      gm.tickOnceForTests();
+      await gm.flushPendingReplaySaveForTests();
+
+      assert.equal(internal.activeReplay, null);
+      assert.equal(uploadedKey, 'replays/replay_r2-upload-test.replay');
+      assert.ok(uploadedBody);
+      const decoded = await decodeReplayFile(uploadedBody) as ReplayDataV2;
+      assert.equal(decoded.seed, 999);
+      assert.equal(decoded.date, 'r2-upload-test');
+      assert.equal(uploadedMetadata?.matchId, 'durable-match-456');
+    } finally {
+      if (previousReplayDir !== undefined) process.env.REPLAYS_DIR = previousReplayDir;
+      else delete process.env.REPLAYS_DIR;
+    }
+  });
+
+  it('isolates R2 upload errors without affecting match outcome or crashing simulation', async () => {
+    const errorClient = {
+      send: async () => {
+        throw new Error('R2 Network Timeout');
+      },
+    } as unknown as S3Client;
+
+    const store = new R2ReplayStore({
+      bucketName: 'shape-showdown-production-replays',
+      endpoint: 'https://test.r2.cloudflarestorage.com',
+      accessKeyId: 'test-key',
+      secretAccessKey: 'test-secret',
+    }, errorClient);
+    setDefaultR2ReplayStoreForTests(store);
+
+    const previousReplayDir = process.env.REPLAYS_DIR;
+    delete process.env.REPLAYS_DIR;
+
+    try {
+      const gm = new GameManager(createFakeIo(), 60);
+      managers.push(gm);
+      gm.handleConnection(new FakeSocket('p1') as unknown as Socket);
+      gm.handleConnection(new FakeSocket('p2') as unknown as Socket);
+
+      const internal = gm as unknown as {
+        gameState: GameState;
+        lastHandledStatus: string;
+        activeReplay: ReplayDataV2 | null;
+      };
+      internal.gameState.status = 'playing';
+      internal.lastHandledStatus = 'playing';
+      internal.gameState.tick = 0;
+
+      const p1 = internal.gameState.players.p1;
+      p1.activePiece = null;
+      for (let y = 0; y < 2; y += 1) {
+        for (let x = 0; x < BOARD_COLS; x += 1) p1.board[y][x] = 'I';
+      }
+      internal.activeReplay = {
+        version: 2,
+        date: 'r2-error-test',
+        seed: 123,
+        initialState: structuredClone(internal.gameState),
+        inputs: [],
+        keyframes: [{
+          tick: 0,
+          players: structuredClone(internal.gameState.players),
+        }],
+        events: [],
+      };
+
+      // Ensure tick and replay flush complete without throwing
+      gm.tickOnceForTests();
+      await gm.flushPendingReplaySaveForTests();
+
+      assert.equal(internal.activeReplay, null);
+      const postTickStatus = internal.gameState.status as string;
+      assert.ok(postTickStatus === 'countdown' || postTickStatus === 'ended');
+    } finally {
+      if (previousReplayDir !== undefined) process.env.REPLAYS_DIR = previousReplayDir;
+      else delete process.env.REPLAYS_DIR;
+    }
+  });
+
+  it('does not allocate activeReplay when recording is toggled off', () => {
+    setRecordingActive(false);
+
+    const gm = new GameManager(createFakeIo(), 60);
+    managers.push(gm);
+    gm.handleConnection(new FakeSocket('p1') as unknown as Socket);
+    gm.handleConnection(new FakeSocket('p2') as unknown as Socket);
+
+    const internal = gm as unknown as {
+      gameState: GameState;
+      activeReplay: ReplayDataV2 | null;
+    };
+    internal.gameState.status = 'countdown';
+    internal.gameState.countdown = 0;
+
+    gm.tickOnceForTests();
+
+    assert.equal(internal.gameState.status, 'playing');
+    assert.equal(internal.activeReplay, null);
+  });
+
+  it('immediately frees activeReplay when recording is toggled off mid-match', () => {
+    setRecordingActive(true);
+
+    const gm = new GameManager(createFakeIo(), 60);
+    managers.push(gm);
+    gm.handleConnection(new FakeSocket('p1') as unknown as Socket);
+    gm.handleConnection(new FakeSocket('p2') as unknown as Socket);
+
+    const internal = gm as unknown as {
+      gameState: GameState;
+      activeReplay: ReplayDataV2 | null;
+    };
+    internal.gameState.status = 'countdown';
+    internal.gameState.countdown = 0;
+
+    gm.tickOnceForTests();
+
+    assert.equal(internal.gameState.status, 'playing');
+    assert.ok(internal.activeReplay !== null);
+
+    // Dynamic toggle OFF mid-match
+    setRecordingActive(false);
+
+    assert.equal(internal.activeReplay, null);
   });
 
   it('derives player RNG channels from match seed and player slot, not socket id', () => {

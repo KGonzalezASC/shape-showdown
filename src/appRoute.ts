@@ -1,4 +1,4 @@
-export type AppRoute = 'landing' | 'game';
+export type AppRoute = 'landing' | 'game' | 'puzzles';
 
 function stripTrailingSlash(pathname: string): string {
   if (pathname === '/') return pathname;
@@ -19,6 +19,7 @@ function toLandingPathname(pathname: string): string {
 function routeFromLocation(pathname: string, hash: string): AppRoute {
   const normalizedHash = hash.toLowerCase().replace(/^#\/?/, '');
   if (normalizedHash === 'game' || normalizedHash === 'play') return 'game';
+  if (normalizedHash === 'puzzles' || normalizedHash === 'puzzle') return 'puzzles';
   if (isLegacyGamePathname(pathname)) return 'game';
   return 'landing';
 }
@@ -45,6 +46,8 @@ export function setAppRoute(route: AppRoute): void {
   const url = new URL(window.location.href);
   if (route === 'game') {
     url.hash = 'game';
+  } else if (route === 'puzzles') {
+    url.hash = 'puzzles';
   } else {
     url.hash = '';
     if (isLegacyGamePathname(url.pathname)) {
