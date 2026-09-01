@@ -212,7 +212,7 @@ export async function startGameServer(
   io.on('connection', (socket) => {
     // Single-player puzzle sessions: one host per socket, lazily created.
     const puzzleHost = new PuzzleHost(socket);
-    socket.on('puzzle:start', (payload?: { seed?: number; level?: string }) => {
+    socket.on('puzzle:start', (payload?: { puzzleId?: string; mode?: 'catalog' | 'random' | 'generated'; seed?: number; level?: string }) => {
       try {
         puzzleHost.start(payload);
       } catch (error) {

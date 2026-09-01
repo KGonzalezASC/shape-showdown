@@ -54,6 +54,8 @@ interface PuzzleEnd {
   piecesUsed: number;
   linesCleared: number;
   perfectClear: boolean;
+  score?: number;
+  levelId?: string;
 }
 
 /** Shape the wire snapshot into the PublicPlayerState GameField expects. */
@@ -130,7 +132,7 @@ export const PuzzleScreen: React.FC = () => {
       socket.on('connect', () => {
         if (cancelled) return;
         setConnected(true);
-        socket.emit('puzzle:start', {});
+        socket.emit('puzzle:start', { mode: 'random' });
       });
       socket.on('disconnect', () => {
         if (!cancelled) setConnected(false);
@@ -238,7 +240,7 @@ export const PuzzleScreen: React.FC = () => {
       if (!socket.connected) {
         socket.connect();
       } else {
-        socket.emit('puzzle:start', {});
+        socket.emit('puzzle:start', { mode: 'random' });
       }
     }
   }, []);

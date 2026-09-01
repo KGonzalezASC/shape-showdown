@@ -3,6 +3,7 @@ import { describe, it } from 'node:test';
 import type { Socket } from 'socket.io';
 import { PuzzleHost } from './puzzleHost.js';
 import type { ActionType, InputState } from '../../src/types.js';
+import { listCuratedPuzzleLevels } from './catalog/index.js';
 
 /** Minimal socket double capturing emissions and simulating client calls. */
 class FakeSocket {
@@ -29,34 +30,46 @@ function makeHost(): { host: PuzzleHost; socket: FakeSocket } {
 }
 
 describe('PuzzleHost', () => {
-  it('starts a session and emits puzzle:started + an initial puzzle:state', () => {
+  it('starts a curated catalog puzzle by puzzleId', () => {
     const { host, socket } = makeHost();
-    host.start({ seed: 42 });
+    const catalogId = listCuratedPuzzleLevels()[0]!.id;
+    host.start({ puzzleId: catalogId, mode: 'catalog' });
     assert.ok(host.active);
-    const started = socket.last('puzzle:started') as { levelId: string; seed: number };
-    assert.equal(started.seed, 42);
-    assert.ok(started.levelId.length > 0);
-    const state = socket.last('puzzle:state') as { tick: number; status: string };
+    const started = socket.last('puzzle:started') as {
+      levelId: string;
+      puzzleId: string;
+      seed: number;
+      visibilityPolicy?: string;
+    };
+    assert.equal(started.levelId, catalogId);
+    assert.equal(started.puzzleId, catalogId);
+    assert.ok(started.visibilityPolicy === 'hidden' || started.visibilityPolicy === 'revealed' || started.visibilityPolicy === 'partial');
+    const state = socket.last('puzzle:state') as { tick: number; levelId: string };
     assert.equal(state.tick, 0);
-    assert.ok(state.status == 'playing' || state.status == 'solved');
+    assert.equal(state.levelId, catalogId);
     host.stop();
   });
 
-  it('random pick with no seed produces a level and started event', () => {
+  it('random mode picks a curated catalog level', () => {
     const { host, socket } = makeHost();
-    host.start();
+    host.start({ mode: 'random' });
     assert.ok(host.active);
-    const started = socket.last('puzzle:started') as { seed: number; goal: unknown };
-    assert.ok(Number.isInteger(started.seed));
-    assert.ok(started.goal != null);
+    const started = socket.last('puzzle:started') as { levelId: string };
+    const ids = new Set(listCuratedPuzzleLevels().map((level) => level.id));
+    assert.ok(ids.has(started.levelId));
     host.stop();
+  });
+
+  it('rejects unknown catalog puzzleId', () => {
+    const { host } = makeHost();
+    assert.throws(() => host.start({ mode: 'catalog', puzzleId: 'does-not-exist' }), /Unknown puzzleId/);
   });
 
   it('advances ticks and streams puzzle:state with increasing tick', async () => {
     const { host, socket } = makeHost();
-    host.start({ seed: 7 });
+    host.start({ mode: 'catalog', puzzleId: listCuratedPuzzleLevels()[0]!.id });
     const before = (socket.last('puzzle:state') as { tick: number }).tick;
-    await new Promise((r) => setTimeout(r, 120)); // ~7 ticks at 60Hz
+    await new Promise((r) => setTimeout(r, 120));
     const after = (socket.last('puzzle:state') as { tick: number }).tick;
     assert.ok(after > before, `expected tick to advance: ${before} -> ${after}`);
     host.stop();
@@ -64,8 +77,7 @@ describe('PuzzleHost', () => {
 
   it('human input drives the piece: hardDrop action locks a piece eventually', async () => {
     const { host, socket } = makeHost();
-    host.start({ seed: 5, level: 'clean' });
-    // Hold right to push the piece to a wall, then hard-drop repeatedly.
+    host.start({ mode: 'generated', seed: 5, level: 'clean' });
     const input: Partial<InputState> = { right: true };
     host.setInput(input);
     await new Promise((r) => setTimeout(r, 300));
@@ -79,9 +91,9 @@ describe('PuzzleHost', () => {
     host.stop();
   });
 
-  it('archetype selection by name is honored', () => {
+  it('generated archetype selection by name is honored', () => {
     const { host, socket } = makeHost();
-    host.start({ seed: 3, level: 'dig' });
+    host.start({ mode: 'generated', seed: 3, level: 'dig' });
     const started = socket.last('puzzle:started') as { levelId: string };
     assert.ok(started.levelId.startsWith('dig-'));
     host.stop();
@@ -89,7 +101,7 @@ describe('PuzzleHost', () => {
 
   it('stop() clears the session', () => {
     const { host } = makeHost();
-    host.start({ seed: 1 });
+    host.start({ mode: 'random' });
     host.stop();
     assert.equal(host.active, false);
   });

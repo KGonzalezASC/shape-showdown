@@ -2,24 +2,22 @@ import type { Socket } from 'socket.io';
 import type { ActionType, InputState } from '../../src/types.js';
 import { generatePuzzleLevel } from './puzzleGenerator.js';
 import { PuzzleSession } from './puzzleSession.js';
-import type { PuzzleLevel } from './puzzleTypes.js';
+import type { PuzzleLevel, PuzzleVisibilityPolicy } from './puzzleTypes.js';
+import { getCuratedPuzzleEntry, loadPuzzleCatalog } from './catalog/index.js';
 import type { InputDriver, DriverObservation, PlayerCommand } from '../testHarness/inputDriver.js';
 
 /**
  * Server-side host for single-player puzzle sessions.
  *
- * One PuzzleHost per connected socket (created lazily on `puzzle:start`).
- * Runs a PuzzleSession on a 60Hz timer, streaming compact player snapshots
- * to the client via `puzzle:state`. Human input arrives via `puzzle:input`
- * (continuous) and `puzzle:action` (discrete), buffered in a driver that
- * the session drains each tick.
+ * Default product path loads curated catalog levels by `puzzleId` (or a random
+ * catalog entry). Generated archetypes remain available only via mode=generated.
  */
 
 const TICK_MS = 1000 / 60;
 const MAX_TICKS = 60 * 60 * 10; // 10 minute safety cap
 
-/** Level archetypes offered on `puzzle:start` (random pick with random seed). */
-const LEVEL_ARCHETYPES = [
+/** Optional generated practice archetypes (not the curated catalog). */
+const GENERATED_ARCHETYPES = [
   {
     name: 'dig',
     goal: { kind: 'clear-lines', lines: 5 } as const,
@@ -56,18 +54,22 @@ const LEVEL_ARCHETYPES = [
     garbageRows: 0,
     allowHold: true,
   },
-  {
-    name: 'hazard-run',
-    goal: { kind: 'survive', ticks: 60 * 45 } as const,
-    garbageRows: 2,
-    allowHold: true,
-    timeline: [
-      { tick: 600, kind: 'garbage' as const, params: { lines: 1 } },
-      { tick: 1500, kind: 'poison' as const },
-      { tick: 2400, kind: 'magnet' as const },
-    ],
-  },
 ] as const;
+
+export type PuzzleStartPayload = {
+  /** Curated catalog id. Preferred product path. */
+  puzzleId?: string;
+  /**
+   * catalog: require puzzleId
+   * random: pick a random curated entry
+   * generated: legacy archetype generator (practice only)
+   */
+  mode?: 'catalog' | 'random' | 'generated';
+  /** Seed for generated mode only. Catalog levels keep their frozen seed. */
+  seed?: number;
+  /** Generated archetype name when mode=generated. */
+  level?: string;
+};
 
 /** Wire-safe player snapshot for the client (strip sim internals). */
 export interface PuzzleStateSnapshot {
@@ -88,6 +90,7 @@ export interface PuzzleStateSnapshot {
   goal: PuzzleLevel['goal'];
   levelId: string;
   levelName: string;
+  visibilityPolicy?: PuzzleVisibilityPolicy;
 }
 
 /** InputDriver that drains socket-originated input each tick (replaces RulesBot). */
@@ -125,11 +128,9 @@ export class PuzzleHost {
     this.socket = socket;
   }
 
-  // ---- public API (called from socket handlers) ----
-
-  public start(payload?: { seed?: number; level?: string }): void {
+  public start(payload?: PuzzleStartPayload): void {
     this.stop();
-    this.level = this.pickLevel(payload?.seed, payload?.level);
+    this.level = this.resolveLevel(payload);
     this.driver = new HumanInputDriver();
     this.session = new PuzzleSession({
       level: this.level,
@@ -142,8 +143,10 @@ export class PuzzleHost {
       seed: this.level.seed,
       goal: this.level.goal,
       allowHold: this.level.allowHold ?? true,
+      visibilityPolicy: this.level.visibilityPolicy,
+      puzzleId: this.level.id,
     });
-    this.emitState(); // initial state immediately
+    this.emitState();
     this.loopHandle = setInterval(() => this.tick(), TICK_MS);
   }
 
@@ -168,8 +171,6 @@ export class PuzzleHost {
     return this.session !== null;
   }
 
-  // ---- internals ----
-
   private tick(): void {
     if (!this.session) {
       this.stop();
@@ -186,6 +187,7 @@ export class PuzzleHost {
         linesCleared: report.linesCleared,
         perfectClear: report.perfectClear,
         score: report.score,
+        levelId: this.level?.id,
       });
       this.stop();
     }
@@ -212,15 +214,53 @@ export class PuzzleHost {
       goal: this.level.goal,
       levelId: this.level.id,
       levelName: this.level.name,
+      visibilityPolicy: this.level.visibilityPolicy,
     };
     this.socket.emit('puzzle:state', snap);
   }
 
-  private pickLevel(seed?: number, archetype?: string): PuzzleLevel {
+  private resolveLevel(payload?: PuzzleStartPayload): PuzzleLevel {
+    const mode =
+      payload?.mode ??
+      (payload?.puzzleId ? 'catalog' : 'random');
+
+    if (mode === 'generated') {
+      return this.pickGeneratedLevel(payload?.seed, payload?.level);
+    }
+
+    if (mode === 'catalog') {
+      const puzzleId = payload?.puzzleId;
+      if (!puzzleId) {
+        throw new Error('puzzle:start mode=catalog requires puzzleId');
+      }
+      const entry = getCuratedPuzzleEntry(puzzleId);
+      if (!entry) {
+        throw new Error(`Unknown puzzleId: ${puzzleId}`);
+      }
+      return entry.level;
+    }
+
+    // random curated entry
+    const catalog = loadPuzzleCatalog();
+    if (catalog.length === 0) {
+      throw new Error('Curated puzzle catalog is empty');
+    }
+    if (payload?.puzzleId) {
+      const entry = getCuratedPuzzleEntry(payload.puzzleId);
+      if (!entry) {
+        throw new Error(`Unknown puzzleId: ${payload.puzzleId}`);
+      }
+      return entry.level;
+    }
+    const index = Math.floor(Math.random() * catalog.length);
+    return catalog[index]!.level;
+  }
+
+  private pickGeneratedLevel(seed?: number, archetype?: string): PuzzleLevel {
     const chosen = archetype
-      ? LEVEL_ARCHETYPES.find((a) => a.name === archetype)
-      : LEVEL_ARCHETYPES[Math.floor(Math.random() * LEVEL_ARCHETYPES.length)];
-    const template = chosen ?? LEVEL_ARCHETYPES[0];
+      ? GENERATED_ARCHETYPES.find((a) => a.name === archetype)
+      : GENERATED_ARCHETYPES[Math.floor(Math.random() * GENERATED_ARCHETYPES.length)];
+    const template = chosen ?? GENERATED_ARCHETYPES[0]!;
     const levelSeed = seed ?? Math.floor(Math.random() * 2 ** 31);
     return generatePuzzleLevel({
       id: `${template.name}-${levelSeed}`,
@@ -232,7 +272,7 @@ export class PuzzleHost {
       openColumn: 'openColumn' in template ? template.openColumn : undefined,
       variedHeights: 'variedHeights' in template ? template.variedHeights : false,
       allowHold: 'allowHold' in template ? template.allowHold : true,
-      timeline: 'timeline' in template ? [...template.timeline] : [],
+      timeline: [],
       goal: { ...template.goal },
     });
   }
