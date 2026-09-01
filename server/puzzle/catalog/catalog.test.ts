@@ -64,10 +64,11 @@ describe('puzzle catalog', () => {
       first.map((level) => hashPuzzleContent(level)),
       second.map((level) => hashPuzzleContent(level)),
     );
-    const holdOff = getCuratedPuzzleEntry('staging-well-clear-lines');
+    const holdOff = getCuratedPuzzleEntry('authored-well-freeze');
     assert.ok(holdOff);
-    assert.equal(holdOff.level.visibilityPolicy, 'hidden');
+    assert.equal(holdOff.level.visibilityPolicy, 'partial');
     assert.ok(holdOff.level.initialBoard.some((row) => row.some((cell) => cell !== null)));
     assert.equal(holdOff.level.benchmark.metric, 'ticks');
   });
 });
+

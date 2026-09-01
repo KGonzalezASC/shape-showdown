@@ -1,47 +1,36 @@
-import { readFileSync } from 'node:fs';
-import { dirname, join } from 'node:path';
-import { fileURLToPath } from 'node:url';
 import type { CuratedPuzzleLevel } from '../puzzleTypes.js';
 import { curatePuzzleLevel, type CuratedPuzzleEntry } from './curate.js';
+import { buildAuthoredLevels } from './authoredLevels.js';
 
 function freezeLevel<T>(value: T): T {
   return JSON.parse(JSON.stringify(value)) as T;
 }
 
-const here = dirname(fileURLToPath(import.meta.url));
-const frozen = JSON.parse(
-  readFileSync(join(here, 'frozenStagingLevels.json'), 'utf8'),
-) as { cheese: CuratedPuzzleLevel; well: CuratedPuzzleLevel };
-
 /**
- * Checked-in frozen staging catalog.
- * Boards/queues come from frozenStagingLevels.json (generator-independent).
+ * Authored curated catalog (TS source of truth).
+ * Replaces generator dump frozenStagingLevels.json.
  */
-const STAGING_CATALOG: CuratedPuzzleEntry[] = (() => {
-  const cheese = freezeLevel(frozen.cheese);
-  const well = freezeLevel(frozen.well);
-  return [
-    curatePuzzleLevel(cheese, {
-      allowHold: cheese.allowHold,
-      shopPolicy: cheese.shopPolicy,
-      benchmark: cheese.benchmark,
-      visibilityPolicy: cheese.visibilityPolicy,
-      intendedSolutionRefs: ['intended:staging-cheese-clear-lines'],
+const AUTHORED_CATALOG: CuratedPuzzleEntry[] = (() => {
+  return buildAuthoredLevels().map((level: CuratedPuzzleLevel) =>
+    curatePuzzleLevel(level, {
+      allowHold: level.allowHold,
+      shopPolicy: level.shopPolicy,
+      benchmark: level.benchmark,
+      visibilityPolicy: level.visibilityPolicy,
+      intendedSolutionRefs: [`intended:${level.id}`],
     }),
-    curatePuzzleLevel(well, {
-      allowHold: well.allowHold,
-      shopPolicy: well.shopPolicy,
-      benchmark: well.benchmark,
-      visibilityPolicy: well.visibilityPolicy,
-      intendedSolutionRefs: ['intended:staging-well-clear-lines'],
-    }),
-  ];
+  );
 })();
 
+/** @deprecated name kept for loadPuzzleCatalog stability; returns authored curated entries. */
 export function buildStagingCatalogEntries(): CuratedPuzzleEntry[] {
-  return STAGING_CATALOG.map((entry) => ({
+  return AUTHORED_CATALOG.map((entry) => ({
     level: freezeLevel(entry.level),
     intendedSolutionRefs: [...entry.intendedSolutionRefs],
     solutionAlternativeRefs: [...entry.solutionAlternativeRefs],
   }));
+}
+
+export function buildAuthoredCatalogEntries(): CuratedPuzzleEntry[] {
+  return buildStagingCatalogEntries();
 }
