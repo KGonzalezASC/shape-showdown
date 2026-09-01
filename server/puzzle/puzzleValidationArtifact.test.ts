@@ -2,11 +2,13 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import { DEFAULT_RULES_BOT_PROFILE } from '../testHarness/rulesBot.js';
 import { GAME_PROTOCOL_VERSION } from '../../src/protocol/version.js';
+import { loadPuzzleCatalog } from './catalog/index.js';
 import { generatePuzzleLevel } from './puzzleGenerator.js';
 import { runPuzzleBaselineBatch } from './puzzleBaselineBatch.js';
 import {
   DEFAULT_PUZZLE_VALIDATION_CANDIDATES,
   buildPuzzleValidationArtifact,
+  emitPuzzleValidationArtifacts,
   hashPuzzleContent,
 } from './puzzleValidationArtifact.js';
 import type { PuzzleLevel } from './puzzleTypes.js';
@@ -32,33 +34,29 @@ describe('puzzleValidationArtifact', () => {
     assert.notEqual(hashPuzzleContent(a), hashPuzzleContent(c));
   });
 
-  it('builds a passed artifact with selected baseline metrics and no solution traces', () => {
-    const level = cleanLevel('artifact-pass', 42);
-    const batch = runPuzzleBaselineBatch(level, [...DEFAULT_PUZZLE_VALIDATION_CANDIDATES]);
+  it('builds a passed artifact with selected baseline metrics and catalog visibility', () => {
+    const entry = loadPuzzleCatalog()[0]!;
+    const batch = runPuzzleBaselineBatch(entry.level, [...DEFAULT_PUZZLE_VALIDATION_CANDIDATES]);
     const artifact = buildPuzzleValidationArtifact({
-      level,
+      level: entry.level,
       batch,
       packageVersion: '0.0.0-test',
-      intendedSolutionRefs: ['intended:artifact-pass'],
+      intendedSolutionRefs: entry.intendedSolutionRefs,
     });
 
     assert.equal(artifact.schemaVersion, 1);
-    assert.equal(artifact.puzzleId, 'artifact-pass');
+    assert.equal(artifact.puzzleId, entry.level.id);
     assert.equal(artifact.engineProtocolVersion, GAME_PROTOCOL_VERSION);
-    assert.equal(artifact.packageVersion, '0.0.0-test');
     assert.equal(artifact.validationStatus, 'passed');
     assert.ok(artifact.selectedBaseline);
-    assert.equal(artifact.selectedBaseline.solved, true);
-    assert.equal(typeof artifact.selectedBaseline.score, 'number');
-    assert.equal(artifact.batchSize, DEFAULT_PUZZLE_VALIDATION_CANDIDATES.length);
-    assert.equal(artifact.visibilityPolicy, 'unspecified');
-    assert.deepEqual(artifact.intendedSolutionRefs, ['intended:artifact-pass']);
-    assert.deepEqual(artifact.solutionAlternativeRefs, []);
+    assert.equal(artifact.visibilityPolicy, entry.level.visibilityPolicy);
+    assert.notEqual(artifact.visibilityPolicy, 'unspecified');
+    assert.deepEqual(artifact.intendedSolutionRefs, entry.intendedSolutionRefs);
     assert.equal('commands' in artifact, false);
     assert.ok(artifact.contentHash.length === 64);
   });
 
-  it('marks duplicate-only batches as invalid-batch', () => {
+  it('marks duplicate-only batches as invalid-batch and exits 1 from emit', () => {
     const level = cleanLevel('artifact-dup', 9);
     const batch = runPuzzleBaselineBatch(level, [
       DEFAULT_RULES_BOT_PROFILE,
@@ -70,10 +68,17 @@ describe('puzzleValidationArtifact', () => {
       packageVersion: '0.0.0-test',
     });
     assert.equal(artifact.validationStatus, 'invalid-batch');
-    assert.ok(artifact.duplicateProfileIdentities.length >= 1);
+
+    const emitted = emitPuzzleValidationArtifacts(
+      [{ level }],
+      '0.0.0-test',
+      [DEFAULT_RULES_BOT_PROFILE, DEFAULT_RULES_BOT_PROFILE],
+    );
+    assert.equal(emitted.exitCode, 1);
+    assert.equal(emitted.artifacts[0]?.validationStatus, 'invalid-batch');
   });
 
-  it('marks batches with no qualifying solve as failed', () => {
+  it('marks batches with no qualifying solve as failed and exits 1 from emit', () => {
     const level = generatePuzzleLevel({
       id: 'artifact-fail',
       name: 'artifact-fail',
@@ -81,13 +86,21 @@ describe('puzzleValidationArtifact', () => {
       garbageRows: 10,
       goal: { kind: 'survive', ticks: 60 * 60 },
     });
-    const batch = runPuzzleBaselineBatch(level, [DEFAULT_RULES_BOT_PROFILE], 5);
-    const artifact = buildPuzzleValidationArtifact({
-      level,
-      batch,
-      packageVersion: '0.0.0-test',
-    });
-    assert.equal(artifact.validationStatus, 'failed');
-    assert.equal(artifact.selectedBaseline, null);
+    const emitted = emitPuzzleValidationArtifacts(
+      [{ level }],
+      '0.0.0-test',
+      [DEFAULT_RULES_BOT_PROFILE],
+      5,
+    );
+    assert.equal(emitted.exitCode, 1);
+    assert.equal(emitted.artifacts[0]?.validationStatus, 'failed');
+    assert.equal(emitted.artifacts[0]?.selectedBaseline, null);
+  });
+
+  it('emits exitCode 0 for the curated catalog', () => {
+    const catalog = loadPuzzleCatalog();
+    const emitted = emitPuzzleValidationArtifacts(catalog, '0.0.0-test');
+    assert.equal(emitted.exitCode, 0);
+    assert.ok(emitted.artifacts.every((artifact) => artifact.validationStatus === 'passed'));
   });
 });

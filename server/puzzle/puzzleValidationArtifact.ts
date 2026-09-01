@@ -4,11 +4,12 @@ import {
   type RulesBotCandidateProfile,
 } from '../testHarness/rulesBot.js';
 import { GAME_PROTOCOL_VERSION } from '../../src/protocol/version.js';
-import type { PuzzleBaselineBatchResult } from './puzzleBaselineBatch.js';
+import { runPuzzleBaselineBatch, type PuzzleBaselineBatchResult } from './puzzleBaselineBatch.js';
 import {
   DEFAULT_PUZZLE_BENCHMARK,
   type PuzzleBenchmarkPolicy,
   type PuzzleLevel,
+  type PuzzleVisibilityPolicy,
 } from './puzzleTypes.js';
 
 export type PuzzleValidationStatus = 'passed' | 'failed' | 'invalid-batch';
@@ -60,11 +61,8 @@ export interface PuzzleValidationArtifact {
     allowHold: boolean;
   };
   scriptedEvents: Array<{ tick: number; kind: string }>;
-  /**
-   * Levels do not yet carry Puzzle Visibility Policy. Record unspecified
-   * so the seam exists without inventing per-puzzle UX.
-   */
-  visibilityPolicy: 'unspecified';
+  /** Copied from the level; curated catalog entries always set a concrete policy. */
+  visibilityPolicy: PuzzleVisibilityPolicy | 'unspecified';
   /** References only. Never embed hidden solution command traces here. */
   intendedSolutionRefs: string[];
   solutionAlternativeRefs: string[];
@@ -94,6 +92,7 @@ export function hashPuzzleContent(level: PuzzleLevel): string {
     allowHold: level.allowHold ?? true,
     par: level.par ?? null,
     benchmark: level.benchmark ?? DEFAULT_PUZZLE_BENCHMARK,
+    visibilityPolicy: level.visibilityPolicy ?? 'unspecified',
   };
   return createHash('sha256').update(JSON.stringify(payload)).digest('hex');
 }
@@ -164,8 +163,41 @@ export function buildPuzzleValidationArtifact(
       tick: event.tick,
       kind: event.kind,
     })),
-    visibilityPolicy: 'unspecified',
+    visibilityPolicy: level.visibilityPolicy ?? 'unspecified',
     intendedSolutionRefs: [...(input.intendedSolutionRefs ?? [])],
     solutionAlternativeRefs: [...(input.solutionAlternativeRefs ?? [])],
   };
+}
+
+export interface EmitPuzzleValidationResult {
+  artifacts: PuzzleValidationArtifact[];
+  exitCode: 0 | 1;
+}
+
+/** Run validation batches and build artifacts (no filesystem I/O). */
+export function emitPuzzleValidationArtifacts(
+  entries: Array<{
+    level: PuzzleLevel;
+    intendedSolutionRefs?: string[];
+    solutionAlternativeRefs?: string[];
+  }>,
+  packageVersion: string,
+  candidates: readonly RulesBotCandidateProfile[] = DEFAULT_PUZZLE_VALIDATION_CANDIDATES,
+  maxTicks = 90 * 60,
+): EmitPuzzleValidationResult {
+  const artifacts: PuzzleValidationArtifact[] = [];
+  for (const entry of entries) {
+    const batch = runPuzzleBaselineBatch(entry.level, [...candidates], maxTicks);
+    artifacts.push(
+      buildPuzzleValidationArtifact({
+        level: entry.level,
+        batch,
+        packageVersion,
+        intendedSolutionRefs: entry.intendedSolutionRefs,
+        solutionAlternativeRefs: entry.solutionAlternativeRefs,
+      }),
+    );
+  }
+  const failed = artifacts.some((artifact) => artifact.validationStatus !== 'passed');
+  return { artifacts, exitCode: failed ? 1 : 0 };
 }

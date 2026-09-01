@@ -1,18 +1,14 @@
 {
   "schemaVersion": 1,
   "puzzleId": "staging-clean-pc-hold-off",
-  "contentHash": "d60535720658e3372f04824c01051cd4a34282d7bf98fb4a0fb26c00315958a4",
+  "contentHash": "c78c1bd143ed08d49d30759c782558e97439c57f7bb708c362088e805a21dd54",
   "engineProtocolVersion": 4,
   "packageVersion": "0.0.0",
   "validationStatus": "passed",
   "benchmark": {
-    "metric": "score",
-    "direction": "maximize",
+    "metric": "ticks",
+    "direction": "minimize",
     "tieBreakers": [
-      {
-        "metric": "ticks",
-        "direction": "minimize"
-      },
       {
         "metric": "pieces",
         "direction": "minimize"
@@ -69,7 +65,9 @@
     "allowHold": false
   },
   "scriptedEvents": [],
-  "visibilityPolicy": "unspecified",
-  "intendedSolutionRefs": [],
+  "visibilityPolicy": "hidden",
+  "intendedSolutionRefs": [
+    "intended:staging-clean-pc-hold-off"
+  ],
   "solutionAlternativeRefs": []
 }

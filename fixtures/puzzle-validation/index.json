@@ -3,14 +3,16 @@
   "puzzles": [
     {
       "puzzleId": "staging-clean-pc",
-      "contentHash": "d79ebaa823310929682f78b6dc45edf3131417987eb385bdb0061ac37b715561",
+      "contentHash": "c0a77e2dbe5f36d12d69f24ce94622c6617a339cfcfa346293d8d1469ca41d1f",
       "validationStatus": "passed",
+      "visibilityPolicy": "revealed",
       "selectedBaselineProfileId": "default"
     },
     {
       "puzzleId": "staging-clean-pc-hold-off",
-      "contentHash": "d60535720658e3372f04824c01051cd4a34282d7bf98fb4a0fb26c00315958a4",
+      "contentHash": "c78c1bd143ed08d49d30759c782558e97439c57f7bb708c362088e805a21dd54",
       "validationStatus": "passed",
+      "visibilityPolicy": "hidden",
       "selectedBaselineProfileId": "default"
     }
   ]

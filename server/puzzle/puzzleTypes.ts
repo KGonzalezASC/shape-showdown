@@ -67,8 +67,14 @@ export interface PuzzleLevel {
   /**
    * How Reference Baseline selection compares qualifying solved runs.
    * Omit to use DEFAULT_PUZZLE_BENCHMARK (maximize engine score).
+   * Curated catalog entries must set this explicitly.
    */
   benchmark?: PuzzleBenchmarkPolicy;
+  /**
+   * Per-puzzle presentation of future hazards / solution hints.
+   * Not a security boundary. Curated catalog entries must set this explicitly.
+   */
+  visibilityPolicy?: PuzzleVisibilityPolicy;
 }
 
 /** Metric used when selecting a Reference Baseline from a candidate batch. */
@@ -89,6 +95,20 @@ export const DEFAULT_PUZZLE_BENCHMARK: PuzzleBenchmarkPolicy = {
     { metric: 'ticks', direction: 'minimize' },
     { metric: 'pieces', direction: 'minimize' },
   ],
+};
+
+/** How much future puzzle information is revealed to the player. */
+export type PuzzleVisibilityPolicy = 'hidden' | 'partial' | 'revealed';
+
+/**
+ * Curated catalog level: product content with required policy fields.
+ * Generator-made ad-hoc levels may still omit these; catalog entries may not.
+ */
+export type CuratedPuzzleLevel = PuzzleLevel & {
+  shopPolicy: 'none' | 'standard';
+  allowHold: boolean;
+  benchmark: PuzzleBenchmarkPolicy;
+  visibilityPolicy: PuzzleVisibilityPolicy;
 };
 
 /** A derived reference solution: the RulesBot's play of the level. */
