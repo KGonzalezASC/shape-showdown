@@ -1,5 +1,8 @@
 # Handoff — Single-Player Puzzle Mode (branch `feature/single-player-puzzles`)
 
+> **SUPERSEDED as a driver.** Do not start new work from this file. Active next-session handoff: `.scratch/handoff-curated-puzzle-catalog.md`. RulesBot baseline contract is closed on `feature/single-player-puzzles`. This document remains historical context for the earlier socket/UI prototype only.
+
+
 > Next-session focus: build the **playable puzzle mode** (server-side session + socket plumbing + client UI + landing-page button). Read this file first, then `AGENTS.md`.
 
 ## Goal (user's words)
