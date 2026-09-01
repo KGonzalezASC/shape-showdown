@@ -46,6 +46,10 @@ interface GameFieldProps {
   performanceId?: string;
   /** Replay diagnostics can show effect pills for both players, not only the local player. */
   showEffectPills?: boolean;
+  /** Match chrome: shop wallet. Hide for solo puzzles. */
+  showFunds?: boolean;
+  /** Match chrome: guest/display name row. Hide for solo puzzles. */
+  showPlayerName?: boolean;
   /** Current replay tick used to show remaining effect duration. */
   effectTick?: number;
   /** Replay-only counterfactual placement overlay for the inspected player. */
@@ -158,6 +162,8 @@ const GameField = forwardRef<GameFieldRef, GameFieldProps>(({
   faceGrowthStartedAtMs = null,
   performanceId = title,
   showEffectPills = false,
+  showFunds = true,
+  showPlayerName = true,
   effectTick,
   replayCandidateOverlay = null,
 }, ref) => {
@@ -400,14 +406,17 @@ const GameField = forwardRef<GameFieldRef, GameFieldProps>(({
           {player.linesCleared} clears
         </span>
       </div>
-      {/* ── Player Username / Guest Name between title and funds/score ── */}
-      <div className="mb-1 flex items-center font-mono text-[10px] font-bold text-zinc-300">
-        <span className="truncate tracking-wide">{playerName}</span>
-      </div>
+      {showPlayerName && (
+        <div className="mb-1 flex items-center font-mono text-[10px] font-bold text-zinc-300">
+          <span className="truncate tracking-wide">{playerName}</span>
+        </div>
+      )}
       <div className="mb-1 flex items-center gap-3 font-mono text-[9px] font-bold uppercase tracking-wider text-zinc-500">
-        <span>
-          Funds <strong className={isMe ? 'text-cyan-200' : 'text-rose-200'}>{player.funds}</strong>
-        </span>
+        {showFunds && (
+          <span>
+            Funds <strong className={isMe ? 'text-cyan-200' : 'text-rose-200'}>{player.funds}</strong>
+          </span>
+        )}
         <span>
           Score <strong className={isMe ? 'text-emerald-200' : 'text-rose-200'}>{player.score}</strong>
         </span>
@@ -694,7 +703,9 @@ export default React.memo(GameField, (prev, next) => {
     prev.hatchingEnabled !== next.hatchingEnabled ||
     prev.fieldRole !== next.fieldRole ||
     prev.decorationSeed !== next.decorationSeed ||
-    prev.faceGrowthStartedAtMs !== next.faceGrowthStartedAtMs
+    prev.faceGrowthStartedAtMs !== next.faceGrowthStartedAtMs ||
+    prev.showFunds !== next.showFunds ||
+    prev.showPlayerName !== next.showPlayerName
   ) {
     return false;
   }

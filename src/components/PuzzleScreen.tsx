@@ -381,7 +381,9 @@ export const PuzzleScreen: React.FC = () => {
                 player={player}
                 isMe
                 title="Puzzle"
-                hatchingEnabled={false}
+            showFunds={false}
+            showPlayerName={false}
+            hatchingEnabled={false}
                 status={finished ? 'ended' : 'playing'}
               />
             ) : (
@@ -455,3 +457,4 @@ export const PuzzleScreen: React.FC = () => {
 };
 
 export default PuzzleScreen;
+
