@@ -105,4 +105,24 @@ describe('PuzzleHost', () => {
     host.stop();
     assert.equal(host.active, false);
   });
+
+  it('emits a stable attemptId on start and end', () => {
+    const { host, socket } = makeHost();
+    const catalogId = listCuratedPuzzleLevels()[0]!.id;
+    host.start({ puzzleId: catalogId, mode: 'catalog' });
+    const started = socket.last('puzzle:started') as { attemptId: string };
+    assert.equal(typeof started.attemptId, 'string');
+    assert.ok(started.attemptId.length > 0);
+    host.stop();
+  });
+
+  it('lists catalog summaries', () => {
+    const { host, socket } = makeHost();
+    host.listCatalog();
+    const catalog = socket.last('puzzle:catalog') as Array<{ id: string; name: string }>;
+    assert.ok(Array.isArray(catalog));
+    assert.ok(catalog.length >= 2);
+    assert.ok(catalog.every((entry) => typeof entry.id === 'string' && typeof entry.name === 'string'));
+  });
+
 });

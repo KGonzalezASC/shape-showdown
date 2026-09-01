@@ -21,18 +21,18 @@
   },
   "batchSize": 2,
   "candidateProfileIds": [
-    "default",
-    "omniscient-surface"
+    "player-limited-default",
+    "player-limited-surface"
   ],
   "candidateProfileIdentities": [
-    "default|v1|omniscient|topology=none|garbage=0|seed=0",
-    "omniscient-surface|v1|omniscient|topology=surface|garbage=0|seed=0"
+    "player-limited-default|v1|player-limited|topology=none|garbage=0|seed=0",
+    "player-limited-surface|v1|player-limited|topology=surface|garbage=0|seed=0"
   ],
   "duplicateProfileIdentities": [],
   "candidates": [
     {
-      "profileId": "default",
-      "profileIdentity": "default|v1|omniscient|topology=none|garbage=0|seed=0",
+      "profileId": "player-limited-default",
+      "profileIdentity": "player-limited-default|v1|player-limited|topology=none|garbage=0|seed=0",
       "qualifies": true,
       "solved": true,
       "topOut": false,
@@ -43,8 +43,8 @@
       "perfectClear": false
     },
     {
-      "profileId": "omniscient-surface",
-      "profileIdentity": "omniscient-surface|v1|omniscient|topology=surface|garbage=0|seed=0",
+      "profileId": "player-limited-surface",
+      "profileIdentity": "player-limited-surface|v1|player-limited|topology=surface|garbage=0|seed=0",
       "qualifies": true,
       "solved": true,
       "topOut": false,
@@ -56,8 +56,8 @@
     }
   ],
   "selectedBaseline": {
-    "profileId": "default",
-    "profileIdentity": "default|v1|omniscient|topology=none|garbage=0|seed=0",
+    "profileId": "player-limited-default",
+    "profileIdentity": "player-limited-default|v1|player-limited|topology=none|garbage=0|seed=0",
     "score": 334,
     "ticksUsed": 87,
     "piecesUsed": 4,

@@ -5,6 +5,7 @@ import { matchStep } from '../puzzleEngine/matchStep.js';
 import { clonePlayer, type InputDriver } from '../testHarness/inputDriver.js';
 import { defaultObservationProjector } from '../testHarness/observationProjector.js';
 import type { HazardKind, PuzzleGoal, PuzzleLevel, PuzzleAttempt, TimelineEvent } from './puzzleTypes.js';
+import { assertSupportedPuzzleTimeline } from './puzzleHazards.js';
 
 /**
  * Single-player puzzle session: a deterministic scenario with one player, a
@@ -117,10 +118,7 @@ function applyHazard(player: PlayerState, kind: HazardKind, params: Record<strin
     case 'purge':
     case 'wildcard':
     case 'tectonic':
-      // These hazards are applied through the shop handlers (vortex-step,
-      // wildcard-four, tectonic-shift); the session runner maps them to shop
-      // purchases with bypassAffordabilityCheck so the engine-side code runs.
-      break;
+      throw new Error(`Unsupported puzzle hazard in session: ${kind}`);
   }
 }
 
@@ -144,6 +142,7 @@ export class PuzzleSession {
     this.driver = config.driver;
     this.maxTicks = config.maxTicks ?? 60 * 60;
     this.timeline = [...config.level.timeline].sort((a, b) => a.tick - b.tick);
+    assertSupportedPuzzleTimeline(this.timeline, `PuzzleSession(${config.level.id})`);
 
     this.rngChannels = createPlayerRngChannels(config.level.seed, 'puzzle');
     const player = makePlayer('puzzle', this.rngChannels);

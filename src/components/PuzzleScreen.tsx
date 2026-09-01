@@ -9,7 +9,11 @@ import { actionForCode } from '../input/keyBindings';
 import { HOLD_SWAP_CUTOFF_VISIBLE_ROW } from '../types';
 import { appendDiscordFrameId, isDiscordActivityContext } from '../discordContext';
 import { resolveGameServerUrl } from '../hooks/useGameSocket';
-import { isPuzzleFinished } from '../puzzle/puzzlePresentation';
+import {
+  isPuzzleFinished,
+  presentTimelineHints,
+  type PuzzleVisibilityPolicy,
+} from '../puzzle/puzzlePresentation';
 
 /**
  * Single-player puzzle screen.
@@ -45,6 +49,18 @@ interface PuzzleStarted {
   seed: number;
   goal: { kind: string; lines?: number; ticks?: number };
   allowHold?: boolean;
+  visibilityPolicy?: PuzzleVisibilityPolicy;
+  puzzleId?: string;
+  attemptId?: string;
+  timeline?: Array<{ tick: number; kind: string }>;
+}
+
+interface PuzzleCatalogEntry {
+  id: string;
+  name: string;
+  goal: { kind: string; lines?: number; ticks?: number };
+  allowHold: boolean;
+  visibilityPolicy: PuzzleVisibilityPolicy;
 }
 
 interface PuzzleEnd {
@@ -56,6 +72,7 @@ interface PuzzleEnd {
   perfectClear: boolean;
   score?: number;
   levelId?: string;
+  attemptId?: string;
 }
 
 /** Shape the wire snapshot into the PublicPlayerState GameField expects. */
@@ -111,6 +128,11 @@ export const PuzzleScreen: React.FC = () => {
   const [started, setStarted] = useState<PuzzleStarted | null>(null);
   const [end, setEnd] = useState<PuzzleEnd | null>(null);
   const [connected, setConnected] = useState(false);
+  const [catalog, setCatalog] = useState<PuzzleCatalogEntry[]>([]);
+  const [selectedPuzzleId, setSelectedPuzzleId] = useState<string | null>(null);
+  const [picking, setPicking] = useState(true);
+  const selectedPuzzleIdRef = useRef<string | null>(null);
+  selectedPuzzleIdRef.current = selectedPuzzleId;
   const heldInputsRef = useRef({ left: false, right: false, softDrop: false });
 
   useEffect(() => {
@@ -132,17 +154,26 @@ export const PuzzleScreen: React.FC = () => {
       socket.on('connect', () => {
         if (cancelled) return;
         setConnected(true);
-        socket.emit('puzzle:start', { mode: 'random' });
+        socket.emit('puzzle:list');
       });
       socket.on('disconnect', () => {
-        if (!cancelled) setConnected(false);
+        if (!cancelled) {
+          setConnected(false);
+          setState(null);
+        }
       });
       socket.on('connect_error', (err) => {
         console.warn('Puzzle socket connection error:', err);
       });
+      socket.on('puzzle:catalog', (entries: PuzzleCatalogEntry[]) => {
+        if (cancelled) return;
+        setCatalog(entries);
+      });
       socket.on('puzzle:started', (payload: PuzzleStarted) => {
         if (cancelled) return;
         setStarted(payload);
+        setSelectedPuzzleId(payload.puzzleId ?? payload.levelId);
+        setPicking(false);
         setEnd(null);
       });
       socket.on('puzzle:state', (snap: PuzzleWireState) => {
@@ -231,22 +262,41 @@ export const PuzzleScreen: React.FC = () => {
     };
   }, []);
 
-  const restart = useCallback(() => {
+  const startPuzzle = useCallback((puzzleId: string) => {
     setEnd(null);
     setState(null);
     setStarted(null);
+    setSelectedPuzzleId(puzzleId);
+    setPicking(false);
     const socket = socketRef.current;
-    if (socket) {
-      if (!socket.connected) {
-        socket.connect();
-      } else {
-        socket.emit('puzzle:start', { mode: 'random' });
-      }
+    if (!socket) return;
+    if (!socket.connected) {
+      socket.connect();
     }
+    socket.emit('puzzle:start', { mode: 'catalog', puzzleId });
+  }, []);
+
+  const restartSame = useCallback(() => {
+    const id = selectedPuzzleIdRef.current;
+    if (id) startPuzzle(id);
+  }, [startPuzzle]);
+
+  const pickAnother = useCallback(() => {
+    setEnd(null);
+    setState(null);
+    setStarted(null);
+    setPicking(true);
+    socketRef.current?.emit('puzzle:stop');
+    socketRef.current?.emit('puzzle:list');
   }, []);
 
   const player = state ? toPublicPlayerState(state, 'puzzle-me') : null;
   const finished = isPuzzleFinished(state?.status ?? null, end !== null);
+  const timelineHints = presentTimelineHints(
+    started?.timeline ?? [],
+    started?.visibilityPolicy,
+    state?.tick ?? 0,
+  );
 
   return (
     <div className="flex min-h-dvh flex-col items-center justify-center gap-4 bg-[#07080b] p-4 font-sans text-white">
@@ -261,7 +311,7 @@ export const PuzzleScreen: React.FC = () => {
         </button>
         <div className="text-center">
           <h1 className="text-lg font-black uppercase tracking-wider">Puzzles</h1>
-          {started && (
+          {started && !picking && (
             <p className="text-xs text-zinc-400">
               {started.name} — {goalLabel(started.goal)}
               {started.allowHold === false && (
@@ -269,67 +319,136 @@ export const PuzzleScreen: React.FC = () => {
                   No Hold
                 </span>
               )}
+              {started.visibilityPolicy && (
+                <span className="ml-2 rounded bg-sky-500/20 px-1.5 py-0.5 text-[10px] font-bold text-sky-300">
+                  {started.visibilityPolicy}
+                </span>
+              )}
             </p>
           )}
         </div>
         <div className="text-right text-xs text-zinc-400">
-          {state && <div>Lines: {state.linesCleared}</div>}
-          {state && <div>Pieces: {state.piecesPlaced ?? 0}</div>}
-          {state && <div>Time: {Math.floor(state.tick / 60)}s</div>}
+          {state && !picking && <div>Lines: {state.linesCleared}</div>}
+          {state && !picking && <div>Pieces: {state.piecesPlaced ?? 0}</div>}
+          {state && !picking && <div>Time: {Math.floor(state.tick / 60)}s</div>}
         </div>
       </header>
 
-      <div className="flex items-start justify-center">
-        {player ? (
-          <GameField
-            ref={myFieldRef}
-            player={player}
-            isMe
-            title="Puzzle"
-            hatchingEnabled={false}
-            status={finished ? 'ended' : 'playing'}
-          />
-        ) : (
-          <div className="flex h-[420px] w-[240px] items-center justify-center rounded-xl border border-white/10 bg-[#08090d] text-sm text-zinc-500">
-            {connected ? 'Loading puzzle…' : 'Connecting…'}
-          </div>
-        )}
-      </div>
-
-      {finished && (
-        <div className="flex flex-col items-center gap-3 rounded-xl border border-white/10 bg-[#08090d] px-8 py-6 text-center">
-          <p className="text-xl font-black uppercase tracking-wider">
-            {end?.solved || state?.status === 'solved'
-              ? 'Solved! 🎉'
-              : end?.topOut || state?.status === 'topout'
-                ? 'Top Out'
-                : 'Session Ended'}
-          </p>
-          {end && (
-            <p className="text-xs text-zinc-400">
-              {end.linesCleared} lines · {end.piecesUsed} pieces ·{' '}
-              {Math.round(end.ticksUsed / 60)}s
-            </p>
+      {picking ? (
+        <div className="flex w-full max-w-md flex-col gap-3 rounded-xl border border-white/10 bg-[#08090d] p-5">
+          <p className="text-sm font-bold uppercase tracking-wider text-zinc-300">Choose a puzzle</p>
+          {!connected && (
+            <p className="text-xs text-zinc-500">Connecting…</p>
           )}
-          <div className="flex gap-2">
+          {connected && catalog.length === 0 && (
+            <p className="text-xs text-zinc-500">Loading catalog…</p>
+          )}
+          {catalog.map((entry) => (
             <button
+              key={entry.id}
               type="button"
-              onClick={restart}
-              className="inline-flex items-center gap-1.5 rounded-lg bg-white/10 px-4 py-2 text-xs font-bold uppercase tracking-wider hover:bg-white/20"
+              onClick={() => startPuzzle(entry.id)}
+              className="flex flex-col items-start rounded-lg border border-white/10 bg-white/[0.03] px-4 py-3 text-left hover:bg-white/[0.08]"
             >
-              <RotateCcw className="h-3.5 w-3.5" />
-              <span>New Puzzle</span>
+              <span className="text-sm font-bold">{entry.name}</span>
+              <span className="text-xs text-zinc-400">
+                {goalLabel(entry.goal)}
+                {entry.allowHold ? '' : ' · no hold'}
+                {' · '}
+                {entry.visibilityPolicy}
+              </span>
             </button>
-            <button
-              type="button"
-              onClick={() => setAppRoute('landing')}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-white/10 px-4 py-2 text-xs font-bold uppercase tracking-wider text-zinc-300 hover:bg-white/10"
-            >
-              <Play className="h-3.5 w-3.5" />
-              <span>Back to Menu</span>
-            </button>
-          </div>
+          ))}
+          <button
+            type="button"
+            onClick={() => {
+              const socket = socketRef.current;
+              if (!socket) return;
+              setPicking(false);
+              socket.emit('puzzle:start', { mode: 'random' });
+            }}
+            className="rounded-lg bg-white/10 px-4 py-2 text-xs font-bold uppercase tracking-wider hover:bg-white/20"
+          >
+            Random curated
+          </button>
         </div>
+      ) : (
+        <>
+          <div className="flex items-start justify-center gap-4">
+            {player ? (
+              <GameField
+                ref={myFieldRef}
+                player={player}
+                isMe
+                title="Puzzle"
+                hatchingEnabled={false}
+                status={finished ? 'ended' : 'playing'}
+              />
+            ) : (
+              <div className="flex h-[420px] w-[240px] items-center justify-center rounded-xl border border-white/10 bg-[#08090d] text-sm text-zinc-500">
+                {connected ? 'Loading puzzle…' : 'Connecting…'}
+              </div>
+            )}
+            {timelineHints.length > 0 && (
+              <div className="w-40 rounded-xl border border-white/10 bg-[#08090d] p-3 text-xs text-zinc-300">
+                <p className="mb-2 font-bold uppercase tracking-wider text-zinc-400">Upcoming</p>
+                <ul className="space-y-1">
+                  {timelineHints.map((hint, index) => (
+                    <li key={`${hint.kind}-${index}`}>
+                      {hint.tick < 0
+                        ? hint.kind
+                        : `${hint.kind} @ ${Math.floor(hint.tick / 60)}s`}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </div>
+
+          {finished && (
+            <div className="flex flex-col items-center gap-3 rounded-xl border border-white/10 bg-[#08090d] px-8 py-6 text-center">
+              <p className="text-xl font-black uppercase tracking-wider">
+                {end?.solved || state?.status === 'solved'
+                  ? 'Solved!'
+                  : end?.topOut || state?.status === 'topout'
+                    ? 'Top Out'
+                    : 'Session Ended'}
+              </p>
+              {end && (
+                <p className="text-xs text-zinc-400">
+                  {end.linesCleared} lines · {end.piecesUsed} pieces ·{' '}
+                  {Math.round(end.ticksUsed / 60)}s
+                  {end.attemptId ? ` · attempt ${end.attemptId.slice(0, 8)}` : ''}
+                </p>
+              )}
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={restartSame}
+                  className="inline-flex items-center gap-1.5 rounded-lg bg-white/10 px-4 py-2 text-xs font-bold uppercase tracking-wider hover:bg-white/20"
+                >
+                  <RotateCcw className="h-3.5 w-3.5" />
+                  <span>Retry</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={pickAnother}
+                  className="inline-flex items-center gap-1.5 rounded-lg bg-white/10 px-4 py-2 text-xs font-bold uppercase tracking-wider hover:bg-white/20"
+                >
+                  <Play className="h-3.5 w-3.5" />
+                  <span>Pick Another</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setAppRoute('landing')}
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-white/10 px-4 py-2 text-xs font-bold uppercase tracking-wider text-zinc-300 hover:bg-white/10"
+                >
+                  <span>Menu</span>
+                </button>
+              </div>
+            </div>
+          )}
+        </>
       )}
     </div>
   );

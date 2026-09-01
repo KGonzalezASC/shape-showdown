@@ -69,7 +69,28 @@ export interface PuzzleValidationArtifact {
 }
 
 /** Default meaningful candidate set for staging validation (not identical reruns). */
+/** Publication baseline candidates: player-limited only. */
 export const DEFAULT_PUZZLE_VALIDATION_CANDIDATES: readonly RulesBotCandidateProfile[] = [
+  {
+    id: 'player-limited-default',
+    policyVersion: 1,
+    observationMode: 'player-limited',
+    topology: 'none',
+    garbageEnabled: false,
+    variationSeed: 0,
+  },
+  {
+    id: 'player-limited-surface',
+    policyVersion: 1,
+    observationMode: 'player-limited',
+    topology: 'surface',
+    garbageEnabled: false,
+    variationSeed: 0,
+  },
+];
+
+/** Omniscient profiles for diagnostics only (not publication baselines). */
+export const DIAGNOSTIC_OMNISCIENT_CANDIDATES: readonly RulesBotCandidateProfile[] = [
   DEFAULT_RULES_BOT_PROFILE,
   {
     ...DEFAULT_RULES_BOT_PROFILE,

@@ -1,3 +1,4 @@
+import { assertSupportedPuzzleTimeline } from '../puzzleHazards.js';
 import type {
   CuratedPuzzleLevel,
   PuzzleBenchmarkPolicy,
@@ -43,6 +44,7 @@ export function curatePuzzleLevel(
       `curated level "${level.id}" has an empty board for goal ${level.goal.kind}; refuse vacuous zero-piece clears`,
     );
   }
+  assertSupportedPuzzleTimeline(level.timeline, `curatePuzzleLevel(${level.id})`);
   const curated: CuratedPuzzleLevel = {
     ...level,
     shopPolicy: options.shopPolicy ?? level.shopPolicy,

@@ -6,14 +6,14 @@
       "contentHash": "e613f9797c8677204989606c4e5918ddda7725c202221bdaf12ab9f86aa21c44",
       "validationStatus": "passed",
       "visibilityPolicy": "revealed",
-      "selectedBaselineProfileId": "default"
+      "selectedBaselineProfileId": "player-limited-default"
     },
     {
       "puzzleId": "staging-well-clear-lines",
       "contentHash": "9e0dcd56d5a6124aa52a125f7163cc104dc4ac0400de2201ff39e3c1b304972a",
       "validationStatus": "passed",
       "visibilityPolicy": "hidden",
-      "selectedBaselineProfileId": "default"
+      "selectedBaselineProfileId": "player-limited-default"
     }
   ]
 }

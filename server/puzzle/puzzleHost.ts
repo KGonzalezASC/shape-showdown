@@ -1,9 +1,11 @@
+import { randomUUID } from 'node:crypto';
 import type { Socket } from 'socket.io';
 import type { ActionType, InputState } from '../../src/types.js';
 import { generatePuzzleLevel } from './puzzleGenerator.js';
 import { PuzzleSession } from './puzzleSession.js';
 import type { PuzzleLevel, PuzzleVisibilityPolicy } from './puzzleTypes.js';
-import { getCuratedPuzzleEntry, loadPuzzleCatalog } from './catalog/index.js';
+import { visibleNextQueueCount } from '../../src/puzzle/puzzlePresentation.js';
+import { getCuratedPuzzleEntry, listPuzzleCatalogSummaries, loadPuzzleCatalog } from './catalog/index.js';
 import type { InputDriver, DriverObservation, PlayerCommand } from '../testHarness/inputDriver.js';
 
 /**
@@ -121,6 +123,7 @@ export class PuzzleHost {
   private session: PuzzleSession | null = null;
   private driver: HumanInputDriver | null = null;
   private level: PuzzleLevel | null = null;
+  private attemptId: string | null = null;
   private loopHandle: ReturnType<typeof setInterval> | null = null;
   private readonly socket: Socket;
 
@@ -128,9 +131,14 @@ export class PuzzleHost {
     this.socket = socket;
   }
 
+  public listCatalog(): void {
+    this.socket.emit('puzzle:catalog', listPuzzleCatalogSummaries());
+  }
+
   public start(payload?: PuzzleStartPayload): void {
     this.stop();
     this.level = this.resolveLevel(payload);
+    this.attemptId = randomUUID();
     this.driver = new HumanInputDriver();
     this.session = new PuzzleSession({
       level: this.level,
@@ -145,6 +153,8 @@ export class PuzzleHost {
       allowHold: this.level.allowHold ?? true,
       visibilityPolicy: this.level.visibilityPolicy,
       puzzleId: this.level.id,
+      attemptId: this.attemptId,
+      timeline: this.level.timeline.map((event) => ({ tick: event.tick, kind: event.kind })),
     });
     this.emitState();
     this.loopHandle = setInterval(() => this.tick(), TICK_MS);
@@ -165,6 +175,8 @@ export class PuzzleHost {
     }
     this.session = null;
     this.driver = null;
+    this.level = null;
+    this.attemptId = null;
   }
 
   public get active(): boolean {
@@ -188,6 +200,7 @@ export class PuzzleHost {
         perfectClear: report.perfectClear,
         score: report.score,
         levelId: this.level?.id,
+        attemptId: this.attemptId,
       });
       this.stop();
     }
@@ -204,7 +217,7 @@ export class PuzzleHost {
       canHold: p.canHold,
       swapCutoffRow: p.swapCutoffRow,
       allowHold: this.level.allowHold ?? true,
-      nextQueue: p.nextQueue.slice(0, 5),
+      nextQueue: p.nextQueue.slice(0, visibleNextQueueCount(this.level.visibilityPolicy)),
       score: p.score,
       linesCleared: p.linesCleared,
       piecesPlaced: this.session.piecesPlaced,

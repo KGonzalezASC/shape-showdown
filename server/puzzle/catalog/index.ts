@@ -1,9 +1,17 @@
-import type { CuratedPuzzleLevel } from '../puzzleTypes.js';
+import type { CuratedPuzzleLevel, PuzzleGoal, PuzzleVisibilityPolicy } from '../puzzleTypes.js';
 import type { CuratedPuzzleEntry } from './curate.js';
 import { buildStagingCatalogEntries } from './stagingEntries.js';
 
 export type { CuratedPuzzleEntry } from './curate.js';
 export { curatePuzzleLevel } from './curate.js';
+
+export interface PuzzleCatalogSummary {
+  id: string;
+  name: string;
+  goal: PuzzleGoal;
+  allowHold: boolean;
+  visibilityPolicy: PuzzleVisibilityPolicy;
+}
 
 /** Load the curated puzzle catalog (deterministic, pure). */
 export function loadPuzzleCatalog(): CuratedPuzzleEntry[] {
@@ -12,6 +20,16 @@ export function loadPuzzleCatalog(): CuratedPuzzleEntry[] {
 
 export function listCuratedPuzzleLevels(): CuratedPuzzleLevel[] {
   return loadPuzzleCatalog().map((entry) => entry.level);
+}
+
+export function listPuzzleCatalogSummaries(): PuzzleCatalogSummary[] {
+  return loadPuzzleCatalog().map((entry) => ({
+    id: entry.level.id,
+    name: entry.level.name,
+    goal: entry.level.goal,
+    allowHold: entry.level.allowHold,
+    visibilityPolicy: entry.level.visibilityPolicy,
+  }));
 }
 
 export function getCuratedPuzzleEntry(id: string): CuratedPuzzleEntry | undefined {

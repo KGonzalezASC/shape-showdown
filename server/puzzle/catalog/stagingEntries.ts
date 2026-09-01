@@ -1,76 +1,38 @@
-import { DEFAULT_PUZZLE_BENCHMARK, type PuzzleLevel } from '../puzzleTypes.js';
-import { generatePuzzleLevel } from '../puzzleGenerator.js';
+import { readFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import type { CuratedPuzzleLevel } from '../puzzleTypes.js';
 import { curatePuzzleLevel, type CuratedPuzzleEntry } from './curate.js';
 
-/** Deep-freeze a generated level so catalog content is immutable after load. */
-function freezeLevel(level: PuzzleLevel): PuzzleLevel {
-  return JSON.parse(JSON.stringify(level)) as PuzzleLevel;
+function freezeLevel<T>(value: T): T {
+  return JSON.parse(JSON.stringify(value)) as T;
 }
 
-function boardCellCount(level: PuzzleLevel): number {
-  let count = 0;
-  for (const row of level.initialBoard) {
-    for (const cell of row) {
-      if (cell !== null) count += 1;
-    }
-  }
-  return count;
-}
+const here = dirname(fileURLToPath(import.meta.url));
+const frozen = JSON.parse(
+  readFileSync(join(here, 'frozenStagingLevels.json'), 'utf8'),
+) as { cheese: CuratedPuzzleLevel; well: CuratedPuzzleLevel };
 
 /**
- * Frozen staging catalog content.
- * Boards start non-empty so validation cannot pass via a zero-piece vacuous clear.
- * Goals are clear-lines targets the default RulesBot batch can actually solve.
+ * Checked-in frozen staging catalog.
+ * Boards/queues come from frozenStagingLevels.json (generator-independent).
  */
 const STAGING_CATALOG: CuratedPuzzleEntry[] = (() => {
-  const cheeseLines = freezeLevel(
-    generatePuzzleLevel({
-      id: 'staging-cheese-clear-lines',
-      name: 'Staging Cheese Clear Lines',
-      seed: 42,
-      garbageRows: 3,
-      messyGarbage: true,
-      maxHolesPerRow: 2,
-      goal: { kind: 'clear-lines', lines: 2 },
-      shopPolicy: 'none',
-      allowHold: true,
-    }),
-  );
-  const wellLines = freezeLevel(
-    generatePuzzleLevel({
-      id: 'staging-well-clear-lines',
-      name: 'Staging Well Clear Lines',
-      seed: 77,
-      garbageRows: 4,
-      variedHeights: true,
-      openColumn: 4,
-      goal: { kind: 'clear-lines', lines: 2 },
-      shopPolicy: 'none',
-      allowHold: false,
-    }),
-  );
-
-  if (boardCellCount(cheeseLines) === 0 || boardCellCount(wellLines) === 0) {
-    throw new Error('staging catalog levels must start with a non-empty board');
-  }
-
+  const cheese = freezeLevel(frozen.cheese);
+  const well = freezeLevel(frozen.well);
   return [
-    curatePuzzleLevel(cheeseLines, {
-      allowHold: true,
-      shopPolicy: 'none',
-      benchmark: DEFAULT_PUZZLE_BENCHMARK,
-      visibilityPolicy: 'revealed',
+    curatePuzzleLevel(cheese, {
+      allowHold: cheese.allowHold,
+      shopPolicy: cheese.shopPolicy,
+      benchmark: cheese.benchmark,
+      visibilityPolicy: cheese.visibilityPolicy,
       intendedSolutionRefs: ['intended:staging-cheese-clear-lines'],
     }),
-    curatePuzzleLevel(wellLines, {
-      allowHold: false,
-      shopPolicy: 'none',
-      benchmark: {
-        metric: 'ticks',
-        direction: 'minimize',
-        tieBreakers: [{ metric: 'pieces', direction: 'minimize' }],
-      },
-      visibilityPolicy: 'hidden',
+    curatePuzzleLevel(well, {
+      allowHold: well.allowHold,
+      shopPolicy: well.shopPolicy,
+      benchmark: well.benchmark,
+      visibilityPolicy: well.visibilityPolicy,
       intendedSolutionRefs: ['intended:staging-well-clear-lines'],
     }),
   ];
@@ -78,7 +40,7 @@ const STAGING_CATALOG: CuratedPuzzleEntry[] = (() => {
 
 export function buildStagingCatalogEntries(): CuratedPuzzleEntry[] {
   return STAGING_CATALOG.map((entry) => ({
-    level: freezeLevel(entry.level) as typeof entry.level,
+    level: freezeLevel(entry.level),
     intendedSolutionRefs: [...entry.intendedSolutionRefs],
     solutionAlternativeRefs: [...entry.solutionAlternativeRefs],
   }));
