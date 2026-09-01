@@ -30,6 +30,7 @@ import type {
 } from '../src/types.js';
 import {
   resolveRuntimePolicy,
+  isSoloModeEnabled,
   type RuntimePolicy,
   type ServerMode,
 } from './runtimePolicy.js';
@@ -56,7 +57,10 @@ export async function startGameServer(
   const cwd = options.cwd ?? process.cwd();
   const config = options.config ?? loadServerConfig(cwd);
   const mode = options.mode ?? (process.env.NODE_ENV === 'production' ? 'production' : 'development');
-  const database = createDatabase();
+  const soloMode = isSoloModeEnabled(process.env);
+  const database = createDatabase(undefined, {
+    forceInMemory: soloMode,
+  });
   let policy: RuntimePolicy;
   try {
     policy = resolveRuntimePolicy({
@@ -203,12 +207,14 @@ export async function startGameServer(
       database,
       gameServerUrl,
     );
-  const matchRegistry = new MatchRegistry(
-    io,
-    config.replayKeyframeIntervalTicks,
-    persistence,
-    config.recoveryVoidTimeoutMs,
-  );
+  const matchRegistry = database === null
+    ? null
+    : new MatchRegistry(
+      io,
+      config.replayKeyframeIntervalTicks,
+      persistence,
+      config.recoveryVoidTimeoutMs,
+    );
   io.on('connection', (socket) => {
     // Single-player puzzle sessions: one host per socket, lazily created.
     const puzzleHost = new PuzzleHost(socket);
@@ -240,7 +246,7 @@ export async function startGameServer(
     socket.on('disconnect', () => puzzleHost.stop());
 
     const purpose = readAuthString(socket.handshake.auth, 'purpose');
-    if (purpose === 'puzzle') {
+    if (purpose === 'puzzle' || matchRegistry === null) {
       return;
     }
 
@@ -274,7 +280,7 @@ export async function startGameServer(
       });
     });
   } catch (error) {
-    await matchRegistry.stop();
+    await matchRegistry?.stop();
     await closeDevelopmentServer?.();
     io.close();
     await database?.end({ timeout: 1 });
@@ -283,7 +289,7 @@ export async function startGameServer(
 
   const address = httpServer.address();
   if (address === null || typeof address === 'string') {
-    await matchRegistry.stop();
+    await matchRegistry?.stop();
     await closeDevelopmentServer?.();
     io.close();
     await database?.end({ timeout: 1 });
@@ -311,7 +317,7 @@ export async function startGameServer(
       })
         .then(async (allocations) => {
           for (const allocation of allocations) {
-            matchRegistry.prepareMatch(
+            matchRegistry?.prepareMatch(
               allocation.match.id,
               allocation.match.matchSeed,
             );
@@ -361,9 +367,9 @@ export async function startGameServer(
     stop: async () => {
       if (stopped) return;
       stopped = true;
-      matchRegistry.beginDrain();
+      matchRegistry?.beginDrain();
       if (allocationHandle !== null) clearInterval(allocationHandle);
-      await matchRegistry.stop();
+      await matchRegistry?.stop();
       await closeDevelopmentServer?.();
       io.disconnectSockets(true);
       if (typeof httpServer.closeAllConnections === 'function') {

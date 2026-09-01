@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import { deriveGuestPlayerId } from './controlPlane/playerStore.js';
-import { resolveRuntimePolicy } from './runtimePolicy.js';
+import { isSoloModeEnabled, resolveRuntimePolicy } from './runtimePolicy.js';
 
 describe('runtime policy', () => {
   it('requires Postgres and match tickets in production', () => {
@@ -38,6 +38,21 @@ describe('runtime policy', () => {
         }),
       /ALLOW_LEGACY_SOCKET_BOOTSTRAP=true is forbidden in production/,
     );
+    assert.throws(
+      () =>
+        resolveRuntimePolicy({
+          mode: 'production',
+          hasDatabase: true,
+          env: { SOLO_MODE: 'true' },
+        }),
+      /SOLO_MODE=true is forbidden in production/,
+    );
+  });
+
+  it('recognizes the explicit solo boot profile', () => {
+    assert.equal(isSoloModeEnabled({ SOLO_MODE: 'true' }), true);
+    assert.equal(isSoloModeEnabled({ SOLO_MODE: 'false' }), false);
+    assert.equal(isSoloModeEnabled({}), false);
   });
 
   it('keeps legacy sockets available for development without a database', () => {

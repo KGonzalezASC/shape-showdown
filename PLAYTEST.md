@@ -1,8 +1,21 @@
 # Shape Showdown — local two-seat playtest
 
-This is the local playtest. Use it whenever someone says **run a playtest** or **test locally**. It is not `bun run test`, and it is not two tabs on the same origin.
+This page covers the local two-seat playtest. Use it whenever someone says **run a playtest** or **test locally**. It is not `bun run test`, and it is not two tabs on the same origin.
 
 Repo: `C:\Users\Keithythefrog\source\BubbleBlitzers`
+
+## Choose the local path
+
+For a solo curated puzzle, use the in-memory boot profile. It does not use `DATABASE_URL`, does not run migrations, and does not need Docker or Postgres:
+
+```powershell
+cd C:\Users\Keithythefrog\source\BubbleBlitzers
+bun run dev:solo
+```
+
+Open `http://localhost:3000/#puzzles`, choose a puzzle, and start it. The server's `/health/details` response should report `databaseMode: "in-memory"`.
+
+For a two-seat multiplayer playtest, keep using the Docker/Postgres path below and `bun run dev`. That path still needs match tickets and the control-plane database.
 
 ## What “playtest” means
 

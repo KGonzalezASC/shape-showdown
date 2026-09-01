@@ -3,12 +3,19 @@ import postgres from 'postgres';
 export type Database = ReturnType<typeof postgres>;
 export type SqlExecutor = postgres.ISql;
 
+export type DatabaseOptions = {
+  forceInMemory?: boolean;
+};
+
 const DEFAULT_POOL_SIZE = 10;
 const DEFAULT_HEALTH_TIMEOUT_MS = 2_000;
 
 export function createDatabase(
   url: string | undefined = process.env.DATABASE_URL,
+  options: DatabaseOptions = {},
 ): Database | null {
+  if (options.forceInMemory) return null;
+
   const trimmedUrl = url?.trim();
   if (!trimmedUrl) return null;
 

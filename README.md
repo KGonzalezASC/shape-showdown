@@ -21,7 +21,8 @@ The goal for Shape Showdown is to evolve it from a single-host VPS game into a c
 
 1. Install dependencies: `bun install`
 2. Optional: copy `.env.example` to `.env` if you use env overrides (see AGENTS.md).
-3. Run the full stack (Vite + game server): `bun run dev`
+3. For solo curated puzzles, run the no-Docker stack: `bun run dev:solo`
+4. For the two-seat multiplayer playtest, run the full stack (Vite + game server): `bun run dev` with the Docker/Postgres setup in [PLAYTEST.md](./PLAYTEST.md)
    Default: **http://localhost:3000**
 
 ### Local client + local server (separate processes)

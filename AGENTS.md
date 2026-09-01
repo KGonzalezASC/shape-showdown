@@ -92,7 +92,7 @@ fixtures/                      # QA / internal only — NOT copied into dist/cli
 | `bun run validate:puzzles` | Emit curated-puzzle validation artifacts under `fixtures/puzzle-validation/` (RulesBot/server only) |
 | `bun run clean` | Remove build artifacts |
 
-**Local playtest (two seats):** see [PLAYTEST.md](./PLAYTEST.md). Helium, two profiles, localhost vs 127.0.0.1, Docker Postgres. Not two tabs on the same origin.
+**Local play paths:** solo curated puzzles use `bun run dev:solo` and need no Docker or Postgres. Two-seat multiplayer still uses [PLAYTEST.md](./PLAYTEST.md), Helium, two profiles, `localhost` vs `127.0.0.1`, Docker Postgres, and `bun run dev`. Do not use two tabs on the same origin for multiplayer.
 
 **Integration test database:** set `TEST_DATABASE_URL` to a disposable Postgres database before
 running `bun run test:integration`. Integration tests ignore the normal `DATABASE_URL`, so a

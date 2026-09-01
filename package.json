@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "bun server.ts",
+    "dev:solo": "cross-env NODE_ENV=development SOLO_MODE=true bun server.ts",
     "dev:server": "cross-env NODE_ENV=development ALLOW_IN_MEMORY_DATABASE=true bun server.ts",
     "dev:client": "bunx vite",
     "dev:local": "cross-env VITE_GAME_SERVER_URL=http://localhost:3000 bunx vite",
