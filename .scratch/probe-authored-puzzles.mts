@@ -1,14 +1,13 @@
-import { buildAuthoredLevels } from './server/puzzle/catalog/authoredLevels.ts';
-import { runPuzzleBaselineBatch } from './server/puzzle/puzzleBaselineBatch.ts';
-import { DEFAULT_PUZZLE_VALIDATION_CANDIDATES, DIAGNOSTIC_OMNISCIENT_CANDIDATES } from './server/puzzle/puzzleValidationArtifact.ts';
-import { derivePuzzleSolution } from './server/puzzle/puzzleSolution.ts';
+import { buildAuthoredLevels } from '../server/puzzle/catalog/authoredLevels.js';
+import { runPuzzleBaselineBatch } from '../server/puzzle/puzzleBaselineBatch.js';
+import { DEFAULT_PUZZLE_VALIDATION_CANDIDATES, DIAGNOSTIC_OMNISCIENT_CANDIDATES } from '../server/puzzle/puzzleValidationArtifact.js';
+import { derivePuzzleSolution } from '../server/puzzle/puzzleSolution.js';
 
 const levels = buildAuthoredLevels();
 for (const level of levels) {
   console.log('\n===', level.id, level.name, '===');
-  console.log('goal', level.goal, 'queue', level.queuePrefix.join(''), 'hold', level.allowHold);
+  console.log('goal', JSON.stringify(level.goal), 'queue', level.queuePrefix.join(''), 'hold', level.allowHold);
   console.log('timeline', JSON.stringify(level.timeline));
-  // print bottom 6 rows
   for (let y = 14; y < 20; y++) {
     const row = level.initialBoard[y].map((c) => (c == null ? '.' : c)).join('');
     console.log(`y${y}: ${row}`);
@@ -18,7 +17,6 @@ for (const level of levels) {
   const batch = runPuzzleBaselineBatch(level, [...DEFAULT_PUZZLE_VALIDATION_CANDIDATES]);
   console.log('player-limited selected', batch.selected ? {
     id: batch.selected.profile.id,
-    solved: batch.selected.report.solved,
     ticks: batch.selected.report.ticksUsed,
     pieces: batch.selected.report.piecesUsed,
     score: batch.selected.report.score,
@@ -36,7 +34,7 @@ for (const level of levels) {
     });
   }
   const diag = runPuzzleBaselineBatch(level, [...DIAGNOSTIC_OMNISCIENT_CANDIDATES]);
-  console.log('omni-batch selected', diag.selected ? {
+  console.log('omni-batch', diag.selected ? {
     id: diag.selected.profile.id,
     ticks: diag.selected.report.ticksUsed,
     pieces: diag.selected.report.piecesUsed,
