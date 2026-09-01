@@ -2,17 +2,17 @@
   "packageVersion": "0.0.0",
   "puzzles": [
     {
-      "puzzleId": "staging-cheese-clear-lines",
-      "contentHash": "e613f9797c8677204989606c4e5918ddda7725c202221bdaf12ab9f86aa21c44",
+      "puzzleId": "authored-cheese-keyhole",
+      "contentHash": "baf963cbafca58b1bc72f8b7d2a29ada8d7b73518c05b76116236443024dc8ae",
       "validationStatus": "passed",
       "visibilityPolicy": "revealed",
       "selectedBaselineProfileId": "player-limited-default"
     },
     {
-      "puzzleId": "staging-well-clear-lines",
-      "contentHash": "9e0dcd56d5a6124aa52a125f7163cc104dc4ac0400de2201ff39e3c1b304972a",
+      "puzzleId": "authored-well-freeze",
+      "contentHash": "34ec1b5386faec7c6ebfa275b136f722433a96930e197fcc22b6dd0eae3ca40a",
       "validationStatus": "passed",
-      "visibilityPolicy": "hidden",
+      "visibilityPolicy": "partial",
       "selectedBaselineProfileId": "player-limited-default"
     }
   ]

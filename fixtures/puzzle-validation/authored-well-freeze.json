@@ -1,18 +1,14 @@
 {
   "schemaVersion": 1,
-  "puzzleId": "staging-cheese-clear-lines",
-  "contentHash": "e613f9797c8677204989606c4e5918ddda7725c202221bdaf12ab9f86aa21c44",
+  "puzzleId": "authored-well-freeze",
+  "contentHash": "34ec1b5386faec7c6ebfa275b136f722433a96930e197fcc22b6dd0eae3ca40a",
   "engineProtocolVersion": 4,
   "packageVersion": "0.0.0",
   "validationStatus": "passed",
   "benchmark": {
-    "metric": "score",
-    "direction": "maximize",
+    "metric": "ticks",
+    "direction": "minimize",
     "tieBreakers": [
-      {
-        "metric": "ticks",
-        "direction": "minimize"
-      },
       {
         "metric": "pieces",
         "direction": "minimize"
@@ -36,10 +32,10 @@
       "qualifies": true,
       "solved": true,
       "topOut": false,
-      "score": 334,
-      "ticksUsed": 87,
-      "piecesUsed": 4,
-      "linesCleared": 2,
+      "score": 716,
+      "ticksUsed": 120,
+      "piecesUsed": 6,
+      "linesCleared": 5,
       "perfectClear": false
     },
     {
@@ -48,30 +44,35 @@
       "qualifies": true,
       "solved": true,
       "topOut": false,
-      "score": 334,
-      "ticksUsed": 87,
-      "piecesUsed": 4,
-      "linesCleared": 2,
+      "score": 716,
+      "ticksUsed": 120,
+      "piecesUsed": 6,
+      "linesCleared": 5,
       "perfectClear": false
     }
   ],
   "selectedBaseline": {
     "profileId": "player-limited-default",
     "profileIdentity": "player-limited-default|v1|player-limited|topology=none|garbage=0|seed=0",
-    "score": 334,
-    "ticksUsed": 87,
-    "piecesUsed": 4,
-    "linesCleared": 2,
+    "score": 716,
+    "ticksUsed": 120,
+    "piecesUsed": 6,
+    "linesCleared": 5,
     "solved": true
   },
   "allowedMechanics": {
     "shopPolicy": "none",
     "allowHold": true
   },
-  "scriptedEvents": [],
-  "visibilityPolicy": "revealed",
+  "scriptedEvents": [
+    {
+      "tick": 55,
+      "kind": "freeze"
+    }
+  ],
+  "visibilityPolicy": "partial",
   "intendedSolutionRefs": [
-    "intended:staging-cheese-clear-lines"
+    "intended:authored-well-freeze"
   ],
   "solutionAlternativeRefs": []
 }

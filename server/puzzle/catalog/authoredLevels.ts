@@ -21,6 +21,15 @@ export function paintGarbageRow(
   }
 }
 
+/** Solid garbage column stack of `height` resting on the floor (no floating cells). */
+export function paintColumnStack(board: CellValue[][], col: number, height: number): void {
+  if (col < 0 || col >= BOARD_COLS) throw new Error(`col out of range: ${col}`);
+  if (height < 0 || height >= BOARD_ROWS) throw new Error(`height out of range: ${height}`);
+  for (let i = 0; i < height; i++) {
+    board[BOARD_ROWS - 1 - i][col] = 'G';
+  }
+}
+
 function freezeLevel<T>(value: T): T {
   return JSON.parse(JSON.stringify(value)) as T;
 }
@@ -33,10 +42,6 @@ function freezeLevel<T>(value: T): T {
 export function buildCheeseKeyholeLevel(): CuratedPuzzleLevel {
   const board = emptyBoard();
   // Bottom → top (rowFromBottom): staggered cheese + central 2x2 keyhole at cols 4-5.
-  // r0: holes 3, 7        — side notches
-  // r1: holes 4, 5, 8     — keyhole bottom + right well
-  // r2: holes 4, 5        — keyhole top (O pocket with r1)
-  // r3: holes 2, 6        — upper stagger (forces follow-up after O)
   paintGarbageRow(board, 0, [3, 7]);
   paintGarbageRow(board, 1, [4, 5, 8]);
   paintGarbageRow(board, 2, [4, 5]);
@@ -60,29 +65,28 @@ export function buildCheeseKeyholeLevel(): CuratedPuzzleLevel {
 }
 
 /**
- * Frozen Well — open center well with a T-slot floor. Hold is useful for the
- * late T; a mid-puzzle freeze locks the hold chamber so timing matters.
+ * Frozen Well — left ramp + right stub basin. Early T is worth holding for the
+ * basin floor; freeze at tick 55 locks hold mid-solve so timing matters.
  */
 export function buildFrozenWellLevel(): CuratedPuzzleLevel {
   const board = emptyBoard();
-  // Center well (col 4) three deep, with a T-flat pocket on the floor (cols 3-5)
-  // and supporting side stacks. No floating cells.
-  // r0: holes 3, 4, 5     — T-slot / well mouth
-  // r1: hole 4            — well
-  // r2: hole 4            — well
-  // r3: holes 4, 8        — well + right cheese hole (second clear target)
-  // r4: hole 8            — stacked over r3 hole (supported column)
-  paintGarbageRow(board, 0, [3, 4, 5]);
-  paintGarbageRow(board, 1, [4]);
-  paintGarbageRow(board, 2, [4]);
-  paintGarbageRow(board, 3, [4, 8]);
-  paintGarbageRow(board, 4, [8]);
+  // Messy basin: deep left ramp, narrow center gaps, right stub wall.
+  // Not a clean I-well — needs several packs to reach 3 line clears.
+  // Heights (supported): 0:5 1:6 2:5 3:2 4:0 5:1 6:2 7:4 8:5 9:5
+  paintColumnStack(board, 0, 5);
+  paintColumnStack(board, 1, 6);
+  paintColumnStack(board, 2, 5);
+  paintColumnStack(board, 3, 2);
+  paintColumnStack(board, 5, 1);
+  paintColumnStack(board, 6, 2);
+  paintColumnStack(board, 7, 4);
+  paintColumnStack(board, 8, 5);
+  paintColumnStack(board, 9, 5);
 
-  // Awkward early T: better held for the floor slot; I plugs the well.
-  // Freeze mid-run so hold-before-freeze is the intended beat.
-  const queuePrefix: ShapeType[] = ['T', 'I', 'L', 'J', 'S', 'Z', 'O'];
+  // Hold the early T for a later floor tuck; S/Z force setup work first.
+  const queuePrefix: ShapeType[] = ['T', 'S', 'Z', 'L', 'J', 'I', 'O'];
   const timeline: TimelineEvent[] = [
-    { tick: 100, kind: 'freeze', params: { durationTicks: 900 } },
+    { tick: 55, kind: 'freeze', params: { durationTicks: 1500 } },
   ];
 
   return freezeLevel({
@@ -91,7 +95,7 @@ export function buildFrozenWellLevel(): CuratedPuzzleLevel {
     seed: 2077,
     initialBoard: board,
     queuePrefix,
-    goal: { kind: 'clear-lines', lines: 2 },
+    goal: { kind: 'clear-lines', lines: 3 },
     timeline,
     shopPolicy: 'none',
     allowHold: true,
