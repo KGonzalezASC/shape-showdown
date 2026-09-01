@@ -117,6 +117,34 @@ describe('puzzleSession', () => {
     assert.ok(report.commandRecords.length > 0);
   });
 
+  it('report lifecycle: mid-play reports stay fresh until the terminal cache', () => {
+    const level = generatePuzzleLevel({
+      id: 'report-lifecycle',
+      name: 'report-lifecycle',
+      seed: 42,
+      garbageRows: 3,
+      messyGarbage: true,
+      goal: { kind: 'clear-lines', lines: 1 },
+    });
+    const session = new PuzzleSession({
+      level,
+      driver: new RulesBot({ mode: 'omniscient' }),
+      maxTicks: 60 * 60,
+    });
+    const first = session.advance(1);
+    assert.equal(first.solved, false);
+    // Keep stepping until solved or safety cap.
+    let report = first;
+    for (let i = 0; i < 60 * 60 && !report.solved && !report.topOut; i++) {
+      report = session.advance(1);
+    }
+    assert.equal(report.solved, true, 'terminal advance must report solved=true');
+    assert.equal(session.isSolved, true);
+    const cached = session.getReport();
+    assert.equal(cached.solved, true);
+    assert.equal(cached.piecesUsed > 0, true);
+  });
+
   it('is deterministic: same seed and driver produce identical reports', () => {
     const level = cleanLevel('det-session', 4242);
     const run = () => {

@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
-  "puzzleId": "staging-clean-pc-hold-off",
-  "contentHash": "c78c1bd143ed08d49d30759c782558e97439c57f7bb708c362088e805a21dd54",
+  "puzzleId": "staging-well-clear-lines",
+  "contentHash": "9e0dcd56d5a6124aa52a125f7163cc104dc4ac0400de2201ff39e3c1b304972a",
   "engineProtocolVersion": 4,
   "packageVersion": "0.0.0",
   "validationStatus": "passed",
@@ -32,11 +32,11 @@
       "qualifies": true,
       "solved": true,
       "topOut": false,
-      "score": 0,
-      "ticksUsed": 1,
-      "piecesUsed": 0,
-      "linesCleared": 0,
-      "perfectClear": true
+      "score": 546,
+      "ticksUsed": 125,
+      "piecesUsed": 7,
+      "linesCleared": 3,
+      "perfectClear": false
     },
     {
       "profileId": "omniscient-surface",
@@ -44,20 +44,20 @@
       "qualifies": true,
       "solved": true,
       "topOut": false,
-      "score": 0,
-      "ticksUsed": 1,
-      "piecesUsed": 0,
-      "linesCleared": 0,
-      "perfectClear": true
+      "score": 546,
+      "ticksUsed": 125,
+      "piecesUsed": 7,
+      "linesCleared": 3,
+      "perfectClear": false
     }
   ],
   "selectedBaseline": {
     "profileId": "default",
     "profileIdentity": "default|v1|omniscient|topology=none|garbage=0|seed=0",
-    "score": 0,
-    "ticksUsed": 1,
-    "piecesUsed": 0,
-    "linesCleared": 0,
+    "score": 546,
+    "ticksUsed": 125,
+    "piecesUsed": 7,
+    "linesCleared": 3,
     "solved": true
   },
   "allowedMechanics": {
@@ -67,7 +67,7 @@
   "scriptedEvents": [],
   "visibilityPolicy": "hidden",
   "intendedSolutionRefs": [
-    "intended:staging-clean-pc-hold-off"
+    "intended:staging-well-clear-lines"
   ],
   "solutionAlternativeRefs": []
 }

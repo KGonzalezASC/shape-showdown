@@ -295,9 +295,12 @@ export class PuzzleSession {
   }
 
   public getReport(): PuzzleSessionReport {
-    if (this.reported) return this.reported;
+    // While playing, rebuild every call so advance()/host see live solved/topOut.
+    // Cache only after the session has ended (stable terminal artifact).
+    if (this.reported && this.gameState.status === 'ended') {
+      return this.reported;
+    }
     const player = this.getPlayerState();
-    const goal: PuzzleGoal = this.level.goal;
     const perfectClear = player.board.every((row) => row.every((cell) => cell === null));
     const report: PuzzleSessionReport = {
       levelId: this.level.id,
@@ -314,7 +317,9 @@ export class PuzzleSession {
       commandRecords: [...this.commandRecords],
       gameState: JSON.parse(JSON.stringify(this.gameState)),
     };
-    this.reported = report;
+    if (this.gameState.status === 'ended') {
+      this.reported = report;
+    }
     return report;
   }
 }

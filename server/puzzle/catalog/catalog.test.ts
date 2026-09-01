@@ -21,6 +21,10 @@ describe('puzzle catalog', () => {
           entry.level.visibilityPolicy === 'partial' ||
           entry.level.visibilityPolicy === 'revealed',
       );
+      assert.ok(
+        entry.level.initialBoard.some((row) => row.some((cell) => cell !== null)),
+        `curated level ${entry.level.id} must start non-empty`,
+      );
     }
   });
 
@@ -60,9 +64,10 @@ describe('puzzle catalog', () => {
       first.map((level) => hashPuzzleContent(level)),
       second.map((level) => hashPuzzleContent(level)),
     );
-    const holdOff = getCuratedPuzzleEntry('staging-clean-pc-hold-off');
+    const holdOff = getCuratedPuzzleEntry('staging-well-clear-lines');
     assert.ok(holdOff);
     assert.equal(holdOff.level.visibilityPolicy, 'hidden');
+    assert.ok(holdOff.level.initialBoard.some((row) => row.some((cell) => cell !== null)));
     assert.equal(holdOff.level.benchmark.metric, 'ticks');
   });
 });
