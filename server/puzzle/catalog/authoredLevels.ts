@@ -66,7 +66,7 @@ export function buildCheeseKeyholeLevel(): CuratedPuzzleLevel {
 
 /**
  * Frozen Well — left ramp + right stub basin. Early T is worth holding for the
- * basin floor; freeze at tick 55 locks hold mid-solve so timing matters.
+ * basin floor; freeze at tick 360 (~6s) locks hold mid-human-solve so early holds matter.
  */
 export function buildFrozenWellLevel(): CuratedPuzzleLevel {
   const board = emptyBoard();
@@ -86,7 +86,8 @@ export function buildFrozenWellLevel(): CuratedPuzzleLevel {
   // Hold the early T for a later floor tuck; S/Z force setup work first.
   const queuePrefix: ShapeType[] = ['T', 'S', 'Z', 'L', 'J', 'I', 'O'];
   const timeline: TimelineEvent[] = [
-    { tick: 55, kind: 'freeze', params: { durationTicks: 1500 } },
+    // ~6s in at 60Hz: several pieces in before hold freezes for ~15s.
+    { tick: 360, kind: 'freeze', params: { durationTicks: 900 } },
   ];
 
   return freezeLevel({

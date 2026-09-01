@@ -125,4 +125,21 @@ describe('PuzzleHost', () => {
     assert.ok(catalog.every((entry) => typeof entry.id === 'string' && typeof entry.name === 'string'));
   });
 
+
+  it('includes referenceBaseline on puzzle:started for curated levels', () => {
+    const { host, socket } = makeHost();
+    const catalogId = listCuratedPuzzleLevels()[0]!.id;
+    host.start({ puzzleId: catalogId, mode: 'catalog' });
+    const started = socket.last('puzzle:started') as {
+      referenceBaseline: { score: number; ticksUsed: number; piecesUsed: number; profileId: string } | null;
+      benchmark?: { metric: string };
+    };
+    assert.ok(started.referenceBaseline);
+    assert.equal(typeof started.referenceBaseline.score, 'number');
+    assert.equal(typeof started.referenceBaseline.ticksUsed, 'number');
+    assert.equal(typeof started.referenceBaseline.piecesUsed, 'number');
+    assert.ok(started.benchmark);
+    host.stop();
+  });
+
 });

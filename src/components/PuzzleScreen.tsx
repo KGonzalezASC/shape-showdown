@@ -43,6 +43,19 @@ interface PuzzleWireState {
   levelName: string;
 }
 
+interface PuzzleReferenceBaseline {
+  score: number;
+  ticksUsed: number;
+  piecesUsed: number;
+  linesCleared: number;
+  profileId: string;
+}
+
+interface PuzzleBenchmarkWire {
+  metric: 'score' | 'ticks' | 'pieces';
+  direction: 'maximize' | 'minimize';
+}
+
 interface PuzzleStarted {
   levelId: string;
   name: string;
@@ -53,6 +66,8 @@ interface PuzzleStarted {
   puzzleId?: string;
   attemptId?: string;
   timeline?: Array<{ tick: number; kind: string }>;
+  benchmark?: PuzzleBenchmarkWire;
+  referenceBaseline?: PuzzleReferenceBaseline | null;
 }
 
 interface PuzzleCatalogEntry {
@@ -115,6 +130,12 @@ const goalLabel = (goal: PuzzleStarted['goal']): string => {
     default:
       return goal.kind;
   }
+};
+
+const baselinePrimaryLabel = (benchmark?: PuzzleBenchmarkWire): string => {
+  if (!benchmark) return 'Beat baseline';
+  const verb = benchmark.direction === 'maximize' ? 'Beat' : 'Stay under';
+  return `${verb} ${benchmark.metric}`;
 };
 
 export const PuzzleScreen: React.FC = () => {
@@ -333,6 +354,46 @@ export const PuzzleScreen: React.FC = () => {
           {state && !picking && <div>Time: {Math.floor(state.tick / 60)}s</div>}
         </div>
       </header>
+
+      {!picking && started?.referenceBaseline && (
+        <div className="w-full max-w-3xl rounded-xl border border-white/10 bg-[#08090d] px-4 py-3">
+          <div className="mb-1 flex items-baseline justify-between gap-2">
+            <p className="text-[10px] font-bold uppercase tracking-wider text-zinc-500">
+              {baselinePrimaryLabel(started.benchmark)}
+            </p>
+            <p className="text-[10px] text-zinc-600">Reference Baseline</p>
+          </div>
+          <div className="flex flex-wrap gap-4 font-mono text-xs tabular-nums text-zinc-300">
+            <span>
+              Score{' '}
+              <strong className="text-emerald-300">{started.referenceBaseline.score}</strong>
+              {state && (
+                <span className="ml-1 text-zinc-500">/ {state.score}</span>
+              )}
+            </span>
+            <span>
+              Pieces{' '}
+              <strong className="text-sky-300">{started.referenceBaseline.piecesUsed}</strong>
+              {state && (
+                <span className="ml-1 text-zinc-500">/ {state.piecesPlaced ?? 0}</span>
+              )}
+            </span>
+            <span>
+              Ticks{' '}
+              <strong className="text-amber-300">{started.referenceBaseline.ticksUsed}</strong>
+              {state && (
+                <span className="ml-1 text-zinc-500">/ {state.tick}</span>
+              )}
+            </span>
+          </div>
+          {finished && end && (
+            <p className="mt-2 text-[10px] text-zinc-500">
+              Your run: {end.score ?? '—'} score · {end.piecesUsed} pieces · {end.ticksUsed} ticks
+              {end.solved ? ' · solved' : end.topOut ? ' · top out' : ''}
+            </p>
+          )}
+        </div>
+      )}
 
       {picking ? (
         <div className="flex w-full max-w-md flex-col gap-3 rounded-xl border border-white/10 bg-[#08090d] p-5">

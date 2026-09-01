@@ -6,6 +6,7 @@ import { PuzzleSession } from './puzzleSession.js';
 import type { PuzzleLevel, PuzzleVisibilityPolicy } from './puzzleTypes.js';
 import { visibleNextQueueCount } from '../../src/puzzle/puzzlePresentation.js';
 import { getCuratedPuzzleEntry, listPuzzleCatalogSummaries, loadPuzzleCatalog } from './catalog/index.js';
+import { loadReferenceBaseline } from './catalog/referenceBaselines.js';
 import type { InputDriver, DriverObservation, PlayerCommand } from '../testHarness/inputDriver.js';
 
 /**
@@ -155,6 +156,8 @@ export class PuzzleHost {
       puzzleId: this.level.id,
       attemptId: this.attemptId,
       timeline: this.level.timeline.map((event) => ({ tick: event.tick, kind: event.kind })),
+      benchmark: this.level.benchmark,
+      referenceBaseline: loadReferenceBaseline(this.level.id),
     });
     this.emitState();
     this.loopHandle = setInterval(() => this.tick(), TICK_MS);
