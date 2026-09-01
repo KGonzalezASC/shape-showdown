@@ -32,6 +32,7 @@
     "test:pricing": "bun scripts/pricing-lab.mts",
     "test:smoke": "bun scripts/live-smoke.mts",
     "test:baseline": "bun scripts/generate-baseline-evidence.mts",
+    "validate:puzzles": "bun scripts/validate-puzzle-baselines.mts",
     "knip": "knip",
     "lint:dead-code": "knip",
     "doctor": "react-doctor --yes --offline --fail-on warning",

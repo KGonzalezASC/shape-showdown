@@ -1,0 +1,17 @@
+{
+  "packageVersion": "0.0.0",
+  "puzzles": [
+    {
+      "puzzleId": "staging-clean-pc",
+      "contentHash": "d79ebaa823310929682f78b6dc45edf3131417987eb385bdb0061ac37b715561",
+      "validationStatus": "passed",
+      "selectedBaselineProfileId": "default"
+    },
+    {
+      "puzzleId": "staging-clean-pc-hold-off",
+      "contentHash": "d60535720658e3372f04824c01051cd4a34282d7bf98fb4a0fb26c00315958a4",
+      "validationStatus": "passed",
+      "selectedBaselineProfileId": "default"
+    }
+  ]
+}

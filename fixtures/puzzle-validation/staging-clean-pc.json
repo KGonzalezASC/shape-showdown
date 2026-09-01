@@ -1,0 +1,75 @@
+{
+  "schemaVersion": 1,
+  "puzzleId": "staging-clean-pc",
+  "contentHash": "d79ebaa823310929682f78b6dc45edf3131417987eb385bdb0061ac37b715561",
+  "engineProtocolVersion": 4,
+  "packageVersion": "0.0.0",
+  "validationStatus": "passed",
+  "benchmark": {
+    "metric": "score",
+    "direction": "maximize",
+    "tieBreakers": [
+      {
+        "metric": "ticks",
+        "direction": "minimize"
+      },
+      {
+        "metric": "pieces",
+        "direction": "minimize"
+      }
+    ]
+  },
+  "batchSize": 2,
+  "candidateProfileIds": [
+    "default",
+    "omniscient-surface"
+  ],
+  "candidateProfileIdentities": [
+    "default|v1|omniscient|topology=none|garbage=0|seed=0",
+    "omniscient-surface|v1|omniscient|topology=surface|garbage=0|seed=0"
+  ],
+  "duplicateProfileIdentities": [],
+  "candidates": [
+    {
+      "profileId": "default",
+      "profileIdentity": "default|v1|omniscient|topology=none|garbage=0|seed=0",
+      "qualifies": true,
+      "solved": true,
+      "topOut": false,
+      "score": 0,
+      "ticksUsed": 1,
+      "piecesUsed": 0,
+      "linesCleared": 0,
+      "perfectClear": true
+    },
+    {
+      "profileId": "omniscient-surface",
+      "profileIdentity": "omniscient-surface|v1|omniscient|topology=surface|garbage=0|seed=0",
+      "qualifies": true,
+      "solved": true,
+      "topOut": false,
+      "score": 0,
+      "ticksUsed": 1,
+      "piecesUsed": 0,
+      "linesCleared": 0,
+      "perfectClear": true
+    }
+  ],
+  "selectedBaseline": {
+    "profileId": "default",
+    "profileIdentity": "default|v1|omniscient|topology=none|garbage=0|seed=0",
+    "score": 0,
+    "ticksUsed": 1,
+    "piecesUsed": 0,
+    "linesCleared": 0,
+    "solved": true
+  },
+  "allowedMechanics": {
+    "shopPolicy": "none",
+    "allowHold": true
+  },
+  "scriptedEvents": [],
+  "visibilityPolicy": "unspecified",
+  "intendedSolutionRefs": [],
+  "solutionAlternativeRefs": []
+}
