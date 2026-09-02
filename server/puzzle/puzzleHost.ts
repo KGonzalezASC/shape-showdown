@@ -99,6 +99,11 @@ export interface PuzzleStateSnapshot {
   levelId: string;
   levelName: string;
   visibilityPolicy?: PuzzleVisibilityPolicy;
+  /** Same poison / wildcard fields multiplayer public snapshots expose. */
+  poisonBoard?: number[][];
+  poisonSpread?: unknown;
+  customNextPieceSourceCells?: [number, number][];
+  curtainDefenseLevel?: number;
 }
 
 /** InputDriver that drains socket-originated input each tick (replaces RulesBot). */
@@ -241,6 +246,11 @@ export class PuzzleHost {
       levelId: this.level.id,
       levelName: this.level.name,
       visibilityPolicy: this.level.visibilityPolicy,
+      // Match multiplayer toPublicPlayerState so GameField can render poison/wildcard.
+      poisonBoard: p.poisonBoard,
+      poisonSpread: p.poisonSpread,
+      customNextPieceSourceCells: p.customNextPieceSourceCells,
+      curtainDefenseLevel: p.curtainDefenseLevel ?? 0,
     };
     this.socket.emit('puzzle:state', snap);
   }

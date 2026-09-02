@@ -43,6 +43,10 @@ interface PuzzleWireState {
   goal: { kind: string; lines?: number; ticks?: number };
   levelId: string;
   levelName: string;
+  poisonBoard?: PublicPlayerState['poisonBoard'];
+  poisonSpread?: PublicPlayerState['poisonSpread'];
+  customNextPieceSourceCells?: PublicPlayerState['customNextPieceSourceCells'];
+  curtainDefenseLevel?: number;
 }
 
 interface PuzzleReferenceBaseline {
@@ -123,6 +127,10 @@ function toPublicPlayerState(snap: PuzzleWireState, myId: string): PublicPlayerS
     pendingGarbage: [],
     topOut: snap.topOut,
     swapCutoffRow: allowHold ? (snap.swapCutoffRow ?? HOLD_SWAP_CUTOFF_VISIBLE_ROW) : 0,
+    poisonBoard: snap.poisonBoard,
+    poisonSpread: snap.poisonSpread ?? null,
+    customNextPieceSourceCells: snap.customNextPieceSourceCells,
+    curtainDefenseLevel: snap.curtainDefenseLevel ?? 0,
     shop: {
       offerIds: [],
       phase: 'waiting',
