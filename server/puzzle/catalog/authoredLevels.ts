@@ -358,7 +358,7 @@ export function buildPoisonBeatLevel(): CuratedPuzzleLevel {
 }
 
 /**
- * Curtain Drop — retrim once, then curtain that loops every 200 ticks after the first fire.
+ * Curtain Drop — retrim once, then curtain that loops with 200 clear ticks after each curtain ends.
  */
 export function buildCurtainDropLevel(): CuratedPuzzleLevel {
   const board = emptyBoard();
@@ -371,7 +371,7 @@ export function buildCurtainDropLevel(): CuratedPuzzleLevel {
   const timeline: TimelineEntry[] = [
     // Retrim once (synergy setup before first curtain).
     { tick: 60, kind: 'retrim' },
-    // First curtain at 180, then every 200 ticks (200 without curtain, then curtain again).
+    // First curtain at 180; after curtain finishes, 200 idle ticks, then curtain again.
     {
       loop: {
         startTick: 180,

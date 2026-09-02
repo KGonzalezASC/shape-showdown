@@ -78,19 +78,7 @@
       "kind": "curtain"
     },
     {
-      "tick": 380,
-      "kind": "curtain"
-    },
-    {
-      "tick": 580,
-      "kind": "curtain"
-    },
-    {
-      "tick": 780,
-      "kind": "curtain"
-    },
-    {
-      "tick": 980,
+      "tick": 680,
       "kind": "curtain"
     },
     {
@@ -98,19 +86,7 @@
       "kind": "curtain"
     },
     {
-      "tick": 1380,
-      "kind": "curtain"
-    },
-    {
-      "tick": 1580,
-      "kind": "curtain"
-    },
-    {
-      "tick": 1780,
-      "kind": "curtain"
-    },
-    {
-      "tick": 1980,
+      "tick": 1680,
       "kind": "curtain"
     },
     {
@@ -118,31 +94,11 @@
       "kind": "curtain"
     },
     {
-      "tick": 2380,
-      "kind": "curtain"
-    },
-    {
-      "tick": 2580,
-      "kind": "curtain"
-    },
-    {
-      "tick": 2780,
-      "kind": "curtain"
-    },
-    {
-      "tick": 2980,
+      "tick": 2680,
       "kind": "curtain"
     },
     {
       "tick": 3180,
-      "kind": "curtain"
-    },
-    {
-      "tick": 3380,
-      "kind": "curtain"
-    },
-    {
-      "tick": 3580,
       "kind": "curtain"
     }
   ],

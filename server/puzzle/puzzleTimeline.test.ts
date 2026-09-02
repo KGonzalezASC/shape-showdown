@@ -2,6 +2,7 @@ import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   assertValidTimelineLoop,
+  hazardOccupiedTicks,
   materializeTimeline,
   offsetTimelineEntries,
 } from './puzzleTimeline.js';
@@ -11,34 +12,38 @@ import { generatePuzzleLevel } from './puzzleGenerator.js';
 import { RulesBot } from '../testHarness/rulesBot.js';
 import { buildCurtainDropLevel } from './catalog/authoredLevels.js';
 import type { TimelineEntry } from './puzzleTypes.js';
+import { CURTAIN_DURATION_TICKS, CURTAIN_TELEGRAPH_TICKS } from '../../src/constants.js';
+
+const CURTAIN_OCCUPIED = CURTAIN_TELEGRAPH_TICKS + CURTAIN_DURATION_TICKS; // 300
+const CURTAIN_LOOP_IDLE = 200;
+const CURTAIN_LOOP_STRIDE = CURTAIN_OCCUPIED + CURTAIN_LOOP_IDLE; // 500
 
 describe('puzzle timeline loops', () => {
-  it('materializes a looping sequence at period boundaries', () => {
+  it('materializes a lasting curtain loop with idle gap after effect ends', () => {
+    assert.equal(hazardOccupiedTicks('curtain'), CURTAIN_OCCUPIED);
     const entries: TimelineEntry[] = [
       { tick: 60, kind: 'retrim' },
       {
         loop: {
           startTick: 180,
-          periodTicks: 200,
+          periodTicks: CURTAIN_LOOP_IDLE,
           sequence: [{ at: 0, kind: 'curtain' }],
         },
       },
     ];
-    const events = materializeTimeline(entries, 980);
+    const events = materializeTimeline(entries, 180 + CURTAIN_LOOP_STRIDE * 2);
     assert.deepEqual(
       events.map((e) => ({ tick: e.tick, kind: e.kind })),
       [
         { tick: 60, kind: 'retrim' },
         { tick: 180, kind: 'curtain' },
-        { tick: 380, kind: 'curtain' },
-        { tick: 580, kind: 'curtain' },
-        { tick: 780, kind: 'curtain' },
-        { tick: 980, kind: 'curtain' },
+        { tick: 180 + CURTAIN_LOOP_STRIDE, kind: 'curtain' },
+        { tick: 180 + CURTAIN_LOOP_STRIDE * 2, kind: 'curtain' },
       ],
     );
   });
 
-  it('materializes multi-beat loop sequences', () => {
+  it('materializes multi-beat instant loop sequences with absolute period', () => {
     const events = materializeTimeline(
       [
         {
@@ -109,12 +114,12 @@ describe('puzzle timeline loops', () => {
     assert.equal('loop' in offset[1] && offset[1].loop.startTick, 180);
   });
 
-  it('authored curtain-drop loops curtain every 200 ticks after first fire', () => {
+  it('authored curtain-drop waits for curtain end then 200 idle ticks', () => {
     const level = buildCurtainDropLevel();
-    const events = materializeTimeline(level.timeline, 980);
+    const events = materializeTimeline(level.timeline, 180 + CURTAIN_LOOP_STRIDE * 2);
     assert.deepEqual(
       events.filter((e) => e.kind === 'curtain').map((e) => e.tick),
-      [180, 380, 580, 780, 980],
+      [180, 180 + CURTAIN_LOOP_STRIDE, 180 + CURTAIN_LOOP_STRIDE * 2],
     );
     assert.deepEqual(
       events.filter((e) => e.kind === 'retrim').map((e) => e.tick),
@@ -122,13 +127,13 @@ describe('puzzle timeline loops', () => {
     );
   });
 
-  it('PuzzleSession fires looping curtains at expected ticks', () => {
+  it('PuzzleSession does not fire next curtain while prior curtain is active', () => {
     const level = generatePuzzleLevel({
       id: 'loop-curtain-session',
       name: 'loop-curtain-session',
       seed: 3,
       garbageRows: 2,
-      goal: { kind: 'survive', ticks: 700 },
+      goal: { kind: 'survive', ticks: 1300 },
       timeline: [],
     });
     level.timeline = [
@@ -136,7 +141,7 @@ describe('puzzle timeline loops', () => {
       {
         loop: {
           startTick: 180,
-          periodTicks: 200,
+          periodTicks: CURTAIN_LOOP_IDLE,
           sequence: [{ at: 0, kind: 'curtain' }],
         },
       },
@@ -144,22 +149,42 @@ describe('puzzle timeline loops', () => {
     const session = new PuzzleSession({
       level,
       driver: new RulesBot({ mode: 'omniscient' }),
-      maxTicks: 700,
+      maxTicks: 1300,
     });
 
     const fireTicks: number[] = [];
     let lastCurtainPending = 0;
-    for (let t = 0; t < 700; t += 1) {
+    for (let t = 0; t < 1300; t += 1) {
       session.advance(1);
-      const pending = session
-        .getPlayerState()
-        .pendingShopEffects.filter((e) => e.itemId === 'curtain').length;
+      const player = session.getPlayerState();
+      const pending = player.pendingShopEffects.filter((e) => e.itemId === 'curtain').length;
       if (pending > lastCurtainPending) {
-        fireTicks.push(session.tick - 1);
+        const fireTick = session.tick - 1;
+        fireTicks.push(fireTick);
+        // Fresh warn is pushed on this fire; prior blackout must already be gone.
+        if (fireTicks.length > 1) {
+          assert.equal(
+            (player.activeEffects ?? []).filter((e) => e.kind === 'curtain').length,
+            0,
+            `curtain still active at next fire tick ${fireTick}`,
+          );
+          assert.equal(
+            pending,
+            1,
+            `curtains stacked at fire tick ${fireTick}`,
+          );
+        }
       }
       lastCurtainPending = pending;
       if (session.isEnded) break;
     }
-    assert.deepEqual(fireTicks, [180, 380, 580]);
+
+    assert.deepEqual(fireTicks, [180, 180 + CURTAIN_LOOP_STRIDE, 180 + CURTAIN_LOOP_STRIDE * 2]);
+    for (let i = 1; i < fireTicks.length; i += 1) {
+      const prev = fireTicks[i - 1]!;
+      const next = fireTicks[i]!;
+      assert.equal(next, prev + CURTAIN_OCCUPIED + CURTAIN_LOOP_IDLE);
+      assert.ok(next >= prev + CURTAIN_OCCUPIED + CURTAIN_LOOP_IDLE);
+    }
   });
 });

@@ -30,11 +30,17 @@ export interface TimelineLoopBeat {
 }
 
 /**
- * Repeat `sequence` every `periodTicks` starting at `startTick` (first iteration included).
+ * Repeat `sequence` starting at `startTick` (first iteration included).
  * Materialized to TimelineEvent[] up to a session horizon before application.
+ *
+ * `periodTicks` meaning:
+ * - Instant hazards only: absolute start-to-start stride (legacy).
+ * - Lasting hazards (e.g. curtain): idle clear gap *after* the prior iteration's
+ *   effect ends (telegraph + active), then the sequence fires again.
  */
 export interface TimelineLoop {
   startTick: number;
+  /** Idle gap (lasting) or start-to-start period (instant-only). See interface doc. */
   periodTicks: number;
   sequence: TimelineLoopBeat[];
 }

@@ -1,9 +1,38 @@
 import type { HazardKind, TimelineEntry, TimelineEvent, TimelineLoop } from './puzzleTypes.js';
+import { CURTAIN_DURATION_TICKS, CURTAIN_TELEGRAPH_TICKS } from '../../src/constants.js';
 
 export function isTimelineLoopEntry(
   entry: TimelineEntry,
 ): entry is { loop: TimelineLoop } {
   return typeof entry === 'object' && entry !== null && 'loop' in entry;
+}
+
+/**
+ * Ticks from fire until a lasting hazard is fully clear (warn + active).
+ * Instant hazards return 0 so loop periodTicks stays an absolute start-to-start stride.
+ */
+export function hazardOccupiedTicks(kind: HazardKind): number {
+  switch (kind) {
+    case 'curtain':
+      // Telegraph pending/warn, then blackout duration — matches shop + engine.
+      return CURTAIN_TELEGRAPH_TICKS + CURTAIN_DURATION_TICKS;
+    default:
+      return 0;
+  }
+}
+
+/** How long a loop iteration occupies the board before the idle gap may begin. */
+export function loopIterationOccupiedTicks(sequence: TimelineLoop['sequence']): number {
+  let occupied = 0;
+  for (const beat of sequence) {
+    occupied = Math.max(occupied, beat.at + hazardOccupiedTicks(beat.kind));
+  }
+  return occupied;
+}
+
+/** True when any beat has a lasting (non-instant) hazard. */
+export function loopHasLastingHazard(sequence: TimelineLoop['sequence']): boolean {
+  return sequence.some((beat) => hazardOccupiedTicks(beat.kind) > 0);
 }
 
 /** Expand authored timeline entries (including loops) into absolute fire events up to untilTick inclusive. */
@@ -20,17 +49,43 @@ export function materializeTimeline(
   for (const entry of entries) {
     if (isTimelineLoopEntry(entry)) {
       const { startTick, periodTicks, sequence } = entry.loop;
-      for (let iter = 0; ; iter += 1) {
-        const base = startTick + iter * periodTicks;
-        if (base > untilTick) break;
-        for (const beat of sequence) {
-          const tick = base + beat.at;
-          if (tick > untilTick) continue;
-          out.push({
-            tick,
-            kind: beat.kind,
-            ...(beat.params !== undefined ? { params: beat.params } : {}),
-          });
+      const lasting = loopHasLastingHazard(sequence);
+      if (lasting) {
+        // periodTicks = idle gap after the lasting effect ends (not fire-to-fire).
+        const occupied = loopIterationOccupiedTicks(sequence);
+        let base = startTick;
+        while (base <= untilTick) {
+          for (const beat of sequence) {
+            const tick = base + beat.at;
+            if (tick > untilTick) continue;
+            out.push({
+              tick,
+              kind: beat.kind,
+              ...(beat.params !== undefined ? { params: beat.params } : {}),
+            });
+          }
+          const stride = occupied + periodTicks;
+          if (stride <= 0) {
+            throw new Error(
+              `materializeTimeline: lasting loop stride must be positive (occupied=${occupied}, period=${periodTicks})`,
+            );
+          }
+          base += stride;
+        }
+      } else {
+        // Instant hazards: periodTicks is the absolute start-to-start period.
+        for (let iter = 0; ; iter += 1) {
+          const base = startTick + iter * periodTicks;
+          if (base > untilTick) break;
+          for (const beat of sequence) {
+            const tick = base + beat.at;
+            if (tick > untilTick) continue;
+            out.push({
+              tick,
+              kind: beat.kind,
+              ...(beat.params !== undefined ? { params: beat.params } : {}),
+            });
+          }
         }
       }
     } else {
