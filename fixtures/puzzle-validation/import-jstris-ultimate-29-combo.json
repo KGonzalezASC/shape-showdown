@@ -1,0 +1,82 @@
+{
+  "schemaVersion": 1,
+  "puzzleId": "import-jstris-ultimate-29-combo",
+  "contentHash": "9c5ffedb4c10a6480e1c774601da78c460a5b08c69306c1414f47dc254157a77",
+  "engineProtocolVersion": 4,
+  "packageVersion": "0.0.0",
+  "validationStatus": "passed",
+  "benchmark": {
+    "metric": "score",
+    "direction": "maximize",
+    "tieBreakers": [
+      {
+        "metric": "ticks",
+        "direction": "minimize"
+      },
+      {
+        "metric": "pieces",
+        "direction": "minimize"
+      }
+    ]
+  },
+  "batchSize": 2,
+  "candidateProfileIds": [
+    "player-limited-default",
+    "player-limited-surface"
+  ],
+  "candidateProfileIdentities": [
+    "player-limited-default|v1|player-limited|topology=none|garbage=0|seed=0",
+    "player-limited-surface|v1|player-limited|topology=surface|garbage=0|seed=0"
+  ],
+  "duplicateProfileIdentities": [],
+  "candidates": [
+    {
+      "profileId": "player-limited-default",
+      "profileIdentity": "player-limited-default|v1|player-limited|topology=none|garbage=0|seed=0",
+      "qualifies": true,
+      "solved": true,
+      "topOut": false,
+      "score": 1202,
+      "ticksUsed": 353,
+      "piecesUsed": 18,
+      "linesCleared": 8,
+      "perfectClear": false
+    },
+    {
+      "profileId": "player-limited-surface",
+      "profileIdentity": "player-limited-surface|v1|player-limited|topology=surface|garbage=0|seed=0",
+      "qualifies": true,
+      "solved": true,
+      "topOut": false,
+      "score": 1202,
+      "ticksUsed": 353,
+      "piecesUsed": 18,
+      "linesCleared": 8,
+      "perfectClear": false
+    }
+  ],
+  "selectedBaseline": {
+    "profileId": "player-limited-default",
+    "profileIdentity": "player-limited-default|v1|player-limited|topology=none|garbage=0|seed=0",
+    "score": 1202,
+    "ticksUsed": 353,
+    "piecesUsed": 18,
+    "linesCleared": 8,
+    "solved": true
+  },
+  "allowedMechanics": {
+    "shopPolicy": "none",
+    "allowHold": true
+  },
+  "scriptedEvents": [
+    {
+      "tick": 360,
+      "kind": "freeze"
+    }
+  ],
+  "visibilityPolicy": "revealed",
+  "intendedSolutionRefs": [
+    "intended:import-jstris-ultimate-29-combo"
+  ],
+  "solutionAlternativeRefs": []
+}

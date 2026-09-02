@@ -93,8 +93,15 @@
       "selectedBaselineProfileId": "player-limited-default"
     },
     {
-      "puzzleId": "import-ronylicha-master-61",
-      "contentHash": "68d4126cc584fc4326737ae9730b2ff8a9b21f8ef4da56420f359295b9eb6f5f",
+      "puzzleId": "import-jstris-ultimate-29-combo",
+      "contentHash": "9c5ffedb4c10a6480e1c774601da78c460a5b08c69306c1414f47dc254157a77",
+      "validationStatus": "passed",
+      "visibilityPolicy": "revealed",
+      "selectedBaselineProfileId": "player-limited-default"
+    },
+    {
+      "puzzleId": "import-fumen-c4w-3res",
+      "contentHash": "84519be8f616d6f14856179bdc2472b432a69fd8b54d2864a914b9b8a306e677",
       "validationStatus": "passed",
       "visibilityPolicy": "partial",
       "selectedBaselineProfileId": "player-limited-default"

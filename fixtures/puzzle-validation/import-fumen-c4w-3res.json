@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
-  "puzzleId": "import-ronylicha-master-61",
-  "contentHash": "68d4126cc584fc4326737ae9730b2ff8a9b21f8ef4da56420f359295b9eb6f5f",
+  "puzzleId": "import-fumen-c4w-3res",
+  "contentHash": "84519be8f616d6f14856179bdc2472b432a69fd8b54d2864a914b9b8a306e677",
   "engineProtocolVersion": 4,
   "packageVersion": "0.0.0",
   "validationStatus": "passed",
@@ -36,32 +36,32 @@
       "qualifies": true,
       "solved": true,
       "topOut": false,
-      "score": 658,
-      "ticksUsed": 264,
-      "piecesUsed": 12,
-      "linesCleared": 4,
+      "score": 906,
+      "ticksUsed": 77,
+      "piecesUsed": 8,
+      "linesCleared": 6,
       "perfectClear": false
     },
     {
       "profileId": "player-limited-surface",
       "profileIdentity": "player-limited-surface|v1|player-limited|topology=surface|garbage=0|seed=0",
-      "qualifies": false,
-      "solved": false,
-      "topOut": true,
-      "score": 540,
-      "ticksUsed": 997,
-      "piecesUsed": 17,
-      "linesCleared": 3,
+      "qualifies": true,
+      "solved": true,
+      "topOut": false,
+      "score": 906,
+      "ticksUsed": 77,
+      "piecesUsed": 8,
+      "linesCleared": 6,
       "perfectClear": false
     }
   ],
   "selectedBaseline": {
     "profileId": "player-limited-default",
     "profileIdentity": "player-limited-default|v1|player-limited|topology=none|garbage=0|seed=0",
-    "score": 658,
-    "ticksUsed": 264,
-    "piecesUsed": 12,
-    "linesCleared": 4,
+    "score": 906,
+    "ticksUsed": 77,
+    "piecesUsed": 8,
+    "linesCleared": 6,
     "solved": true
   },
   "allowedMechanics": {
@@ -70,13 +70,13 @@
   },
   "scriptedEvents": [
     {
-      "tick": 240,
+      "tick": 300,
       "kind": "freeze"
     }
   ],
   "visibilityPolicy": "partial",
   "intendedSolutionRefs": [
-    "intended:import-ronylicha-master-61"
+    "intended:import-fumen-c4w-3res"
   ],
   "solutionAlternativeRefs": []
 }
