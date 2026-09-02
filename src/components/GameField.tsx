@@ -50,6 +50,12 @@ interface GameFieldProps {
   showFunds?: boolean;
   /** Match chrome: guest/display name row. Hide for solo puzzles. */
   showPlayerName?: boolean;
+  /**
+   * When false (solo puzzles like Four Wide), storage is disabled entirely.
+   * Distinct from multiplayer `canHold === false` ("Used this piece").
+   * Default / undefined = enabled.
+   */
+  allowHold?: boolean;
   /** Current replay tick used to show remaining effect duration. */
   effectTick?: number;
   /** Replay-only counterfactual placement overlay for the inspected player. */
@@ -164,6 +170,7 @@ const GameField = forwardRef<GameFieldRef, GameFieldProps>(({
   showEffectPills = false,
   showFunds = true,
   showPlayerName = true,
+  allowHold = true,
   effectTick,
   replayCandidateOverlay = null,
 }, ref) => {
@@ -341,26 +348,31 @@ const GameField = forwardRef<GameFieldRef, GameFieldProps>(({
     );
   }, [heldPiece]);
   const holdPreviewCell = Math.max(5, Math.round(cellSize * 0.31));
-  const swapZoneText = `Swap rows 0-${cutoffRow - 1}`;
+  const storageDisabled = allowHold === false;
+  const swapZoneText = storageDisabled
+    ? 'Hold unavailable'
+    : `Swap rows 0-${cutoffRow - 1}`;
   const swapLineY = cutoffRow * cellSize;
-  const showSwapLine = isMe && cutoffRow > 0 && cutoffRow < BOARD_VISIBLE_ROWS;
+  const showSwapLine = isMe && !storageDisabled && cutoffRow > 0 && cutoffRow < BOARD_VISIBLE_ROWS;
 
   const storageFrozen = isMe && activeEffects.some((e) => e.kind === 'freeze');
   const snagged = isMe && !!player.snagHardDropBlocked;
   const holdPoisoned = !!player.activePiece?.poisoned;
-  const holdStatus = storageFrozen
-    ? { text: 'Frozen — no store/swap', tone: 'text-sky-300' }
-    : holdPoisoned
-      ? { text: 'Poisoned — no hold', tone: 'text-fuchsia-300' }
-      : snagged
-        ? { text: 'Snagged — no hard drop', tone: 'text-orange-300' }
-        : !player.activePiece
-          ? { text: 'No active piece', tone: 'text-zinc-300' }
-          : !player.canHold
-            ? { text: 'Used this piece', tone: 'text-amber-300' }
-            : !canHoldByHeight
-              ? { text: 'Past swap line', tone: 'text-rose-300' }
-              : { text: 'Ready', tone: 'text-emerald-300' };
+  const holdStatus = storageDisabled
+    ? { text: 'Storage disabled', tone: 'text-rose-400' }
+    : storageFrozen
+      ? { text: 'Frozen — no store/swap', tone: 'text-sky-300' }
+      : holdPoisoned
+        ? { text: 'Poisoned — no hold', tone: 'text-fuchsia-300' }
+        : snagged
+          ? { text: 'Snagged — no hard drop', tone: 'text-orange-300' }
+          : !player.activePiece
+            ? { text: 'No active piece', tone: 'text-zinc-300' }
+            : !player.canHold
+              ? { text: 'Used this piece', tone: 'text-amber-300' }
+              : !canHoldByHeight
+                ? { text: 'Past swap line', tone: 'text-rose-300' }
+                : { text: 'Ready', tone: 'text-emerald-300' };
 
   const playerName =
     player.displayName ||
@@ -680,10 +692,24 @@ const GameField = forwardRef<GameFieldRef, GameFieldProps>(({
               </div>
             ) : (
               <div
-                className="flex items-center justify-center border border-dashed border-zinc-700 text-[10px] font-mono text-zinc-500"
+                className={`relative flex items-center justify-center border border-dashed text-[10px] font-mono ${
+                  storageDisabled
+                    ? 'border-rose-500/50 bg-rose-950/40 text-rose-400'
+                    : 'border-zinc-700 text-zinc-500'
+                }`}
                 style={{ width: HOLD_PREVIEW_SIZE * holdPreviewCell, height: HOLD_PREVIEW_SIZE * holdPreviewCell }}
+                aria-label={storageDisabled ? 'Storage disabled' : 'Empty storage'}
               >
-                EMPTY
+                {storageDisabled ? (
+                  <span
+                    className="pointer-events-none select-none text-4xl font-black leading-none text-rose-500"
+                    aria-hidden
+                  >
+                    ✕
+                  </span>
+                ) : (
+                  'EMPTY'
+                )}
               </div>
             )}
           </div>
@@ -705,7 +731,8 @@ export default React.memo(GameField, (prev, next) => {
     prev.decorationSeed !== next.decorationSeed ||
     prev.faceGrowthStartedAtMs !== next.faceGrowthStartedAtMs ||
     prev.showFunds !== next.showFunds ||
-    prev.showPlayerName !== next.showPlayerName
+    prev.showPlayerName !== next.showPlayerName ||
+    prev.allowHold !== next.allowHold
   ) {
     return false;
   }

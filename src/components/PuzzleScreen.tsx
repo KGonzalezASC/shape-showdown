@@ -509,9 +509,10 @@ export const PuzzleScreen: React.FC = () => {
                 player={player}
                 isMe
                 title="Puzzle"
-            showFunds={false}
-            showPlayerName={false}
-            hatchingEnabled={false}
+                showFunds={false}
+                showPlayerName={false}
+                hatchingEnabled={false}
+                allowHold={started?.allowHold !== false}
                 status={finished ? 'ended' : 'playing'}
               />
             ) : (
