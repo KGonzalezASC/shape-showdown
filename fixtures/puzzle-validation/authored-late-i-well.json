@@ -1,0 +1,77 @@
+{
+  "schemaVersion": 1,
+  "puzzleId": "authored-late-i-well",
+  "contentHash": "cda8ef5a14bd9b3c90b40079e39fd3c1266d9873daa2989ecfaefff10c84cb2b",
+  "engineProtocolVersion": 4,
+  "packageVersion": "0.0.0",
+  "validationStatus": "passed",
+  "benchmark": {
+    "metric": "score",
+    "direction": "maximize",
+    "tieBreakers": [
+      {
+        "metric": "ticks",
+        "direction": "minimize"
+      },
+      {
+        "metric": "pieces",
+        "direction": "minimize"
+      }
+    ]
+  },
+  "batchSize": 2,
+  "candidateProfileIds": [
+    "player-limited-default",
+    "player-limited-surface"
+  ],
+  "candidateProfileIdentities": [
+    "player-limited-default|v1|player-limited|topology=none|garbage=0|seed=0",
+    "player-limited-surface|v1|player-limited|topology=surface|garbage=0|seed=0"
+  ],
+  "duplicateProfileIdentities": [],
+  "candidates": [
+    {
+      "profileId": "player-limited-default",
+      "profileIdentity": "player-limited-default|v1|player-limited|topology=none|garbage=0|seed=0",
+      "qualifies": true,
+      "solved": true,
+      "topOut": false,
+      "score": 626,
+      "ticksUsed": 178,
+      "piecesUsed": 7,
+      "linesCleared": 4,
+      "perfectClear": false
+    },
+    {
+      "profileId": "player-limited-surface",
+      "profileIdentity": "player-limited-surface|v1|player-limited|topology=surface|garbage=0|seed=0",
+      "qualifies": true,
+      "solved": true,
+      "topOut": false,
+      "score": 626,
+      "ticksUsed": 178,
+      "piecesUsed": 7,
+      "linesCleared": 4,
+      "perfectClear": false
+    }
+  ],
+  "selectedBaseline": {
+    "profileId": "player-limited-default",
+    "profileIdentity": "player-limited-default|v1|player-limited|topology=none|garbage=0|seed=0",
+    "score": 626,
+    "ticksUsed": 178,
+    "piecesUsed": 7,
+    "linesCleared": 4,
+    "solved": true
+  },
+  "allowedMechanics": {
+    "shopPolicy": "none",
+    "allowHold": true
+  },
+  "scriptedEvents": [],
+  "visibilityPolicy": "revealed",
+  "intendedSolutionRefs": [
+    "intended:authored-late-i-well"
+  ],
+  "solutionAlternativeRefs": []
+}

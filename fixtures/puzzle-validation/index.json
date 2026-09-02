@@ -28,6 +28,62 @@
       "validationStatus": "passed",
       "visibilityPolicy": "hidden",
       "selectedBaselineProfileId": "player-limited-default"
+    },
+    {
+      "puzzleId": "authored-cheese-ladder",
+      "contentHash": "3c8f099ffe857092ac077cbc7ad5530962de10a2311beed25081cbe30ebffd7b",
+      "validationStatus": "passed",
+      "visibilityPolicy": "revealed",
+      "selectedBaselineProfileId": "player-limited-default"
+    },
+    {
+      "puzzleId": "authored-dig-shaft",
+      "contentHash": "4f91e84a840cf606041c88f8bc28df83f855ffb61a9fd416271db3a86e803d7a",
+      "validationStatus": "passed",
+      "visibilityPolicy": "revealed",
+      "selectedBaselineProfileId": "player-limited-default"
+    },
+    {
+      "puzzleId": "authored-tslot-setup",
+      "contentHash": "c9bc33a9044ee827658bda489d5066e1dba26a7808b7afcb0a6914d1f5e02a6b",
+      "validationStatus": "passed",
+      "visibilityPolicy": "partial",
+      "selectedBaselineProfileId": "player-limited-default"
+    },
+    {
+      "puzzleId": "authored-four-wide",
+      "contentHash": "cb82e8c532340f8339569c351895109c757f62f4358f2778652ff4763d58ff37",
+      "validationStatus": "passed",
+      "visibilityPolicy": "revealed",
+      "selectedBaselineProfileId": "player-limited-default"
+    },
+    {
+      "puzzleId": "authored-hold-discipline",
+      "contentHash": "5a118ddc17fd52ba6465e0cbbaa287506c7f9be1e7656048ef952cb8a2981b29",
+      "validationStatus": "passed",
+      "visibilityPolicy": "partial",
+      "selectedBaselineProfileId": "player-limited-default"
+    },
+    {
+      "puzzleId": "authored-poison-beat",
+      "contentHash": "ca380a7105a23cfd69f47edcb9c981e2e4ec3fd30e8b8d3f9c07cf05011ebc2b",
+      "validationStatus": "passed",
+      "visibilityPolicy": "hidden",
+      "selectedBaselineProfileId": "player-limited-default"
+    },
+    {
+      "puzzleId": "authored-curtain-drop",
+      "contentHash": "a1a1c1119c7f2e0f3bc36e31e8a178a1949ee4cad2b72bc7d841c804d2b41a76",
+      "validationStatus": "passed",
+      "visibilityPolicy": "partial",
+      "selectedBaselineProfileId": "player-limited-default"
+    },
+    {
+      "puzzleId": "authored-late-i-well",
+      "contentHash": "cda8ef5a14bd9b3c90b40079e39fd3c1266d9873daa2989ecfaefff10c84cb2b",
+      "validationStatus": "passed",
+      "visibilityPolicy": "revealed",
+      "selectedBaselineProfileId": "player-limited-default"
     }
   ]
 }
