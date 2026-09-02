@@ -415,7 +415,7 @@ export function buildCurtainDropLevel(): CuratedPuzzleLevel {
     seed: 11770,
     initialBoard: board,
     queuePrefix,
-    goal: { kind: 'clear-lines', lines: 2 },
+    goal: { kind: 'clear-lines', lines: 14 },
     timeline,
     shopPolicy: 'none',
     allowHold: true,
