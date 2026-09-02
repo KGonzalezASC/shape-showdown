@@ -31,56 +31,56 @@
     },
     {
       "puzzleId": "authored-cheese-ladder",
-      "contentHash": "3c8f099ffe857092ac077cbc7ad5530962de10a2311beed25081cbe30ebffd7b",
+      "contentHash": "1c87b3522dfbb1ef3da22b8852e67a1621a5610741d1a8ee36399b2d2dec6b4b",
       "validationStatus": "passed",
       "visibilityPolicy": "revealed",
       "selectedBaselineProfileId": "player-limited-default"
     },
     {
       "puzzleId": "authored-dig-shaft",
-      "contentHash": "4f91e84a840cf606041c88f8bc28df83f855ffb61a9fd416271db3a86e803d7a",
+      "contentHash": "15cad7656d0c44e5eaf623ee9dba23e26ec856c86d277d7c2ce5775c810da3a4",
+      "validationStatus": "passed",
+      "visibilityPolicy": "partial",
+      "selectedBaselineProfileId": "player-limited-surface"
+    },
+    {
+      "puzzleId": "authored-tslot-setup",
+      "contentHash": "b723fb8a75d701c89e8a634769bbc2e24af82232b0a982f76310e28c49470712",
       "validationStatus": "passed",
       "visibilityPolicy": "revealed",
       "selectedBaselineProfileId": "player-limited-default"
     },
     {
-      "puzzleId": "authored-tslot-setup",
-      "contentHash": "c9bc33a9044ee827658bda489d5066e1dba26a7808b7afcb0a6914d1f5e02a6b",
-      "validationStatus": "passed",
-      "visibilityPolicy": "partial",
-      "selectedBaselineProfileId": "player-limited-default"
-    },
-    {
       "puzzleId": "authored-four-wide",
-      "contentHash": "cb82e8c532340f8339569c351895109c757f62f4358f2778652ff4763d58ff37",
+      "contentHash": "72d4e03fb951fc465e8f6686a892474f99a20776a4ac85a6edc2ff651251d694",
       "validationStatus": "passed",
       "visibilityPolicy": "revealed",
       "selectedBaselineProfileId": "player-limited-default"
     },
     {
       "puzzleId": "authored-hold-discipline",
-      "contentHash": "5a118ddc17fd52ba6465e0cbbaa287506c7f9be1e7656048ef952cb8a2981b29",
+      "contentHash": "986ff39449611a9a7dcb8328b1ae509515525616b4e01f4e1810a226132d80f0",
       "validationStatus": "passed",
       "visibilityPolicy": "partial",
-      "selectedBaselineProfileId": "player-limited-default"
+      "selectedBaselineProfileId": "player-limited-surface"
     },
     {
       "puzzleId": "authored-poison-beat",
-      "contentHash": "ca380a7105a23cfd69f47edcb9c981e2e4ec3fd30e8b8d3f9c07cf05011ebc2b",
+      "contentHash": "1e831c7922ac2a3868db9cae07382a1866e36f63d5349ec0c9281c7b6c33efd1",
+      "validationStatus": "passed",
+      "visibilityPolicy": "partial",
+      "selectedBaselineProfileId": "player-limited-surface"
+    },
+    {
+      "puzzleId": "authored-curtain-drop",
+      "contentHash": "3d94985bb494968d2ec5188308b37d67d79fcd6f9172d063db1a933ba77c4c98",
       "validationStatus": "passed",
       "visibilityPolicy": "hidden",
       "selectedBaselineProfileId": "player-limited-default"
     },
     {
-      "puzzleId": "authored-curtain-drop",
-      "contentHash": "a1a1c1119c7f2e0f3bc36e31e8a178a1949ee4cad2b72bc7d841c804d2b41a76",
-      "validationStatus": "passed",
-      "visibilityPolicy": "partial",
-      "selectedBaselineProfileId": "player-limited-default"
-    },
-    {
       "puzzleId": "authored-late-i-well",
-      "contentHash": "cda8ef5a14bd9b3c90b40079e39fd3c1266d9873daa2989ecfaefff10c84cb2b",
+      "contentHash": "1bbfc142352f94aab892fbed837465f402f6f06a70b79548fd8cd9e5a84c8544",
       "validationStatus": "passed",
       "visibilityPolicy": "revealed",
       "selectedBaselineProfileId": "player-limited-default"

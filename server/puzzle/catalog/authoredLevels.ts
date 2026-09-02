@@ -178,18 +178,20 @@ export function buildPulseGarbageLevel(): CuratedPuzzleLevel {
 }
 
 /**
- * Cheese Ladder — vertical ladder of single-column holes climbing left→right.
- * O/J/L plug rungs; I finishes tall residual. Distinct from skew stairs.
+ * Cheese Ladder — multi-row staggered cheese with ascending hole ladder.
+ * Forced queue rewards climbing the holes in order; wrong plugs strand overhangs.
  */
 export function buildCheeseLadderLevel(): CuratedPuzzleLevel {
   const board = emptyBoard();
+  // Ascending hole ladder (left→right), plus a second-pass gap on row 3.
   paintGarbageRow(board, 0, [1]);
   paintGarbageRow(board, 1, [2, 8]);
   paintGarbageRow(board, 2, [3]);
-  paintGarbageRow(board, 3, [4, 7]);
+  paintGarbageRow(board, 3, [4, 0]);
   paintGarbageRow(board, 4, [5]);
 
-  const queuePrefix: ShapeType[] = ['J', 'O', 'L', 'I', 'T', 'S', 'Z'];
+  // J seats low rung, L mid, O flats, I spans the climb.
+  const queuePrefix: ShapeType[] = ['J', 'L', 'O', 'S', 'Z', 'I', 'T'];
 
   return freezeLevel({
     id: 'authored-cheese-ladder',
@@ -207,24 +209,60 @@ export function buildCheeseLadderLevel(): CuratedPuzzleLevel {
 }
 
 /**
- * Dig Shaft — narrow center shaft through mid cheese with side buttresses.
- * Dig down the shaft; wrong fills leave unreachable pockets.
+ * Dig Shaft — deep center shaft with flanking walls. Dig down the column;
+ * mid-run garbage pulse forces a replan while the shaft is still open.
  */
 export function buildDigShaftLevel(): CuratedPuzzleLevel {
   const board = emptyBoard();
-  // Shaft at cols 4-5 through 5 rows; staggered side holes for secondary digs.
-  paintGarbageRow(board, 0, [4, 5]);
-  paintGarbageRow(board, 1, [4, 5, 1]);
-  paintGarbageRow(board, 2, [4, 5]);
-  paintGarbageRow(board, 3, [4, 5, 8]);
-  paintGarbageRow(board, 4, [4, 5]);
+  // Cheese dig with a preferred shaft lane (holes cluster near col 4) plus
+  // staggered side holes so one vertical I cannot skim the goal alone.
+  paintGarbageRow(board, 0, [4, 8]);
+  paintGarbageRow(board, 1, [4, 1]);
+  paintGarbageRow(board, 2, [3, 4]);
+  paintGarbageRow(board, 3, [4, 7]);
+  paintGarbageRow(board, 4, [2, 5]);
+  paintColumnStack(board, 0, 3);
+  paintColumnStack(board, 9, 4);
 
-  const queuePrefix: ShapeType[] = ['O', 'I', 'J', 'L', 'T', 'S', 'Z'];
+  // Openers force packing into the shaft before I arrives.
+  const queuePrefix: ShapeType[] = ['T', 'S', 'Z', 'O', 'J', 'L', 'I'];
+  const timeline: TimelineEvent[] = [
+    // ~2s: garbage pulse mid-dig shifts the shaft geometry.
+    { tick: 120, kind: 'garbage', params: { lines: 1, delayTicks: 18 } },
+  ];
 
   return freezeLevel({
     id: 'authored-dig-shaft',
     name: 'Dig Shaft',
-    seed: 5208,
+    seed: 6208,
+    initialBoard: board,
+    queuePrefix,
+    goal: { kind: 'clear-lines', lines: 3 },
+    timeline,
+    shopPolicy: 'none',
+    allowHold: true,
+    benchmark: DEFAULT_PUZZLE_BENCHMARK,
+    visibilityPolicy: 'partial',
+  });
+}
+
+export function buildTSlotSetupLevel(): CuratedPuzzleLevel {
+  const board = emptyBoard();
+  // T-pocket: open floor under overhang at cols 3-5, walls left/right.
+  // Row0 holes at 3,4,5 (T floor); row1 hole at 4 (T stem); buttresses.
+  paintGarbageRow(board, 0, [3, 4, 5]);
+  paintGarbageRow(board, 1, [4]);
+  paintGarbageRow(board, 2, [2, 6]);
+  paintColumnStack(board, 0, 4);
+  paintColumnStack(board, 9, 4);
+
+  // Early T bankable; late T after setup pieces seat the pocket.
+  const queuePrefix: ShapeType[] = ['T', 'S', 'Z', 'J', 'L', 'O', 'T'];
+
+  return freezeLevel({
+    id: 'authored-tslot-setup',
+    name: 'T-Slot Setup',
+    seed: 7331,
     initialBoard: board,
     queuePrefix,
     goal: { kind: 'clear-lines', lines: 3 },
@@ -237,27 +275,102 @@ export function buildDigShaftLevel(): CuratedPuzzleLevel {
 }
 
 /**
- * T-Slot Setup — flat cheese with a T-shaped cavity (stem + crossbar).
- * Early T seats the slot; S/Z punish mistiming the setup.
+ * Four Wide — narrow 4-col corridor play. Side walls lock the player into the
+ * center lane; hold disabled so every piece must commit in-corridor.
  */
-export function buildTSlotSetupLevel(): CuratedPuzzleLevel {
+export function buildFourWideLevel(): CuratedPuzzleLevel {
   const board = emptyBoard();
-  // T cavity: stem at col 4 on floor, crossbar holes at 3-5 one row up.
-  paintGarbageRow(board, 0, [4]);
-  paintGarbageRow(board, 1, [3, 4, 5]);
-  paintGarbageRow(board, 2, [2, 7]);
-  paintGarbageRow(board, 3, [1, 8]);
+  // Side walls cols 0-2 and 7-9; textured 4-wide corridor cols 3-6.
+  paintColumnStack(board, 0, 7);
+  paintColumnStack(board, 1, 8);
+  paintColumnStack(board, 2, 6);
+  paintColumnStack(board, 7, 6);
+  paintColumnStack(board, 8, 8);
+  paintColumnStack(board, 9, 7);
+  // Corridor texture: uneven floor so a single I cannot skim 3 clears.
+  paintColumnStack(board, 3, 2);
+  paintColumnStack(board, 4, 1);
+  paintColumnStack(board, 5, 3);
+  paintColumnStack(board, 6, 1);
 
-  const queuePrefix: ShapeType[] = ['T', 'J', 'L', 'O', 'I', 'S', 'Z'];
+  const queuePrefix: ShapeType[] = ['O', 'J', 'L', 'T', 'S', 'Z', 'I'];
 
   return freezeLevel({
-    id: 'authored-tslot-setup',
-    name: 'T-Slot Setup',
-    seed: 5317,
+    id: 'authored-four-wide',
+    name: 'Four Wide',
+    seed: 8412,
     initialBoard: board,
     queuePrefix,
     goal: { kind: 'clear-lines', lines: 3 },
     timeline: [],
+    shopPolicy: 'none',
+    allowHold: false,
+    benchmark: DEFAULT_PUZZLE_BENCHMARK,
+    visibilityPolicy: 'revealed',
+  });
+}
+
+export function buildHoldDisciplineLevel(): CuratedPuzzleLevel {
+  const board = emptyBoard();
+  // Imperfect center well — shoulders have gaps so early I cannot skim tetrises.
+  // Heights: 0:3 1:5 2:2 3:4 4:1 5:0 6:1 7:3 8:5 9:2
+  paintColumnStack(board, 0, 3);
+  paintColumnStack(board, 1, 5);
+  paintColumnStack(board, 2, 2);
+  paintColumnStack(board, 3, 4);
+  paintColumnStack(board, 4, 1);
+  // col 5 open well
+  paintColumnStack(board, 6, 1);
+  paintColumnStack(board, 7, 3);
+  paintColumnStack(board, 8, 5);
+  paintColumnStack(board, 9, 2);
+
+  // Early I wants banking; S/Z/O force setup before the well is ready.
+  const queuePrefix: ShapeType[] = ['I', 'S', 'Z', 'O', 'J', 'L', 'T'];
+  const timeline: TimelineEvent[] = [
+    { tick: 360, kind: 'freeze', params: { durationTicks: 900 } },
+  ];
+
+  return freezeLevel({
+    id: 'authored-hold-discipline',
+    name: 'Hold Discipline',
+    seed: 9550,
+    initialBoard: board,
+    queuePrefix,
+    goal: { kind: 'clear-lines', lines: 3 },
+    timeline,
+    shopPolicy: 'none',
+    allowHold: true,
+    benchmark: {
+      metric: 'ticks',
+      direction: 'minimize',
+      tieBreakers: [{ metric: 'pieces', direction: 'minimize' }],
+    },
+    visibilityPolicy: 'partial',
+  });
+}
+
+export function buildPoisonBeatLevel(): CuratedPuzzleLevel {
+  const board = emptyBoard();
+  paintGarbageRow(board, 0, [1, 6]);
+  paintGarbageRow(board, 1, [2, 7]);
+  paintGarbageRow(board, 2, [3, 8]);
+  paintGarbageRow(board, 3, [4]);
+
+  const queuePrefix: ShapeType[] = ['O', 'J', 'L', 'T', 'S', 'Z', 'I'];
+  const timeline: TimelineEvent[] = [
+    // ~2.5s: poison the active piece mid-opening.
+    { tick: 150, kind: 'poison', params: { variant: 1 } },
+  ];
+
+  return freezeLevel({
+    id: 'authored-poison-beat',
+    name: 'Poison Beat',
+    seed: 10661,
+    initialBoard: board,
+    queuePrefix,
+    goal: { kind: 'clear-lines', lines: 2 },
+    timeline,
     shopPolicy: 'none',
     allowHold: true,
     benchmark: DEFAULT_PUZZLE_BENCHMARK,
@@ -266,100 +379,29 @@ export function buildTSlotSetupLevel(): CuratedPuzzleLevel {
 }
 
 /**
- * Four-Wide — classic 4-wide residual well on the left with solid right stack.
- * Queue forces building in the well; O/I clean residual height.
+ * Curtain Drop — curtain timeline beat shrinks the playable sky mid-solve.
+ * Hidden upcoming hazards; clear ≥2 with intentional cheese, not empty PC.
  */
-export function buildFourWideLevel(): CuratedPuzzleLevel {
+export function buildCurtainDropLevel(): CuratedPuzzleLevel {
   const board = emptyBoard();
-  // Right six columns stacked; left four open as a playable well.
-  paintColumnStack(board, 4, 4);
-  paintColumnStack(board, 5, 5);
-  paintColumnStack(board, 6, 5);
-  paintColumnStack(board, 7, 4);
-  paintColumnStack(board, 8, 5);
-  paintColumnStack(board, 9, 4);
-  // Floor crumbs in the well so clears aren't free flat spam.
-  board[BOARD_ROWS - 1][0] = 'G';
-  board[BOARD_ROWS - 1][2] = 'G';
-  board[BOARD_ROWS - 2][1] = 'G';
+  paintGarbageRow(board, 0, [0, 5]);
+  paintGarbageRow(board, 1, [1, 6]);
+  paintGarbageRow(board, 2, [2, 7]);
+  paintGarbageRow(board, 3, [3, 8]);
 
-  const queuePrefix: ShapeType[] = ['L', 'J', 'O', 'I', 'T', 'S', 'Z'];
-
-  return freezeLevel({
-    id: 'authored-four-wide',
-    name: 'Four-Wide',
-    seed: 5420,
-    initialBoard: board,
-    queuePrefix,
-    goal: { kind: 'clear-lines', lines: 3 },
-    timeline: [],
-    shopPolicy: 'none',
-    allowHold: true,
-    benchmark: DEFAULT_PUZZLE_BENCHMARK,
-    visibilityPolicy: 'revealed',
-  });
-}
-
-/**
- * Hold Discipline — early I is the well cleaner but S/Z arrive first.
- * Hold the I; a late freeze punishes players who never banked it.
- */
-export function buildHoldDisciplineLevel(): CuratedPuzzleLevel {
-  const board = emptyBoard();
-  // Messy left ramp + right basin; early I is valuable later but dumping it
-  // into the shallow gaps wastes the only vertical cleaner before freeze.
-  paintGarbageRow(board, 0, [2, 7]);
-  paintGarbageRow(board, 1, [3, 6]);
-  paintGarbageRow(board, 2, [4, 5, 8]);
-  paintGarbageRow(board, 3, [1, 4, 9]);
-  paintColumnStack(board, 0, 5);
-  paintColumnStack(board, 9, 4);
-
-  // Hold I through S/Z/T setup; freeze arrives ~5s to punish late banking.
-  const queuePrefix: ShapeType[] = ["I", "S", "Z", "T", "J", "L", "O"];
+  const queuePrefix: ShapeType[] = ['T', 'J', 'L', 'O', 'S', 'Z', 'I'];
   const timeline: TimelineEvent[] = [
-    { tick: 300, kind: "freeze", params: { durationTicks: 720 } },
+    // ~2s: curtain drops 3 rows — sky shrinks, hold still available.
+    { tick: 120, kind: 'curtain', params: { rows: 3 } },
   ];
 
   return freezeLevel({
-    id: "authored-hold-discipline",
-    name: "Hold Discipline",
-    seed: 5531,
+    id: 'authored-curtain-drop',
+    name: 'Curtain Drop',
+    seed: 11770,
     initialBoard: board,
     queuePrefix,
-    goal: { kind: "clear-lines", lines: 3 },
-    timeline,
-    shopPolicy: "none",
-    allowHold: true,
-    benchmark: {
-      metric: "ticks",
-      direction: "minimize",
-      tieBreakers: [{ metric: "pieces", direction: "minimize" }],
-    },
-    visibilityPolicy: "partial",
-  });
-}
-
-export function buildPoisonBeatLevel(): CuratedPuzzleLevel {
-  const board = emptyBoard();
-  paintGarbageRow(board, 0, [2, 6]);
-  paintGarbageRow(board, 1, [3, 5]);
-  paintGarbageRow(board, 2, [4, 7]);
-  paintGarbageRow(board, 3, [1, 8]);
-
-  const queuePrefix: ShapeType[] = ['O', 'T', 'J', 'L', 'I', 'S', 'Z'];
-  const timeline: TimelineEvent[] = [
-    // ~2s: poison the live piece after the first placement settles.
-    { tick: 120, kind: 'poison', params: { variant: 1 } },
-  ];
-
-  return freezeLevel({
-    id: 'authored-poison-beat',
-    name: 'Poison Beat',
-    seed: 5644,
-    initialBoard: board,
-    queuePrefix,
-    goal: { kind: 'clear-lines', lines: 3 },
+    goal: { kind: 'clear-lines', lines: 2 },
     timeline,
     shopPolicy: 'none',
     allowHold: true,
@@ -369,75 +411,37 @@ export function buildPoisonBeatLevel(): CuratedPuzzleLevel {
 }
 
 /**
- * Curtain Drop — mid cheese with a scripted curtain that lowers the playable
- * ceiling; finish clears before the frost choke becomes awkward.
- */
-export function buildCurtainDropLevel(): CuratedPuzzleLevel {
-  const board = emptyBoard();
-  paintGarbageRow(board, 0, [1, 8]);
-  paintGarbageRow(board, 1, [2, 7]);
-  paintGarbageRow(board, 2, [3, 6]);
-  paintGarbageRow(board, 3, [4, 5]);
-
-  const queuePrefix: ShapeType[] = ['J', 'L', 'O', 'T', 'I', 'S', 'Z'];
-  const timeline: TimelineEvent[] = [
-    // ~3s: curtain drops 3 rows, compressing the field.
-    { tick: 180, kind: 'curtain', params: { rows: 3 } },
-  ];
-
-  return freezeLevel({
-    id: 'authored-curtain-drop',
-    name: 'Curtain Drop',
-    seed: 5755,
-    initialBoard: board,
-    queuePrefix,
-    goal: { kind: 'clear-lines', lines: 3 },
-    timeline,
-    shopPolicy: 'none',
-    allowHold: true,
-    benchmark: DEFAULT_PUZZLE_BENCHMARK,
-    visibilityPolicy: 'partial',
-  });
-}
-
-/**
- * Late I Well — clean center I-well with early J/L/O/T that should set up,
- * not fill, the well. I arrives late in the prefix to reward patience.
+ * Late I Well — deep well that wants a late I. Awkward early S/Z/O force setup
+ * before the I arrives; hold allowed to bank fillers incorrectly at your peril.
  */
 export function buildLateIWellLevel(): CuratedPuzzleLevel {
   const board = emptyBoard();
-  // Almost-I-well with crumbs in the lane and uneven walls so early J/L/O
-  // must prep before the late I cleans multiple residual lines.
-  paintColumnStack(board, 0, 3);
-  paintColumnStack(board, 1, 5);
-  paintColumnStack(board, 2, 5);
-  paintColumnStack(board, 3, 4);
-  paintColumnStack(board, 4, 5);
-  // col 5 well with floor crumb + mid blockage (not a free Tetris).
-  board[BOARD_ROWS - 1][5] = "G";
-  board[BOARD_ROWS - 3][5] = "G";
-  paintColumnStack(board, 6, 5);
-  paintColumnStack(board, 7, 4);
-  paintColumnStack(board, 8, 5);
-  paintColumnStack(board, 9, 3);
-  // Side cheese holes so clears are not only the well.
-  board[BOARD_ROWS - 1][3] = null;
-  board[BOARD_ROWS - 2][7] = null;
+  // Deep well at col 4; tall shoulders. Floor hole is simply the open well column.
+  paintColumnStack(board, 0, 6);
+  paintColumnStack(board, 1, 7);
+  paintColumnStack(board, 2, 6);
+  paintColumnStack(board, 3, 5);
+  // col 4 open
+  paintColumnStack(board, 5, 5);
+  paintColumnStack(board, 6, 6);
+  paintColumnStack(board, 7, 7);
+  paintColumnStack(board, 8, 6);
+  paintColumnStack(board, 9, 5);
 
-  const queuePrefix: ShapeType[] = ["J", "L", "O", "T", "S", "Z", "I"];
+  const queuePrefix: ShapeType[] = ['S', 'Z', 'O', 'J', 'L', 'T', 'I'];
 
   return freezeLevel({
-    id: "authored-late-i-well",
-    name: "Late I Well",
-    seed: 5866,
+    id: 'authored-late-i-well',
+    name: 'Late I Well',
+    seed: 12880,
     initialBoard: board,
     queuePrefix,
-    goal: { kind: "clear-lines", lines: 3 },
+    goal: { kind: 'clear-lines', lines: 3 },
     timeline: [],
-    shopPolicy: "none",
+    shopPolicy: 'none',
     allowHold: true,
     benchmark: DEFAULT_PUZZLE_BENCHMARK,
-    visibilityPolicy: "revealed",
+    visibilityPolicy: 'revealed',
   });
 }
 

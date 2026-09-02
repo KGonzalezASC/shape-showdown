@@ -13,6 +13,7 @@ export const PUZZLE_DAILY_TIMEZONE = 'America/New_York';
  * Seeded for near-term dates once authored ids exist.
  */
 export const DAILY_SCHEDULE: Record<string, string> = {
+  // ~2 weeks starting 2026-09-01 ET, rotating all 12 authored ids.
   '2026-09-01': 'authored-cheese-keyhole',
   '2026-09-02': 'authored-well-freeze',
   '2026-09-03': 'authored-skew-stairs',

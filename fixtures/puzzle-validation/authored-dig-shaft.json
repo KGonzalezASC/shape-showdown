@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "puzzleId": "authored-dig-shaft",
-  "contentHash": "4f91e84a840cf606041c88f8bc28df83f855ffb61a9fd416271db3a86e803d7a",
+  "contentHash": "15cad7656d0c44e5eaf623ee9dba23e26ec856c86d277d7c2ce5775c810da3a4",
   "engineProtocolVersion": 4,
   "packageVersion": "0.0.0",
   "validationStatus": "passed",
@@ -36,9 +36,9 @@
       "qualifies": true,
       "solved": true,
       "topOut": false,
-      "score": 454,
-      "ticksUsed": 50,
-      "piecesUsed": 4,
+      "score": 532,
+      "ticksUsed": 247,
+      "piecesUsed": 8,
       "linesCleared": 3,
       "perfectClear": false
     },
@@ -48,19 +48,19 @@
       "qualifies": true,
       "solved": true,
       "topOut": false,
-      "score": 454,
-      "ticksUsed": 50,
-      "piecesUsed": 4,
+      "score": 670,
+      "ticksUsed": 332,
+      "piecesUsed": 16,
       "linesCleared": 3,
       "perfectClear": false
     }
   ],
   "selectedBaseline": {
-    "profileId": "player-limited-default",
-    "profileIdentity": "player-limited-default|v1|player-limited|topology=none|garbage=0|seed=0",
-    "score": 454,
-    "ticksUsed": 50,
-    "piecesUsed": 4,
+    "profileId": "player-limited-surface",
+    "profileIdentity": "player-limited-surface|v1|player-limited|topology=surface|garbage=0|seed=0",
+    "score": 670,
+    "ticksUsed": 332,
+    "piecesUsed": 16,
     "linesCleared": 3,
     "solved": true
   },
@@ -68,8 +68,13 @@
     "shopPolicy": "none",
     "allowHold": true
   },
-  "scriptedEvents": [],
-  "visibilityPolicy": "revealed",
+  "scriptedEvents": [
+    {
+      "tick": 120,
+      "kind": "garbage"
+    }
+  ],
+  "visibilityPolicy": "partial",
   "intendedSolutionRefs": [
     "intended:authored-dig-shaft"
   ],
