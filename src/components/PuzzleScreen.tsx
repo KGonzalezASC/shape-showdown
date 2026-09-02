@@ -72,7 +72,7 @@ interface PuzzleStarted {
   visibilityPolicy?: PuzzleVisibilityPolicy;
   puzzleId?: string;
   attemptId?: string;
-  timeline?: Array<{ tick: number; kind: string }>;
+  timeline?: Array<{ tick?: number; afterPieces?: number; kind: string }>;
   benchmark?: PuzzleBenchmarkWire;
   referenceBaseline?: PuzzleReferenceBaseline | null;
 }
@@ -368,10 +368,15 @@ export const PuzzleScreen: React.FC = () => {
   const player = state ? toPublicPlayerState(state, 'puzzle-me') : null;
   const finished = isPuzzleFinished(state?.status ?? null, end !== null);
   const timelineHints = presentTimelineHints(
-    started?.timeline ?? [],
+    (started?.timeline ?? []).map((event) => ({
+      tick: typeof event.tick === 'number' ? event.tick : -1,
+      ...(typeof event.afterPieces === 'number' ? { afterPieces: event.afterPieces } : {}),
+      kind: event.kind,
+    })),
     started?.visibilityPolicy,
     state?.tick ?? 0,
     state?.pendingHazardKinds ?? [],
+    state?.piecesPlaced ?? 0,
   );
 
   return (
@@ -528,9 +533,11 @@ export const PuzzleScreen: React.FC = () => {
                 <ul className="space-y-1">
                   {timelineHints.map((hint, index) => (
                     <li key={`${hint.kind}-${index}`}>
-                      {hint.tick < 0
-                        ? hint.kind
-                        : `${hint.kind} @ ${Math.floor(hint.tick / 60)}s`}
+                      {typeof hint.afterPieces === 'number'
+                        ? `${hint.kind} after ${hint.afterPieces} pcs`
+                        : hint.tick < 0
+                          ? hint.kind
+                          : `${hint.kind} @ ${Math.floor(hint.tick / 60)}s`}
                     </li>
                   ))}
                 </ul>

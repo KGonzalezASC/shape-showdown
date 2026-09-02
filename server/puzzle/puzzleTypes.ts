@@ -10,8 +10,7 @@ import type { CellValue, ShapeType } from '../../src/types.js';
  * by hand.
  */
 
-/** One scripted event in the level timeline (the "opponent"). */
-/** One absolute scripted fire in the level timeline (the "opponent"). */
+/** One absolute tick-scheduled fire (authored one-shot or materialized from a loop). */
 export interface TimelineEvent {
   /** Absolute game tick at which the event fires. */
   tick: number;
@@ -21,7 +20,18 @@ export interface TimelineEvent {
   params?: Record<string, unknown>;
 }
 
-/** Relative beat inside a looped timeline segment. */
+/**
+ * Fire once when piecesPlaced (locks) reaches `afterPieces`.
+ * Not materializable to ticks ahead of time — session applies on each lock.
+ */
+export interface TimelinePieceEvent {
+  /** Inclusive lock count at which the event fires (1 = after first lock). */
+  afterPieces: number;
+  kind: HazardKind;
+  params?: Record<string, unknown>;
+}
+
+/** Relative beat inside a looped timeline segment (tick-based; v1). */
 export interface TimelineLoopBeat {
   /** Offset from each iteration's startTick; must satisfy 0 <= at < periodTicks. */
   at: number;
@@ -37,6 +47,8 @@ export interface TimelineLoopBeat {
  * - Instant hazards only: absolute start-to-start stride (legacy).
  * - Lasting hazards (e.g. curtain): idle clear gap *after* the prior iteration's
  *   effect ends (telegraph + active), then the sequence fires again.
+ *
+ * Loops stay tick-based in v1 (no piece-loops).
  */
 export interface TimelineLoop {
   startTick: number;
@@ -45,8 +57,8 @@ export interface TimelineLoop {
   sequence: TimelineLoopBeat[];
 }
 
-/** Authored timeline entry: one-shot event or a looping sequence segment. */
-export type TimelineEntry = TimelineEvent | { loop: TimelineLoop };
+/** Authored timeline entry: tick one-shot, piece one-shot, or tick loop. */
+export type TimelineEntry = TimelineEvent | TimelinePieceEvent | { loop: TimelineLoop };
 
 /** Scripted hazard kinds. Semantic only — presentation lives in the client adapter. */
 export type HazardKind =

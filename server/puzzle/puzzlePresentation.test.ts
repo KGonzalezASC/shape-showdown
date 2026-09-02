@@ -43,5 +43,26 @@ describe('puzzle visibility presentation', () => {
     assert.equal(visibleNextQueueCount('partial'), 3);
     assert.equal(visibleNextQueueCount('revealed'), 5);
   });
-});
 
+
+  it('filters piece-scheduled hints by piecesPlaced and keeps tick hints', () => {
+    const mixed = [
+      { tick: 10, kind: 'poison' },
+      { tick: -1, afterPieces: 5, kind: 'freeze' },
+      { tick: -1, afterPieces: 12, kind: 'curtain' },
+    ];
+    assert.deepEqual(presentTimelineHints(mixed, 'revealed', 15, [], 4), [
+      { tick: -1, afterPieces: 5, kind: 'freeze' },
+      { tick: -1, afterPieces: 12, kind: 'curtain' },
+    ]);
+    assert.deepEqual(presentTimelineHints(mixed, 'revealed', 15, [], 5), [
+      { tick: -1, afterPieces: 12, kind: 'curtain' },
+    ]);
+    assert.deepEqual(presentTimelineHints(mixed, 'partial', 0, [], 0), [
+      { tick: -1, kind: 'poison' },
+      { tick: -1, kind: 'freeze' },
+      { tick: -1, kind: 'curtain' },
+    ]);
+  });
+
+});

@@ -172,9 +172,9 @@ describe('puzzle poison stacking matches multiplayer elixir-pulse', () => {
     const level = buildPoisonBeatLevel();
     assert.equal(level.goal.kind, 'clear-lines');
     assert.equal(level.goal.kind === 'clear-lines' ? level.goal.lines : -1, 10);
-    const wildcardEvent = level.timeline.find((e) => !('loop' in e) && e.kind === 'wildcard');
-    assert.ok(wildcardEvent && !('loop' in wildcardEvent));
-    assert.equal(!('loop' in wildcardEvent!) ? wildcardEvent.tick : -1, 170);
+    const wildcardEvent = level.timeline.find((e) => 'tick' in e && e.kind === 'wildcard');
+    assert.ok(wildcardEvent && 'tick' in wildcardEvent);
+    assert.equal('tick' in wildcardEvent! ? wildcardEvent.tick : -1, 170);
     const session = new PuzzleSession({
       level,
       driver: new RulesBot({ mode: 'omniscient' }),

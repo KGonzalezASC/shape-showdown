@@ -508,11 +508,11 @@ export function buildImportJstrisCheckboardLevel(): CuratedPuzzleLevel {
  * Source: https://jstris.jezevec10.com/map/255 (API maps/api/255).
  * Board decoded from base64 `data` as 200 nibbles (20×10); non-zero → garbage.
  * Authentic bottom 2 combo rows (filled except the hole column) kept for spawn
- * headroom + RulesBot PC solvability; full 19-row stack tops out the bot.
- * Exact API static queue as queuePrefix. finish=1 → perfect-clear.
- * Bot PC ≈ 1493 ticks (no hazards); human horizon ×3 ≈ 4479 — longer
- * freeze/curtain/magnet/snag sequence taxes time without hard-bricking the PC path.
- * Avoids poison/wildcard on this map.
+ * headroom; full 19-row stack tops out the bot.
+ * Exact API static queue as queuePrefix.
+ * Goal: clear-lines (not full Jstris PC — too long/annoying for solo).
+ * Timeline demos piece-scheduled beats (freeze@5, curtain@12, snag@20) mixed with
+ * a couple early tick beats. Avoids poison/wildcard on this map.
  */
 export function buildImportJstrisUltimate29ComboLevel(): CuratedPuzzleLevel {
   const board = emptyBoard();
@@ -525,12 +525,13 @@ export function buildImportJstrisUltimate29ComboLevel(): CuratedPuzzleLevel {
     'I', 'L', 'Z', 'S', 'J', 'O', 'I', 'T', 'L', 'Z', 'J', 'O', 'I', 'T', 'S',
     'L', 'O', 'T', 'I', 'S', 'J', 'Z', 'J', 'O', 'I', 'T', 'Z', 'S', 'L', 'Z', 'I',
   ];
-  // Human window ≈ 4479 ticks. Early light freeze; mid curtain; late magnet/snag.
-  const timeline: TimelineEvent[] = [
-    { tick: 300, kind: 'freeze', params: { durationTicks: 480 } },
-    { tick: 1600, kind: 'curtain' },
-    { tick: 3000, kind: 'magnet' },
-    { tick: 4000, kind: 'snag' },
+  // Piece-scheduled pressure + light early tick beats (no multi-minute tick slog).
+  const timeline: TimelineEntry[] = [
+    { tick: 120, kind: 'retrim' },
+    { tick: 480, kind: 'magnet' },
+    { afterPieces: 5, kind: 'freeze', params: { durationTicks: 360 } },
+    { afterPieces: 12, kind: 'curtain' },
+    { afterPieces: 20, kind: 'snag' },
   ];
 
   return freezeLevel({
@@ -539,7 +540,7 @@ export function buildImportJstrisUltimate29ComboLevel(): CuratedPuzzleLevel {
     seed: 255255,
     initialBoard: board,
     queuePrefix,
-    goal: { kind: 'perfect-clear', maxPieces: 120 },
+    goal: { kind: 'clear-lines', lines: 10 },
     timeline,
     shopPolicy: 'none',
     allowHold: true,

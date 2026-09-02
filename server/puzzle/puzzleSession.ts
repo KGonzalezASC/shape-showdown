@@ -4,9 +4,9 @@ import { makePlayer } from '../puzzleEngine/engine.js';
 import { matchStep } from '../puzzleEngine/matchStep.js';
 import { clonePlayer, type InputDriver } from '../testHarness/inputDriver.js';
 import { defaultObservationProjector } from '../testHarness/observationProjector.js';
-import type { HazardKind, PuzzleGoal, PuzzleLevel, PuzzleAttempt, TimelineEvent } from './puzzleTypes.js';
+import type { HazardKind, PuzzleGoal, PuzzleLevel, PuzzleAttempt, TimelineEvent, TimelinePieceEvent } from './puzzleTypes.js';
 import { assertSupportedPuzzleTimeline } from './puzzleHazards.js';
-import { materializeTimeline } from './puzzleTimeline.js';
+import { extractPieceTimeline, materializeTimeline } from './puzzleTimeline.js';
 import { applyScriptedShopAttack } from '../shop.js';
 import { applyBomberToBuyer } from '../puzzleEngine/engine.js';
 import { ensureWildcardIncomingEffect, pushFieldEffect } from '../../src/shop/fieldEffects.js';
@@ -110,6 +110,9 @@ export class PuzzleSession {
   private readonly commandRecords: PuzzleCommandRecord[] = [];
   private readonly timeline: TimelineEvent[];
   private timelineIndex = 0;
+  /** Piece-scheduled beats; applied when piecesPlaced reaches afterPieces. */
+  private readonly pieceTimeline: TimelinePieceEvent[];
+  private pieceTimelineIndex = 0;
   private pieceLocks = 0;
   private solved = false;
   private topOut = false;
@@ -123,6 +126,7 @@ export class PuzzleSession {
     this.maxTicks = config.maxTicks ?? 60 * 60;
     assertSupportedPuzzleTimeline(config.level.timeline, `PuzzleSession(${config.level.id})`);
     this.timeline = materializeTimeline(config.level.timeline, this.maxTicks);
+    this.pieceTimeline = extractPieceTimeline(config.level.timeline);
 
     this.rngChannels = createPlayerRngChannels(config.level.seed, 'puzzle');
     const player = makePlayer('puzzle', this.rngChannels);
@@ -188,6 +192,36 @@ export class PuzzleSession {
     this.commandRecords.push({ tick: this.gameState.tick, kind: 'action', detail: action });
   }
 
+  /** Apply one timeline beat (tick- or piece-scheduled). */
+  private fireHazard(kind: HazardKind, params: Record<string, unknown> | undefined): void {
+    if (kind === 'garbage') {
+      applyHazard(this.getPlayerState(), 'garbage', params, this.gameState.tick);
+      return;
+    }
+    if (kind === 'wildcard') {
+      const player = this.getPlayerState();
+      const applied = applyHazard(player, 'wildcard', params, this.gameState.tick);
+      if (!applied) {
+        this.deferredWildcards.push(params ?? {});
+        ensureWildcardIncomingEffect(player, this.gameState.tick);
+      }
+      return;
+    }
+    applyHazard(this.getPlayerState(), kind, params, this.gameState.tick);
+  }
+
+  /** Fire any piece-scheduled beats whose afterPieces threshold is now met. */
+  private applyDuePieceHazards(): void {
+    while (
+      this.pieceTimelineIndex < this.pieceTimeline.length
+      && this.pieceTimeline[this.pieceTimelineIndex]!.afterPieces <= this.pieceLocks
+    ) {
+      const event = this.pieceTimeline[this.pieceTimelineIndex]!;
+      this.pieceTimelineIndex += 1;
+      this.fireHazard(event.kind, event.params);
+    }
+  }
+
   /** Goal check per tick. Returns true when the goal is reached. */
   private checkGoal(): boolean {
     const player = this.getPlayerState();
@@ -212,23 +246,11 @@ export class PuzzleSession {
     for (let t = 0; t < ticks; t++) {
       if (this.gameState.status !== 'playing') break;
 
-      // Fire due timeline events (the scripted "opponent").
-      while (this.timelineIndex < this.timeline.length && this.timeline[this.timelineIndex].tick <= this.gameState.tick) {
-        const event = this.timeline[this.timelineIndex];
+      // Fire due tick-scheduled timeline events (the scripted "opponent").
+      while (this.timelineIndex < this.timeline.length && this.timeline[this.timelineIndex]!.tick <= this.gameState.tick) {
+        const event = this.timeline[this.timelineIndex]!;
         this.timelineIndex += 1;
-        if (event.kind === 'garbage') {
-          applyHazard(this.getPlayerState(), 'garbage', event.params, this.gameState.tick);
-        } else if (event.kind === 'wildcard') {
-          const player = this.getPlayerState();
-          const applied = applyHazard(player, 'wildcard', event.params, this.gameState.tick);
-          if (!applied) {
-            this.deferredWildcards.push(event.params ?? {});
-            // Keep telegraph visible until shape actually locks (gate may delay apply).
-            ensureWildcardIncomingEffect(player, this.gameState.tick);
-          }
-        } else {
-          applyHazard(this.getPlayerState(), event.kind, event.params, this.gameState.tick);
-        }
+        this.fireHazard(event.kind, event.params);
       }
 
       // Retry deferred wildcards once poison spread has finished (shape gate).
@@ -282,13 +304,14 @@ export class PuzzleSession {
         break;
       }
 
-      // Track piece locks for perfect-clear / clear-lines goals.
+      // Track piece locks for perfect-clear / clear-lines / piece-timeline goals.
       if (stepRes.stepResults.puzzle?.locked) {
         this.pieceLocks += 1;
         if (this.level.allowHold === false) {
           rawPlayer.canHold = false;
           rawPlayer.swapCutoffRow = 0;
         }
+        this.applyDuePieceHazards();
       }
 
       if (this.checkGoal()) {

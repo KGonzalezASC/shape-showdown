@@ -1,7 +1,9 @@
 import type { HazardKind, TimelineEntry } from './puzzleTypes.js';
 import {
   assertValidTimelineLoop,
+  assertValidTimelinePieceEvent,
   isTimelineLoopEntry,
+  isTimelinePieceEntry,
   timelineEntryHazardKinds,
 } from './puzzleTimeline.js';
 
@@ -42,6 +44,8 @@ export function assertSupportedPuzzleTimeline(
   for (const entry of timeline) {
     if (isTimelineLoopEntry(entry)) {
       assertValidTimelineLoop(entry.loop, context);
+    } else if (isTimelinePieceEntry(entry)) {
+      assertValidTimelinePieceEvent(entry, context);
     } else if (!Number.isInteger(entry.tick) || entry.tick < 0) {
       throw new Error(`${context}: event.tick must be a non-negative integer`);
     }

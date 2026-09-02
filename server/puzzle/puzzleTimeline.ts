@@ -1,10 +1,28 @@
-import type { HazardKind, TimelineEntry, TimelineEvent, TimelineLoop } from './puzzleTypes.js';
+import type {
+  HazardKind,
+  TimelineEntry,
+  TimelineEvent,
+  TimelineLoop,
+  TimelinePieceEvent,
+} from './puzzleTypes.js';
 import { CURTAIN_DURATION_TICKS, CURTAIN_TELEGRAPH_TICKS } from '../../src/constants.js';
 
 export function isTimelineLoopEntry(
   entry: TimelineEntry,
 ): entry is { loop: TimelineLoop } {
   return typeof entry === 'object' && entry !== null && 'loop' in entry;
+}
+
+export function isTimelinePieceEntry(
+  entry: TimelineEntry,
+): entry is TimelinePieceEvent {
+  return typeof entry === 'object' && entry !== null && 'afterPieces' in entry;
+}
+
+export function isTimelineTickEntry(
+  entry: TimelineEntry,
+): entry is TimelineEvent {
+  return typeof entry === 'object' && entry !== null && 'tick' in entry && !('loop' in entry);
 }
 
 /**
@@ -35,7 +53,10 @@ export function loopHasLastingHazard(sequence: TimelineLoop['sequence']): boolea
   return sequence.some((beat) => hazardOccupiedTicks(beat.kind) > 0);
 }
 
-/** Expand authored timeline entries (including loops) into absolute fire events up to untilTick inclusive. */
+/**
+ * Expand authored tick/loop timeline entries into absolute fire events up to untilTick inclusive.
+ * Piece-scheduled beats are omitted — they cannot be materialized to ticks ahead of time.
+ */
 export function materializeTimeline(
   entries: readonly TimelineEntry[],
   untilTick: number,
@@ -88,14 +109,15 @@ export function materializeTimeline(
           }
         }
       }
-    } else {
-      if (entry.tick <= untilTick) {
-        out.push({
-          tick: entry.tick,
-          kind: entry.kind,
-          ...(entry.params !== undefined ? { params: entry.params } : {}),
-        });
-      }
+    } else if (isTimelinePieceEntry(entry)) {
+      // Piece-triggered beats stay on the session; not expandable to absolute ticks.
+      continue;
+    } else if (entry.tick <= untilTick) {
+      out.push({
+        tick: entry.tick,
+        kind: entry.kind,
+        ...(entry.params !== undefined ? { params: entry.params } : {}),
+      });
     }
   }
 
@@ -103,7 +125,27 @@ export function materializeTimeline(
   return out;
 }
 
-/** Offset absolute ticks / loop startTicks (used by the level generator). */
+/** Piece-scheduled one-shots, sorted by afterPieces then kind (stable fire order). */
+export function extractPieceTimeline(
+  entries: readonly TimelineEntry[],
+): TimelinePieceEvent[] {
+  const out: TimelinePieceEvent[] = [];
+  for (const entry of entries) {
+    if (isTimelinePieceEntry(entry)) {
+      out.push({
+        afterPieces: entry.afterPieces,
+        kind: entry.kind,
+        ...(entry.params !== undefined ? { params: entry.params } : {}),
+      });
+    }
+  }
+  out.sort(
+    (a, b) => a.afterPieces - b.afterPieces || a.kind.localeCompare(b.kind),
+  );
+  return out;
+}
+
+/** Offset absolute ticks / loop startTicks (used by the level generator). Piece counts unchanged. */
 export function offsetTimelineEntries(
   entries: readonly TimelineEntry[],
   offsetTicks: number,
@@ -117,6 +159,13 @@ export function offsetTimelineEntries(
           startTick: entry.loop.startTick + offset,
           sequence: entry.loop.sequence.map((beat) => ({ ...beat })),
         },
+      };
+    }
+    if (isTimelinePieceEntry(entry)) {
+      return {
+        afterPieces: entry.afterPieces,
+        kind: entry.kind,
+        ...(entry.params !== undefined ? { params: entry.params } : {}),
       };
     }
     return { ...entry, tick: entry.tick + offset };
@@ -145,6 +194,18 @@ export function assertValidTimelineLoop(
     if (typeof beat.kind !== 'string' || beat.kind.length === 0) {
       throw new Error(`${context}: loop beat.kind is required`);
     }
+  }
+}
+
+export function assertValidTimelinePieceEvent(
+  event: TimelinePieceEvent,
+  context: string,
+): void {
+  if (!Number.isInteger(event.afterPieces) || event.afterPieces <= 0) {
+    throw new Error(`${context}: event.afterPieces must be a positive integer`);
+  }
+  if (typeof event.kind !== 'string' || event.kind.length === 0) {
+    throw new Error(`${context}: event.kind is required`);
   }
 }
 

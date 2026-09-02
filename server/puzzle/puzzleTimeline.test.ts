@@ -2,6 +2,7 @@ import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   assertValidTimelineLoop,
+  extractPieceTimeline,
   hazardOccupiedTicks,
   materializeTimeline,
   offsetTimelineEntries,
@@ -10,7 +11,7 @@ import { assertSupportedPuzzleTimeline } from './puzzleHazards.js';
 import { PuzzleSession } from './puzzleSession.js';
 import { generatePuzzleLevel } from './puzzleGenerator.js';
 import { RulesBot } from '../testHarness/rulesBot.js';
-import { buildCurtainDropLevel } from './catalog/authoredLevels.js';
+import { buildCurtainDropLevel, buildImportJstrisUltimate29ComboLevel } from './catalog/authoredLevels.js';
 import type { TimelineEntry } from './puzzleTypes.js';
 import { CURTAIN_DURATION_TICKS, CURTAIN_TELEGRAPH_TICKS } from '../../src/constants.js';
 
@@ -192,5 +193,133 @@ describe('puzzle timeline loops', () => {
       assert.equal(next, prev + CURTAIN_OCCUPIED + CURTAIN_LOOP_IDLE);
       assert.ok(next >= prev + CURTAIN_OCCUPIED + CURTAIN_LOOP_IDLE);
     }
+  });
+});
+
+describe('puzzle timeline piece triggers', () => {
+  it('materializeTimeline skips afterPieces entries; extractPieceTimeline keeps them', () => {
+    const entries: TimelineEntry[] = [
+      { tick: 60, kind: 'retrim' },
+      { afterPieces: 5, kind: 'freeze', params: { durationTicks: 120 } },
+      { afterPieces: 12, kind: 'curtain' },
+      {
+        loop: {
+          startTick: 100,
+          periodTicks: 200,
+          sequence: [{ at: 0, kind: 'magnet' }],
+        },
+      },
+    ];
+    const tickEvents = materializeTimeline(entries, 300);
+    assert.deepEqual(
+      tickEvents.map((e) => ({ tick: e.tick, kind: e.kind })),
+      [
+        { tick: 60, kind: 'retrim' },
+        { tick: 100, kind: 'magnet' },
+        { tick: 300, kind: 'magnet' },
+      ],
+    );
+    assert.deepEqual(
+      extractPieceTimeline(entries).map((e) => ({ afterPieces: e.afterPieces, kind: e.kind })),
+      [
+        { afterPieces: 5, kind: 'freeze' },
+        { afterPieces: 12, kind: 'curtain' },
+      ],
+    );
+  });
+
+  it('rejects non-positive afterPieces at the allowlist boundary', () => {
+    assert.throws(
+      () => assertSupportedPuzzleTimeline([{ afterPieces: 0, kind: 'freeze' }]),
+      /afterPieces/,
+    );
+    assert.throws(
+      () => assertSupportedPuzzleTimeline([{ afterPieces: -1, kind: 'curtain' }]),
+      /afterPieces/,
+    );
+  });
+
+  it('offsetTimelineEntries leaves afterPieces unchanged', () => {
+    const offset = offsetTimelineEntries(
+      [
+        { tick: 10, kind: 'retrim' },
+        { afterPieces: 5, kind: 'freeze' },
+      ],
+      60,
+    );
+    assert.deepEqual(offset[0], { tick: 70, kind: 'retrim' });
+    assert.deepEqual(offset[1], { afterPieces: 5, kind: 'freeze' });
+  });
+
+  it('PuzzleSession fires piece-triggered hazards at the correct lock count', () => {
+    const level = generatePuzzleLevel({
+      id: 'piece-timeline-session',
+      name: 'piece-timeline-session',
+      seed: 11,
+      garbageRows: 0,
+      goal: { kind: 'survive', ticks: 3600 },
+      timeline: [],
+    });
+    // Garbage leaves a clear pendingGarbage footprint at known lock counts.
+    level.timeline = [
+      { tick: 10, kind: 'retrim' },
+      { afterPieces: 2, kind: 'garbage', params: { lines: 1, delayTicks: 9999 } },
+      { afterPieces: 4, kind: 'garbage', params: { lines: 2, delayTicks: 9999 } },
+    ];
+    const session = new PuzzleSession({
+      level,
+      driver: new RulesBot({ mode: 'omniscient' }),
+      maxTicks: 3600,
+    });
+
+    let sawTickPath = false;
+    let sawLines1At2 = false;
+    let sawLines2At4 = false;
+    let lastPieces = 0;
+
+    for (let i = 0; i < 3600; i += 1) {
+      session.advance(1);
+      const player = session.getPlayerState();
+      if (session.tick >= 10) sawTickPath = true;
+
+      if (session.piecesPlaced >= 2 && lastPieces < 2) {
+        sawLines1At2 = player.pendingGarbage.some((g) => g.lines === 1);
+        assert.equal(sawLines1At2, true, 'garbage lines=1 after 2 locks');
+      }
+      if (session.piecesPlaced >= 4 && lastPieces < 4) {
+        sawLines2At4 = player.pendingGarbage.some((g) => g.lines === 2);
+        assert.equal(sawLines2At4, true, 'garbage lines=2 after 4 locks');
+      }
+      lastPieces = session.piecesPlaced;
+      if (session.piecesPlaced >= 4) break;
+      if (session.isEnded) break;
+    }
+
+    assert.equal(sawTickPath, true);
+    assert.equal(sawLines1At2, true);
+    assert.equal(sawLines2At4, true);
+    assert.ok(session.piecesPlaced >= 4);
+  });
+
+  it('authored Ultimate 29-combo uses clear-lines and mixed tick+piece timeline', () => {
+    const level = buildImportJstrisUltimate29ComboLevel();
+    assert.equal(level.goal.kind, 'clear-lines');
+    if (level.goal.kind === 'clear-lines') {
+      assert.ok(level.goal.lines >= 8 && level.goal.lines <= 12);
+    }
+    const ticks = materializeTimeline(level.timeline, 60 * 60).map((e) => ({ tick: e.tick, kind: e.kind }));
+    const pieces = extractPieceTimeline(level.timeline).map((e) => ({ afterPieces: e.afterPieces, kind: e.kind }));
+    assert.ok(ticks.length >= 1, 'expected at least one tick beat');
+    assert.ok(pieces.length >= 2, 'expected piece-scheduled beats');
+    assert.deepEqual(
+      pieces,
+      [
+        { afterPieces: 5, kind: 'freeze' },
+        { afterPieces: 12, kind: 'curtain' },
+        { afterPieces: 20, kind: 'snag' },
+      ],
+    );
+    assert.ok(ticks.some((e) => e.kind === 'retrim'));
+    assert.ok(ticks.some((e) => e.kind === 'magnet'));
   });
 });

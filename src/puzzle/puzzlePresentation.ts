@@ -10,14 +10,17 @@ export function isPuzzleFinished(
 }
 
 export interface PuzzleTimelineHint {
+  /** Absolute tick for tick-scheduled beats; -1 when piece-based, pending, or partial. */
   tick: number;
+  /** Present for piece-scheduled beats (fire when piecesPlaced reaches this count). */
+  afterPieces?: number;
   kind: string;
 }
 
 /**
  * Apply visibility policy to upcoming scripted events for client presentation.
- * revealed: full timeline
- * partial: kinds only (ticks hidden)
+ * revealed: full timeline (tick seconds and/or after-N-pieces)
+ * partial: kinds only (ticks / piece counts hidden)
  * hidden: no timeline hints
  */
 export function presentTimelineHints(
@@ -25,8 +28,14 @@ export function presentTimelineHints(
   policy: PuzzleVisibilityPolicy | 'unspecified' | undefined,
   currentTick: number,
   pendingKinds: string[] = [],
+  piecesPlaced = 0,
 ): PuzzleTimelineHint[] {
-  const upcoming = events.filter((event) => event.tick > currentTick);
+  const upcoming = events.filter((event) => {
+    if (typeof event.afterPieces === 'number') {
+      return event.afterPieces > piecesPlaced;
+    }
+    return event.tick > currentTick;
+  });
   // Keep deferred hazards in the telegraph until they actually apply.
   const pendingHints: PuzzleTimelineHint[] = [];
   for (const kind of pendingKinds) {

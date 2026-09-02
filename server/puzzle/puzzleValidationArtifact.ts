@@ -11,7 +11,7 @@ import {
   type PuzzleLevel,
   type PuzzleVisibilityPolicy,
 } from './puzzleTypes.js';
-import { materializeTimeline } from './puzzleTimeline.js';
+import { extractPieceTimeline, materializeTimeline } from './puzzleTimeline.js';
 
 export type PuzzleValidationStatus = 'passed' | 'failed' | 'invalid-batch';
 
@@ -61,7 +61,7 @@ export interface PuzzleValidationArtifact {
     shopPolicy: 'none' | 'standard';
     allowHold: boolean;
   };
-  scriptedEvents: Array<{ tick: number; kind: string }>;
+  scriptedEvents: Array<{ tick?: number; afterPieces?: number; kind: string }>;
   /** Copied from the level; curated catalog entries always set a concrete policy. */
   visibilityPolicy: PuzzleVisibilityPolicy | 'unspecified';
   /** References only. Never embed hidden solution command traces here. */
@@ -181,10 +181,16 @@ export function buildPuzzleValidationArtifact(
       shopPolicy: level.shopPolicy,
       allowHold: level.allowHold ?? true,
     },
-    scriptedEvents: materializeTimeline(level.timeline, 60 * 60).map((event) => ({
-      tick: event.tick,
-      kind: event.kind,
-    })),
+    scriptedEvents: [
+      ...materializeTimeline(level.timeline, 60 * 60).map((event) => ({
+        tick: event.tick,
+        kind: event.kind,
+      })),
+      ...extractPieceTimeline(level.timeline).map((event) => ({
+        afterPieces: event.afterPieces,
+        kind: event.kind,
+      })),
+    ],
     visibilityPolicy: level.visibilityPolicy ?? 'unspecified',
     intendedSolutionRefs: [...(input.intendedSolutionRefs ?? [])],
     solutionAlternativeRefs: [...(input.solutionAlternativeRefs ?? [])],
