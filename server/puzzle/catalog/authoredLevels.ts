@@ -109,6 +109,79 @@ export function buildFrozenWellLevel(): CuratedPuzzleLevel {
   });
 }
 
+
+/**
+ * Skew Stairs — diagonal cheese stairs with a forced queue that rewards
+ * committing to the ascending holes in order (J/L plugs, then O/I finish).
+ * Wrong order leaves unreachable overhangs. No timeline.
+ */
+export function buildSkewStairsLevel(): CuratedPuzzleLevel {
+  const board = emptyBoard();
+  // Diagonal cheese stairs: holes march right; upper row adds a second skew lane.
+  paintGarbageRow(board, 0, [0, 1]);
+  paintGarbageRow(board, 1, [1, 2]);
+  paintGarbageRow(board, 2, [2, 3]);
+  paintGarbageRow(board, 3, [3, 4, 8]);
+  paintGarbageRow(board, 4, [4, 5]);
+  // Soft right buttress so clears favor the stair lane.
+  paintColumnStack(board, 9, 3);
+
+  // Forced order: J seats the low left step, L the mid skew, O flats, I cleans height.
+  const queuePrefix: ShapeType[] = ['J', 'L', 'O', 'I', 'T', 'S', 'Z'];
+
+  return freezeLevel({
+    id: 'authored-skew-stairs',
+    name: 'Skew Stairs',
+    seed: 3110,
+    initialBoard: board,
+    queuePrefix,
+    goal: { kind: 'clear-lines', lines: 3 },
+    timeline: [],
+    shopPolicy: 'none',
+    allowHold: true,
+    benchmark: DEFAULT_PUZZLE_BENCHMARK,
+    visibilityPolicy: 'revealed',
+  });
+}
+
+/**
+ * Pulse Garbage — shallow-to-mid cheese dig with a mid-run garbage timeline
+ * beat. Hold allowed; upcoming hazards / queue stay hidden.
+ */
+export function buildPulseGarbageLevel(): CuratedPuzzleLevel {
+  const board = emptyBoard();
+  // Messy 4-row cheese: needs several packs to reach 3 clears.
+  paintGarbageRow(board, 0, [2, 7]);
+  paintGarbageRow(board, 1, [3, 6]);
+  paintGarbageRow(board, 2, [4, 5]);
+  paintGarbageRow(board, 3, [1, 8]);
+
+  const queuePrefix: ShapeType[] = ['T', 'S', 'Z', 'O', 'J', 'L', 'I'];
+  const timeline: TimelineEvent[] = [
+    // ~1.5s: garbage pulse lands mid-opening so the player must replan.
+    { tick: 90, kind: 'garbage', params: { lines: 2, delayTicks: 12 } },
+  ];
+
+  return freezeLevel({
+    id: 'authored-pulse-garbage',
+    name: 'Pulse Garbage',
+    seed: 4201,
+    initialBoard: board,
+    queuePrefix,
+    goal: { kind: 'clear-lines', lines: 3 },
+    timeline,
+    shopPolicy: 'none',
+    allowHold: true,
+    benchmark: DEFAULT_PUZZLE_BENCHMARK,
+    visibilityPolicy: 'hidden',
+  });
+}
+
 export function buildAuthoredLevels(): CuratedPuzzleLevel[] {
-  return [buildCheeseKeyholeLevel(), buildFrozenWellLevel()];
+  return [
+    buildCheeseKeyholeLevel(),
+    buildFrozenWellLevel(),
+    buildSkewStairsLevel(),
+    buildPulseGarbageLevel(),
+  ];
 }

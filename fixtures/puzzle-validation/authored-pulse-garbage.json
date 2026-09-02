@@ -1,0 +1,82 @@
+{
+  "schemaVersion": 1,
+  "puzzleId": "authored-pulse-garbage",
+  "contentHash": "8a47e66026375d7d1f5bbb0e77c7aac3c60677767be7e596b4870206eee0b8f9",
+  "engineProtocolVersion": 4,
+  "packageVersion": "0.0.0",
+  "validationStatus": "passed",
+  "benchmark": {
+    "metric": "score",
+    "direction": "maximize",
+    "tieBreakers": [
+      {
+        "metric": "ticks",
+        "direction": "minimize"
+      },
+      {
+        "metric": "pieces",
+        "direction": "minimize"
+      }
+    ]
+  },
+  "batchSize": 2,
+  "candidateProfileIds": [
+    "player-limited-default",
+    "player-limited-surface"
+  ],
+  "candidateProfileIdentities": [
+    "player-limited-default|v1|player-limited|topology=none|garbage=0|seed=0",
+    "player-limited-surface|v1|player-limited|topology=surface|garbage=0|seed=0"
+  ],
+  "duplicateProfileIdentities": [],
+  "candidates": [
+    {
+      "profileId": "player-limited-default",
+      "profileIdentity": "player-limited-default|v1|player-limited|topology=none|garbage=0|seed=0",
+      "qualifies": true,
+      "solved": true,
+      "topOut": false,
+      "score": 574,
+      "ticksUsed": 184,
+      "piecesUsed": 9,
+      "linesCleared": 3,
+      "perfectClear": false
+    },
+    {
+      "profileId": "player-limited-surface",
+      "profileIdentity": "player-limited-surface|v1|player-limited|topology=surface|garbage=0|seed=0",
+      "qualifies": true,
+      "solved": true,
+      "topOut": false,
+      "score": 574,
+      "ticksUsed": 184,
+      "piecesUsed": 9,
+      "linesCleared": 3,
+      "perfectClear": false
+    }
+  ],
+  "selectedBaseline": {
+    "profileId": "player-limited-default",
+    "profileIdentity": "player-limited-default|v1|player-limited|topology=none|garbage=0|seed=0",
+    "score": 574,
+    "ticksUsed": 184,
+    "piecesUsed": 9,
+    "linesCleared": 3,
+    "solved": true
+  },
+  "allowedMechanics": {
+    "shopPolicy": "none",
+    "allowHold": true
+  },
+  "scriptedEvents": [
+    {
+      "tick": 90,
+      "kind": "garbage"
+    }
+  ],
+  "visibilityPolicy": "hidden",
+  "intendedSolutionRefs": [
+    "intended:authored-pulse-garbage"
+  ],
+  "solutionAlternativeRefs": []
+}

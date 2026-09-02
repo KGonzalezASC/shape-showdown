@@ -14,6 +14,20 @@
       "validationStatus": "passed",
       "visibilityPolicy": "partial",
       "selectedBaselineProfileId": "player-limited-default"
+    },
+    {
+      "puzzleId": "authored-skew-stairs",
+      "contentHash": "868e45c51887bbd8e24cd9637487cb52c43c326ec7be9fb2b8675a22475cc3c3",
+      "validationStatus": "passed",
+      "visibilityPolicy": "revealed",
+      "selectedBaselineProfileId": "player-limited-default"
+    },
+    {
+      "puzzleId": "authored-pulse-garbage",
+      "contentHash": "8a47e66026375d7d1f5bbb0e77c7aac3c60677767be7e596b4870206eee0b8f9",
+      "validationStatus": "passed",
+      "visibilityPolicy": "hidden",
+      "selectedBaselineProfileId": "player-limited-default"
     }
   ]
 }
