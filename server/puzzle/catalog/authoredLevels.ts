@@ -1,6 +1,6 @@
 import { BOARD_COLS, BOARD_ROWS } from '../../../src/constants.js';
 import type { CellValue, ShapeType } from '../../../src/types.js';
-import { DEFAULT_PUZZLE_BENCHMARK, type CuratedPuzzleLevel, type TimelineEvent } from '../puzzleTypes.js';
+import { DEFAULT_PUZZLE_BENCHMARK, type CuratedPuzzleLevel, type TimelineEntry, type TimelineEvent } from '../puzzleTypes.js';
 
 /** Empty 20x10 board. */
 export function emptyBoard(): CellValue[][] {
@@ -358,7 +358,7 @@ export function buildPoisonBeatLevel(): CuratedPuzzleLevel {
 }
 
 /**
- * Curtain Drop — retrim (raises curtainDefense + pending swap trim) then curtain.
+ * Curtain Drop — retrim once, then curtain that loops every 200 ticks after the first fire.
  */
 export function buildCurtainDropLevel(): CuratedPuzzleLevel {
   const board = emptyBoard();
@@ -368,12 +368,18 @@ export function buildCurtainDropLevel(): CuratedPuzzleLevel {
   paintGarbageRow(board, 3, [3, 8]);
 
   const queuePrefix: ShapeType[] = ['T', 'J', 'L', 'O', 'S', 'Z', 'I'];
-  const timeline: TimelineEvent[] = [
-    // Retrim first so defense + pending trim are armed before curtain telegraph.
+  const timeline: TimelineEntry[] = [
+    // Retrim once (synergy setup before first curtain).
     { tick: 60, kind: 'retrim' },
-    // Curtain after retrim activation window (~1s) so synergy is felt.
-    { tick: 180, kind: 'curtain' },
-  ];
+    // First curtain at 180, then every 200 ticks (200 without curtain, then curtain again).
+    {
+      loop: {
+        startTick: 180,
+        periodTicks: 200,
+        sequence: [{ at: 0, kind: 'curtain' }],
+      },
+    },
+  ]
 
   return freezeLevel({
     id: 'authored-curtain-drop',

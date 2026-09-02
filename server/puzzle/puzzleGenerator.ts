@@ -9,7 +9,8 @@ import { createEmptyBoard, createEmptyPoisonBoard } from '../puzzleEngine/engine
 import type { MutableRng } from '../../src/rng.js';
 import { rngInt, rngNext } from '../../src/rng.js';
 import { PIECE_SEQUENCE } from '../puzzleEngine/pieces.js';
-import type { PuzzleLevel, TimelineEvent } from './puzzleTypes.js';
+import type { PuzzleLevel, TimelineEntry } from './puzzleTypes.js';
+import { offsetTimelineEntries } from './puzzleTimeline.js';
 
 /** Engine-compatible shuffled 7-bag (same Fisher-Yates as engine.ts). */
 function shuffledPieceBag(rng: MutableRng): ShapeType[] {
@@ -48,7 +49,7 @@ export interface GenerateOptions {
   /** Seed this many poison cells on the initial stack (0 = clean). */
   poisonSeeds?: number;
   /** Hazard timeline appended after the first piece lands. */
-  timeline?: TimelineEvent[];
+  timeline?: TimelineEntry[];
   /** Shop policy for the level (default 'none' = pure puzzle). */
   shopPolicy?: 'none' | 'standard';
   /** Whether the player is permitted to use the hold chamber (default true). */
@@ -174,12 +175,6 @@ function seedPoison(board: CellValue[][], poison: number[][], count: number, rng
   }
 }
 
-/** Offset the hazard timeline so the first event fires after the first piece lands. */
-function offsetTimeline(events: TimelineEvent[], firstPieceTicks: number): TimelineEvent[] {
-  const offset = Math.max(0, firstPieceTicks);
-  return events.map((e) => ({ ...e, tick: e.tick + offset }));
-}
-
 /** First lock happens after GRAVITY_TICKS_PER_CELL * (board height) — approximate with a constant. */
 const FIRST_PIECE_TICKS = 60;
 
@@ -212,7 +207,7 @@ export function generatePuzzleLevel(options: GenerateOptions): PuzzleLevel {
     initialBoard: board,
     queuePrefix,
     goal: options.goal,
-    timeline: offsetTimeline(options.timeline ?? [], FIRST_PIECE_TICKS),
+    timeline: offsetTimelineEntries(options.timeline ?? [], FIRST_PIECE_TICKS),
     shopPolicy,
     allowHold: options.allowHold ?? true,
     par: options.par,
@@ -220,4 +215,4 @@ export function generatePuzzleLevel(options: GenerateOptions): PuzzleLevel {
   return level;
 }
 
-export type { PuzzleLevel, TimelineEvent, PuzzleGoal, HazardKind } from './puzzleTypes.js';
+export type { PuzzleLevel, TimelineEvent, TimelineEntry, PuzzleGoal, HazardKind } from './puzzleTypes.js';

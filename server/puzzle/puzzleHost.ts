@@ -9,6 +9,7 @@ import { getCuratedPuzzleEntry, listPuzzleCatalogSummaries, loadPuzzleCatalog } 
 import { getDailyChallenge, getDailyChallengeSummary } from './catalog/dailyCalendar.js';
 import { loadReferenceBaseline } from './catalog/referenceBaselines.js';
 import type { InputDriver, DriverObservation, PlayerCommand } from '../testHarness/inputDriver.js';
+import { materializeTimeline } from './puzzleTimeline.js';
 
 /**
  * Server-side host for single-player puzzle sessions.
@@ -162,7 +163,7 @@ export class PuzzleHost {
       visibilityPolicy: this.level.visibilityPolicy,
       puzzleId: this.level.id,
       attemptId: this.attemptId,
-      timeline: this.level.timeline.map((event) => ({ tick: event.tick, kind: event.kind })),
+      timeline: materializeTimeline(this.level.timeline, MAX_TICKS).map((event) => ({ tick: event.tick, kind: event.kind })),
       benchmark: this.level.benchmark,
       referenceBaseline: loadReferenceBaseline(this.level.id),
     });

@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "puzzleId": "authored-curtain-drop",
-  "contentHash": "f6bc175bdbda20743bad396cf7d529cb892a0f92dc1d9b7b1f1e52a020c1b84c",
+  "contentHash": "850da479f9fcf947481a0b8499b19abcf5becda786a59f80352ebd2764a4b41c",
   "engineProtocolVersion": 4,
   "packageVersion": "0.0.0",
   "validationStatus": "passed",
@@ -75,6 +75,74 @@
     },
     {
       "tick": 180,
+      "kind": "curtain"
+    },
+    {
+      "tick": 380,
+      "kind": "curtain"
+    },
+    {
+      "tick": 580,
+      "kind": "curtain"
+    },
+    {
+      "tick": 780,
+      "kind": "curtain"
+    },
+    {
+      "tick": 980,
+      "kind": "curtain"
+    },
+    {
+      "tick": 1180,
+      "kind": "curtain"
+    },
+    {
+      "tick": 1380,
+      "kind": "curtain"
+    },
+    {
+      "tick": 1580,
+      "kind": "curtain"
+    },
+    {
+      "tick": 1780,
+      "kind": "curtain"
+    },
+    {
+      "tick": 1980,
+      "kind": "curtain"
+    },
+    {
+      "tick": 2180,
+      "kind": "curtain"
+    },
+    {
+      "tick": 2380,
+      "kind": "curtain"
+    },
+    {
+      "tick": 2580,
+      "kind": "curtain"
+    },
+    {
+      "tick": 2780,
+      "kind": "curtain"
+    },
+    {
+      "tick": 2980,
+      "kind": "curtain"
+    },
+    {
+      "tick": 3180,
+      "kind": "curtain"
+    },
+    {
+      "tick": 3380,
+      "kind": "curtain"
+    },
+    {
+      "tick": 3580,
       "kind": "curtain"
     }
   ],

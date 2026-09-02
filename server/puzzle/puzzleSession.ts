@@ -6,6 +6,7 @@ import { clonePlayer, type InputDriver } from '../testHarness/inputDriver.js';
 import { defaultObservationProjector } from '../testHarness/observationProjector.js';
 import type { HazardKind, PuzzleGoal, PuzzleLevel, PuzzleAttempt, TimelineEvent } from './puzzleTypes.js';
 import { assertSupportedPuzzleTimeline } from './puzzleHazards.js';
+import { materializeTimeline } from './puzzleTimeline.js';
 import { applyScriptedShopAttack } from '../shop.js';
 import { applyBomberToBuyer } from '../puzzleEngine/engine.js';
 import { pushFieldEffect } from '../../src/shop/fieldEffects.js';
@@ -116,8 +117,8 @@ export class PuzzleSession {
     this.level = config.level;
     this.driver = config.driver;
     this.maxTicks = config.maxTicks ?? 60 * 60;
-    this.timeline = [...config.level.timeline].sort((a, b) => a.tick - b.tick);
-    assertSupportedPuzzleTimeline(this.timeline, `PuzzleSession(${config.level.id})`);
+    assertSupportedPuzzleTimeline(config.level.timeline, `PuzzleSession(${config.level.id})`);
+    this.timeline = materializeTimeline(config.level.timeline, this.maxTicks);
 
     this.rngChannels = createPlayerRngChannels(config.level.seed, 'puzzle');
     const player = makePlayer('puzzle', this.rngChannels);

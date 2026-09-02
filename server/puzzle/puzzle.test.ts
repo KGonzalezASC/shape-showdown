@@ -79,7 +79,7 @@ describe('puzzleGenerator', () => {
       goal: pcGoal,
     });
     assert.equal(level.timeline.length, 1);
-    assert.ok(level.timeline[0].tick >= 60);
+    assert.ok("tick" in level.timeline[0] && level.timeline[0].tick >= 60);
   });
 });
 
@@ -172,8 +172,8 @@ describe('puzzleSession', () => {
       ],
       goal: pcGoal,
     });
-    assert.ok(level.timeline[0].tick >= 60);
-    assert.ok(level.timeline[1].tick >= level.timeline[0].tick + 60);
+    assert.ok("tick" in level.timeline[0] && level.timeline[0].tick >= 60);
+    assert.ok("tick" in level.timeline[0] && "tick" in level.timeline[1] && level.timeline[1].tick >= level.timeline[0].tick + 60);
   });
 
   it('a top-out ends the session as unsolved', () => {

@@ -11,6 +11,7 @@ import {
   type PuzzleLevel,
   type PuzzleVisibilityPolicy,
 } from './puzzleTypes.js';
+import { materializeTimeline } from './puzzleTimeline.js';
 
 export type PuzzleValidationStatus = 'passed' | 'failed' | 'invalid-batch';
 
@@ -180,7 +181,7 @@ export function buildPuzzleValidationArtifact(
       shopPolicy: level.shopPolicy,
       allowHold: level.allowHold ?? true,
     },
-    scriptedEvents: level.timeline.map((event) => ({
+    scriptedEvents: materializeTimeline(level.timeline, 60 * 60).map((event) => ({
       tick: event.tick,
       kind: event.kind,
     })),

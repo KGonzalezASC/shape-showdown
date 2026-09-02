@@ -11,6 +11,7 @@ import type { CellValue, ShapeType } from '../../src/types.js';
  */
 
 /** One scripted event in the level timeline (the "opponent"). */
+/** One absolute scripted fire in the level timeline (the "opponent"). */
 export interface TimelineEvent {
   /** Absolute game tick at which the event fires. */
   tick: number;
@@ -19,6 +20,27 @@ export interface TimelineEvent {
   /** Hazard parameters (poison variant, curtain rows, magnet step, ...). */
   params?: Record<string, unknown>;
 }
+
+/** Relative beat inside a looped timeline segment. */
+export interface TimelineLoopBeat {
+  /** Offset from each iteration's startTick; must satisfy 0 <= at < periodTicks. */
+  at: number;
+  kind: HazardKind;
+  params?: Record<string, unknown>;
+}
+
+/**
+ * Repeat `sequence` every `periodTicks` starting at `startTick` (first iteration included).
+ * Materialized to TimelineEvent[] up to a session horizon before application.
+ */
+export interface TimelineLoop {
+  startTick: number;
+  periodTicks: number;
+  sequence: TimelineLoopBeat[];
+}
+
+/** Authored timeline entry: one-shot event or a looping sequence segment. */
+export type TimelineEntry = TimelineEvent | { loop: TimelineLoop };
 
 /** Scripted hazard kinds. Semantic only — presentation lives in the client adapter. */
 export type HazardKind =
@@ -57,8 +79,8 @@ export interface PuzzleLevel {
   /** Fixed piece queue prefix; the seeded bag continues after it runs out. */
   queuePrefix: ShapeType[];
   goal: PuzzleGoal;
-  /** Scripted hazard timeline standing in for the missing opponent. */
-  timeline: TimelineEvent[];
+  /** Scripted hazard timeline standing in for the missing opponent (may include loops). */
+  timeline: TimelineEntry[];
   /** Shop policy: 'none' = pure puzzle, 'standard' = normal line-clear rolls. */
   shopPolicy: 'none' | 'standard';
   /** Whether the player is permitted to use the hold chamber (default true). */

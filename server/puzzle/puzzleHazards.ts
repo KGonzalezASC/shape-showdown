@@ -1,4 +1,9 @@
-import type { HazardKind, TimelineEvent } from './puzzleTypes.js';
+import type { HazardKind, TimelineEntry } from './puzzleTypes.js';
+import {
+  assertValidTimelineLoop,
+  isTimelineLoopEntry,
+  timelineEntryHazardKinds,
+} from './puzzleTimeline.js';
 
 /** Hazards the puzzle session runner actually applies today. */
 export const SUPPORTED_PUZZLE_HAZARDS = [
@@ -31,13 +36,20 @@ export function isSupportedPuzzleHazard(kind: HazardKind): kind is SupportedPuzz
 }
 
 export function assertSupportedPuzzleTimeline(
-  timeline: TimelineEvent[],
+  timeline: TimelineEntry[],
   context = 'puzzle timeline',
 ): void {
-  for (const event of timeline) {
-    if (!isSupportedPuzzleHazard(event.kind)) {
+  for (const entry of timeline) {
+    if (isTimelineLoopEntry(entry)) {
+      assertValidTimelineLoop(entry.loop, context);
+    } else if (!Number.isInteger(entry.tick) || entry.tick < 0) {
+      throw new Error(`${context}: event.tick must be a non-negative integer`);
+    }
+  }
+  for (const kind of timelineEntryHazardKinds(timeline)) {
+    if (!isSupportedPuzzleHazard(kind)) {
       throw new Error(
-        `${context}: unsupported hazard "${event.kind}" (supported: ${SUPPORTED_PUZZLE_HAZARDS.join(', ')})`,
+        `${context}: unsupported hazard "${kind}" (supported: ${SUPPORTED_PUZZLE_HAZARDS.join(', ')})`,
       );
     }
   }
