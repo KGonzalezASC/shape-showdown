@@ -1,0 +1,90 @@
+{
+  "schemaVersion": 1,
+  "puzzleId": "import-jstris-clog",
+  "contentHash": "559945e1d1da361e5d1a0cfc9d6ccabcd40d95cb51dc2fd089d85f1d7f5868d7",
+  "engineProtocolVersion": 4,
+  "packageVersion": "0.0.0",
+  "validationStatus": "passed",
+  "benchmark": {
+    "metric": "score",
+    "direction": "maximize",
+    "tieBreakers": [
+      {
+        "metric": "ticks",
+        "direction": "minimize"
+      },
+      {
+        "metric": "pieces",
+        "direction": "minimize"
+      }
+    ]
+  },
+  "batchSize": 2,
+  "candidateProfileIds": [
+    "player-limited-default",
+    "player-limited-surface"
+  ],
+  "candidateProfileIdentities": [
+    "player-limited-default|v1|player-limited|topology=none|garbage=0|seed=0",
+    "player-limited-surface|v1|player-limited|topology=surface|garbage=0|seed=0"
+  ],
+  "duplicateProfileIdentities": [],
+  "candidates": [
+    {
+      "profileId": "player-limited-default",
+      "profileIdentity": "player-limited-default|v1|player-limited|topology=none|garbage=0|seed=0",
+      "qualifies": true,
+      "solved": true,
+      "topOut": false,
+      "score": 1266,
+      "ticksUsed": 1097,
+      "piecesUsed": 22,
+      "linesCleared": 7,
+      "perfectClear": false
+    },
+    {
+      "profileId": "player-limited-surface",
+      "profileIdentity": "player-limited-surface|v1|player-limited|topology=surface|garbage=0|seed=0",
+      "qualifies": true,
+      "solved": true,
+      "topOut": false,
+      "score": 1266,
+      "ticksUsed": 1097,
+      "piecesUsed": 22,
+      "linesCleared": 7,
+      "perfectClear": false
+    }
+  ],
+  "selectedBaseline": {
+    "profileId": "player-limited-default",
+    "profileIdentity": "player-limited-default|v1|player-limited|topology=none|garbage=0|seed=0",
+    "score": 1266,
+    "ticksUsed": 1097,
+    "piecesUsed": 22,
+    "linesCleared": 7,
+    "solved": true
+  },
+  "allowedMechanics": {
+    "shopPolicy": "none",
+    "allowHold": true
+  },
+  "scriptedEvents": [
+    {
+      "tick": 150,
+      "kind": "snag"
+    },
+    {
+      "afterPieces": 5,
+      "kind": "retrim"
+    },
+    {
+      "afterPieces": 10,
+      "kind": "curtain"
+    }
+  ],
+  "visibilityPolicy": "partial",
+  "intendedSolutionRefs": [
+    "intended:import-jstris-clog"
+  ],
+  "solutionAlternativeRefs": []
+}

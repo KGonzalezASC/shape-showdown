@@ -1,0 +1,90 @@
+{
+  "schemaVersion": 1,
+  "puzzleId": "import-jstris-lspins-easy",
+  "contentHash": "58c8199e4041c89b980ec54b67b99e5a24f7e954dd9e7c31ffe573146f554676",
+  "engineProtocolVersion": 4,
+  "packageVersion": "0.0.0",
+  "validationStatus": "passed",
+  "benchmark": {
+    "metric": "score",
+    "direction": "maximize",
+    "tieBreakers": [
+      {
+        "metric": "ticks",
+        "direction": "minimize"
+      },
+      {
+        "metric": "pieces",
+        "direction": "minimize"
+      }
+    ]
+  },
+  "batchSize": 2,
+  "candidateProfileIds": [
+    "player-limited-default",
+    "player-limited-surface"
+  ],
+  "candidateProfileIdentities": [
+    "player-limited-default|v1|player-limited|topology=none|garbage=0|seed=0",
+    "player-limited-surface|v1|player-limited|topology=surface|garbage=0|seed=0"
+  ],
+  "duplicateProfileIdentities": [],
+  "candidates": [
+    {
+      "profileId": "player-limited-default",
+      "profileIdentity": "player-limited-default|v1|player-limited|topology=none|garbage=0|seed=0",
+      "qualifies": true,
+      "solved": true,
+      "topOut": false,
+      "score": 746,
+      "ticksUsed": 508,
+      "piecesUsed": 11,
+      "linesCleared": 5,
+      "perfectClear": false
+    },
+    {
+      "profileId": "player-limited-surface",
+      "profileIdentity": "player-limited-surface|v1|player-limited|topology=surface|garbage=0|seed=0",
+      "qualifies": true,
+      "solved": true,
+      "topOut": false,
+      "score": 782,
+      "ticksUsed": 508,
+      "piecesUsed": 12,
+      "linesCleared": 5,
+      "perfectClear": false
+    }
+  ],
+  "selectedBaseline": {
+    "profileId": "player-limited-surface",
+    "profileIdentity": "player-limited-surface|v1|player-limited|topology=surface|garbage=0|seed=0",
+    "score": 782,
+    "ticksUsed": 508,
+    "piecesUsed": 12,
+    "linesCleared": 5,
+    "solved": true
+  },
+  "allowedMechanics": {
+    "shopPolicy": "none",
+    "allowHold": true
+  },
+  "scriptedEvents": [
+    {
+      "afterPieces": 4,
+      "kind": "sticky"
+    },
+    {
+      "afterPieces": 8,
+      "kind": "freeze"
+    },
+    {
+      "afterPieces": 12,
+      "kind": "snag"
+    }
+  ],
+  "visibilityPolicy": "partial",
+  "intendedSolutionRefs": [
+    "intended:import-jstris-lspins-easy"
+  ],
+  "solutionAlternativeRefs": []
+}

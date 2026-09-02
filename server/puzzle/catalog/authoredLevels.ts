@@ -591,6 +591,814 @@ export function buildImportFumenC4w3resLevel(): CuratedPuzzleLevel {
   });
 }
 
+// --- BEGIN JSTRIS BATCH20 ---
+/**
+ * Import — Jstris map 2 "Perfect clear how?"
+ * Source: https://jstris.jezevec10.com/map/2 (API maps/api/2).
+ * Board decoded from base64 data (200 nibbles); non-zero → G. Kept bottom
+ * 4 row(s) for spawn headroom. Exact API queue as queuePrefix.
+ * PC opener; piece-scheduled curtain→snag→magnet. Goal clear-lines:4.
+ */
+export function buildImportJstrisPerfectClearHowLevel(): CuratedPuzzleLevel {
+  const board = emptyBoard();
+  paintGarbageRow(board, 0, [2, 3, 4, 5, 7, 8]);
+  paintGarbageRow(board, 1, [2, 3, 4, 5]);
+  paintGarbageRow(board, 2, [2, 3, 4, 5, 7, 8]);
+  paintGarbageRow(board, 3, [2, 3, 4, 5, 6, 7, 8, 9]);
+
+  const queuePrefix: ShapeType[] = ['S', 'J', 'I', 'L', 'S', 'Z', 'Z'];
+  const timeline: TimelineEntry[] = [
+    { afterPieces: 3, kind: 'curtain' },
+    { afterPieces: 6, kind: 'snag' },
+    { afterPieces: 9, kind: 'magnet' },
+  ];
+
+  return freezeLevel({
+    id: 'import-jstris-perfect-clear-how',
+    name: 'Jstris: Perfect clear how?',
+    seed: 2002,
+    initialBoard: board,
+    queuePrefix,
+    goal: { kind: 'clear-lines', lines: 4 },
+    timeline,
+    shopPolicy: 'none',
+    allowHold: true,
+    benchmark: DEFAULT_PUZZLE_BENCHMARK,
+    visibilityPolicy: 'partial',
+  });
+}
+
+/**
+ * Import — Jstris map 15 "Clear the rainbow"
+ * Source: https://jstris.jezevec10.com/map/15 (API maps/api/15).
+ * Board decoded from base64 data (200 nibbles); non-zero → G. Kept bottom
+ * 8 row(s) for spawn headroom. Exact API queue as queuePrefix.
+ * Well dig; retrim→magnet + garbage pulse. Goal clear-lines:6.
+ */
+export function buildImportJstrisClearTheRainbowLevel(): CuratedPuzzleLevel {
+  const board = emptyBoard();
+  paintGarbageRow(board, 0, [7, 8, 9]);
+  paintGarbageRow(board, 1, [7, 8, 9]);
+  paintGarbageRow(board, 2, [7, 8, 9]);
+  paintGarbageRow(board, 3, [7, 8, 9]);
+  paintGarbageRow(board, 4, [7, 8, 9]);
+  paintGarbageRow(board, 5, [7, 8, 9]);
+  paintGarbageRow(board, 6, [7, 8, 9]);
+  paintGarbageRow(board, 7, [7, 8, 9]);
+
+  const queuePrefix: ShapeType[] = ['L', 'O', 'J', 'J', 'Z', 'J', 'O', 'O', 'I'];
+  const timeline: TimelineEntry[] = [
+    { tick: 90, kind: 'retrim' },
+    { tick: 180, kind: 'magnet' },
+    { tick: 300, kind: 'garbage', params: { lines: 1, delayTicks: 12 } },
+  ];
+
+  return freezeLevel({
+    id: 'import-jstris-clear-the-rainbow',
+    name: 'Jstris: Clear the rainbow',
+    seed: 15015,
+    initialBoard: board,
+    queuePrefix,
+    goal: { kind: 'clear-lines', lines: 6 },
+    timeline,
+    shopPolicy: 'none',
+    allowHold: true,
+    benchmark: DEFAULT_PUZZLE_BENCHMARK,
+    visibilityPolicy: 'partial',
+  });
+}
+
+/**
+ * Import — Jstris map 24 "Lspins (Easy)"
+ * Source: https://jstris.jezevec10.com/map/24 (API maps/api/24).
+ * Board decoded from base64 data (200 nibbles); non-zero → G. Kept bottom
+ * 8 row(s) for spawn headroom. Exact API queue as queuePrefix.
+ * L-spin stack; sticky→freeze→snag afterPieces. Goal clear-lines:5.
+ */
+export function buildImportJstrisLspinsEasyLevel(): CuratedPuzzleLevel {
+  const board = emptyBoard();
+  paintGarbageRow(board, 0, [6, 7]);
+  paintGarbageRow(board, 1, [6]);
+  paintGarbageRow(board, 2, [6]);
+  paintGarbageRow(board, 3, [6, 7, 8]);
+  paintGarbageRow(board, 4, [7, 8]);
+  paintGarbageRow(board, 5, [2, 3]);
+  paintGarbageRow(board, 6, [3]);
+  paintGarbageRow(board, 7, [3]);
+
+  const queuePrefix: ShapeType[] = ['L', 'T', 'S', 'J', 'T', 'T', 'L', 'T', 'T'];
+  const timeline: TimelineEntry[] = [
+    { afterPieces: 4, kind: 'sticky' },
+    { afterPieces: 8, kind: 'freeze', params: { durationTicks: 360 } },
+    { afterPieces: 12, kind: 'snag' },
+  ];
+
+  return freezeLevel({
+    id: 'import-jstris-lspins-easy',
+    name: 'Jstris: Lspins (Easy)',
+    seed: 24024,
+    initialBoard: board,
+    queuePrefix,
+    goal: { kind: 'clear-lines', lines: 5 },
+    timeline,
+    shopPolicy: 'none',
+    allowHold: true,
+    benchmark: DEFAULT_PUZZLE_BENCHMARK,
+    visibilityPolicy: 'partial',
+  });
+}
+
+/**
+ * Import — Jstris map 45 "Cheese 10"
+ * Source: https://jstris.jezevec10.com/map/45 (API maps/api/45).
+ * Board decoded from base64 data (200 nibbles); non-zero → G. Kept bottom
+ * 10 row(s) for spawn headroom. Exact API queue as queuePrefix.
+ * Cheese 10; garbage→purge→magnet ticks. Goal clear-lines:8.
+ */
+export function buildImportJstrisCheese10Level(): CuratedPuzzleLevel {
+  const board = emptyBoard();
+  paintGarbageRow(board, 0, [6]);
+  paintGarbageRow(board, 1, [7]);
+  paintGarbageRow(board, 2, [8]);
+  paintGarbageRow(board, 3, [9]);
+  paintGarbageRow(board, 4, [9]);
+  paintGarbageRow(board, 5, [6]);
+  paintGarbageRow(board, 6, [6]);
+  paintGarbageRow(board, 7, [5]);
+  paintGarbageRow(board, 8, [2]);
+  paintGarbageRow(board, 9, [0]);
+
+  const queuePrefix: ShapeType[] = ['T', 'Z', 'S', 'J', 'L', 'O', 'I', 'T', 'S', 'I', 'J', 'O', 'L', 'Z', 'S', 'O', 'O', 'O', 'O', 'O', 'O', 'O', 'O', 'O', 'O'];
+  const timeline: TimelineEntry[] = [
+    { tick: 120, kind: 'garbage', params: { lines: 1, delayTicks: 18 } },
+    { tick: 240, kind: 'purge', params: { variant: 2 } },
+    { tick: 420, kind: 'magnet' },
+  ];
+
+  return freezeLevel({
+    id: 'import-jstris-cheese-10',
+    name: 'Jstris: Cheese 10',
+    seed: 45045,
+    initialBoard: board,
+    queuePrefix,
+    goal: { kind: 'clear-lines', lines: 8 },
+    timeline,
+    shopPolicy: 'none',
+    allowHold: true,
+    benchmark: DEFAULT_PUZZLE_BENCHMARK,
+    visibilityPolicy: 'partial',
+  });
+}
+
+/**
+ * Import — Jstris map 53 "Clog"
+ * Source: https://jstris.jezevec10.com/map/53 (API maps/api/53).
+ * Board decoded from base64 data (200 nibbles); non-zero → G. Kept bottom
+ * 8 row(s) for spawn headroom. Exact API queue as queuePrefix.
+ * Clog chambers; snag + piece retrim/curtain. Goal clear-lines:7.
+ */
+export function buildImportJstrisClogLevel(): CuratedPuzzleLevel {
+  const board = emptyBoard();
+  paintGarbageRow(board, 0, [1, 2]);
+  paintGarbageRow(board, 1, [1, 2, 3, 4, 5, 6, 7, 8]);
+  paintGarbageRow(board, 2, [1, 2, 3, 4, 5, 6, 7, 8]);
+  paintGarbageRow(board, 3, [7, 8]);
+  paintGarbageRow(board, 4, [7, 8]);
+  paintGarbageRow(board, 5, [1, 2, 3, 4, 5, 6, 7, 8]);
+  paintGarbageRow(board, 6, [1, 2, 3, 4, 5, 6, 7, 8]);
+  paintGarbageRow(board, 7, [1, 2]);
+
+  const queuePrefix: ShapeType[] = ['O', 'J', 'O', 'O', 'L', 'O', 'L', 'O', 'O', 'J', 'O', 'J', 'O', 'O', 'L', 'O', 'L', 'O', 'O', 'J', 'O'];
+  const timeline: TimelineEntry[] = [
+    { tick: 150, kind: 'snag' },
+    { afterPieces: 5, kind: 'retrim' },
+    { afterPieces: 10, kind: 'curtain' },
+  ];
+
+  return freezeLevel({
+    id: 'import-jstris-clog',
+    name: 'Jstris: Clog',
+    seed: 53053,
+    initialBoard: board,
+    queuePrefix,
+    goal: { kind: 'clear-lines', lines: 7 },
+    timeline,
+    shopPolicy: 'none',
+    allowHold: true,
+    benchmark: DEFAULT_PUZZLE_BENCHMARK,
+    visibilityPolicy: 'partial',
+  });
+}
+
+/**
+ * Import — Jstris map 61 "s-spin triple"
+ * Source: https://jstris.jezevec10.com/map/61 (API maps/api/61).
+ * Board decoded from base64 data (200 nibbles); non-zero → G. Kept bottom
+ * 8 row(s) for spawn headroom. Exact API queue as queuePrefix.
+ * S-spin triple; sticky→magnet + late purge. Goal clear-lines:5.
+ */
+export function buildImportJstrisSSpinTripleLevel(): CuratedPuzzleLevel {
+  const board = emptyBoard();
+  paintGarbageRow(board, 0, [3]);
+  paintGarbageRow(board, 1, [3, 4]);
+  paintGarbageRow(board, 2, [4]);
+  paintGarbageRow(board, 3, [5]);
+  paintGarbageRow(board, 4, [4, 5]);
+  paintGarbageRow(board, 5, [4]);
+  paintGarbageRow(board, 6, [3]);
+  paintGarbageRow(board, 7, [3, 4]);
+
+  const queuePrefix: ShapeType[] = ['S', 'Z', 'S', 'Z', 'S', 'O', 'T'];
+  const timeline: TimelineEntry[] = [
+    { afterPieces: 3, kind: 'sticky' },
+    { afterPieces: 7, kind: 'magnet' },
+    { tick: 480, kind: 'purge', params: { variant: 2 } },
+  ];
+
+  return freezeLevel({
+    id: 'import-jstris-s-spin-triple',
+    name: 'Jstris: s-spin triple',
+    seed: 61061,
+    initialBoard: board,
+    queuePrefix,
+    goal: { kind: 'clear-lines', lines: 5 },
+    timeline,
+    shopPolicy: 'none',
+    allowHold: true,
+    benchmark: DEFAULT_PUZZLE_BENCHMARK,
+    visibilityPolicy: 'partial',
+  });
+}
+
+/**
+ * Import — Jstris map 70 "drilltris 1"
+ * Source: https://jstris.jezevec10.com/map/70 (API maps/api/70).
+ * Board decoded from base64 data (200 nibbles); non-zero → G. Kept bottom
+ * 8 row(s) for spawn headroom. Exact API queue as queuePrefix.
+ * Drill shaft; early garbage + mid freeze. Goal clear-lines:6.
+ */
+export function buildImportJstrisDrilltris1Level(): CuratedPuzzleLevel {
+  const board = emptyBoard();
+  paintGarbageRow(board, 0, [4]);
+  paintGarbageRow(board, 1, [4]);
+  paintGarbageRow(board, 2, [4]);
+  paintGarbageRow(board, 3, []);
+  paintGarbageRow(board, 4, [4]);
+  paintGarbageRow(board, 5, [4]);
+  paintGarbageRow(board, 6, [4]);
+  paintGarbageRow(board, 7, [4]);
+
+  const queuePrefix: ShapeType[] = [
+    'I', 'I', 'I', 'I', 'I', 'I', 'I', 'I', 'I', 'I', 'I', 'I', 'I', 'I', 'I', 'I', 
+    'I', 'I', 'I', 'I', 'I', 'I', 'I', 'I', 'I', 'I', 'I', 'I', 'I', 'I', 'I', 'I', 
+    'I', 'I', 'I', 'I', 'I', 'I', 'I', 'I', 'I', 'I', 'I', 'I', 'I', 'I', 'I', 'I', 
+    'I', 'I', 'I', 'I', 'I', 'I', 'I', 'I', 'I', 'I', 'I', 'I', 'I', 'I', 'I', 'I', 
+    'I', 'I', 'I', 'I', 'I', 'I', 'I', 'I', 'I', 'I', 'I', 'I', 'I', 'I', 'I', 'I', 
+    'I', 'I', 'I', 'I', 'I', 'I', 'I', 'I', 'I', 'I', 'I', 'I', 'I', 'I', 'I', 'I', 
+    'I', 'I', 'I', 'I', 'I', 'I', 'I', 'I', 'I', 'I', 'I', 'I', 'I', 'I'
+  ];
+  const timeline: TimelineEntry[] = [
+    { tick: 240, kind: 'freeze', params: { durationTicks: 600 } },
+    { tick: 120, kind: 'garbage', params: { lines: 1, delayTicks: 18 } },
+  ];
+
+  return freezeLevel({
+    id: 'import-jstris-drilltris-1',
+    name: 'Jstris: drilltris 1',
+    seed: 70070,
+    initialBoard: board,
+    queuePrefix,
+    goal: { kind: 'clear-lines', lines: 6 },
+    timeline,
+    shopPolicy: 'none',
+    allowHold: true,
+    benchmark: DEFAULT_PUZZLE_BENCHMARK,
+    visibilityPolicy: 'partial',
+  });
+}
+
+/**
+ * Import — Jstris map 71 "drilltris 2"
+ * Source: https://jstris.jezevec10.com/map/71 (API maps/api/71).
+ * Board decoded from base64 data (200 nibbles); non-zero → G. Kept bottom
+ * 8 row(s) for spawn headroom. Exact API queue as queuePrefix.
+ * Drill 2; retrim + sparse curtain loop + late magnet. Goal clear-lines:7.
+ */
+export function buildImportJstrisDrilltris2Level(): CuratedPuzzleLevel {
+  const board = emptyBoard();
+  paintGarbageRow(board, 0, []);
+  paintGarbageRow(board, 1, []);
+  paintGarbageRow(board, 2, [4]);
+  paintGarbageRow(board, 3, [4]);
+  paintGarbageRow(board, 4, [4]);
+  paintGarbageRow(board, 5, [4]);
+  paintGarbageRow(board, 6, []);
+  paintGarbageRow(board, 7, [4]);
+
+  const queuePrefix: ShapeType[] = [
+    'I', 'I', 'I', 'I', 'I', 'I', 'I', 'I', 'I', 'I', 'I', 'I', 'I', 'I', 'I', 'I', 
+    'I', 'I', 'I', 'I', 'I', 'I', 'I', 'I', 'I', 'I', 'I', 'I', 'I', 'I', 'I', 'I', 
+    'I', 'I', 'I', 'I', 'I', 'I', 'I', 'I', 'I', 'I', 'I', 'I', 'I', 'I', 'I', 'I', 
+    'I'
+  ];
+  const timeline: TimelineEntry[] = [
+    { tick: 90, kind: 'retrim' },
+    { loop: { startTick: 360, periodTicks: 720, sequence: [{ at: 0, kind: 'curtain' }] } },
+    { tick: 900, kind: 'magnet' },
+  ];
+
+  return freezeLevel({
+    id: 'import-jstris-drilltris-2',
+    name: 'Jstris: drilltris 2',
+    seed: 71071,
+    initialBoard: board,
+    queuePrefix,
+    goal: { kind: 'clear-lines', lines: 7 },
+    timeline,
+    shopPolicy: 'none',
+    allowHold: true,
+    benchmark: DEFAULT_PUZZLE_BENCHMARK,
+    visibilityPolicy: 'partial',
+  });
+}
+
+/**
+ * Import — Jstris map 76 "SRS Tower"
+ * Source: https://jstris.jezevec10.com/map/76 (API maps/api/76).
+ * Board decoded from base64 data (200 nibbles); non-zero → G. Kept bottom
+ * 8 row(s) for spawn headroom. Exact API queue as queuePrefix.
+ * SRS tower; poison→wildcard (+ late snag). Goal clear-lines:10.
+ */
+export function buildImportJstrisSrsTowerLevel(): CuratedPuzzleLevel {
+  const board = emptyBoard();
+  paintGarbageRow(board, 0, [7, 8]);
+  paintGarbageRow(board, 1, [7]);
+  paintGarbageRow(board, 2, [7]);
+  paintGarbageRow(board, 3, [7, 8]);
+  paintGarbageRow(board, 4, [7]);
+  paintGarbageRow(board, 5, [7, 8, 9]);
+  paintGarbageRow(board, 6, [7]);
+  paintGarbageRow(board, 7, [7]);
+
+  const queuePrefix: ShapeType[] = ['T', 'T', 'L', 'T', 'L', 'S', 'I', 'I'];
+  const timeline: TimelineEntry[] = [
+    { tick: 90, kind: 'poison', params: { variant: 2 } },
+    { tick: 200, kind: 'wildcard', params: { variant: 2 } },
+    { afterPieces: 14, kind: 'snag' },
+  ];
+
+  return freezeLevel({
+    id: 'import-jstris-srs-tower',
+    name: 'Jstris: SRS Tower',
+    seed: 76076,
+    initialBoard: board,
+    queuePrefix,
+    goal: { kind: 'clear-lines', lines: 10 },
+    timeline,
+    shopPolicy: 'none',
+    allowHold: true,
+    benchmark: DEFAULT_PUZZLE_BENCHMARK,
+    visibilityPolicy: 'partial',
+  });
+}
+
+
+
+/**
+ * Import — Jstris map 89 "SRS Training"
+ * Source: https://jstris.jezevec10.com/map/89 (API maps/api/89).
+ * Board decoded from base64 data (200 nibbles); non-zero → G. Kept bottom
+ * 8 row(s) for spawn headroom. Exact API queue as queuePrefix.
+ * SRS training; retrim→magnet→curtain. Goal clear-lines:8.
+ */
+export function buildImportJstrisSrsTrainingLevel(): CuratedPuzzleLevel {
+  const board = emptyBoard();
+  paintGarbageRow(board, 0, [7]);
+  paintGarbageRow(board, 1, [7]);
+  paintGarbageRow(board, 2, [7, 8]);
+  paintGarbageRow(board, 3, [7]);
+  paintGarbageRow(board, 4, [7]);
+  paintGarbageRow(board, 5, [7, 8]);
+  paintGarbageRow(board, 6, [7]);
+  paintGarbageRow(board, 7, [7, 8, 9]);
+
+  const queuePrefix: ShapeType[] = ['J', 'Z', 'S', 'T', 'L', 'T', 'T', 'L', 'O', 'I', 'I'];
+  const timeline: TimelineEntry[] = [
+    { tick: 120, kind: 'retrim' },
+    { tick: 280, kind: 'magnet' },
+    { tick: 480, kind: 'curtain' },
+  ];
+
+  return freezeLevel({
+    id: 'import-jstris-srs-training',
+    name: 'Jstris: SRS Training',
+    seed: 89089,
+    initialBoard: board,
+    queuePrefix,
+    goal: { kind: 'clear-lines', lines: 8 },
+    timeline,
+    shopPolicy: 'none',
+    allowHold: true,
+    benchmark: DEFAULT_PUZZLE_BENCHMARK,
+    visibilityPolicy: 'partial',
+  });
+}
+
+/**
+ * Import — Jstris map 97 "DT Cannon Practice"
+ * Source: https://jstris.jezevec10.com/map/97 (API maps/api/97).
+ * Board decoded from base64 data (200 nibbles); non-zero → G. Kept bottom
+ * 8 row(s) for spawn headroom. Exact API queue as queuePrefix.
+ * DT cannon; snag→curtain→magnet afterPieces. Goal clear-lines:6.
+ */
+export function buildImportJstrisDtCannonPracticeLevel(): CuratedPuzzleLevel {
+  const board = emptyBoard();
+  paintGarbageRow(board, 0, [7]);
+  paintGarbageRow(board, 1, [7]);
+  paintGarbageRow(board, 2, [6, 7, 8]);
+  paintGarbageRow(board, 3, [7, 8]);
+  paintGarbageRow(board, 4, [7]);
+  paintGarbageRow(board, 5, [7, 8, 9]);
+  paintGarbageRow(board, 6, [8, 9]);
+  paintGarbageRow(board, 7, [2]);
+
+  const queuePrefix: ShapeType[] = ['T', 'T', 'T', 'T', 'T'];
+  const timeline: TimelineEntry[] = [
+    { afterPieces: 2, kind: 'snag' },
+    { afterPieces: 5, kind: 'curtain' },
+    { afterPieces: 8, kind: 'magnet' },
+  ];
+
+  return freezeLevel({
+    id: 'import-jstris-dt-cannon-practice',
+    name: 'Jstris: DT Cannon Practice',
+    seed: 97000,
+    initialBoard: board,
+    queuePrefix,
+    goal: { kind: 'clear-lines', lines: 6 },
+    timeline,
+    shopPolicy: 'none',
+    allowHold: true,
+    benchmark: DEFAULT_PUZZLE_BENCHMARK,
+    visibilityPolicy: 'partial',
+  });
+}
+
+/**
+ * Import — Jstris map 99 "Godspin"
+ * Source: https://jstris.jezevec10.com/map/99 (API maps/api/99).
+ * Board decoded from base64 data (200 nibbles); non-zero → G. Kept bottom
+ * 8 row(s) for spawn headroom. Exact API queue as queuePrefix.
+ * Godspin; purge→sticky→garbage. Goal clear-lines:7.
+ */
+export function buildImportJstrisGodspinLevel(): CuratedPuzzleLevel {
+  const board = emptyBoard();
+  paintGarbageRow(board, 0, [7]);
+  paintGarbageRow(board, 1, [7, 8]);
+  paintGarbageRow(board, 2, [6]);
+  paintGarbageRow(board, 3, [6, 7]);
+  paintGarbageRow(board, 4, [6, 7, 8]);
+  paintGarbageRow(board, 5, [5, 6, 7, 8]);
+  paintGarbageRow(board, 6, [7, 8]);
+  paintGarbageRow(board, 7, [4, 5, 6, 7, 8]);
+
+  const queuePrefix: ShapeType[] = ['Z', 'T', 'T', 'Z', 'T', 'L', 'J', 'O', 'I', 'I', 'T', 'Z', 'S'];
+  const timeline: TimelineEntry[] = [
+    { tick: 150, kind: 'purge', params: { variant: 2 } },
+    { tick: 300, kind: 'sticky' },
+    { tick: 450, kind: 'garbage', params: { lines: 1, delayTicks: 12 } },
+  ];
+
+  return freezeLevel({
+    id: 'import-jstris-godspin',
+    name: 'Jstris: Godspin',
+    seed: 99002,
+    initialBoard: board,
+    queuePrefix,
+    goal: { kind: 'clear-lines', lines: 7 },
+    timeline,
+    shopPolicy: 'none',
+    allowHold: true,
+    benchmark: DEFAULT_PUZZLE_BENCHMARK,
+    visibilityPolicy: 'partial',
+  });
+}
+
+/**
+ * Import — Jstris map 105 "Many STSD"
+ * Source: https://jstris.jezevec10.com/map/105 (API maps/api/105).
+ * Board decoded from base64 data (200 nibbles); non-zero → G. Kept bottom
+ * 8 row(s) for spawn headroom. Exact API queue as queuePrefix.
+ * STSD tower; magnet→snag→freeze afterPieces. Goal clear-lines:11.
+ */
+export function buildImportJstrisManyStsdLevel(): CuratedPuzzleLevel {
+  const board = emptyBoard();
+  paintGarbageRow(board, 0, [6, 7]);
+  paintGarbageRow(board, 1, [6, 7]);
+  paintGarbageRow(board, 2, [6]);
+  paintGarbageRow(board, 3, [6, 7, 8]);
+  paintGarbageRow(board, 4, [7, 8]);
+  paintGarbageRow(board, 5, [7, 8]);
+  paintGarbageRow(board, 6, [8]);
+  paintGarbageRow(board, 7, [6, 7, 8]);
+
+  const queuePrefix: ShapeType[] = ['T', 'T', 'T', 'T', 'T', 'T', 'T', 'T', 'O', 'J', 'L', 'I', 'I'];
+  const timeline: TimelineEntry[] = [
+    { afterPieces: 4, kind: 'magnet' },
+    { afterPieces: 9, kind: 'snag' },
+    { afterPieces: 14, kind: 'freeze', params: { durationTicks: 360 } },
+  ];
+
+  return freezeLevel({
+    id: 'import-jstris-many-stsd',
+    name: 'Jstris: Many STSD',
+    seed: 105008,
+    initialBoard: board,
+    queuePrefix,
+    goal: { kind: 'clear-lines', lines: 11 },
+    timeline,
+    shopPolicy: 'none',
+    allowHold: true,
+    benchmark: DEFAULT_PUZZLE_BENCHMARK,
+    visibilityPolicy: 'partial',
+  });
+}
+
+/**
+ * Import — Jstris map 216 "tripz"
+ * Source: https://jstris.jezevec10.com/map/216 (API maps/api/216).
+ * Board decoded from base64 data (200 nibbles); non-zero → G. Kept bottom
+ * 8 row(s) for spawn headroom. Exact API queue as queuePrefix.
+ * Tripz; curtain→retrim→sticky. Goal clear-lines:9.
+ */
+export function buildImportJstrisTripzLevel(): CuratedPuzzleLevel {
+  const board = emptyBoard();
+  paintGarbageRow(board, 0, [8]);
+  paintGarbageRow(board, 1, [8, 9]);
+  paintGarbageRow(board, 2, [9]);
+  paintGarbageRow(board, 3, [7]);
+  paintGarbageRow(board, 4, [7, 8]);
+  paintGarbageRow(board, 5, [8]);
+  paintGarbageRow(board, 6, [3]);
+  paintGarbageRow(board, 7, [3, 4]);
+
+  const queuePrefix: ShapeType[] = ['Z', 'Z', 'Z', 'Z', 'Z', 'I', 'I', 'I', 'I', 'I', 'I', 'I'];
+  const timeline: TimelineEntry[] = [
+    { tick: 100, kind: 'curtain' },
+    { tick: 220, kind: 'retrim' },
+    { tick: 400, kind: 'sticky' },
+  ];
+
+  return freezeLevel({
+    id: 'import-jstris-tripz',
+    name: 'Jstris: tripz',
+    seed: 216022,
+    initialBoard: board,
+    queuePrefix,
+    goal: { kind: 'clear-lines', lines: 9 },
+    timeline,
+    shopPolicy: 'none',
+    allowHold: true,
+    benchmark: DEFAULT_PUZZLE_BENCHMARK,
+    visibilityPolicy: 'partial',
+  });
+}
+
+/**
+ * Import — Jstris map 305 "The Gutter"
+ * Source: https://jstris.jezevec10.com/map/305 (API maps/api/305).
+ * Board decoded from base64 data (200 nibbles); non-zero → G. Kept bottom
+ * 8 row(s) for spawn headroom. Exact API queue as queuePrefix.
+ * Gutter; freeze-primary mid-solve. Goal clear-lines:6.
+ */
+export function buildImportJstrisTheGutterLevel(): CuratedPuzzleLevel {
+  const board = emptyBoard();
+  paintGarbageRow(board, 0, []);
+  paintGarbageRow(board, 1, [4, 5]);
+  paintGarbageRow(board, 2, [5]);
+  paintGarbageRow(board, 3, [4, 5, 6]);
+  paintGarbageRow(board, 4, [5]);
+  paintGarbageRow(board, 5, [5]);
+  paintGarbageRow(board, 6, [6]);
+  paintGarbageRow(board, 7, [5, 6, 7]);
+
+  const queuePrefix: ShapeType[] = ['T', 'T', 'S', 'T', 'T', 'S', 'O'];
+  const timeline: TimelineEntry[] = [
+    { tick: 300, kind: 'freeze', params: { durationTicks: 900 } },
+  ];
+
+  return freezeLevel({
+    id: 'import-jstris-the-gutter',
+    name: 'Jstris: The Gutter',
+    seed: 305014,
+    initialBoard: board,
+    queuePrefix,
+    goal: { kind: 'clear-lines', lines: 6 },
+    timeline,
+    shopPolicy: 'none',
+    allowHold: true,
+    benchmark: DEFAULT_PUZZLE_BENCHMARK,
+    visibilityPolicy: 'partial',
+  });
+}
+
+/**
+ * Import — Jstris map 355 "1v1 downstack"
+ * Source: https://jstris.jezevec10.com/map/355 (API maps/api/355).
+ * Board decoded from base64 data (200 nibbles); non-zero → G. Kept bottom
+ * 8 row(s) for spawn headroom. Exact API queue as queuePrefix.
+ * Downstack; garbage→magnet + late snag. Goal clear-lines:8.
+ */
+export function buildImportJstris1v1DownstackLevel(): CuratedPuzzleLevel {
+  const board = emptyBoard();
+  paintGarbageRow(board, 0, [0]);
+  paintGarbageRow(board, 1, [0]);
+  paintGarbageRow(board, 2, [0]);
+  paintGarbageRow(board, 3, [0]);
+  paintGarbageRow(board, 4, [5]);
+  paintGarbageRow(board, 5, [5]);
+  paintGarbageRow(board, 6, [1]);
+  paintGarbageRow(board, 7, [1]);
+
+  const queuePrefix: ShapeType[] = ['O', 'I', 'J', 'T', 'L', 'L', 'J', 'S', 'I'];
+  const timeline: TimelineEntry[] = [
+    { tick: 120, kind: 'garbage', params: { lines: 1, delayTicks: 18 } },
+    { tick: 240, kind: 'magnet' },
+    { afterPieces: 10, kind: 'snag' },
+  ];
+
+  return freezeLevel({
+    id: 'import-jstris-1v1-downstack',
+    name: 'Jstris: 1v1 downstack',
+    seed: 355064,
+    initialBoard: board,
+    queuePrefix,
+    goal: { kind: 'clear-lines', lines: 8 },
+    timeline,
+    shopPolicy: 'none',
+    allowHold: true,
+    benchmark: DEFAULT_PUZZLE_BENCHMARK,
+    visibilityPolicy: 'partial',
+  });
+}
+
+/**
+ * Import — Jstris map 368 "AAron's T-spin tower"
+ * Source: https://jstris.jezevec10.com/map/368 (API maps/api/368).
+ * Board decoded from base64 data (200 nibbles); non-zero → G. Kept bottom
+ * 8 row(s) for spawn headroom. Exact API queue as queuePrefix.
+ * T-spin tower; sticky→curtain→snag afterPieces. Goal clear-lines:10.
+ */
+export function buildImportJstrisAaronSTSpinTowerLevel(): CuratedPuzzleLevel {
+  const board = emptyBoard();
+  paintGarbageRow(board, 0, [5, 6, 7, 8]);
+  paintGarbageRow(board, 1, [6, 7, 8]);
+  paintGarbageRow(board, 2, [8]);
+  paintGarbageRow(board, 3, [1, 2, 3, 4, 5, 6, 7, 8]);
+  paintGarbageRow(board, 4, [1, 2, 3, 4, 5, 6, 7]);
+  paintGarbageRow(board, 5, [1]);
+  paintGarbageRow(board, 6, [1, 2, 3]);
+  paintGarbageRow(board, 7, [2, 3]);
+
+  const queuePrefix: ShapeType[] = ['T', 'T', 'T', 'T', 'T', 'T', 'T', 'T', 'T', 'T', 'T', 'T', 'T'];
+  const timeline: TimelineEntry[] = [
+    { afterPieces: 3, kind: 'sticky' },
+    { afterPieces: 7, kind: 'curtain' },
+    { afterPieces: 12, kind: 'snag' },
+  ];
+
+  return freezeLevel({
+    id: 'import-jstris-aaron-s-t-spin-tower',
+    name: 'Jstris: AAron\'s T-spin tower',
+    seed: 368077,
+    initialBoard: board,
+    queuePrefix,
+    goal: { kind: 'clear-lines', lines: 10 },
+    timeline,
+    shopPolicy: 'none',
+    allowHold: true,
+    benchmark: DEFAULT_PUZZLE_BENCHMARK,
+    visibilityPolicy: 'partial',
+  });
+}
+
+/**
+ * Import — Jstris map 410 "DHD"
+ * Source: https://jstris.jezevec10.com/map/410 (API maps/api/410).
+ * Board decoded from base64 data (200 nibbles); non-zero → G. Kept bottom
+ * 8 row(s) for spawn headroom. Exact API queue as queuePrefix.
+ * DHD; poison→wildcard + magnet. Goal clear-lines:12.
+ */
+export function buildImportJstrisDhdLevel(): CuratedPuzzleLevel {
+  const board = emptyBoard();
+  paintGarbageRow(board, 0, [4]);
+  paintGarbageRow(board, 1, [3, 4, 5]);
+  paintGarbageRow(board, 2, [1, 8]);
+  paintGarbageRow(board, 3, [2, 7]);
+  paintGarbageRow(board, 4, [1, 2, 7, 8]);
+  paintGarbageRow(board, 5, [2, 7]);
+  paintGarbageRow(board, 6, [1, 2, 7, 8]);
+  paintGarbageRow(board, 7, [2, 7]);
+
+  const queuePrefix: ShapeType[] = ['J', 'L', 'J', 'L', 'J', 'L', 'S', 'Z', 'I', 'I', 'O', 'T', 'S', 'S', 'Z', 'J', 'L', 'T', 'T', 'T', 'T', 'J', 'O', 'O', 'O', 'O', 'T', 'J', 'I', 'J'];
+  const timeline: TimelineEntry[] = [
+    { tick: 90, kind: 'poison', params: { variant: 1 } },
+    { tick: 210, kind: 'wildcard', params: { variant: 1 } },
+    { tick: 480, kind: 'magnet' },
+  ];
+
+  return freezeLevel({
+    id: 'import-jstris-dhd',
+    name: 'Jstris: DHD',
+    seed: 410022,
+    initialBoard: board,
+    queuePrefix,
+    goal: { kind: 'clear-lines', lines: 12 },
+    timeline,
+    shopPolicy: 'none',
+    allowHold: true,
+    benchmark: DEFAULT_PUZZLE_BENCHMARK,
+    visibilityPolicy: 'partial',
+  });
+}
+
+/**
+ * Import — Jstris map 9100 "T-Spin triples!"
+ * Source: https://jstris.jezevec10.com/map/9100 (API maps/api/9100).
+ * Board decoded from base64 data (200 nibbles); non-zero → G. Kept bottom
+ * 3 authentic TST rows for spawn headroom. Exact API queue as queuePrefix.
+ * Soft afterPieces pressure (snag→curtain→magnet). Goal clear-lines:4.
+ */
+export function buildImportJstrisTSpinTriplesLevel(): CuratedPuzzleLevel {
+  const board = emptyBoard();
+  // Bottom 3 of TST pair pattern (r17–19).
+  paintGarbageRow(board, 0, [2, 8]);
+  paintGarbageRow(board, 1, [2, 8]);
+  paintGarbageRow(board, 2, [1, 2, 7, 8]);
+
+  const queuePrefix: ShapeType[] = ['T', 'T', 'T', 'T', 'O', 'J', 'J', 'T', 'T', 'T', 'T', 'O', 'J', 'J', 'O', 'O'];
+  const timeline: TimelineEntry[] = [
+    { afterPieces: 5, kind: 'snag' },
+    { afterPieces: 10, kind: 'curtain' },
+    { afterPieces: 15, kind: 'magnet' },
+  ];
+
+  return freezeLevel({
+    id: 'import-jstris-t-spin-triples',
+    name: 'Jstris: T-Spin triples!',
+    seed: 9100079,
+    initialBoard: board,
+    queuePrefix,
+    goal: { kind: 'clear-lines', lines: 4 },
+    timeline,
+    shopPolicy: 'none',
+    allowHold: true,
+    benchmark: DEFAULT_PUZZLE_BENCHMARK,
+    visibilityPolicy: 'partial',
+  });
+}
+/**
+ * Import — Jstris map 160 "Mash space"
+ * Source: https://jstris.jezevec10.com/map/160 (API maps/api/160).
+ * Board decoded from base64 data (200 nibbles); non-zero → G. Kept bottom
+ * 8 row(s) of center-4 corridor for spawn headroom. Exact API queue.
+ * Replaces unsolvable L-spin-mania (77) for RulesBot. snag→sticky→purge afterPieces.
+ * Goal clear-lines:6.
+ */
+export function buildImportJstrisMashSpaceLevel(): CuratedPuzzleLevel {
+  const board = emptyBoard();
+  paintGarbageRow(board, 0, [3, 4, 5, 6]);
+  paintGarbageRow(board, 1, [3, 4, 5, 6]);
+  paintGarbageRow(board, 2, [3, 4, 5, 6]);
+  paintGarbageRow(board, 3, [3, 4, 5, 6]);
+  paintGarbageRow(board, 4, [3, 4, 5, 6]);
+  paintGarbageRow(board, 5, [3, 4, 5, 6]);
+  paintGarbageRow(board, 6, [3, 4, 5, 6]);
+  paintGarbageRow(board, 7, [3, 4, 5, 6]);
+
+  const queuePrefix: ShapeType[] = ['I', 'I', 'I', 'I', 'I', 'I', 'I', 'I', 'I', 'I', 'I', 'I', 'I', 'I', 'I', 'I', 'I', 'I', 'I'];
+  const timeline: TimelineEntry[] = [
+    { afterPieces: 4, kind: 'snag' },
+    { afterPieces: 8, kind: 'sticky' },
+    { afterPieces: 12, kind: 'purge', params: { variant: 2 } },
+  ];
+
+  return freezeLevel({
+    id: 'import-jstris-mash-space',
+    name: 'Jstris: Mash space',
+    seed: 160063,
+    initialBoard: board,
+    queuePrefix,
+    goal: { kind: 'clear-lines', lines: 6 },
+    timeline,
+    shopPolicy: 'none',
+    allowHold: true,
+    benchmark: DEFAULT_PUZZLE_BENCHMARK,
+    visibilityPolicy: 'partial',
+  });
+}
+// --- END JSTRIS BATCH20 ---
+
 export function buildAuthoredLevels(): CuratedPuzzleLevel[] {
   return [
     buildCheeseKeyholeLevel(),
@@ -609,6 +1417,28 @@ export function buildAuthoredLevels(): CuratedPuzzleLevel[] {
     buildImportJstrisCheckboardLevel(),
     buildImportJstrisUltimate29ComboLevel(),
     buildImportFumenC4w3resLevel(),
+    // JSTRIS BATCH20
+    buildImportJstrisPerfectClearHowLevel(),
+    buildImportJstrisClearTheRainbowLevel(),
+    buildImportJstrisLspinsEasyLevel(),
+    buildImportJstrisCheese10Level(),
+    buildImportJstrisClogLevel(),
+    buildImportJstrisSSpinTripleLevel(),
+    buildImportJstrisDrilltris1Level(),
+    buildImportJstrisDrilltris2Level(),
+    buildImportJstrisSrsTowerLevel(),
+    buildImportJstrisMashSpaceLevel(),
+    buildImportJstrisSrsTrainingLevel(),
+    buildImportJstrisDtCannonPracticeLevel(),
+    buildImportJstrisGodspinLevel(),
+    buildImportJstrisManyStsdLevel(),
+    buildImportJstrisTripzLevel(),
+    buildImportJstrisTheGutterLevel(),
+    buildImportJstris1v1DownstackLevel(),
+    buildImportJstrisAaronSTSpinTowerLevel(),
+    buildImportJstrisDhdLevel(),
+    buildImportJstrisTSpinTriplesLevel(),
+    // JSTRIS BATCH20 END
   ];
 }
 

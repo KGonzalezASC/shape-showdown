@@ -1,0 +1,90 @@
+{
+  "schemaVersion": 1,
+  "puzzleId": "import-jstris-1v1-downstack",
+  "contentHash": "bab1f4340286e7c46a6d3c58aaaa283ea0f1f898a110cec12e096718d675eb11",
+  "engineProtocolVersion": 4,
+  "packageVersion": "0.0.0",
+  "validationStatus": "passed",
+  "benchmark": {
+    "metric": "score",
+    "direction": "maximize",
+    "tieBreakers": [
+      {
+        "metric": "ticks",
+        "direction": "minimize"
+      },
+      {
+        "metric": "pieces",
+        "direction": "minimize"
+      }
+    ]
+  },
+  "batchSize": 2,
+  "candidateProfileIds": [
+    "player-limited-default",
+    "player-limited-surface"
+  ],
+  "candidateProfileIdentities": [
+    "player-limited-default|v1|player-limited|topology=none|garbage=0|seed=0",
+    "player-limited-surface|v1|player-limited|topology=surface|garbage=0|seed=0"
+  ],
+  "duplicateProfileIdentities": [],
+  "candidates": [
+    {
+      "profileId": "player-limited-default",
+      "profileIdentity": "player-limited-default|v1|player-limited|topology=none|garbage=0|seed=0",
+      "qualifies": true,
+      "solved": true,
+      "topOut": false,
+      "score": 1068,
+      "ticksUsed": 214,
+      "piecesUsed": 9,
+      "linesCleared": 8,
+      "perfectClear": false
+    },
+    {
+      "profileId": "player-limited-surface",
+      "profileIdentity": "player-limited-surface|v1|player-limited|topology=surface|garbage=0|seed=0",
+      "qualifies": true,
+      "solved": true,
+      "topOut": false,
+      "score": 1066,
+      "ticksUsed": 215,
+      "piecesUsed": 9,
+      "linesCleared": 8,
+      "perfectClear": false
+    }
+  ],
+  "selectedBaseline": {
+    "profileId": "player-limited-default",
+    "profileIdentity": "player-limited-default|v1|player-limited|topology=none|garbage=0|seed=0",
+    "score": 1068,
+    "ticksUsed": 214,
+    "piecesUsed": 9,
+    "linesCleared": 8,
+    "solved": true
+  },
+  "allowedMechanics": {
+    "shopPolicy": "none",
+    "allowHold": true
+  },
+  "scriptedEvents": [
+    {
+      "tick": 120,
+      "kind": "garbage"
+    },
+    {
+      "tick": 240,
+      "kind": "magnet"
+    },
+    {
+      "afterPieces": 10,
+      "kind": "snag"
+    }
+  ],
+  "visibilityPolicy": "partial",
+  "intendedSolutionRefs": [
+    "intended:import-jstris-1v1-downstack"
+  ],
+  "solutionAlternativeRefs": []
+}

@@ -1,0 +1,90 @@
+{
+  "schemaVersion": 1,
+  "puzzleId": "import-jstris-godspin",
+  "contentHash": "0622b6a0877e0715a84c40aa63caa10bc5fda86401cf6748195e71d6682e906b",
+  "engineProtocolVersion": 4,
+  "packageVersion": "0.0.0",
+  "validationStatus": "passed",
+  "benchmark": {
+    "metric": "score",
+    "direction": "maximize",
+    "tieBreakers": [
+      {
+        "metric": "ticks",
+        "direction": "minimize"
+      },
+      {
+        "metric": "pieces",
+        "direction": "minimize"
+      }
+    ]
+  },
+  "batchSize": 2,
+  "candidateProfileIds": [
+    "player-limited-default",
+    "player-limited-surface"
+  ],
+  "candidateProfileIdentities": [
+    "player-limited-default|v1|player-limited|topology=none|garbage=0|seed=0",
+    "player-limited-surface|v1|player-limited|topology=surface|garbage=0|seed=0"
+  ],
+  "duplicateProfileIdentities": [],
+  "candidates": [
+    {
+      "profileId": "player-limited-default",
+      "profileIdentity": "player-limited-default|v1|player-limited|topology=none|garbage=0|seed=0",
+      "qualifies": true,
+      "solved": true,
+      "topOut": false,
+      "score": 1128,
+      "ticksUsed": 350,
+      "piecesUsed": 16,
+      "linesCleared": 7,
+      "perfectClear": false
+    },
+    {
+      "profileId": "player-limited-surface",
+      "profileIdentity": "player-limited-surface|v1|player-limited|topology=surface|garbage=0|seed=0",
+      "qualifies": true,
+      "solved": true,
+      "topOut": false,
+      "score": 1130,
+      "ticksUsed": 345,
+      "piecesUsed": 16,
+      "linesCleared": 7,
+      "perfectClear": false
+    }
+  ],
+  "selectedBaseline": {
+    "profileId": "player-limited-surface",
+    "profileIdentity": "player-limited-surface|v1|player-limited|topology=surface|garbage=0|seed=0",
+    "score": 1130,
+    "ticksUsed": 345,
+    "piecesUsed": 16,
+    "linesCleared": 7,
+    "solved": true
+  },
+  "allowedMechanics": {
+    "shopPolicy": "none",
+    "allowHold": true
+  },
+  "scriptedEvents": [
+    {
+      "tick": 150,
+      "kind": "purge"
+    },
+    {
+      "tick": 300,
+      "kind": "sticky"
+    },
+    {
+      "tick": 450,
+      "kind": "garbage"
+    }
+  ],
+  "visibilityPolicy": "partial",
+  "intendedSolutionRefs": [
+    "intended:import-jstris-godspin"
+  ],
+  "solutionAlternativeRefs": []
+}

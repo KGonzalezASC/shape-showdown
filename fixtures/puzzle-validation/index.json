@@ -105,6 +105,146 @@
       "validationStatus": "passed",
       "visibilityPolicy": "partial",
       "selectedBaselineProfileId": "player-limited-default"
+    },
+    {
+      "puzzleId": "import-jstris-perfect-clear-how",
+      "contentHash": "6dfc6c8c191b6d279525d034e42154a90e65797a8a3e6ef8c90577118bdb9e02",
+      "validationStatus": "passed",
+      "visibilityPolicy": "partial",
+      "selectedBaselineProfileId": "player-limited-default"
+    },
+    {
+      "puzzleId": "import-jstris-clear-the-rainbow",
+      "contentHash": "90a9d383b5e6ac2a43625768ac7f32a0f84d31cdec8d2b188dc3a49b2d8f0687",
+      "validationStatus": "passed",
+      "visibilityPolicy": "partial",
+      "selectedBaselineProfileId": "player-limited-default"
+    },
+    {
+      "puzzleId": "import-jstris-lspins-easy",
+      "contentHash": "58c8199e4041c89b980ec54b67b99e5a24f7e954dd9e7c31ffe573146f554676",
+      "validationStatus": "passed",
+      "visibilityPolicy": "partial",
+      "selectedBaselineProfileId": "player-limited-surface"
+    },
+    {
+      "puzzleId": "import-jstris-cheese-10",
+      "contentHash": "2927f6ea919b2df42b5950d7027a4f25eb0b85ec382f720217106105b4350d58",
+      "validationStatus": "passed",
+      "visibilityPolicy": "partial",
+      "selectedBaselineProfileId": "player-limited-default"
+    },
+    {
+      "puzzleId": "import-jstris-clog",
+      "contentHash": "559945e1d1da361e5d1a0cfc9d6ccabcd40d95cb51dc2fd089d85f1d7f5868d7",
+      "validationStatus": "passed",
+      "visibilityPolicy": "partial",
+      "selectedBaselineProfileId": "player-limited-default"
+    },
+    {
+      "puzzleId": "import-jstris-s-spin-triple",
+      "contentHash": "56c3543298de78c539141733d4cc5f18742e98562cc64ff97a01fd1ce2427ddc",
+      "validationStatus": "passed",
+      "visibilityPolicy": "partial",
+      "selectedBaselineProfileId": "player-limited-default"
+    },
+    {
+      "puzzleId": "import-jstris-drilltris-1",
+      "contentHash": "623ef4f50d3f7c9ff783db0fe96c9e2090df67b1c9b8ac14075b42173bde9365",
+      "validationStatus": "passed",
+      "visibilityPolicy": "partial",
+      "selectedBaselineProfileId": "player-limited-default"
+    },
+    {
+      "puzzleId": "import-jstris-drilltris-2",
+      "contentHash": "8a71fe899e707f0e7632f52cc811ddd4331cc0c469d92f2504943c7028c468a3",
+      "validationStatus": "passed",
+      "visibilityPolicy": "partial",
+      "selectedBaselineProfileId": "player-limited-default"
+    },
+    {
+      "puzzleId": "import-jstris-srs-tower",
+      "contentHash": "3b121b889ae2ee8c2a130d9d1c1bcd893fcdbfcc136546725729b53ac26d383a",
+      "validationStatus": "passed",
+      "visibilityPolicy": "partial",
+      "selectedBaselineProfileId": "player-limited-default"
+    },
+    {
+      "puzzleId": "import-jstris-mash-space",
+      "contentHash": "9328d396d828292d84090225220ac7a5ffd6e97d63b5843f27f78007bb554b23",
+      "validationStatus": "passed",
+      "visibilityPolicy": "partial",
+      "selectedBaselineProfileId": "player-limited-default"
+    },
+    {
+      "puzzleId": "import-jstris-srs-training",
+      "contentHash": "e61aa084d65324c596d5a81feaf5c62e880208353b0e81d5735e3e459bc2fb69",
+      "validationStatus": "passed",
+      "visibilityPolicy": "partial",
+      "selectedBaselineProfileId": "player-limited-surface"
+    },
+    {
+      "puzzleId": "import-jstris-dt-cannon-practice",
+      "contentHash": "1f4e25b6674798f9677e141d97bb3120f5b31178b841bfdf858ca7b9d98a304a",
+      "validationStatus": "passed",
+      "visibilityPolicy": "partial",
+      "selectedBaselineProfileId": "player-limited-default"
+    },
+    {
+      "puzzleId": "import-jstris-godspin",
+      "contentHash": "0622b6a0877e0715a84c40aa63caa10bc5fda86401cf6748195e71d6682e906b",
+      "validationStatus": "passed",
+      "visibilityPolicy": "partial",
+      "selectedBaselineProfileId": "player-limited-surface"
+    },
+    {
+      "puzzleId": "import-jstris-many-stsd",
+      "contentHash": "7f3f59d59c5e88e26220710e9f1b4c81e936d09785bef20edd649a785f97a584",
+      "validationStatus": "passed",
+      "visibilityPolicy": "partial",
+      "selectedBaselineProfileId": "player-limited-default"
+    },
+    {
+      "puzzleId": "import-jstris-tripz",
+      "contentHash": "40e412ce6e1fdf6ee35cd3f0f7071714cfda5bb8738725a61971e01fa6240a2d",
+      "validationStatus": "passed",
+      "visibilityPolicy": "partial",
+      "selectedBaselineProfileId": "player-limited-default"
+    },
+    {
+      "puzzleId": "import-jstris-the-gutter",
+      "contentHash": "fcb4df25d1ed0d9eff4ac33c088b38721fa1dcfcd2a86a6a9c3f07cffdcc62e3",
+      "validationStatus": "passed",
+      "visibilityPolicy": "partial",
+      "selectedBaselineProfileId": "player-limited-default"
+    },
+    {
+      "puzzleId": "import-jstris-1v1-downstack",
+      "contentHash": "bab1f4340286e7c46a6d3c58aaaa283ea0f1f898a110cec12e096718d675eb11",
+      "validationStatus": "passed",
+      "visibilityPolicy": "partial",
+      "selectedBaselineProfileId": "player-limited-default"
+    },
+    {
+      "puzzleId": "import-jstris-aaron-s-t-spin-tower",
+      "contentHash": "83b0999939c5e98ee643b623c0d853ea870f17577ac157e268b5b944840d385d",
+      "validationStatus": "passed",
+      "visibilityPolicy": "partial",
+      "selectedBaselineProfileId": "player-limited-default"
+    },
+    {
+      "puzzleId": "import-jstris-dhd",
+      "contentHash": "df035f8a09e393888f5a0796f7a11de096a7cf9c64330bd90d0790e18dc4e0b1",
+      "validationStatus": "passed",
+      "visibilityPolicy": "partial",
+      "selectedBaselineProfileId": "player-limited-default"
+    },
+    {
+      "puzzleId": "import-jstris-t-spin-triples",
+      "contentHash": "9a5d072e21773425ae2aaf7b4f8893087a58c4dc94c3003b6ef432ae1328c9fa",
+      "validationStatus": "passed",
+      "visibilityPolicy": "partial",
+      "selectedBaselineProfileId": "player-limited-default"
     }
   ]
 }

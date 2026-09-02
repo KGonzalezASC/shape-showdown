@@ -7,7 +7,8 @@ import {
 } from './solutionProvenance.js';
 
 describe('solution provenance', () => {
-  it('resolves intended solution refs to derived metrics', () => {
+  // Catalog grew with Jstris batch imports; RulesBot derive can exceed default 5s under suite load.
+  it('resolves intended solution refs to derived metrics', { timeout: 30_000 }, () => {
     const entry = loadPuzzleCatalog()[0]!;
     const refId = entry.intendedSolutionRefs[0]!;
     const record = resolveSolutionProvenance(refId);
@@ -26,4 +27,3 @@ describe('solution provenance', () => {
     assert.ok(rows.every((row) => row.levelId === entry.level.id));
   });
 });
-

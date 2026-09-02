@@ -1,0 +1,90 @@
+{
+  "schemaVersion": 1,
+  "puzzleId": "import-jstris-aaron-s-t-spin-tower",
+  "contentHash": "83b0999939c5e98ee643b623c0d853ea870f17577ac157e268b5b944840d385d",
+  "engineProtocolVersion": 4,
+  "packageVersion": "0.0.0",
+  "validationStatus": "passed",
+  "benchmark": {
+    "metric": "score",
+    "direction": "maximize",
+    "tieBreakers": [
+      {
+        "metric": "ticks",
+        "direction": "minimize"
+      },
+      {
+        "metric": "pieces",
+        "direction": "minimize"
+      }
+    ]
+  },
+  "batchSize": 2,
+  "candidateProfileIds": [
+    "player-limited-default",
+    "player-limited-surface"
+  ],
+  "candidateProfileIdentities": [
+    "player-limited-default|v1|player-limited|topology=none|garbage=0|seed=0",
+    "player-limited-surface|v1|player-limited|topology=surface|garbage=0|seed=0"
+  ],
+  "duplicateProfileIdentities": [],
+  "candidates": [
+    {
+      "profileId": "player-limited-default",
+      "profileIdentity": "player-limited-default|v1|player-limited|topology=none|garbage=0|seed=0",
+      "qualifies": true,
+      "solved": true,
+      "topOut": false,
+      "score": 1546,
+      "ticksUsed": 916,
+      "piecesUsed": 25,
+      "linesCleared": 10,
+      "perfectClear": false
+    },
+    {
+      "profileId": "player-limited-surface",
+      "profileIdentity": "player-limited-surface|v1|player-limited|topology=surface|garbage=0|seed=0",
+      "qualifies": true,
+      "solved": true,
+      "topOut": false,
+      "score": 1546,
+      "ticksUsed": 916,
+      "piecesUsed": 25,
+      "linesCleared": 10,
+      "perfectClear": false
+    }
+  ],
+  "selectedBaseline": {
+    "profileId": "player-limited-default",
+    "profileIdentity": "player-limited-default|v1|player-limited|topology=none|garbage=0|seed=0",
+    "score": 1546,
+    "ticksUsed": 916,
+    "piecesUsed": 25,
+    "linesCleared": 10,
+    "solved": true
+  },
+  "allowedMechanics": {
+    "shopPolicy": "none",
+    "allowHold": true
+  },
+  "scriptedEvents": [
+    {
+      "afterPieces": 3,
+      "kind": "sticky"
+    },
+    {
+      "afterPieces": 7,
+      "kind": "curtain"
+    },
+    {
+      "afterPieces": 12,
+      "kind": "snag"
+    }
+  ],
+  "visibilityPolicy": "partial",
+  "intendedSolutionRefs": [
+    "intended:import-jstris-aaron-s-t-spin-tower"
+  ],
+  "solutionAlternativeRefs": []
+}
