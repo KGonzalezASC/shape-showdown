@@ -84,6 +84,20 @@
       "validationStatus": "passed",
       "visibilityPolicy": "revealed",
       "selectedBaselineProfileId": "player-limited-default"
+    },
+    {
+      "puzzleId": "import-jstris-checkboard",
+      "contentHash": "e9059ed85441e3d3e763696874ac0cf021d36a1632844c5ed3a3e5c2c011c88d",
+      "validationStatus": "passed",
+      "visibilityPolicy": "revealed",
+      "selectedBaselineProfileId": "player-limited-default"
+    },
+    {
+      "puzzleId": "import-ronylicha-master-61",
+      "contentHash": "68d4126cc584fc4326737ae9730b2ff8a9b21f8ef4da56420f359295b9eb6f5f",
+      "validationStatus": "passed",
+      "visibilityPolicy": "partial",
+      "selectedBaselineProfileId": "player-limited-default"
     }
   ]
 }
