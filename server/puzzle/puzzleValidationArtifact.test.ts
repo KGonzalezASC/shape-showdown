@@ -97,10 +97,11 @@ describe('puzzleValidationArtifact', () => {
     assert.equal(emitted.artifacts[0]?.selectedBaseline, null);
   });
 
-  it('emits exitCode 0 for the curated catalog', () => {
+  it('emits exitCode 0 for the curated catalog', { timeout: 120_000 }, () => {
     const catalog = loadPuzzleCatalog();
     const emitted = emitPuzzleValidationArtifacts(catalog, '0.0.0-test');
     assert.equal(emitted.exitCode, 0);
     assert.ok(emitted.artifacts.every((artifact) => artifact.validationStatus === 'passed'));
   });
 });
+

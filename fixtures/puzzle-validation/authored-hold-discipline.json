@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "puzzleId": "authored-hold-discipline",
-  "contentHash": "7a102f6e5307b82b22f1381d07f1ff225d30cd93dfcd15434749cd59a8945e37",
+  "contentHash": "45e796b14887207791f0fc2497d86d841f234bbb444f22c247e4da7176701426",
   "engineProtocolVersion": 4,
   "packageVersion": "0.0.0",
   "validationStatus": "passed",
@@ -32,10 +32,10 @@
       "qualifies": true,
       "solved": true,
       "topOut": false,
-      "score": 518,
-      "ticksUsed": 13,
-      "piecesUsed": 3,
-      "linesCleared": 4,
+      "score": 2226,
+      "ticksUsed": 1282,
+      "piecesUsed": 27,
+      "linesCleared": 13,
       "perfectClear": false
     },
     {
@@ -44,20 +44,20 @@
       "qualifies": true,
       "solved": true,
       "topOut": false,
-      "score": 518,
-      "ticksUsed": 13,
-      "piecesUsed": 3,
-      "linesCleared": 4,
+      "score": 2238,
+      "ticksUsed": 1286,
+      "piecesUsed": 27,
+      "linesCleared": 13,
       "perfectClear": false
     }
   ],
   "selectedBaseline": {
     "profileId": "player-limited-default",
     "profileIdentity": "player-limited-default|v1|player-limited|topology=none|garbage=0|seed=0",
-    "score": 518,
-    "ticksUsed": 13,
-    "piecesUsed": 3,
-    "linesCleared": 4,
+    "score": 2226,
+    "ticksUsed": 1282,
+    "piecesUsed": 27,
+    "linesCleared": 13,
     "solved": true
   },
   "allowedMechanics": {

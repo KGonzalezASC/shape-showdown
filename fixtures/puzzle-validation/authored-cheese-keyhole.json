@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "puzzleId": "authored-cheese-keyhole",
-  "contentHash": "baf963cbafca58b1bc72f8b7d2a29ada8d7b73518c05b76116236443024dc8ae",
+  "contentHash": "ec7b899a2736b060b3c3b54275eecc47b029a358a3219fb7452fd6050cf12373",
   "engineProtocolVersion": 4,
   "packageVersion": "0.0.0",
   "validationStatus": "passed",
@@ -36,10 +36,10 @@
       "qualifies": true,
       "solved": true,
       "topOut": false,
-      "score": 494,
-      "ticksUsed": 147,
-      "piecesUsed": 6,
-      "linesCleared": 3,
+      "score": 644,
+      "ticksUsed": 179,
+      "piecesUsed": 7,
+      "linesCleared": 4,
       "perfectClear": false
     },
     {
@@ -48,27 +48,32 @@
       "qualifies": true,
       "solved": true,
       "topOut": false,
-      "score": 494,
-      "ticksUsed": 147,
-      "piecesUsed": 6,
-      "linesCleared": 3,
+      "score": 644,
+      "ticksUsed": 179,
+      "piecesUsed": 7,
+      "linesCleared": 4,
       "perfectClear": false
     }
   ],
   "selectedBaseline": {
     "profileId": "player-limited-default",
     "profileIdentity": "player-limited-default|v1|player-limited|topology=none|garbage=0|seed=0",
-    "score": 494,
-    "ticksUsed": 147,
-    "piecesUsed": 6,
-    "linesCleared": 3,
+    "score": 644,
+    "ticksUsed": 179,
+    "piecesUsed": 7,
+    "linesCleared": 4,
     "solved": true
   },
   "allowedMechanics": {
     "shopPolicy": "none",
     "allowHold": true
   },
-  "scriptedEvents": [],
+  "scriptedEvents": [
+    {
+      "tick": 300,
+      "kind": "freeze"
+    }
+  ],
   "visibilityPolicy": "revealed",
   "intendedSolutionRefs": [
     "intended:authored-cheese-keyhole"

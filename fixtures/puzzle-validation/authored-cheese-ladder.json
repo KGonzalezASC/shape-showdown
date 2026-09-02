@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "puzzleId": "authored-cheese-ladder",
-  "contentHash": "1c87b3522dfbb1ef3da22b8852e67a1621a5610741d1a8ee36399b2d2dec6b4b",
+  "contentHash": "9c3742ed51cc88b92ca3037182a467619dacca2ad84ce7abf71b9fa5ab014cd3",
   "engineProtocolVersion": 4,
   "packageVersion": "0.0.0",
   "validationStatus": "passed",
@@ -36,10 +36,10 @@
       "qualifies": true,
       "solved": true,
       "topOut": false,
-      "score": 450,
-      "ticksUsed": 108,
-      "piecesUsed": 5,
-      "linesCleared": 3,
+      "score": 1216,
+      "ticksUsed": 694,
+      "piecesUsed": 14,
+      "linesCleared": 8,
       "perfectClear": false
     },
     {
@@ -48,27 +48,32 @@
       "qualifies": true,
       "solved": true,
       "topOut": false,
-      "score": 450,
-      "ticksUsed": 108,
-      "piecesUsed": 5,
-      "linesCleared": 3,
+      "score": 1216,
+      "ticksUsed": 694,
+      "piecesUsed": 14,
+      "linesCleared": 8,
       "perfectClear": false
     }
   ],
   "selectedBaseline": {
     "profileId": "player-limited-default",
     "profileIdentity": "player-limited-default|v1|player-limited|topology=none|garbage=0|seed=0",
-    "score": 450,
-    "ticksUsed": 108,
-    "piecesUsed": 5,
-    "linesCleared": 3,
+    "score": 1216,
+    "ticksUsed": 694,
+    "piecesUsed": 14,
+    "linesCleared": 8,
     "solved": true
   },
   "allowedMechanics": {
     "shopPolicy": "none",
     "allowHold": true
   },
-  "scriptedEvents": [],
+  "scriptedEvents": [
+    {
+      "tick": 200,
+      "kind": "snag"
+    }
+  ],
   "visibilityPolicy": "revealed",
   "intendedSolutionRefs": [
     "intended:authored-cheese-ladder"

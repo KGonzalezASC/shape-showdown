@@ -35,8 +35,8 @@ function freezeLevel<T>(value: T): T {
 }
 
 /**
- * Cheese Keyhole — staggered multi-row cheese with a 2x2 keyhole and side wells.
- * Intended path leans on O into the keyhole, then J/L to plug remaining holes.
+ * Cheese Keyhole - staggered multi-row cheese with a 2x2 keyhole and side wells.
+ * Freeze mid-opening forces early O/J/L commitment into the keyhole.
  */
 export function buildCheeseKeyholeLevel(): CuratedPuzzleLevel {
   const board = emptyBoard();
@@ -46,6 +46,9 @@ export function buildCheeseKeyholeLevel(): CuratedPuzzleLevel {
   paintGarbageRow(board, 3, [2, 6]);
 
   const queuePrefix: ShapeType[] = ['O', 'J', 'L', 'I', 'T', 'S', 'Z'];
+  const timeline: TimelineEvent[] = [
+    { tick: 300, kind: 'freeze', params: { durationTicks: 900 } },
+  ];
 
   return freezeLevel({
     id: 'authored-cheese-keyhole',
@@ -53,8 +56,8 @@ export function buildCheeseKeyholeLevel(): CuratedPuzzleLevel {
     seed: 1042,
     initialBoard: board,
     queuePrefix,
-    goal: { kind: 'clear-lines', lines: 3 },
-    timeline: [],
+    goal: { kind: 'clear-lines', lines: 4 },
+    timeline,
     shopPolicy: 'none',
     allowHold: true,
     benchmark: DEFAULT_PUZZLE_BENCHMARK,
@@ -63,7 +66,7 @@ export function buildCheeseKeyholeLevel(): CuratedPuzzleLevel {
 }
 
 /**
- * Frozen Well — left ramp + right stub basin. Freeze at tick 360 (~6s) locks hold
+ * Frozen Well - left ramp + right stub basin. Freeze at tick 360 (~6s) locks hold
  * mid-human-solve so early holds matter.
  */
 export function buildFrozenWellLevel(): CuratedPuzzleLevel {
@@ -89,7 +92,7 @@ export function buildFrozenWellLevel(): CuratedPuzzleLevel {
     seed: 2077,
     initialBoard: board,
     queuePrefix,
-    goal: { kind: 'clear-lines', lines: 3 },
+    goal: { kind: 'clear-lines', lines: 5 },
     timeline,
     shopPolicy: 'none',
     allowHold: true,
@@ -103,8 +106,8 @@ export function buildFrozenWellLevel(): CuratedPuzzleLevel {
 }
 
 /**
- * Skew Stairs — diagonal cheese stairs with a forced queue that rewards
- * committing to the ascending holes in order.
+ * Skew Stairs - diagonal cheese stairs with retrim→magnet swap-line / speed pressure
+ * while ascending the holes in order.
  */
 export function buildSkewStairsLevel(): CuratedPuzzleLevel {
   const board = emptyBoard();
@@ -116,6 +119,10 @@ export function buildSkewStairsLevel(): CuratedPuzzleLevel {
   paintColumnStack(board, 9, 3);
 
   const queuePrefix: ShapeType[] = ['J', 'L', 'O', 'I', 'T', 'S', 'Z'];
+  const timeline: TimelineEvent[] = [
+    { tick: 60, kind: 'retrim' },
+    { tick: 180, kind: 'magnet' },
+  ];
 
   return freezeLevel({
     id: 'authored-skew-stairs',
@@ -123,8 +130,8 @@ export function buildSkewStairsLevel(): CuratedPuzzleLevel {
     seed: 3110,
     initialBoard: board,
     queuePrefix,
-    goal: { kind: 'clear-lines', lines: 3 },
-    timeline: [],
+    goal: { kind: 'clear-lines', lines: 6 },
+    timeline,
     shopPolicy: 'none',
     allowHold: true,
     benchmark: DEFAULT_PUZZLE_BENCHMARK,
@@ -133,7 +140,7 @@ export function buildSkewStairsLevel(): CuratedPuzzleLevel {
 }
 
 /**
- * Pulse Garbage — cheese dig with retrim + magnet synergy (swap-line / speed pressure)
+ * Pulse Garbage - cheese dig with retrim + magnet synergy (swap-line / speed pressure)
  * plus a mid-run garbage pulse.
  */
 export function buildPulseGarbageLevel(): CuratedPuzzleLevel {
@@ -157,7 +164,7 @@ export function buildPulseGarbageLevel(): CuratedPuzzleLevel {
     seed: 4201,
     initialBoard: board,
     queuePrefix,
-    goal: { kind: 'clear-lines', lines: 3 },
+    goal: { kind: 'clear-lines', lines: 7 },
     timeline,
     shopPolicy: 'none',
     allowHold: true,
@@ -167,7 +174,8 @@ export function buildPulseGarbageLevel(): CuratedPuzzleLevel {
 }
 
 /**
- * Cheese Ladder — multi-row staggered cheese with ascending hole ladder.
+ * Cheese Ladder - multi-row staggered cheese with ascending hole ladder.
+ * Snag (fortify) mid-climb clamps movement while ascending holes.
  */
 export function buildCheeseLadderLevel(): CuratedPuzzleLevel {
   const board = emptyBoard();
@@ -178,6 +186,9 @@ export function buildCheeseLadderLevel(): CuratedPuzzleLevel {
   paintGarbageRow(board, 4, [5]);
 
   const queuePrefix: ShapeType[] = ['J', 'L', 'O', 'S', 'Z', 'I', 'T'];
+  const timeline: TimelineEvent[] = [
+    { tick: 200, kind: 'snag' },
+  ];
 
   return freezeLevel({
     id: 'authored-cheese-ladder',
@@ -185,8 +196,8 @@ export function buildCheeseLadderLevel(): CuratedPuzzleLevel {
     seed: 5103,
     initialBoard: board,
     queuePrefix,
-    goal: { kind: 'clear-lines', lines: 3 },
-    timeline: [],
+    goal: { kind: 'clear-lines', lines: 8 },
+    timeline,
     shopPolicy: 'none',
     allowHold: true,
     benchmark: DEFAULT_PUZZLE_BENCHMARK,
@@ -195,7 +206,8 @@ export function buildCheeseLadderLevel(): CuratedPuzzleLevel {
 }
 
 /**
- * Dig Shaft — cheese dig with a preferred shaft lane and mid-run garbage pulse.
+ * Dig Shaft - cheese dig with a preferred shaft lane, garbage pulse, and freeze
+ * so the dig must continue under locked-hold pressure.
  */
 export function buildDigShaftLevel(): CuratedPuzzleLevel {
   const board = emptyBoard();
@@ -210,6 +222,7 @@ export function buildDigShaftLevel(): CuratedPuzzleLevel {
   const queuePrefix: ShapeType[] = ['T', 'S', 'Z', 'O', 'J', 'L', 'I'];
   const timeline: TimelineEvent[] = [
     { tick: 120, kind: 'garbage', params: { lines: 1, delayTicks: 18 } },
+    { tick: 240, kind: 'freeze', params: { durationTicks: 900 } },
   ];
 
   return freezeLevel({
@@ -218,7 +231,7 @@ export function buildDigShaftLevel(): CuratedPuzzleLevel {
     seed: 6208,
     initialBoard: board,
     queuePrefix,
-    goal: { kind: 'clear-lines', lines: 3 },
+    goal: { kind: 'clear-lines', lines: 9 },
     timeline,
     shopPolicy: 'none',
     allowHold: true,
@@ -227,7 +240,10 @@ export function buildDigShaftLevel(): CuratedPuzzleLevel {
   });
 }
 
-/** T-Slot Setup — T-oriented pocket; early T bankable, late T finishes. */
+/**
+ * T-Slot Setup - T-oriented pocket; early T bankable, late T finishes.
+ * Sticky (quickstep) clock pressure while the pocket is prepared.
+ */
 export function buildTSlotSetupLevel(): CuratedPuzzleLevel {
   const board = emptyBoard();
   paintGarbageRow(board, 0, [3, 4, 5]);
@@ -237,6 +253,9 @@ export function buildTSlotSetupLevel(): CuratedPuzzleLevel {
   paintColumnStack(board, 9, 4);
 
   const queuePrefix: ShapeType[] = ['T', 'S', 'Z', 'J', 'L', 'O', 'T'];
+  const timeline: TimelineEvent[] = [
+    { tick: 180, kind: 'sticky' },
+  ];
 
   return freezeLevel({
     id: 'authored-tslot-setup',
@@ -244,8 +263,8 @@ export function buildTSlotSetupLevel(): CuratedPuzzleLevel {
     seed: 7331,
     initialBoard: board,
     queuePrefix,
-    goal: { kind: 'clear-lines', lines: 3 },
-    timeline: [],
+    goal: { kind: 'clear-lines', lines: 11 },
+    timeline,
     shopPolicy: 'none',
     allowHold: true,
     benchmark: DEFAULT_PUZZLE_BENCHMARK,
@@ -254,7 +273,9 @@ export function buildTSlotSetupLevel(): CuratedPuzzleLevel {
 }
 
 /**
- * Four Wide — narrow 4-col corridor; hold disabled so every piece commits in-lane.
+ * Four Wide - narrow 4-col corridor; hold disabled so every piece commits in-lane.
+ * Retrim→magnet adds swap-line / speed pressure inside the corridor (freeze would be
+ * a weak beat with hold already off).
  */
 export function buildFourWideLevel(): CuratedPuzzleLevel {
   const board = emptyBoard();
@@ -270,6 +291,10 @@ export function buildFourWideLevel(): CuratedPuzzleLevel {
   paintColumnStack(board, 6, 1);
 
   const queuePrefix: ShapeType[] = ['I', 'O', 'J', 'L', 'T', 'S', 'Z'];
+  const timeline: TimelineEvent[] = [
+    { tick: 60, kind: 'retrim' },
+    { tick: 150, kind: 'magnet' },
+  ];
 
   return freezeLevel({
     id: 'authored-four-wide',
@@ -277,8 +302,8 @@ export function buildFourWideLevel(): CuratedPuzzleLevel {
     seed: 8412,
     initialBoard: board,
     queuePrefix,
-    goal: { kind: 'clear-lines', lines: 3 },
-    timeline: [],
+    goal: { kind: 'clear-lines', lines: 12 },
+    timeline,
     shopPolicy: 'none',
     allowHold: false,
     benchmark: DEFAULT_PUZZLE_BENCHMARK,
@@ -286,7 +311,7 @@ export function buildFourWideLevel(): CuratedPuzzleLevel {
   });
 }
 
-/** Hold Discipline — center well; freeze at 360 punishes late holds. */
+/** Hold Discipline - center well; freeze at 360 punishes late holds. */
 export function buildHoldDisciplineLevel(): CuratedPuzzleLevel {
   const board = emptyBoard();
   paintColumnStack(board, 0, 4);
@@ -310,7 +335,7 @@ export function buildHoldDisciplineLevel(): CuratedPuzzleLevel {
     seed: 9550,
     initialBoard: board,
     queuePrefix,
-    goal: { kind: 'clear-lines', lines: 3 },
+    goal: { kind: 'clear-lines', lines: 13 },
     timeline,
     shopPolicy: 'none',
     allowHold: true,
@@ -324,7 +349,7 @@ export function buildHoldDisciplineLevel(): CuratedPuzzleLevel {
 }
 
 /**
- * Poison Beat — poison (fixed variant) then wildcard-four with the same variant
+ * Poison Beat - poison (fixed variant) then wildcard-four with the same variant
  * once poison is on the stack and spread has finished (multiplayer prerequisite).
  */
 export function buildPoisonBeatLevel(): CuratedPuzzleLevel {
@@ -360,7 +385,8 @@ export function buildPoisonBeatLevel(): CuratedPuzzleLevel {
 }
 
 /**
- * Curtain Drop — retrim once, then curtain that loops with 200 clear ticks after each curtain ends.
+ * Curtain Drop - retrim once, then curtain that loops with 200 clear ticks after each curtain ends.
+ * Goal stays at 2 lines (short blackout-pressure beat).
  */
 export function buildCurtainDropLevel(): CuratedPuzzleLevel {
   const board = emptyBoard();
@@ -381,7 +407,7 @@ export function buildCurtainDropLevel(): CuratedPuzzleLevel {
         sequence: [{ at: 0, kind: 'curtain' }],
       },
     },
-  ]
+  ];
 
   return freezeLevel({
     id: 'authored-curtain-drop',
@@ -399,7 +425,8 @@ export function buildCurtainDropLevel(): CuratedPuzzleLevel {
 }
 
 /**
- * Late I Well — deep well that wants a late I; awkward early S/Z/O force setup.
+ * Late I Well - deep well that wants a late I; awkward early S/Z/O force setup.
+ * Freeze mid-setup punishes banking the I too late.
  */
 export function buildLateIWellLevel(): CuratedPuzzleLevel {
   const board = emptyBoard();
@@ -414,6 +441,9 @@ export function buildLateIWellLevel(): CuratedPuzzleLevel {
   paintColumnStack(board, 9, 5);
 
   const queuePrefix: ShapeType[] = ['S', 'Z', 'O', 'J', 'L', 'T', 'I'];
+  const timeline: TimelineEvent[] = [
+    { tick: 360, kind: 'freeze', params: { durationTicks: 900 } },
+  ];
 
   return freezeLevel({
     id: 'authored-late-i-well',
@@ -421,8 +451,8 @@ export function buildLateIWellLevel(): CuratedPuzzleLevel {
     seed: 12880,
     initialBoard: board,
     queuePrefix,
-    goal: { kind: 'clear-lines', lines: 3 },
-    timeline: [],
+    goal: { kind: 'clear-lines', lines: 15 },
+    timeline,
     shopPolicy: 'none',
     allowHold: true,
     benchmark: DEFAULT_PUZZLE_BENCHMARK,
@@ -446,3 +476,4 @@ export function buildAuthoredLevels(): CuratedPuzzleLevel[] {
     buildLateIWellLevel(),
   ];
 }
+
