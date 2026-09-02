@@ -114,16 +114,22 @@ describe('puzzle timeline loops', () => {
     assert.equal('loop' in offset[1] && offset[1].loop.startTick, 180);
   });
 
-  it('authored curtain-drop waits for curtain end then 200 idle ticks', () => {
+  it('authored curtain-drop keeps sparse one-shot curtains (no dense loop)', () => {
     const level = buildCurtainDropLevel();
-    const events = materializeTimeline(level.timeline, 180 + CURTAIN_LOOP_STRIDE * 2);
+    assert.equal(level.goal.kind, 'survive-clear');
+    if (level.goal.kind === 'survive-clear') {
+      assert.equal(level.goal.ticks, 2250);
+      assert.equal(level.goal.lines, 12);
+    }
+    const events = materializeTimeline(level.timeline, level.goal.kind === 'survive-clear' ? level.goal.ticks : 2250);
     assert.deepEqual(
-      events.filter((e) => e.kind === 'curtain').map((e) => e.tick),
-      [180, 180 + CURTAIN_LOOP_STRIDE, 180 + CURTAIN_LOOP_STRIDE * 2],
-    );
-    assert.deepEqual(
-      events.filter((e) => e.kind === 'retrim').map((e) => e.tick),
-      [60],
+      events.map((e) => ({ tick: e.tick, kind: e.kind })),
+      [
+        { tick: 60, kind: 'retrim' },
+        { tick: 480, kind: 'curtain' },
+        { tick: 1200, kind: 'curtain' },
+        { tick: 1800, kind: 'magnet' },
+      ],
     );
   });
 

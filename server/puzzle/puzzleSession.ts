@@ -199,6 +199,8 @@ export class PuzzleSession {
         return this.gameState.tick >= goal.ticks;
       case 'clear-lines':
         return player.linesCleared >= goal.lines;
+      case 'survive-clear':
+        return this.gameState.tick >= goal.ticks && player.linesCleared >= goal.lines;
     }
   }
 

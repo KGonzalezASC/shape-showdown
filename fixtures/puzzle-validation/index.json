@@ -73,7 +73,7 @@
     },
     {
       "puzzleId": "authored-curtain-drop",
-      "contentHash": "9d6564d583f652381368916cfe41ba88d3fe96d2d1d7360051823a936b3400ac",
+      "contentHash": "c576077ceb56ac16340965e3ecc67701554e2f5d013d0ac8d9335c4840fc5edd",
       "validationStatus": "passed",
       "visibilityPolicy": "hidden",
       "selectedBaselineProfileId": "player-limited-default"
@@ -94,7 +94,7 @@
     },
     {
       "puzzleId": "import-jstris-ultimate-29-combo",
-      "contentHash": "9c5ffedb4c10a6480e1c774601da78c460a5b08c69306c1414f47dc254157a77",
+      "contentHash": "b915316446680fa802223167c5caa2f78ff58a6695410b37509c0dffe61985de",
       "validationStatus": "passed",
       "visibilityPolicy": "revealed",
       "selectedBaselineProfileId": "player-limited-default"

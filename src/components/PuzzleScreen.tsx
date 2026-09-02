@@ -40,7 +40,7 @@ interface PuzzleWireState {
   pendingGarbage: number;
   topOut: boolean;
   status: 'playing' | 'solved' | 'topout';
-  goal: { kind: string; lines?: number; ticks?: number };
+  goal: { kind: string; lines?: number; ticks?: number; maxPieces?: number };
   levelId: string;
   levelName: string;
   poisonBoard?: PublicPlayerState['poisonBoard'];
@@ -67,7 +67,7 @@ interface PuzzleStarted {
   levelId: string;
   name: string;
   seed: number;
-  goal: { kind: string; lines?: number; ticks?: number };
+  goal: { kind: string; lines?: number; ticks?: number; maxPieces?: number };
   allowHold?: boolean;
   visibilityPolicy?: PuzzleVisibilityPolicy;
   puzzleId?: string;
@@ -80,7 +80,7 @@ interface PuzzleStarted {
 interface PuzzleCatalogEntry {
   id: string;
   name: string;
-  goal: { kind: string; lines?: number; ticks?: number };
+  goal: { kind: string; lines?: number; ticks?: number; maxPieces?: number };
   allowHold: boolean;
   visibilityPolicy: PuzzleVisibilityPolicy;
 }
@@ -151,6 +151,8 @@ const goalLabel = (goal: PuzzleStarted['goal']): string => {
       return `Survive ${Math.ceil((goal.ticks ?? 0) / 60)}s`;
     case 'clear-lines':
       return `Clear ${goal.lines ?? 0} lines`;
+    case 'survive-clear':
+      return `Survive ${Math.ceil((goal.ticks ?? 0) / 60)}s · Clear ${goal.lines ?? 0} lines`;
     default:
       return goal.kind;
   }

@@ -37,7 +37,7 @@ export function curatePuzzleLevel(
   options: CuratePuzzleOptions,
 ): CuratedPuzzleEntry {
   if (
-    (level.goal.kind === 'perfect-clear' || level.goal.kind === 'clear-lines') &&
+    (level.goal.kind === 'perfect-clear' || level.goal.kind === 'clear-lines' || level.goal.kind === 'survive-clear') &&
     initialFilledCells(level) === 0
   ) {
     throw new Error(

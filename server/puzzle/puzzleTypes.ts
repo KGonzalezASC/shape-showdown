@@ -73,7 +73,14 @@ export type PuzzleGoal =
       maxPieces?: number;
     }
   | { kind: 'survive'; /** Ticks the player must survive. */ ticks: number }
-  | { kind: 'clear-lines'; /** Total line clears required. */ lines: number };
+  | { kind: 'clear-lines'; /** Total line clears required. */ lines: number }
+  | {
+      kind: 'survive-clear';
+      /** Ticks the player must survive (and still be alive). */
+      ticks: number;
+      /** Lines that must also be cleared by the survive horizon. */
+      lines: number;
+    };
 
 /** A single-player puzzle level: board + piece stream + scripted hazard timeline. */
 export interface PuzzleLevel {
