@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "puzzleId": "authored-poison-beat",
-  "contentHash": "1e831c7922ac2a3868db9cae07382a1866e36f63d5349ec0c9281c7b6c33efd1",
+  "contentHash": "b4ad663ea71985fcb41bf451b6dae5739d1b14e278bb075eb93729d36c596622",
   "engineProtocolVersion": 4,
   "packageVersion": "0.0.0",
   "validationStatus": "passed",
@@ -36,7 +36,7 @@
       "qualifies": true,
       "solved": true,
       "topOut": false,
-      "score": 352,
+      "score": 346,
       "ticksUsed": 139,
       "piecesUsed": 5,
       "linesCleared": 2,
@@ -48,7 +48,7 @@
       "qualifies": true,
       "solved": true,
       "topOut": false,
-      "score": 354,
+      "score": 348,
       "ticksUsed": 112,
       "piecesUsed": 5,
       "linesCleared": 2,
@@ -58,7 +58,7 @@
   "selectedBaseline": {
     "profileId": "player-limited-surface",
     "profileIdentity": "player-limited-surface|v1|player-limited|topology=surface|garbage=0|seed=0",
-    "score": 354,
+    "score": 348,
     "ticksUsed": 112,
     "piecesUsed": 5,
     "linesCleared": 2,
@@ -70,8 +70,12 @@
   },
   "scriptedEvents": [
     {
-      "tick": 150,
+      "tick": 90,
       "kind": "poison"
+    },
+    {
+      "tick": 360,
+      "kind": "wildcard"
     }
   ],
   "visibilityPolicy": "partial",

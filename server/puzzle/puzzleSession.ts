@@ -6,7 +6,12 @@ import { clonePlayer, type InputDriver } from '../testHarness/inputDriver.js';
 import { defaultObservationProjector } from '../testHarness/observationProjector.js';
 import type { HazardKind, PuzzleGoal, PuzzleLevel, PuzzleAttempt, TimelineEvent } from './puzzleTypes.js';
 import { assertSupportedPuzzleTimeline } from './puzzleHazards.js';
+import { applyScriptedShopAttack } from '../shop.js';
+import { applyBomberToBuyer } from '../puzzleEngine/engine.js';
 import { pushFieldEffect } from '../../src/shop/fieldEffects.js';
+import {
+  GARBAGE_ARRIVAL_DELAY_TICKS,
+} from '../../src/constants.js';
 
 /**
  * Single-player puzzle session: a deterministic scenario with one player, a
@@ -40,86 +45,53 @@ export interface PuzzleSessionConfig {
   maxTicks?: number;
 }
 
-/** Apply one scripted hazard to the player (mirrors the shop handlers' semantics). */
+/** Apply one scripted hazard to the player (mirrors shop attack semantics). */
 function applyHazard(player: PlayerState, kind: HazardKind, params: Record<string, unknown> | undefined, tick: number): void {
   const p = params ?? {};
   switch (kind) {
-    case 'poison': {
-      // Poison the active piece (Elixir semantics): on lock it seeds wave 1.
-      const variant = typeof p.variant === 'number' ? p.variant : 1;
-      if (player.activePiece) {
-        player.activePiece.poisoned = true;
-        player.activePiece.poisonVariant = variant;
-      } else {
-        player.poisonNextPiece = true;
-        player.poisonNextVariant = variant;
-      }
+    case 'poison':
+      applyScriptedShopAttack('elixir-pulse', player, tick, p);
       break;
-    }
-    case 'storage-poison': {
-      if (player.holdPiece) {
-        player.holdPiece.poisoned = true;
-        player.holdPiece.poisonVariant = typeof p.variant === 'number' ? p.variant : 1;
-      }
+    case 'storage-poison':
+      applyScriptedShopAttack('storage-toxin', player, tick, p);
       break;
-    }
-    case 'curtain': {
-      // Frost rows drop on the player's field below their swap line.
-      const rows = typeof p.rows === 'number' ? p.rows : 3;
-      player.curtainDefenseLevel = Math.max(0, (player.curtainDefenseLevel ?? 0) - 1);
-      player.swapCutoffRow = Math.max(0, player.swapCutoffRow - rows);
+    case 'retrim':
+      applyScriptedShopAttack('retrim', player, tick, p);
       break;
-    }
-    case 'freeze': {
-      const until = tick + (typeof p.durationTicks === 'number' ? p.durationTicks : 600);
-      player.holdFrozenUntilTick = Math.max(player.holdFrozenUntilTick ?? 0, until);
-      // Same presentation seam multiplayer uses for the hold-box frozen indicator.
-      pushFieldEffect(player, 'freeze', tick, 'Frozen', '❄️', until);
+    case 'curtain':
+      applyScriptedShopAttack('curtain', player, tick, p);
       break;
-    }
-    case 'magnet': {
-      const step = typeof p.gravityStep === 'number' ? p.gravityStep : 2;
-      player.magnetPermanentStacks = Math.min(3, (player.magnetPermanentStacks ?? 0) + 1);
-      player.magnetPieceBoost = (player.magnetPieceBoost ?? 0) + step;
+    case 'freeze':
+      applyScriptedShopAttack('frost-shift', player, tick, p);
       break;
-    }
-    case 'snag': {
-      if (player.activePiece) {
-        player.snagHardDropBlocked = true;
-        player.snagNextPiece = !!player.pieceHasHardDropped;
-      } else {
-        player.snagNextPiece = true;
-      }
+    case 'magnet':
+      applyScriptedShopAttack('gravity-lure', player, tick, p);
       break;
-    }
-    case 'sticky': {
-      if (player.activePiece) {
-        player.pieceLockResetCap = 2;
-        player.stickyNextPiece = false;
-        player.lockResetsUsed = 0;
-      } else {
-        player.stickyNextPiece = true;
-      }
+    case 'snag':
+      applyScriptedShopAttack('fortify-frame', player, tick, p);
       break;
-    }
+    case 'sticky':
+      applyScriptedShopAttack('quickstep-clock', player, tick, p);
+      break;
+    case 'purge':
+      applyScriptedShopAttack('vortex-step', player, tick, p);
+      break;
+    case 'wildcard':
+      applyScriptedShopAttack('wildcard-four', player, tick, p);
+      break;
     case 'bomber': {
-      if (player.activePiece) {
-        player.activePiece.bomber = true;
-        player.bomberNextPiece = false;
-      } else {
-        player.bomberNextPiece = true;
-      }
+      // Bomber is a self-buff in multiplayer; timeline applies it to the puzzle player.
+      applyBomberToBuyer(player);
+      pushFieldEffect(player, 'bomber', tick, 'Bomber', '💣', tick + 240);
       break;
     }
     case 'garbage': {
       const lines = typeof p.lines === 'number' ? p.lines : 1;
-      const arrivalTick = tick + (typeof p.delayTicks === 'number' ? p.delayTicks : 18);
+      const arrivalTick = tick + (typeof p.delayTicks === 'number' ? p.delayTicks : GARBAGE_ARRIVAL_DELAY_TICKS);
       player.pendingGarbage.push({ lines, arrivalTick });
       break;
     }
     case 'satellite':
-    case 'purge':
-    case 'wildcard':
     case 'tectonic':
       throw new Error(`Unsupported puzzle hazard in session: ${kind}`);
   }

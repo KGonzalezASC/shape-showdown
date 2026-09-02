@@ -24,6 +24,7 @@ export interface TimelineEvent {
 export type HazardKind =
   | 'poison'
   | 'storage-poison'
+  | 'retrim'
   | 'purge'
   | 'curtain'
   | 'freeze'

@@ -24,7 +24,7 @@
     },
     {
       "puzzleId": "authored-pulse-garbage",
-      "contentHash": "8a47e66026375d7d1f5bbb0e77c7aac3c60677767be7e596b4870206eee0b8f9",
+      "contentHash": "74c6e708297fe4eae2799c287afa498366d270067be4833b037ad7e84decff3d",
       "validationStatus": "passed",
       "visibilityPolicy": "hidden",
       "selectedBaselineProfileId": "player-limited-default"
@@ -52,28 +52,28 @@
     },
     {
       "puzzleId": "authored-four-wide",
-      "contentHash": "72d4e03fb951fc465e8f6686a892474f99a20776a4ac85a6edc2ff651251d694",
+      "contentHash": "53e6d379936f026c56c5c13cac3fa2437c24faeecbe5fae8aa4acfd092f0bce5",
       "validationStatus": "passed",
       "visibilityPolicy": "revealed",
       "selectedBaselineProfileId": "player-limited-default"
     },
     {
       "puzzleId": "authored-hold-discipline",
-      "contentHash": "986ff39449611a9a7dcb8328b1ae509515525616b4e01f4e1810a226132d80f0",
+      "contentHash": "7a102f6e5307b82b22f1381d07f1ff225d30cd93dfcd15434749cd59a8945e37",
       "validationStatus": "passed",
       "visibilityPolicy": "partial",
-      "selectedBaselineProfileId": "player-limited-surface"
+      "selectedBaselineProfileId": "player-limited-default"
     },
     {
       "puzzleId": "authored-poison-beat",
-      "contentHash": "1e831c7922ac2a3868db9cae07382a1866e36f63d5349ec0c9281c7b6c33efd1",
+      "contentHash": "b4ad663ea71985fcb41bf451b6dae5739d1b14e278bb075eb93729d36c596622",
       "validationStatus": "passed",
       "visibilityPolicy": "partial",
       "selectedBaselineProfileId": "player-limited-surface"
     },
     {
       "puzzleId": "authored-curtain-drop",
-      "contentHash": "3d94985bb494968d2ec5188308b37d67d79fcd6f9172d063db1a933ba77c4c98",
+      "contentHash": "f6bc175bdbda20743bad396cf7d529cb892a0f92dc1d9b7b1f1e52a020c1b84c",
       "validationStatus": "passed",
       "visibilityPolicy": "hidden",
       "selectedBaselineProfileId": "player-limited-default"

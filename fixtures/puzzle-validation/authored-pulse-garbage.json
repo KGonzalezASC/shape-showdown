@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "puzzleId": "authored-pulse-garbage",
-  "contentHash": "8a47e66026375d7d1f5bbb0e77c7aac3c60677767be7e596b4870206eee0b8f9",
+  "contentHash": "74c6e708297fe4eae2799c287afa498366d270067be4833b037ad7e84decff3d",
   "engineProtocolVersion": 4,
   "packageVersion": "0.0.0",
   "validationStatus": "passed",
@@ -36,7 +36,7 @@
       "qualifies": true,
       "solved": true,
       "topOut": false,
-      "score": 574,
+      "score": 580,
       "ticksUsed": 184,
       "piecesUsed": 9,
       "linesCleared": 3,
@@ -48,7 +48,7 @@
       "qualifies": true,
       "solved": true,
       "topOut": false,
-      "score": 574,
+      "score": 580,
       "ticksUsed": 184,
       "piecesUsed": 9,
       "linesCleared": 3,
@@ -58,7 +58,7 @@
   "selectedBaseline": {
     "profileId": "player-limited-default",
     "profileIdentity": "player-limited-default|v1|player-limited|topology=none|garbage=0|seed=0",
-    "score": 574,
+    "score": 580,
     "ticksUsed": 184,
     "piecesUsed": 9,
     "linesCleared": 3,
@@ -70,7 +70,15 @@
   },
   "scriptedEvents": [
     {
-      "tick": 90,
+      "tick": 60,
+      "kind": "retrim"
+    },
+    {
+      "tick": 150,
+      "kind": "magnet"
+    },
+    {
+      "tick": 240,
       "kind": "garbage"
     }
   ],

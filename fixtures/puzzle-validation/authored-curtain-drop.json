@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "puzzleId": "authored-curtain-drop",
-  "contentHash": "3d94985bb494968d2ec5188308b37d67d79fcd6f9172d063db1a933ba77c4c98",
+  "contentHash": "f6bc175bdbda20743bad396cf7d529cb892a0f92dc1d9b7b1f1e52a020c1b84c",
   "engineProtocolVersion": 4,
   "packageVersion": "0.0.0",
   "validationStatus": "passed",
@@ -70,7 +70,11 @@
   },
   "scriptedEvents": [
     {
-      "tick": 120,
+      "tick": 60,
+      "kind": "retrim"
+    },
+    {
+      "tick": 180,
       "kind": "curtain"
     }
   ],
