@@ -25,7 +25,7 @@ export function useShopConfirm() {
       if (chrome.availableFunds < pricingView.currentPrice) return;
       const opponent = playfield.opponentPlayer;
       if (pickedId === 'storage-toxin' && !opponent?.opponentHasHold) return;
-      if (pickedId === 'wildcard-four' && !opponent?.opponentHasPoison) return;
+      if (pickedId === 'wildcard-four' && (!opponent?.opponentHasPoison || opponent.poisonSpread != null)) return;
       sendShopPurchase(pickedId);
     }
   }, [chrome, playfield.opponentPlayer, sendShopOpen, sendShopPurchase]);

@@ -195,6 +195,16 @@ function opponentHasPoison(opponent: PlayerState): boolean {
   return false;
 }
 
+/**
+ * Wildcard +4 may only resolve once poison is on the stack AND spread has
+ * finished. Mid-spread seed cells must not lock the copied shape/colour.
+ */
+export function canApplyWildcardFour(opponent: PlayerState): boolean {
+  if (!opponentHasPoison(opponent)) return false;
+  if (opponent.poisonSpread != null) return false;
+  return true;
+}
+
 const SHOP_HANDLERS: Record<string, ShopHandler> = {
   retrim: {
     onPurchase: ({ buyer, opponent, tick }) => {
@@ -343,7 +353,7 @@ const SHOP_HANDLERS: Record<string, ShopHandler> = {
     },
   },
   'wildcard-four': {
-    canPurchase: ({ opponent }) => !!opponent && opponentHasPoison(opponent),
+    canPurchase: ({ opponent }) => !!opponent && canApplyWildcardFour(opponent),
     onPurchase: ({ opponent, tick, rng }) => {
       if (!opponent) return;
       const poison = opponent.poisonBoard ?? [];
@@ -392,7 +402,7 @@ export function applyScriptedShopAttack(
   victim: PlayerState,
   tick: number,
   params: Record<string, unknown> = {},
-): void {
+): boolean {
   const variantParam = typeof params.variant === 'number' ? params.variant : undefined;
 
   switch (itemId) {
@@ -409,15 +419,15 @@ export function applyScriptedShopAttack(
         }
       }
       pushFieldEffect(victim, 'poison', tick, 'Poisoned', '🧪', tick + 180);
-      break;
+      return true;
     }
     case 'storage-toxin': {
-      if (!victim.holdPiece) return;
+      if (!victim.holdPiece) return false;
       const variant = variantParam ?? 1;
       victim.holdPiece.poisoned = true;
       victim.holdPiece.poisonVariant = variant;
       pushFieldEffect(victim, 'storage-poison', tick, 'Storage poisoned', '🦠', tick + 180);
-      break;
+      return true;
     }
     case 'vortex-step': {
       const variant = variantParam;
@@ -437,13 +447,13 @@ export function applyScriptedShopAttack(
         '🃏',
         tick + POISON_PURGE_TELEGRAPH_TICKS,
       );
-      break;
+      return true;
     }
     case 'wildcard-four': {
-      if (!opponentHasPoison(victim)) return;
+      if (!canApplyWildcardFour(victim)) return false;
       const poison = victim.poisonBoard ?? [];
       let component = findLargestPoisonComponent(poison);
-      if (!component) return;
+      if (!component) return false;
       if (variantParam !== undefined) {
         // Prefer a component matching the authored variant when present.
         const visited = Array.from({ length: BOARD_ROWS }, () =>
@@ -478,7 +488,7 @@ export function applyScriptedShopAttack(
         if (best) component = { cells: best, variant: variantParam };
       }
       const candidates = wildcardCandidates(component.cells, WILDCARD_FOUR_MAX_CELLS);
-      if (candidates.length === 0) return;
+      if (candidates.length === 0) return false;
       // Deterministic: first sorted candidate (no rng).
       const candidate = candidates[0]!;
       const targetCells = candidate.cells;
@@ -488,7 +498,7 @@ export function applyScriptedShopAttack(
       victim.wildcardLastSeed = [candidate.seed.x, candidate.seed.y];
       victim.wildcardLastShapeKey = candidate.shapeKey;
       pushFieldEffect(victim, 'wildcard-four', tick, 'Wildcard +4', '🧩', tick + 240);
-      break;
+      return true;
     }
     case 'curtain': {
       victim.pendingShopEffects.push({
@@ -496,7 +506,7 @@ export function applyScriptedShopAttack(
         activationTick: tick + CURTAIN_TELEGRAPH_TICKS,
       });
       pushFieldEffect(victim, 'curtain-warn', tick, 'Curtain incoming', '🎭', tick + CURTAIN_TELEGRAPH_TICKS);
-      break;
+      return true;
     }
     case 'retrim': {
       // Solo teaching synergy: apply both buyer curtainDefense and victim pending trim
@@ -510,7 +520,7 @@ export function applyScriptedShopAttack(
         });
         pushFieldEffect(victim, 'retrim', tick, 'Retrimmed', '✂️', tick + 240);
       }
-      break;
+      return true;
     }
     case 'gravity-lure': {
       applyMagnetToOpponent(victim);
@@ -519,7 +529,7 @@ export function applyScriptedShopAttack(
       const pull = permanent * 2 + pieceBoost;
       const label = pieceBoost > 0 ? `Magnet +${pull}` : `Magnet ×${permanent} (+${pull})`;
       pushFieldEffect(victim, 'magnet', tick, label, '🧲', tick + 180);
-      break;
+      return true;
     }
     case 'frost-shift': {
       const duration =
@@ -527,17 +537,17 @@ export function applyScriptedShopAttack(
       const until = tick + duration;
       victim.holdFrozenUntilTick = Math.max(victim.holdFrozenUntilTick ?? 0, until);
       pushFieldEffect(victim, 'freeze', tick, 'Frozen', '❄️', until);
-      break;
+      return true;
     }
     case 'fortify-frame': {
       applySnagToOpponent(victim);
       pushFieldEffect(victim, 'snag', tick, 'Snagged', '🪝', tick + 180);
-      break;
+      return true;
     }
     case 'quickstep-clock': {
       applyStickyToActivePiece(victim);
       pushFieldEffect(victim, 'sticky', tick, 'Sticky', '⏱️');
-      break;
+      return true;
     }
     default: {
       const _exhaustive: never = itemId;

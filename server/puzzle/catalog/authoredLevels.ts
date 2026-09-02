@@ -325,7 +325,7 @@ export function buildHoldDisciplineLevel(): CuratedPuzzleLevel {
 
 /**
  * Poison Beat — poison (fixed variant) then wildcard-four with the same variant
- * once poison is already on the stack (multiplayer prerequisite).
+ * once poison is on the stack and spread has finished (multiplayer prerequisite).
  */
 export function buildPoisonBeatLevel(): CuratedPuzzleLevel {
   const board = emptyBoard();
@@ -338,10 +338,10 @@ export function buildPoisonBeatLevel(): CuratedPuzzleLevel {
   const timeline: TimelineEvent[] = [
     // ~1.5s: poison active piece (variant 2).
     { tick: 90, kind: 'poison', params: { variant: 2 } },
-    // After lock (~114): wildcard only applies once poison is on the stack
-    // (matches multiplayer canPurchase gate). Goal is 3 lines so baselines
-    // still run past the wildcard beat.
-    { tick: 150, kind: 'wildcard', params: { variant: 2 } },
+    // Earliest wildcard attempt after lock (~114). Session defers shape lock until
+    // poisonSpread finishes (same gate as multiplayer canPurchase). Goal is 10
+    // lines so baselines run past full spread + wildcard.
+    { tick: 170, kind: 'wildcard', params: { variant: 2 } },
   ];
 
   return freezeLevel({
@@ -350,7 +350,7 @@ export function buildPoisonBeatLevel(): CuratedPuzzleLevel {
     seed: 10661,
     initialBoard: board,
     queuePrefix,
-    goal: { kind: 'clear-lines', lines: 3 },
+    goal: { kind: 'clear-lines', lines: 10 },
     timeline,
     shopPolicy: 'none',
     allowHold: true,

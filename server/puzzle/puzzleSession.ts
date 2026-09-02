@@ -46,51 +46,53 @@ export interface PuzzleSessionConfig {
   maxTicks?: number;
 }
 
-/** Apply one scripted hazard to the player (mirrors shop attack semantics). */
-function applyHazard(player: PlayerState, kind: HazardKind, params: Record<string, unknown> | undefined, tick: number): void {
+/** Apply one scripted hazard to the player (mirrors shop attack semantics).
+ *  Returns false only for wildcard when the spread-before-shape gate blocks apply
+ *  (caller should defer and retry).
+ */
+function applyHazard(player: PlayerState, kind: HazardKind, params: Record<string, unknown> | undefined, tick: number): boolean {
   const p = params ?? {};
   switch (kind) {
     case 'poison':
       applyScriptedShopAttack('elixir-pulse', player, tick, p);
-      break;
+      return true;
     case 'storage-poison':
       applyScriptedShopAttack('storage-toxin', player, tick, p);
-      break;
+      return true;
     case 'retrim':
       applyScriptedShopAttack('retrim', player, tick, p);
-      break;
+      return true;
     case 'curtain':
       applyScriptedShopAttack('curtain', player, tick, p);
-      break;
+      return true;
     case 'freeze':
       applyScriptedShopAttack('frost-shift', player, tick, p);
-      break;
+      return true;
     case 'magnet':
       applyScriptedShopAttack('gravity-lure', player, tick, p);
-      break;
+      return true;
     case 'snag':
       applyScriptedShopAttack('fortify-frame', player, tick, p);
-      break;
+      return true;
     case 'sticky':
       applyScriptedShopAttack('quickstep-clock', player, tick, p);
-      break;
+      return true;
     case 'purge':
       applyScriptedShopAttack('vortex-step', player, tick, p);
-      break;
+      return true;
     case 'wildcard':
-      applyScriptedShopAttack('wildcard-four', player, tick, p);
-      break;
+      return applyScriptedShopAttack('wildcard-four', player, tick, p);
     case 'bomber': {
       // Bomber is a self-buff in multiplayer; timeline applies it to the puzzle player.
       applyBomberToBuyer(player);
       pushFieldEffect(player, 'bomber', tick, 'Bomber', '💣', tick + 240);
-      break;
+      return true;
     }
     case 'garbage': {
       const lines = typeof p.lines === 'number' ? p.lines : 1;
       const arrivalTick = tick + (typeof p.delayTicks === 'number' ? p.delayTicks : GARBAGE_ARRIVAL_DELAY_TICKS);
       player.pendingGarbage.push({ lines, arrivalTick });
-      break;
+      return true;
     }
     case 'satellite':
     case 'tectonic':
@@ -112,6 +114,8 @@ export class PuzzleSession {
   private solved = false;
   private topOut = false;
   private reported: PuzzleSessionReport | null = null;
+  /** Wildcard beats deferred until poison is stacked and spread has finished. */
+  private deferredWildcards: Array<Record<string, unknown>> = [];
 
   constructor(config: PuzzleSessionConfig) {
     this.level = config.level;
@@ -207,9 +211,24 @@ export class PuzzleSession {
         this.timelineIndex += 1;
         if (event.kind === 'garbage') {
           applyHazard(this.getPlayerState(), 'garbage', event.params, this.gameState.tick);
+        } else if (event.kind === 'wildcard') {
+          const applied = applyHazard(this.getPlayerState(), 'wildcard', event.params, this.gameState.tick);
+          if (!applied) this.deferredWildcards.push(event.params ?? {});
         } else {
           applyHazard(this.getPlayerState(), event.kind, event.params, this.gameState.tick);
         }
+      }
+
+      // Retry deferred wildcards once poison spread has finished (shape gate).
+      if (this.deferredWildcards.length > 0) {
+        const player = this.getPlayerState();
+        const remaining: Array<Record<string, unknown>> = [];
+        for (const params of this.deferredWildcards) {
+          if (!applyScriptedShopAttack('wildcard-four', player, this.gameState.tick, params)) {
+            remaining.push(params);
+          }
+        }
+        this.deferredWildcards = remaining;
       }
 
       // Drive the player through the standard observation → command path.

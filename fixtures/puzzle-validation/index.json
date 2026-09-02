@@ -66,10 +66,10 @@
     },
     {
       "puzzleId": "authored-poison-beat",
-      "contentHash": "ae8e5e243c8c561b5426f245c95f74902329069f3ef5feb02a0d8525de95237f",
+      "contentHash": "0462c45345259aac69d89b80f7cf639e30772b683e9ff4a05662911f5b80e5c1",
       "validationStatus": "passed",
       "visibilityPolicy": "partial",
-      "selectedBaselineProfileId": "player-limited-surface"
+      "selectedBaselineProfileId": "player-limited-default"
     },
     {
       "puzzleId": "authored-curtain-drop",

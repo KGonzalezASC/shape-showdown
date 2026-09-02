@@ -117,7 +117,8 @@ describe('puzzle poison stacking matches multiplayer elixir-pulse', () => {
     // Poisoned falling piece alone is not enough — multiplayer requires stack poison.
     player.activePiece!.poisoned = true;
     player.activePiece!.poisonVariant = 2;
-    applyScriptedShopAttack('wildcard-four', player, 20, { variant: 2 });
+    const applied = applyScriptedShopAttack('wildcard-four', player, 20, { variant: 2 });
+    assert.equal(applied, false);
     assert.equal(player.customNextPieceOffsets, undefined);
     assert.equal(player.customNextPieceSourceCells, undefined);
     assert.ok(!(player.activeEffects ?? []).some((e) => e.kind === 'wildcard-four'));
@@ -137,6 +138,7 @@ describe('puzzle poison stacking matches multiplayer elixir-pulse', () => {
     player.poisonBoard[BOARD_ROWS - 1][1] = 2;
     player.poisonBoard[BOARD_ROWS - 1][2] = 2;
     player.poisonBoard[BOARD_ROWS - 1][3] = 2;
+    player.poisonSpread = null;
     applyScriptedShopAttack('wildcard-four', player, 40, { variant: 2 });
     assert.ok(player.customNextPieceOffsets);
     assert.ok(player.customNextPieceSourceCells);
@@ -144,32 +146,65 @@ describe('puzzle poison stacking matches multiplayer elixir-pulse', () => {
     assert.ok((player.activeEffects ?? []).some((e) => e.kind === 'wildcard-four'));
   });
 
-  it('authored poison-beat applies wildcard only after poison is stacked', () => {
+  it('scripted wildcard-four skips while poisonSpread is still running', () => {
+    const rng = createPlayerRngChannels(13, 't');
+    const player = makePlayer('p', rng);
+    player.board[BOARD_ROWS - 1][0] = 'G';
+    player.board[BOARD_ROWS - 1][1] = 'G';
+    player.poisonBoard = Array.from({ length: BOARD_ROWS }, () =>
+      Array.from({ length: BOARD_COLS }, () => 0),
+    );
+    player.poisonBoard[BOARD_ROWS - 1][0] = 2;
+    player.poisonBoard[BOARD_ROWS - 1][1] = 2;
+    player.poisonSpread = {
+      generationsRemaining: 2,
+      nextSpreadTick: 100,
+      variant: 2,
+    };
+    const applied = applyScriptedShopAttack('wildcard-four', player, 40, { variant: 2 });
+    assert.equal(applied, false);
+    assert.equal(player.customNextPieceOffsets, undefined);
+    assert.ok(!(player.activeEffects ?? []).some((e) => e.kind === 'wildcard-four'));
+  });
+
+  it('authored poison-beat applies wildcard only after poison is stacked and spread finished', () => {
     const level = buildPoisonBeatLevel();
+    assert.equal(level.goal.kind, 'clear-lines');
+    assert.equal(level.goal.kind === 'clear-lines' ? level.goal.lines : -1, 10);
+    const wildcardEvent = level.timeline.find((e) => !('loop' in e) && e.kind === 'wildcard');
+    assert.ok(wildcardEvent && !('loop' in wildcardEvent));
+    assert.equal(!('loop' in wildcardEvent!) ? wildcardEvent.tick : -1, 170);
     const session = new PuzzleSession({
       level,
       driver: new RulesBot({ mode: 'omniscient' }),
-      maxTicks: 60 * 30,
+      maxTicks: 60 * 60,
     });
     let poisonOnStackBeforeWildcard = false;
+    let spreadIdleBeforeWildcard = false;
     let wildcardApplied = false;
+    let wildcardTick: number | null = null;
     let sawPoisonedActive = false;
-    for (let i = 0; i < 60 * 20; i++) {
+    for (let i = 0; i < 60 * 45; i++) {
       const before = session.getPlayerState();
       const poisonCells = before.poisonBoard?.flat().filter((c) => c > 0).length ?? 0;
+      const spreadActive = before.poisonSpread != null;
       const hadCustom = before.customNextPieceOffsets != null;
       session.advance(1);
       const after = session.getPlayerState();
       if (after.activePiece?.poisoned) sawPoisonedActive = true;
       if (!hadCustom && after.customNextPieceOffsets != null) {
         wildcardApplied = true;
+        wildcardTick = session.tick;
         poisonOnStackBeforeWildcard = poisonCells > 0;
+        spreadIdleBeforeWildcard = !spreadActive;
       }
       if (session.isEnded) break;
     }
     assert.equal(sawPoisonedActive, true, 'poison hazard must mark the active piece');
     assert.equal(wildcardApplied, true, 'wildcard must fire while the attempt is still live');
     assert.equal(poisonOnStackBeforeWildcard, true, 'wildcard requires poison already on the stack');
+    assert.equal(spreadIdleBeforeWildcard, true, 'wildcard shape must wait until poisonSpread is done');
+    assert.ok(wildcardTick != null && wildcardTick >= 170, 'wildcard applies at/after authored earliest tick');
     assert.equal(session.getReport().solved, true);
   });
 });
