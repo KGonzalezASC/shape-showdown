@@ -28,6 +28,16 @@ describe('puzzle visibility presentation', () => {
     ]);
   });
 
+
+  it('keeps deferred pending kinds visible after authored tick', () => {
+    assert.deepEqual(presentTimelineHints(events, 'partial', 40, ['wildcard']), [
+      { tick: -1, kind: 'wildcard' },
+    ]);
+    assert.deepEqual(presentTimelineHints(events, 'revealed', 40, ['wildcard']), [
+      { tick: -1, kind: 'wildcard' },
+    ]);
+  });
+
   it('limits next-queue preview by policy', () => {
     assert.equal(visibleNextQueueCount('hidden'), 1);
     assert.equal(visibleNextQueueCount('partial'), 3);

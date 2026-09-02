@@ -47,6 +47,7 @@ interface PuzzleWireState {
   poisonSpread?: PublicPlayerState['poisonSpread'];
   customNextPieceSourceCells?: PublicPlayerState['customNextPieceSourceCells'];
   curtainDefenseLevel?: number;
+  pendingHazardKinds?: string[];
 }
 
 interface PuzzleReferenceBaseline {
@@ -368,6 +369,7 @@ export const PuzzleScreen: React.FC = () => {
     started?.timeline ?? [],
     started?.visibilityPolicy,
     state?.tick ?? 0,
+    state?.pendingHazardKinds ?? [],
   );
 
   return (

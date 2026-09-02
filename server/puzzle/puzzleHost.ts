@@ -104,6 +104,8 @@ export interface PuzzleStateSnapshot {
   poisonSpread?: unknown;
   customNextPieceSourceCells?: [number, number][];
   curtainDefenseLevel?: number;
+  /** Hazards authored but still deferred (e.g. wildcard waiting on poison spread). */
+  pendingHazardKinds?: string[];
 }
 
 /** InputDriver that drains socket-originated input each tick (replaces RulesBot). */
@@ -251,6 +253,7 @@ export class PuzzleHost {
       poisonSpread: p.poisonSpread,
       customNextPieceSourceCells: p.customNextPieceSourceCells,
       curtainDefenseLevel: p.curtainDefenseLevel ?? 0,
+      pendingHazardKinds: this.session.getPendingHazardKinds(),
     };
     this.socket.emit('puzzle:state', snap);
   }

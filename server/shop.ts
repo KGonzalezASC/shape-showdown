@@ -13,7 +13,7 @@ import {
 } from '../src/types.js';
 import { MutableRng, RngChannels, ensureRngChannels, rngInt } from '../src/rng.js';
 import { SHOP_ITEM_BY_ID } from '../src/shop/shopCatalog.js';
-import { pushFieldEffect } from '../src/shop/fieldEffects.js';
+import { clearWildcardIncomingEffect, pushFieldEffect } from '../src/shop/fieldEffects.js';
 import {
   applyBomberToBuyer,
   applyMagnetToOpponent,
@@ -367,6 +367,7 @@ const SHOP_HANDLERS: Record<string, ShopHandler> = {
       opponent.customNextPieceSourceCells = targetCells.map((cell) => [cell.x, cell.y]);
       opponent.wildcardLastSeed = [candidate.seed.x, candidate.seed.y];
       opponent.wildcardLastShapeKey = candidate.shapeKey;
+      clearWildcardIncomingEffect(opponent);
       pushFieldEffect(opponent, 'wildcard-four', tick, 'Wildcard +4', '🧩', tick + 240);
     },
   },
@@ -497,6 +498,7 @@ export function applyScriptedShopAttack(
       victim.customNextPieceSourceCells = targetCells.map((cell) => [cell.x, cell.y]);
       victim.wildcardLastSeed = [candidate.seed.x, candidate.seed.y];
       victim.wildcardLastShapeKey = candidate.shapeKey;
+      clearWildcardIncomingEffect(victim);
       pushFieldEffect(victim, 'wildcard-four', tick, 'Wildcard +4', '🧩', tick + 240);
       return true;
     }

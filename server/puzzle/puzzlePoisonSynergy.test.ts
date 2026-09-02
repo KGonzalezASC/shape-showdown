@@ -6,6 +6,7 @@ import { generatePuzzleLevel } from './puzzleGenerator.js';
 import { RulesBot } from '../testHarness/rulesBot.js';
 import type { PuzzleLevel } from './puzzleTypes.js';
 import { applyScriptedShopAttack } from '../shop.js';
+import { WILDCARD_INCOMING_LABEL } from '../../src/shop/fieldEffects.js';
 import { makePlayer } from '../puzzleEngine/engine.js';
 import { createPlayerRngChannels } from '../../src/rng.js';
 import { buildPoisonBeatLevel } from './catalog/authoredLevels.js';
@@ -206,5 +207,48 @@ describe('puzzle poison stacking matches multiplayer elixir-pulse', () => {
     assert.equal(spreadIdleBeforeWildcard, true, 'wildcard shape must wait until poisonSpread is done');
     assert.ok(wildcardTick != null && wildcardTick >= 170, 'wildcard applies at/after authored earliest tick');
     assert.equal(session.getReport().solved, true);
+  });
+
+  it('defers wildcard telegraph until shape locks, then swaps to applied pill', () => {
+    const level = buildPoisonBeatLevel();
+    const session = new PuzzleSession({
+      level,
+      driver: new RulesBot({ mode: 'omniscient' }),
+      maxTicks: 60 * 60,
+    });
+    let sawIncomingWhileDeferred = false;
+    let incomingExpiredBeforeApply = false;
+    let appliedTick: number | null = null;
+    for (let i = 0; i < 60 * 45; i++) {
+      const before = session.getPlayerState();
+      const hadCustom = before.customNextPieceOffsets != null;
+      const hadIncoming = (before.activeEffects ?? []).some(
+        (e) => e.kind === 'wildcard-four' && e.label === WILDCARD_INCOMING_LABEL,
+      );
+      session.advance(1);
+      const after = session.getPlayerState();
+      const pending = session.getPendingHazardKinds();
+      const hasIncoming = (after.activeEffects ?? []).some(
+        (e) => e.kind === 'wildcard-four' && e.label === WILDCARD_INCOMING_LABEL,
+      );
+      const hasAppliedPill = (after.activeEffects ?? []).some(
+        (e) => e.kind === 'wildcard-four' && e.label === 'Wildcard +4',
+      );
+      if (pending.includes('wildcard')) {
+        if (hasIncoming) sawIncomingWhileDeferred = true;
+        if (!hasIncoming) incomingExpiredBeforeApply = true;
+      }
+      if (!hadCustom && after.customNextPieceOffsets != null) {
+        appliedTick = session.tick;
+        assert.equal(hasIncoming, false, 'incoming pill must clear on apply');
+        assert.equal(hasAppliedPill, true, 'applied Wildcard +4 pill must be present');
+        assert.deepEqual(session.getPendingHazardKinds(), []);
+        break;
+      }
+      void hadIncoming;
+    }
+    assert.equal(sawIncomingWhileDeferred, true, 'must show Wildcard incoming while deferred');
+    assert.equal(incomingExpiredBeforeApply, false, 'incoming must not expire before apply');
+    assert.ok(appliedTick != null && appliedTick >= 170);
   });
 });

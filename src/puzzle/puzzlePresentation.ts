@@ -24,15 +24,24 @@ export function presentTimelineHints(
   events: PuzzleTimelineHint[],
   policy: PuzzleVisibilityPolicy | 'unspecified' | undefined,
   currentTick: number,
+  pendingKinds: string[] = [],
 ): PuzzleTimelineHint[] {
   const upcoming = events.filter((event) => event.tick > currentTick);
+  // Keep deferred hazards in the telegraph until they actually apply.
+  const pendingHints: PuzzleTimelineHint[] = [];
+  for (const kind of pendingKinds) {
+    if (!upcoming.some((event) => event.kind === kind) && !pendingHints.some((h) => h.kind === kind)) {
+      pendingHints.push({ tick: -1, kind });
+    }
+  }
+  const combined = [...upcoming, ...pendingHints];
   if (!policy || policy === 'unspecified' || policy === 'hidden') {
     return [];
   }
   if (policy === 'partial') {
-    return upcoming.map((event) => ({ tick: -1, kind: event.kind }));
+    return combined.map((event) => ({ tick: -1, kind: event.kind }));
   }
-  return upcoming;
+  return combined;
 }
 
 /** How many next-queue previews the player may see under the policy. */

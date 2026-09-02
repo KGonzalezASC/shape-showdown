@@ -9,7 +9,7 @@ import { assertSupportedPuzzleTimeline } from './puzzleHazards.js';
 import { materializeTimeline } from './puzzleTimeline.js';
 import { applyScriptedShopAttack } from '../shop.js';
 import { applyBomberToBuyer } from '../puzzleEngine/engine.js';
-import { pushFieldEffect } from '../../src/shop/fieldEffects.js';
+import { ensureWildcardIncomingEffect, pushFieldEffect } from '../../src/shop/fieldEffects.js';
 import {
   GARBAGE_ARRIVAL_DELAY_TICKS,
 } from '../../src/constants.js';
@@ -167,6 +167,11 @@ export class PuzzleSession {
     return this.gameState.players.puzzle!;
   }
 
+  /** Timeline kinds still waiting on a deferred apply (solo telegraph). */
+  public getPendingHazardKinds(): string[] {
+    return this.deferredWildcards.length > 0 ? ['wildcard'] : [];
+  }
+
   public input(inputState: InputState): void {
     const player = this.getPlayerState();
     player.inputState = {
@@ -212,8 +217,13 @@ export class PuzzleSession {
         if (event.kind === 'garbage') {
           applyHazard(this.getPlayerState(), 'garbage', event.params, this.gameState.tick);
         } else if (event.kind === 'wildcard') {
-          const applied = applyHazard(this.getPlayerState(), 'wildcard', event.params, this.gameState.tick);
-          if (!applied) this.deferredWildcards.push(event.params ?? {});
+          const player = this.getPlayerState();
+          const applied = applyHazard(player, 'wildcard', event.params, this.gameState.tick);
+          if (!applied) {
+            this.deferredWildcards.push(event.params ?? {});
+            // Keep telegraph visible until shape actually locks (gate may delay apply).
+            ensureWildcardIncomingEffect(player, this.gameState.tick);
+          }
         } else {
           applyHazard(this.getPlayerState(), event.kind, event.params, this.gameState.tick);
         }
@@ -226,6 +236,7 @@ export class PuzzleSession {
         for (const params of this.deferredWildcards) {
           if (!applyScriptedShopAttack('wildcard-four', player, this.gameState.tick, params)) {
             remaining.push(params);
+            ensureWildcardIncomingEffect(player, this.gameState.tick);
           }
         }
         this.deferredWildcards = remaining;
