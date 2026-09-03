@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "puzzleId": "import-jstris-checkboard",
-  "contentHash": "e9059ed85441e3d3e763696874ac0cf021d36a1632844c5ed3a3e5c2c011c88d",
+  "contentHash": "7eff092168e8a7652bac11ab9df0906e25cd284da70a940c4b90bf7426a51b07",
   "engineProtocolVersion": 4,
   "packageVersion": "0.0.0",
   "validationStatus": "passed",
@@ -36,9 +36,9 @@
       "qualifies": true,
       "solved": true,
       "topOut": false,
-      "score": 664,
+      "score": 620,
       "ticksUsed": 602,
-      "piecesUsed": 15,
+      "piecesUsed": 14,
       "linesCleared": 4,
       "perfectClear": false
     },
@@ -48,9 +48,9 @@
       "qualifies": true,
       "solved": true,
       "topOut": false,
-      "score": 664,
+      "score": 620,
       "ticksUsed": 602,
-      "piecesUsed": 15,
+      "piecesUsed": 14,
       "linesCleared": 4,
       "perfectClear": false
     }
@@ -58,9 +58,9 @@
   "selectedBaseline": {
     "profileId": "player-limited-default",
     "profileIdentity": "player-limited-default|v1|player-limited|topology=none|garbage=0|seed=0",
-    "score": 664,
+    "score": 620,
     "ticksUsed": 602,
-    "piecesUsed": 15,
+    "piecesUsed": 14,
     "linesCleared": 4,
     "solved": true
   },
@@ -70,7 +70,55 @@
   },
   "scriptedEvents": [
     {
-      "tick": 300,
+      "afterPieces": 2,
+      "kind": "magnet"
+    },
+    {
+      "afterPieces": 4,
+      "kind": "sticky"
+    },
+    {
+      "afterPieces": 6,
+      "kind": "snag"
+    },
+    {
+      "afterPieces": 8,
+      "kind": "retrim"
+    },
+    {
+      "afterPieces": 10,
+      "kind": "magnet"
+    },
+    {
+      "afterPieces": 12,
+      "kind": "curtain"
+    },
+    {
+      "afterPieces": 14,
+      "kind": "freeze"
+    },
+    {
+      "afterPieces": 16,
+      "kind": "sticky"
+    },
+    {
+      "afterPieces": 18,
+      "kind": "garbage"
+    },
+    {
+      "afterPieces": 20,
+      "kind": "retrim"
+    },
+    {
+      "afterPieces": 22,
+      "kind": "snag"
+    },
+    {
+      "afterPieces": 24,
+      "kind": "curtain"
+    },
+    {
+      "afterPieces": 26,
       "kind": "freeze"
     }
   ],

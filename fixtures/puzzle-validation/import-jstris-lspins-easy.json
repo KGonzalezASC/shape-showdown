@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "puzzleId": "import-jstris-lspins-easy",
-  "contentHash": "58c8199e4041c89b980ec54b67b99e5a24f7e954dd9e7c31ffe573146f554676",
+  "contentHash": "f2a319fc9250bb8c71649c95fc53210581eab283679b17fac3d201ea3df91bf4",
   "engineProtocolVersion": 4,
   "packageVersion": "0.0.0",
   "validationStatus": "passed",
@@ -36,8 +36,8 @@
       "qualifies": true,
       "solved": true,
       "topOut": false,
-      "score": 746,
-      "ticksUsed": 508,
+      "score": 732,
+      "ticksUsed": 445,
       "piecesUsed": 11,
       "linesCleared": 5,
       "perfectClear": false
@@ -48,8 +48,8 @@
       "qualifies": true,
       "solved": true,
       "topOut": false,
-      "score": 782,
-      "ticksUsed": 508,
+      "score": 764,
+      "ticksUsed": 476,
       "piecesUsed": 12,
       "linesCleared": 5,
       "perfectClear": false
@@ -58,8 +58,8 @@
   "selectedBaseline": {
     "profileId": "player-limited-surface",
     "profileIdentity": "player-limited-surface|v1|player-limited|topology=surface|garbage=0|seed=0",
-    "score": 782,
-    "ticksUsed": 508,
+    "score": 764,
+    "ticksUsed": 476,
     "piecesUsed": 12,
     "linesCleared": 5,
     "solved": true
@@ -70,15 +70,51 @@
   },
   "scriptedEvents": [
     {
+      "afterPieces": 2,
+      "kind": "curtain"
+    },
+    {
       "afterPieces": 4,
+      "kind": "snag"
+    },
+    {
+      "afterPieces": 6,
       "kind": "sticky"
     },
     {
       "afterPieces": 8,
-      "kind": "freeze"
+      "kind": "retrim"
+    },
+    {
+      "afterPieces": 10,
+      "kind": "magnet"
     },
     {
       "afterPieces": 12,
+      "kind": "curtain"
+    },
+    {
+      "afterPieces": 14,
+      "kind": "freeze"
+    },
+    {
+      "afterPieces": 16,
+      "kind": "snag"
+    },
+    {
+      "afterPieces": 18,
+      "kind": "sticky"
+    },
+    {
+      "afterPieces": 20,
+      "kind": "retrim"
+    },
+    {
+      "afterPieces": 22,
+      "kind": "magnet"
+    },
+    {
+      "afterPieces": 24,
       "kind": "snag"
     }
   ],

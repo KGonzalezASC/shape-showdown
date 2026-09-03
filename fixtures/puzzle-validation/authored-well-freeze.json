@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "puzzleId": "authored-well-freeze",
-  "contentHash": "13db98ccc661a2dc676d92ce878018d20eef1792c9d54f0f6d1f94de685b41ab",
+  "contentHash": "1eb61aaccbf090d10ca6869409944495f7e0628fa5d2b9b4de532bf062316ec4",
   "engineProtocolVersion": 4,
   "packageVersion": "0.0.0",
   "validationStatus": "passed",
@@ -32,8 +32,8 @@
       "qualifies": true,
       "solved": true,
       "topOut": false,
-      "score": 716,
-      "ticksUsed": 120,
+      "score": 682,
+      "ticksUsed": 618,
       "piecesUsed": 6,
       "linesCleared": 5,
       "perfectClear": false
@@ -44,8 +44,8 @@
       "qualifies": true,
       "solved": true,
       "topOut": false,
-      "score": 716,
-      "ticksUsed": 120,
+      "score": 682,
+      "ticksUsed": 618,
       "piecesUsed": 6,
       "linesCleared": 5,
       "perfectClear": false
@@ -54,8 +54,8 @@
   "selectedBaseline": {
     "profileId": "player-limited-default",
     "profileIdentity": "player-limited-default|v1|player-limited|topology=none|garbage=0|seed=0",
-    "score": 716,
-    "ticksUsed": 120,
+    "score": 682,
+    "ticksUsed": 618,
     "piecesUsed": 6,
     "linesCleared": 5,
     "solved": true
@@ -66,7 +66,59 @@
   },
   "scriptedEvents": [
     {
-      "tick": 360,
+      "afterPieces": 1,
+      "kind": "freeze"
+    },
+    {
+      "afterPieces": 3,
+      "kind": "snag"
+    },
+    {
+      "afterPieces": 5,
+      "kind": "retrim"
+    },
+    {
+      "afterPieces": 7,
+      "kind": "magnet"
+    },
+    {
+      "afterPieces": 9,
+      "kind": "sticky"
+    },
+    {
+      "afterPieces": 11,
+      "kind": "garbage"
+    },
+    {
+      "afterPieces": 13,
+      "kind": "freeze"
+    },
+    {
+      "afterPieces": 15,
+      "kind": "curtain"
+    },
+    {
+      "afterPieces": 17,
+      "kind": "retrim"
+    },
+    {
+      "afterPieces": 19,
+      "kind": "freeze"
+    },
+    {
+      "afterPieces": 21,
+      "kind": "snag"
+    },
+    {
+      "afterPieces": 23,
+      "kind": "magnet"
+    },
+    {
+      "afterPieces": 25,
+      "kind": "sticky"
+    },
+    {
+      "afterPieces": 27,
       "kind": "freeze"
     }
   ],

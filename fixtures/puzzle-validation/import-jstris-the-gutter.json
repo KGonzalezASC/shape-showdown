@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "puzzleId": "import-jstris-the-gutter",
-  "contentHash": "fcb4df25d1ed0d9eff4ac33c088b38721fa1dcfcd2a86a6a9c3f07cffdcc62e3",
+  "contentHash": "39dc628de6e2357566c1badfa8e186c5a73bedf7aaaa999352131732ab49b57f",
   "engineProtocolVersion": 4,
   "packageVersion": "0.0.0",
   "validationStatus": "passed",
@@ -36,8 +36,8 @@
       "qualifies": true,
       "solved": true,
       "topOut": false,
-      "score": 936,
-      "ticksUsed": 199,
+      "score": 890,
+      "ticksUsed": 677,
       "piecesUsed": 8,
       "linesCleared": 7,
       "perfectClear": false
@@ -48,8 +48,8 @@
       "qualifies": true,
       "solved": true,
       "topOut": false,
-      "score": 936,
-      "ticksUsed": 199,
+      "score": 890,
+      "ticksUsed": 677,
       "piecesUsed": 8,
       "linesCleared": 7,
       "perfectClear": false
@@ -58,8 +58,8 @@
   "selectedBaseline": {
     "profileId": "player-limited-default",
     "profileIdentity": "player-limited-default|v1|player-limited|topology=none|garbage=0|seed=0",
-    "score": 936,
-    "ticksUsed": 199,
+    "score": 890,
+    "ticksUsed": 677,
     "piecesUsed": 8,
     "linesCleared": 7,
     "solved": true
@@ -70,8 +70,52 @@
   },
   "scriptedEvents": [
     {
-      "tick": 300,
+      "afterPieces": 1,
+      "kind": "curtain"
+    },
+    {
+      "afterPieces": 3,
+      "kind": "magnet"
+    },
+    {
+      "afterPieces": 5,
+      "kind": "snag"
+    },
+    {
+      "afterPieces": 7,
+      "kind": "retrim"
+    },
+    {
+      "afterPieces": 9,
+      "kind": "garbage"
+    },
+    {
+      "afterPieces": 11,
       "kind": "freeze"
+    },
+    {
+      "afterPieces": 13,
+      "kind": "curtain"
+    },
+    {
+      "afterPieces": 15,
+      "kind": "sticky"
+    },
+    {
+      "afterPieces": 17,
+      "kind": "magnet"
+    },
+    {
+      "afterPieces": 19,
+      "kind": "snag"
+    },
+    {
+      "afterPieces": 21,
+      "kind": "garbage"
+    },
+    {
+      "afterPieces": 23,
+      "kind": "sticky"
     }
   ],
   "visibilityPolicy": "partial",

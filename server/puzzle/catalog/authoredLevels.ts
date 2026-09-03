@@ -46,17 +46,27 @@ export function buildCheeseKeyholeLevel(): CuratedPuzzleLevel {
   paintGarbageRow(board, 3, [2, 6]);
 
   const queuePrefix: ShapeType[] = ['O', 'J', 'L', 'I', 'T', 'S', 'Z'];
-  const timeline: TimelineEvent[] = [
-    { tick: 300, kind: 'freeze', params: { durationTicks: 900 } },
+  const timeline: TimelineEntry[] = [
+    { afterPieces: 1, kind: 'garbage', params: { lines: 1, delayTicks: 12 } },
+    { afterPieces: 3, kind: 'retrim' },
+    { afterPieces: 5, kind: 'magnet' },
+    { afterPieces: 7, kind: 'sticky' },
+    { afterPieces: 9, kind: 'curtain' },
+    { afterPieces: 11, kind: 'snag' },
+    { afterPieces: 13, kind: 'freeze', params: { durationTicks: 360 } },
+    { afterPieces: 15, kind: 'garbage', params: { lines: 1, delayTicks: 12 } },
+    { afterPieces: 17, kind: 'retrim' },
+    { afterPieces: 19, kind: 'magnet', params: { stacks: 1 } },
   ];
 
   return freezeLevel({
     id: 'authored-cheese-keyhole',
     name: 'Cheese Keyhole',
-    seed: 1042,
+    description: 'Downstack through the central keyhole to clear all 4 cheese rows under lateral snags and hold freezes.',
+    seed: 1001,
     initialBoard: board,
     queuePrefix,
-    goal: { kind: 'clear-lines', lines: 4 },
+    goal: { kind: 'garbage-clear' },
     timeline,
     shopPolicy: 'none',
     allowHold: true,
@@ -82,13 +92,27 @@ export function buildFrozenWellLevel(): CuratedPuzzleLevel {
   paintColumnStack(board, 9, 5);
 
   const queuePrefix: ShapeType[] = ['T', 'S', 'Z', 'L', 'J', 'I', 'O'];
-  const timeline: TimelineEvent[] = [
-    { tick: 360, kind: 'freeze', params: { durationTicks: 900 } },
+  const timeline: TimelineEntry[] = [
+    { afterPieces: 1, kind: 'freeze', params: { durationTicks: 360 } },
+    { afterPieces: 3, kind: 'snag' },
+    { afterPieces: 5, kind: 'retrim' },
+    { afterPieces: 7, kind: 'magnet' },
+    { afterPieces: 9, kind: 'sticky' },
+    { afterPieces: 11, kind: 'garbage', params: { lines: 1, delayTicks: 12 } },
+    { afterPieces: 13, kind: 'freeze', params: { durationTicks: 360 } },
+    { afterPieces: 15, kind: 'curtain' },
+    { afterPieces: 17, kind: 'retrim' },
+    { afterPieces: 19, kind: 'freeze', params: { durationTicks: 360 } },
+    { afterPieces: 21, kind: 'snag' },
+    { afterPieces: 23, kind: 'magnet', params: { stacks: 1 } },
+    { afterPieces: 25, kind: 'sticky' },
+    { afterPieces: 27, kind: 'freeze', params: { durationTicks: 360 } },
   ];
 
   return freezeLevel({
     id: 'authored-well-freeze',
     name: 'Frozen Well',
+    description: 'Navigate an icy well with a frozen hold chamber and persistent magnetic pulls.',
     seed: 2077,
     initialBoard: board,
     queuePrefix,
@@ -119,14 +143,26 @@ export function buildSkewStairsLevel(): CuratedPuzzleLevel {
   paintColumnStack(board, 9, 3);
 
   const queuePrefix: ShapeType[] = ['J', 'L', 'O', 'I', 'T', 'S', 'Z'];
-  const timeline: TimelineEvent[] = [
-    { tick: 60, kind: 'retrim' },
-    { tick: 180, kind: 'magnet' },
+  const timeline: TimelineEntry[] = [
+    { afterPieces: 2, kind: 'retrim' },
+    { afterPieces: 4, kind: 'curtain' },
+    { afterPieces: 6, kind: 'sticky' },
+    { afterPieces: 8, kind: 'garbage', params: { lines: 1, delayTicks: 12 } },
+    { afterPieces: 10, kind: 'magnet' },
+    { afterPieces: 12, kind: 'snag' },
+    { afterPieces: 14, kind: 'garbage', params: { lines: 1, delayTicks: 12 } },
+    { afterPieces: 16, kind: 'retrim' },
+    { afterPieces: 18, kind: 'freeze', params: { durationTicks: 360 } },
+    { afterPieces: 20, kind: 'curtain' },
+    { afterPieces: 22, kind: 'sticky' },
+    { afterPieces: 24, kind: 'magnet', params: { stacks: 1 } },
+    { afterPieces: 26, kind: 'snag' },
   ];
 
   return freezeLevel({
     id: 'authored-skew-stairs',
     name: 'Skew Stairs',
+    description: 'Climb the staggered stair stack while dodging snags and swap line re-trims.',
     seed: 3110,
     initialBoard: board,
     queuePrefix,
@@ -151,16 +187,26 @@ export function buildPulseGarbageLevel(): CuratedPuzzleLevel {
   paintGarbageRow(board, 3, [1, 8]);
 
   const queuePrefix: ShapeType[] = ['T', 'S', 'Z', 'O', 'J', 'L', 'I'];
-  const timeline: TimelineEvent[] = [
-    // Retrim first so swap-line pressure is live before magnet speed.
-    { tick: 60, kind: 'retrim' },
-    { tick: 150, kind: 'magnet' },
-    { tick: 240, kind: 'garbage', params: { lines: 1, delayTicks: 12 } },
+  const timeline: TimelineEntry[] = [
+    { afterPieces: 2, kind: 'garbage', params: { lines: 1, delayTicks: 12 } },
+    { afterPieces: 5, kind: 'retrim' },
+    { afterPieces: 8, kind: 'garbage', params: { lines: 1, delayTicks: 12 } },
+    { afterPieces: 11, kind: 'sticky' },
+    { afterPieces: 14, kind: 'magnet' },
+    { afterPieces: 17, kind: 'garbage', params: { lines: 1, delayTicks: 12 } },
+    { afterPieces: 20, kind: 'curtain' },
+    { afterPieces: 23, kind: 'snag' },
+    { afterPieces: 26, kind: 'garbage', params: { lines: 1, delayTicks: 12 } },
+    { afterPieces: 29, kind: 'sticky' },
+    { afterPieces: 32, kind: 'magnet', params: { stacks: 1 } },
+    { afterPieces: 35, kind: 'freeze', params: { durationTicks: 360 } },
+    { afterPieces: 38, kind: 'retrim' },
   ];
 
   return freezeLevel({
     id: 'authored-pulse-garbage',
     name: 'Pulse Garbage',
+    description: 'Survive successive single-line garbage pulses and hold freezes in a tense downstack scramble.',
     seed: 4201,
     initialBoard: board,
     queuePrefix,
@@ -186,17 +232,30 @@ export function buildCheeseLadderLevel(): CuratedPuzzleLevel {
   paintGarbageRow(board, 4, [5]);
 
   const queuePrefix: ShapeType[] = ['J', 'L', 'O', 'S', 'Z', 'I', 'T'];
-  const timeline: TimelineEvent[] = [
-    { tick: 200, kind: 'snag' },
+  const timeline: TimelineEntry[] = [
+    { afterPieces: 2, kind: 'retrim' },
+    { afterPieces: 4, kind: 'garbage', params: { lines: 1, delayTicks: 12 } },
+    { afterPieces: 6, kind: 'sticky' },
+    { afterPieces: 8, kind: 'magnet' },
+    { afterPieces: 10, kind: 'garbage', params: { lines: 1, delayTicks: 12 } },
+    { afterPieces: 12, kind: 'curtain' },
+    { afterPieces: 14, kind: 'snag' },
+    { afterPieces: 16, kind: 'retrim' },
+    { afterPieces: 18, kind: 'garbage', params: { lines: 1, delayTicks: 12 } },
+    { afterPieces: 20, kind: 'freeze', params: { durationTicks: 360 } },
+    { afterPieces: 22, kind: 'magnet', params: { stacks: 1 } },
+    { afterPieces: 24, kind: 'sticky' },
+    { afterPieces: 26, kind: 'retrim' },
   ];
 
   return freezeLevel({
     id: 'authored-cheese-ladder',
     name: 'Cheese Ladder',
+    description: 'Clean the diagonal cheese ladder while managing shifting swap lines, freeze pressure, and sticky lock limits.',
     seed: 5103,
     initialBoard: board,
     queuePrefix,
-    goal: { kind: 'clear-lines', lines: 8 },
+    goal: { kind: 'garbage-clear' },
     timeline,
     shopPolicy: 'none',
     allowHold: true,
@@ -215,23 +274,30 @@ export function buildDigShaftLevel(): CuratedPuzzleLevel {
   paintGarbageRow(board, 1, [4, 1]);
   paintGarbageRow(board, 2, [3, 4]);
   paintGarbageRow(board, 3, [4, 7]);
-  paintGarbageRow(board, 4, [2, 5]);
-  paintColumnStack(board, 0, 3);
-  paintColumnStack(board, 9, 4);
+  paintGarbageRow(board, 4, [4, 2]);
 
-  const queuePrefix: ShapeType[] = ['T', 'S', 'Z', 'O', 'J', 'L', 'I'];
-  const timeline: TimelineEvent[] = [
-    { tick: 120, kind: 'garbage', params: { lines: 1, delayTicks: 18 } },
-    { tick: 240, kind: 'freeze', params: { durationTicks: 900 } },
+  const queuePrefix: ShapeType[] = ['I', 'J', 'L', 'T', 'O', 'S', 'Z'];
+  const timeline: TimelineEntry[] = [
+    { afterPieces: 2, kind: 'garbage', params: { lines: 1, delayTicks: 12 } },
+    { afterPieces: 5, kind: 'magnet' },
+    { afterPieces: 8, kind: 'snag' },
+    { afterPieces: 11, kind: 'retrim' },
+    { afterPieces: 14, kind: 'sticky' },
+    { afterPieces: 17, kind: 'curtain' },
+    { afterPieces: 20, kind: 'garbage', params: { lines: 1, delayTicks: 12 } },
+    { afterPieces: 23, kind: 'magnet', params: { stacks: 1 } },
+    { afterPieces: 26, kind: 'freeze', params: { durationTicks: 360 } },
+    { afterPieces: 29, kind: 'retrim' },
   ];
 
   return freezeLevel({
     id: 'authored-dig-shaft',
     name: 'Dig Shaft',
-    seed: 6208,
+    description: 'Drill through column 4 and eliminate all garbage under recurring retrim and hold freeze cycles.',
+    seed: 6006,
     initialBoard: board,
     queuePrefix,
-    goal: { kind: 'clear-lines', lines: 9 },
+    goal: { kind: 'garbage-clear' },
     timeline,
     shopPolicy: 'none',
     allowHold: true,
@@ -253,13 +319,27 @@ export function buildTSlotSetupLevel(): CuratedPuzzleLevel {
   paintColumnStack(board, 9, 4);
 
   const queuePrefix: ShapeType[] = ['T', 'S', 'Z', 'J', 'L', 'O', 'T'];
-  const timeline: TimelineEvent[] = [
-    { tick: 180, kind: 'sticky' },
+  const timeline: TimelineEntry[] = [
+    { afterPieces: 3, kind: 'snag' },
+    { afterPieces: 6, kind: 'magnet' },
+    { afterPieces: 9, kind: 'curtain' },
+    { afterPieces: 12, kind: 'retrim' },
+    { afterPieces: 15, kind: 'snag' },
+    { afterPieces: 18, kind: 'sticky' },
+    { afterPieces: 21, kind: 'curtain' },
+    { afterPieces: 24, kind: 'magnet', params: { stacks: 1 } },
+    { afterPieces: 27, kind: 'freeze', params: { durationTicks: 360 } },
+    { afterPieces: 30, kind: 'sticky' },
+    { afterPieces: 33, kind: 'retrim' },
+    { afterPieces: 36, kind: 'sticky' },
+    { afterPieces: 39, kind: 'curtain' },
+    { afterPieces: 42, kind: 'snag' },
   ];
 
   return freezeLevel({
     id: 'authored-tslot-setup',
     name: 'T-Slot Setup',
+    description: 'Build and execute precise T-spin clears to reach the line-clear target.',
     seed: 7331,
     initialBoard: board,
     queuePrefix,
@@ -291,14 +371,25 @@ export function buildFourWideLevel(): CuratedPuzzleLevel {
   paintColumnStack(board, 6, 1);
 
   const queuePrefix: ShapeType[] = ['I', 'O', 'J', 'L', 'T', 'S', 'Z'];
-  const timeline: TimelineEvent[] = [
-    { tick: 60, kind: 'retrim' },
-    { tick: 150, kind: 'magnet' },
+  const timeline: TimelineEntry[] = [
+    { afterPieces: 3, kind: 'magnet' },
+    { afterPieces: 6, kind: 'sticky' },
+    { afterPieces: 9, kind: 'snag' },
+    { afterPieces: 12, kind: 'curtain' },
+    { afterPieces: 15, kind: 'magnet', params: { stacks: 1 } },
+    { afterPieces: 18, kind: 'garbage', params: { lines: 1, delayTicks: 12 } },
+    { afterPieces: 21, kind: 'sticky' },
+    { afterPieces: 24, kind: 'magnet' },
+    { afterPieces: 27, kind: 'retrim' },
+    { afterPieces: 30, kind: 'snag' },
+    { afterPieces: 34, kind: 'sticky' },
+    { afterPieces: 38, kind: 'magnet' },
   ];
 
   return freezeLevel({
     id: 'authored-four-wide',
     name: 'Four Wide',
+    description: 'Maintain a sustained 4-wide center combo under sticky lock pressure and rising tension.',
     seed: 8412,
     initialBoard: board,
     queuePrefix,
@@ -325,13 +416,27 @@ export function buildHoldDisciplineLevel(): CuratedPuzzleLevel {
   paintColumnStack(board, 9, 4);
 
   const queuePrefix: ShapeType[] = ['I', 'S', 'Z', 'O', 'J', 'L', 'T'];
-  const timeline: TimelineEvent[] = [
-    { tick: 360, kind: 'freeze', params: { durationTicks: 900 } },
+  const timeline: TimelineEntry[] = [
+    { afterPieces: 3, kind: 'retrim' },
+    { afterPieces: 6, kind: 'sticky' },
+    { afterPieces: 9, kind: 'freeze', params: { durationTicks: 360 } },
+    { afterPieces: 12, kind: 'retrim' },
+    { afterPieces: 15, kind: 'magnet' },
+    { afterPieces: 18, kind: 'freeze', params: { durationTicks: 360 } },
+    { afterPieces: 21, kind: 'snag' },
+    { afterPieces: 24, kind: 'sticky' },
+    { afterPieces: 27, kind: 'garbage', params: { lines: 1, delayTicks: 12 } },
+    { afterPieces: 30, kind: 'freeze', params: { durationTicks: 360 } },
+    { afterPieces: 33, kind: 'curtain' },
+    { afterPieces: 36, kind: 'magnet', params: { stacks: 1 } },
+    { afterPieces: 39, kind: 'freeze', params: { durationTicks: 360 } },
+    { afterPieces: 42, kind: 'snag' },
   ];
 
   return freezeLevel({
     id: 'authored-hold-discipline',
     name: 'Hold Discipline',
+    description: 'Endure heavy hold freezes while maintaining downstack momentum and stack balance.',
     seed: 9550,
     initialBoard: board,
     queuePrefix,
@@ -360,18 +465,23 @@ export function buildPoisonBeatLevel(): CuratedPuzzleLevel {
   paintGarbageRow(board, 3, [4]);
 
   const queuePrefix: ShapeType[] = ['O', 'J', 'L', 'T', 'S', 'Z', 'I'];
-  const timeline: TimelineEvent[] = [
-    // ~1.5s: poison active piece (variant 2).
+  const timeline: TimelineEntry[] = [
     { tick: 90, kind: 'poison', params: { variant: 2 } },
-    // Earliest wildcard attempt after lock (~114). Session defers shape lock until
-    // poisonSpread finishes (same gate as multiplayer canPurchase). Goal is 10
-    // lines so baselines run past full spread + wildcard.
     { tick: 170, kind: 'wildcard', params: { variant: 2 } },
+    { afterPieces: 6, kind: 'retrim' },
+    { afterPieces: 10, kind: 'curtain' },
+    { afterPieces: 15, kind: 'poison', params: { variant: 2 } },
+    { afterPieces: 18, kind: 'magnet', params: { stacks: 1 } },
+    { afterPieces: 22, kind: 'purge', params: { variant: 2 } },
+    { afterPieces: 25, kind: 'sticky' },
+    { afterPieces: 28, kind: 'snag' },
+    { afterPieces: 32, kind: 'curtain' },
   ];
 
   return freezeLevel({
     id: 'authored-poison-beat',
     name: 'Poison Beat',
+    description: 'Survive spreading poison minos, then cleanse the board with well-timed wildcards.',
     seed: 10661,
     initialBoard: board,
     queuePrefix,
@@ -401,16 +511,25 @@ export function buildCurtainDropLevel(): CuratedPuzzleLevel {
   const queuePrefix: ShapeType[] = ['T', 'J', 'L', 'O', 'S', 'Z', 'I'];
   // Bot clear ≈ 750 ticks with this sparse beat → human horizon 2250 (×3).
   const timeline: TimelineEntry[] = [
-    { tick: 60, kind: 'retrim' },
-    { tick: 480, kind: 'curtain' },
-    { tick: 1200, kind: 'curtain' },
-    // Escalator: lingering players eat magnet pressure near the horizon.
-    { tick: 1800, kind: 'magnet' },
+    { tick: 90, kind: 'retrim' },
+    { tick: 520, kind: 'curtain' },
+    { tick: 1280, kind: 'curtain' },
+    { tick: 1850, kind: 'snag' },
+    { afterPieces: 12, kind: 'garbage', params: { lines: 1, delayTicks: 18 } },
+    { afterPieces: 20, kind: 'freeze', params: { durationTicks: 360 } },
+    { afterPieces: 28, kind: 'sticky' },
+    { afterPieces: 40, kind: 'retrim' },
+    { afterPieces: 52, kind: 'garbage', params: { lines: 1, delayTicks: 18 } },
+    { afterPieces: 65, kind: 'magnet', params: { stacks: 1 } },
+    { afterPieces: 78, kind: 'curtain' },
+    { afterPieces: 90, kind: 'sticky' },
+    { afterPieces: 105, kind: 'snag' },
   ];
 
   return freezeLevel({
     id: 'authored-curtain-drop',
     name: 'Curtain Drop',
+    description: 'Survive 2250 ticks of dense hazard loops while managing line clears under intermittent curtain blindness.',
     seed: 11770,
     initialBoard: board,
     queuePrefix,
@@ -440,13 +559,27 @@ export function buildLateIWellLevel(): CuratedPuzzleLevel {
   paintColumnStack(board, 9, 5);
 
   const queuePrefix: ShapeType[] = ['S', 'Z', 'O', 'J', 'L', 'T', 'I'];
-  const timeline: TimelineEvent[] = [
-    { tick: 360, kind: 'freeze', params: { durationTicks: 900 } },
+  const timeline: TimelineEntry[] = [
+    { afterPieces: 4, kind: 'magnet' },
+    { afterPieces: 7, kind: 'garbage', params: { lines: 1, delayTicks: 12 } },
+    { afterPieces: 10, kind: 'retrim' },
+    { afterPieces: 13, kind: 'curtain' },
+    { afterPieces: 16, kind: 'snag' },
+    { afterPieces: 19, kind: 'sticky' },
+    { afterPieces: 22, kind: 'freeze', params: { durationTicks: 360 } },
+    { afterPieces: 25, kind: 'magnet', params: { stacks: 1 } },
+    { afterPieces: 28, kind: 'retrim' },
+    { afterPieces: 31, kind: 'sticky' },
+    { afterPieces: 34, kind: 'retrim' },
+    { afterPieces: 37, kind: 'snag' },
+    { afterPieces: 40, kind: 'curtain' },
+    { afterPieces: 43, kind: 'sticky' },
   ];
 
   return freezeLevel({
     id: 'authored-late-i-well',
     name: 'Late I Well',
+    description: 'Keep the stack clean and survive without hold until the late I-piece well arrives.',
     seed: 12880,
     initialBoard: board,
     queuePrefix,
@@ -483,14 +616,26 @@ export function buildImportJstrisCheckboardLevel(): CuratedPuzzleLevel {
 
   // Map queue was null; provide a dig-friendly bag prefix.
   const queuePrefix: ShapeType[] = ['I', 'T', 'L', 'J', 'O', 'S', 'Z'];
-  const timeline: TimelineEvent[] = [
-    // Thematic mid-solve freeze (no fake jstris powerups).
-    { tick: 300, kind: 'freeze', params: { durationTicks: 900 } },
+  const timeline: TimelineEntry[] = [
+    { afterPieces: 2, kind: 'magnet' },
+    { afterPieces: 4, kind: 'sticky' },
+    { afterPieces: 6, kind: 'snag' },
+    { afterPieces: 8, kind: 'retrim' },
+    { afterPieces: 10, kind: 'magnet' },
+    { afterPieces: 12, kind: 'curtain' },
+    { afterPieces: 14, kind: 'freeze', params: { durationTicks: 360 } },
+    { afterPieces: 16, kind: 'sticky' },
+    { afterPieces: 18, kind: 'garbage', params: { lines: 1, delayTicks: 12 } },
+    { afterPieces: 20, kind: 'retrim' },
+    { afterPieces: 22, kind: 'snag' },
+    { afterPieces: 24, kind: 'curtain' },
+    { afterPieces: 26, kind: 'freeze', params: { durationTicks: 360 } },
   ];
 
   return freezeLevel({
     id: 'import-jstris-checkboard',
     name: 'Jstris: Checkboard pattern',
+    description: 'Clear alternating checkerboard garbage lines while balancing sticky and magnet interference.',
     seed: 66066,
     initialBoard: board,
     queuePrefix,
@@ -527,16 +672,22 @@ export function buildImportJstrisUltimate29ComboLevel(): CuratedPuzzleLevel {
   ];
   // Piece-scheduled pressure + light early tick beats (no multi-minute tick slog).
   const timeline: TimelineEntry[] = [
-    { tick: 120, kind: 'retrim' },
-    { tick: 480, kind: 'magnet' },
-    { afterPieces: 5, kind: 'freeze', params: { durationTicks: 360 } },
-    { afterPieces: 12, kind: 'curtain' },
-    { afterPieces: 20, kind: 'snag' },
+    { tick: 100, kind: 'magnet' },
+    { tick: 220, kind: 'sticky' },
+    { tick: 340, kind: 'garbage', params: { lines: 1, delayTicks: 12 } },
+    { tick: 460, kind: 'magnet' },
+    { tick: 580, kind: 'sticky' },
+    { tick: 720, kind: 'magnet' },
+    { tick: 860, kind: 'sticky' },
+    { afterPieces: 8, kind: 'curtain' },
+    { afterPieces: 14, kind: 'snag' },
+    { afterPieces: 22, kind: 'retrim' },
   ];
 
   return freezeLevel({
     id: 'import-jstris-ultimate-29-combo',
     name: 'Jstris: Ultimate 29-combo',
+    description: 'Unleash a massive 29-combo chain down the central corridor under speed pressure.',
     seed: 255255,
     initialBoard: board,
     queuePrefix,
@@ -572,13 +723,25 @@ export function buildImportFumenC4w3resLevel(): CuratedPuzzleLevel {
   paintGarbageRow(board, 9, [3, 4, 5, 6]);
 
   const queuePrefix: ShapeType[] = ['I', 'T', 'L', 'J', 'S', 'Z', 'O', 'I', 'T', 'L', 'J', 'S', 'Z', 'O'];
-  const timeline: TimelineEvent[] = [
-    { tick: 300, kind: 'freeze', params: { durationTicks: 900 } },
+  const timeline: TimelineEntry[] = [
+    { afterPieces: 1, kind: 'sticky' },
+    { afterPieces: 3, kind: 'magnet' },
+    { afterPieces: 5, kind: 'garbage', params: { lines: 1, delayTicks: 12 } },
+    { afterPieces: 7, kind: 'retrim' },
+    { afterPieces: 9, kind: 'sticky' },
+    { afterPieces: 11, kind: 'snag' },
+    { afterPieces: 13, kind: 'magnet', params: { stacks: 1 } },
+    { afterPieces: 15, kind: 'curtain' },
+    { afterPieces: 17, kind: 'sticky' },
+    { afterPieces: 19, kind: 'magnet' },
+    { afterPieces: 22, kind: 'retrim' },
+    { afterPieces: 25, kind: 'sticky' },
   ];
 
   return freezeLevel({
     id: 'import-fumen-c4w-3res',
     name: 'Hard Drop: Center 4-wide 3-res',
+    description: 'Execute high-level Hard Drop 4-wide combo downstacking against incoming garbage.',
     seed: 79557,
     initialBoard: board,
     queuePrefix,
@@ -597,7 +760,7 @@ export function buildImportFumenC4w3resLevel(): CuratedPuzzleLevel {
  * Source: https://jstris.jezevec10.com/map/2 (API maps/api/2).
  * Board decoded from base64 data (200 nibbles); non-zero → G. Kept bottom
  * 4 row(s) for spawn headroom. Exact API queue as queuePrefix.
- * PC opener; piece-scheduled curtain→snag→magnet. Goal clear-lines:4.
+ * PC opener; piece-scheduled curtain→snag→magnet. Goal garbage-clear: clear all garbage.
  */
 export function buildImportJstrisPerfectClearHowLevel(): CuratedPuzzleLevel {
   const board = emptyBoard();
@@ -608,18 +771,29 @@ export function buildImportJstrisPerfectClearHowLevel(): CuratedPuzzleLevel {
 
   const queuePrefix: ShapeType[] = ['S', 'J', 'I', 'L', 'S', 'Z', 'Z'];
   const timeline: TimelineEntry[] = [
-    { afterPieces: 3, kind: 'curtain' },
-    { afterPieces: 6, kind: 'snag' },
-    { afterPieces: 9, kind: 'magnet' },
+    { afterPieces: 1, kind: 'garbage', params: { lines: 1, delayTicks: 12 } },
+    { afterPieces: 3, kind: 'sticky' },
+    { afterPieces: 5, kind: 'retrim' },
+    { afterPieces: 7, kind: 'magnet' },
+    { afterPieces: 9, kind: 'garbage', params: { lines: 1, delayTicks: 12 } },
+    { afterPieces: 11, kind: 'snag' },
+    { afterPieces: 13, kind: 'curtain' },
+    { afterPieces: 15, kind: 'retrim' },
+    { afterPieces: 17, kind: 'magnet', params: { stacks: 1 } },
+    { afterPieces: 19, kind: 'freeze', params: { durationTicks: 360 } },
+    { afterPieces: 21, kind: 'garbage', params: { lines: 1, delayTicks: 12 } },
+    { afterPieces: 23, kind: 'sticky' },
+    { afterPieces: 25, kind: 'retrim' },
   ];
 
   return freezeLevel({
     id: 'import-jstris-perfect-clear-how',
     name: 'Jstris: Perfect clear how?',
+    description: 'Downstack the 4-row cheese block to clear all garbage while navigating alternating magnets, snags, and swap re-trims.',
     seed: 2002,
     initialBoard: board,
     queuePrefix,
-    goal: { kind: 'clear-lines', lines: 4 },
+    goal: { kind: 'garbage-clear' },
     timeline,
     shopPolicy: 'none',
     allowHold: true,
@@ -633,7 +807,7 @@ export function buildImportJstrisPerfectClearHowLevel(): CuratedPuzzleLevel {
  * Source: https://jstris.jezevec10.com/map/15 (API maps/api/15).
  * Board decoded from base64 data (200 nibbles); non-zero → G. Kept bottom
  * 8 row(s) for spawn headroom. Exact API queue as queuePrefix.
- * Well dig; retrim→magnet + garbage pulse. Goal clear-lines:6.
+ * Well dig; retrim→magnet + garbage pulse. Goal garbage-clear: clear all garbage.
  */
 export function buildImportJstrisClearTheRainbowLevel(): CuratedPuzzleLevel {
   const board = emptyBoard();
@@ -646,20 +820,30 @@ export function buildImportJstrisClearTheRainbowLevel(): CuratedPuzzleLevel {
   paintGarbageRow(board, 6, [7, 8, 9]);
   paintGarbageRow(board, 7, [7, 8, 9]);
 
-  const queuePrefix: ShapeType[] = ['L', 'O', 'J', 'J', 'Z', 'J', 'O', 'O', 'I'];
+  const queuePrefix: ShapeType[] = ['I', 'I', 'I', 'I', 'I', 'I', 'I', 'I', 'I', 'I', 'I', 'I', 'I', 'I', 'I', 'I', 'I', 'I', 'I', 'I', 'I', 'I', 'I', 'I', 'I', 'I', 'I', 'I', 'I', 'I', 'I', 'I', 'I', 'I', 'I', 'I', 'I', 'I', 'I', 'I', 'I', 'I', 'I', 'I', 'I', 'I', 'I', 'I', 'I', 'I', 'I', 'I', 'I', 'I', 'I', 'I', 'I', 'I', 'I', 'I', 'I', 'I', 'I', 'I', 'I', 'I', 'I', 'I', 'I', 'I', 'I', 'I', 'I', 'I', 'I', 'I', 'I', 'I', 'I', 'I', 'I', 'I', 'I', 'I', 'I', 'I', 'I', 'I', 'I', 'I', 'I', 'I', 'I', 'I', 'I', 'I', 'I', 'I', 'I', 'I'];
   const timeline: TimelineEntry[] = [
-    { tick: 90, kind: 'retrim' },
-    { tick: 180, kind: 'magnet' },
-    { tick: 300, kind: 'garbage', params: { lines: 1, delayTicks: 12 } },
+    { afterPieces: 1, kind: 'sticky' },
+    { afterPieces: 3, kind: 'magnet' },
+    { afterPieces: 5, kind: 'garbage', params: { lines: 1, delayTicks: 12 } },
+    { afterPieces: 7, kind: 'snag' },
+    { afterPieces: 9, kind: 'retrim' },
+    { afterPieces: 11, kind: 'curtain' },
+    { afterPieces: 13, kind: 'garbage', params: { lines: 1, delayTicks: 12 } },
+    { afterPieces: 15, kind: 'magnet', params: { stacks: 1 } },
+    { afterPieces: 17, kind: 'freeze', params: { durationTicks: 360 } },
+    { afterPieces: 19, kind: 'sticky' },
+    { afterPieces: 21, kind: 'retrim' },
+    { afterPieces: 23, kind: 'garbage', params: { lines: 1, delayTicks: 12 } },
   ];
 
   return freezeLevel({
     id: 'import-jstris-clear-the-rainbow',
     name: 'Jstris: Clear the rainbow',
+    description: 'Clear the entire 8-row rainbow stack using an I-piece stream while weathering magnets, stickies, and snags.',
     seed: 15015,
     initialBoard: board,
     queuePrefix,
-    goal: { kind: 'clear-lines', lines: 6 },
+    goal: { kind: 'garbage-clear' },
     timeline,
     shopPolicy: 'none',
     allowHold: true,
@@ -688,14 +872,24 @@ export function buildImportJstrisLspinsEasyLevel(): CuratedPuzzleLevel {
 
   const queuePrefix: ShapeType[] = ['L', 'T', 'S', 'J', 'T', 'T', 'L', 'T', 'T'];
   const timeline: TimelineEntry[] = [
-    { afterPieces: 4, kind: 'sticky' },
-    { afterPieces: 8, kind: 'freeze', params: { durationTicks: 360 } },
-    { afterPieces: 12, kind: 'snag' },
+    { afterPieces: 2, kind: 'curtain' },
+    { afterPieces: 4, kind: 'snag' },
+    { afterPieces: 6, kind: 'sticky' },
+    { afterPieces: 8, kind: 'retrim' },
+    { afterPieces: 10, kind: 'magnet' },
+    { afterPieces: 12, kind: 'curtain' },
+    { afterPieces: 14, kind: 'freeze', params: { durationTicks: 360 } },
+    { afterPieces: 16, kind: 'snag' },
+    { afterPieces: 18, kind: 'sticky' },
+    { afterPieces: 20, kind: 'retrim' },
+    { afterPieces: 22, kind: 'magnet', params: { stacks: 1 } },
+    { afterPieces: 24, kind: 'snag' },
   ];
 
   return freezeLevel({
     id: 'import-jstris-lspins-easy',
     name: 'Jstris: Lspins (Easy)',
+    description: 'Execute clean L-spin twists into snug overhangs to clear lines under pressure.',
     seed: 24024,
     initialBoard: board,
     queuePrefix,
@@ -713,35 +907,43 @@ export function buildImportJstrisLspinsEasyLevel(): CuratedPuzzleLevel {
  * Source: https://jstris.jezevec10.com/map/45 (API maps/api/45).
  * Board decoded from base64 data (200 nibbles); non-zero → G. Kept bottom
  * 10 row(s) for spawn headroom. Exact API queue as queuePrefix.
- * Cheese 10; garbage→purge→magnet ticks. Goal clear-lines:8.
+ * Cheese 10; garbage→purge→magnet ticks. Goal garbage-clear: clear all garbage.
  */
 export function buildImportJstrisCheese10Level(): CuratedPuzzleLevel {
   const board = emptyBoard();
-  paintGarbageRow(board, 0, [6]);
-  paintGarbageRow(board, 1, [7]);
-  paintGarbageRow(board, 2, [8]);
-  paintGarbageRow(board, 3, [9]);
-  paintGarbageRow(board, 4, [9]);
-  paintGarbageRow(board, 5, [6]);
-  paintGarbageRow(board, 6, [6]);
-  paintGarbageRow(board, 7, [5]);
-  paintGarbageRow(board, 8, [2]);
-  paintGarbageRow(board, 9, [0]);
+  paintGarbageRow(board, 0, [4]);
+  paintGarbageRow(board, 1, [0]);
+  paintGarbageRow(board, 2, [3]);
+  paintGarbageRow(board, 3, [8]);
+  paintGarbageRow(board, 4, [6]);
+  paintGarbageRow(board, 5, [2]);
+  paintGarbageRow(board, 6, [7]);
+  paintGarbageRow(board, 7, [9]);
+  paintGarbageRow(board, 8, [5]);
+  paintGarbageRow(board, 9, [1]);
 
-  const queuePrefix: ShapeType[] = ['T', 'Z', 'S', 'J', 'L', 'O', 'I', 'T', 'S', 'I', 'J', 'O', 'L', 'Z', 'S', 'O', 'O', 'O', 'O', 'O', 'O', 'O', 'O', 'O', 'O'];
+  const queuePrefix: ShapeType[] = ['J', 'L', 'I', 'O', 'T', 'S', 'Z', 'J', 'L', 'I', 'O', 'T', 'S', 'Z', 'J', 'L', 'I', 'O', 'T', 'S', 'Z'];
   const timeline: TimelineEntry[] = [
-    { tick: 120, kind: 'garbage', params: { lines: 1, delayTicks: 18 } },
-    { tick: 240, kind: 'purge', params: { variant: 2 } },
-    { tick: 420, kind: 'magnet' },
+    { afterPieces: 2, kind: 'sticky' },
+    { afterPieces: 6, kind: 'garbage', params: { lines: 1, delayTicks: 12 } },
+    { afterPieces: 10, kind: 'snag' },
+    { afterPieces: 14, kind: 'retrim' },
+    { afterPieces: 18, kind: 'magnet' },
+    { afterPieces: 22, kind: 'freeze', params: { durationTicks: 360 } },
+    { afterPieces: 26, kind: 'garbage', params: { lines: 1, delayTicks: 12 } },
+    { afterPieces: 30, kind: 'sticky' },
+    { afterPieces: 34, kind: 'retrim' },
+    { afterPieces: 38, kind: 'magnet', params: { stacks: 1 } },
   ];
 
   return freezeLevel({
     id: 'import-jstris-cheese-10',
     name: 'Jstris: Cheese 10',
-    seed: 45045,
+    description: 'Classic 10-line Cheese Race downstack: clear all 10 lines of messy single-hole cheese while surviving hazards.',
+    seed: 28028,
     initialBoard: board,
     queuePrefix,
-    goal: { kind: 'clear-lines', lines: 8 },
+    goal: { kind: 'garbage-clear' },
     timeline,
     shopPolicy: 'none',
     allowHold: true,
@@ -755,7 +957,7 @@ export function buildImportJstrisCheese10Level(): CuratedPuzzleLevel {
  * Source: https://jstris.jezevec10.com/map/53 (API maps/api/53).
  * Board decoded from base64 data (200 nibbles); non-zero → G. Kept bottom
  * 8 row(s) for spawn headroom. Exact API queue as queuePrefix.
- * Clog chambers; snag + piece retrim/curtain. Goal clear-lines:7.
+ * Clog chambers; snag + piece retrim/curtain. Goal garbage-clear: clear all garbage.
  */
 export function buildImportJstrisClogLevel(): CuratedPuzzleLevel {
   const board = emptyBoard();
@@ -770,14 +972,25 @@ export function buildImportJstrisClogLevel(): CuratedPuzzleLevel {
 
   const queuePrefix: ShapeType[] = ['O', 'J', 'O', 'O', 'L', 'O', 'L', 'O', 'O', 'J', 'O', 'J', 'O', 'O', 'L', 'O', 'L', 'O', 'O', 'J', 'O'];
   const timeline: TimelineEntry[] = [
-    { tick: 150, kind: 'snag' },
-    { afterPieces: 5, kind: 'retrim' },
-    { afterPieces: 10, kind: 'curtain' },
+    { afterPieces: 2, kind: 'curtain' },
+    { afterPieces: 5, kind: 'garbage', params: { lines: 1, delayTicks: 12 } },
+    { afterPieces: 8, kind: 'magnet' },
+    { afterPieces: 11, kind: 'sticky' },
+    { afterPieces: 14, kind: 'snag' },
+    { afterPieces: 17, kind: 'retrim' },
+    { afterPieces: 20, kind: 'curtain' },
+    { afterPieces: 23, kind: 'freeze', params: { durationTicks: 360 } },
+    { afterPieces: 26, kind: 'garbage', params: { lines: 1, delayTicks: 12 } },
+    { afterPieces: 29, kind: 'magnet', params: { stacks: 1 } },
+    { afterPieces: 32, kind: 'sticky' },
+    { afterPieces: 35, kind: 'snag' },
+    { afterPieces: 38, kind: 'retrim' },
   ];
 
   return freezeLevel({
     id: 'import-jstris-clog',
     name: 'Jstris: Clog',
+    description: 'Unclog a tricky garbage bottleneck under swap line shifts and lateral snags.',
     seed: 53053,
     initialBoard: board,
     queuePrefix,
@@ -810,14 +1023,24 @@ export function buildImportJstrisSSpinTripleLevel(): CuratedPuzzleLevel {
 
   const queuePrefix: ShapeType[] = ['S', 'Z', 'S', 'Z', 'S', 'O', 'T'];
   const timeline: TimelineEntry[] = [
-    { afterPieces: 3, kind: 'sticky' },
-    { afterPieces: 7, kind: 'magnet' },
-    { tick: 480, kind: 'purge', params: { variant: 2 } },
+    { afterPieces: 1, kind: 'retrim' },
+    { afterPieces: 3, kind: 'snag' },
+    { afterPieces: 5, kind: 'curtain' },
+    { afterPieces: 7, kind: 'freeze', params: { durationTicks: 360 } },
+    { afterPieces: 9, kind: 'sticky' },
+    { afterPieces: 11, kind: 'magnet' },
+    { afterPieces: 13, kind: 'snag' },
+    { afterPieces: 15, kind: 'sticky' },
+    { afterPieces: 17, kind: 'snag' },
+    { afterPieces: 19, kind: 'curtain' },
+    { afterPieces: 21, kind: 'magnet', params: { stacks: 1 } },
+    { afterPieces: 23, kind: 'sticky' },
   ];
 
   return freezeLevel({
     id: 'import-jstris-s-spin-triple',
     name: 'Jstris: s-spin triple',
+    description: 'Thread S-pieces into complex overhang pockets for triple line clears.',
     seed: 61061,
     initialBoard: board,
     queuePrefix,
@@ -835,17 +1058,17 @@ export function buildImportJstrisSSpinTripleLevel(): CuratedPuzzleLevel {
  * Source: https://jstris.jezevec10.com/map/70 (API maps/api/70).
  * Board decoded from base64 data (200 nibbles); non-zero → G. Kept bottom
  * 8 row(s) for spawn headroom. Exact API queue as queuePrefix.
- * Drill shaft; early garbage + mid freeze. Goal clear-lines:6.
+ * Drill shaft; early garbage + mid freeze. Goal garbage-clear: clear all garbage.
  */
 export function buildImportJstrisDrilltris1Level(): CuratedPuzzleLevel {
   const board = emptyBoard();
-  paintGarbageRow(board, 0, [4]);
-  paintGarbageRow(board, 1, [4]);
+  paintGarbageRow(board, 0, []);
+  paintGarbageRow(board, 1, []);
   paintGarbageRow(board, 2, [4]);
-  paintGarbageRow(board, 3, []);
+  paintGarbageRow(board, 3, [4]);
   paintGarbageRow(board, 4, [4]);
   paintGarbageRow(board, 5, [4]);
-  paintGarbageRow(board, 6, [4]);
+  paintGarbageRow(board, 6, []);
   paintGarbageRow(board, 7, [4]);
 
   const queuePrefix: ShapeType[] = [
@@ -858,17 +1081,27 @@ export function buildImportJstrisDrilltris1Level(): CuratedPuzzleLevel {
     'I', 'I', 'I', 'I', 'I', 'I', 'I', 'I', 'I', 'I', 'I', 'I', 'I', 'I'
   ];
   const timeline: TimelineEntry[] = [
-    { tick: 240, kind: 'freeze', params: { durationTicks: 600 } },
-    { tick: 120, kind: 'garbage', params: { lines: 1, delayTicks: 18 } },
+    { afterPieces: 1, kind: 'garbage', params: { lines: 1, delayTicks: 6 } },
+    { afterPieces: 2, kind: 'retrim' },
+    { afterPieces: 3, kind: 'sticky' },
+    { afterPieces: 4, kind: 'magnet' },
+    { afterPieces: 5, kind: 'curtain' },
+    { afterPieces: 6, kind: 'snag' },
+    { afterPieces: 7, kind: 'garbage', params: { lines: 1, delayTicks: 6 } },
+    { afterPieces: 8, kind: 'freeze', params: { durationTicks: 360 } },
+    { afterPieces: 9, kind: 'magnet', params: { stacks: 1 } },
+    { afterPieces: 10, kind: 'sticky' },
+    { afterPieces: 11, kind: 'retrim' },
   ];
 
   return freezeLevel({
     id: 'import-jstris-drilltris-1',
     name: 'Jstris: drilltris 1',
+    description: 'Drill through the central vertical channel and completely eliminate all solid garbage walls.',
     seed: 70070,
     initialBoard: board,
     queuePrefix,
-    goal: { kind: 'clear-lines', lines: 6 },
+    goal: { kind: 'garbage-clear' },
     timeline,
     shopPolicy: 'none',
     allowHold: true,
@@ -882,7 +1115,7 @@ export function buildImportJstrisDrilltris1Level(): CuratedPuzzleLevel {
  * Source: https://jstris.jezevec10.com/map/71 (API maps/api/71).
  * Board decoded from base64 data (200 nibbles); non-zero → G. Kept bottom
  * 8 row(s) for spawn headroom. Exact API queue as queuePrefix.
- * Drill 2; retrim + sparse curtain loop + late magnet. Goal clear-lines:7.
+ * Drill 2; retrim + sparse curtain loop + late magnet. Goal garbage-clear: clear all garbage.
  */
 export function buildImportJstrisDrilltris2Level(): CuratedPuzzleLevel {
   const board = emptyBoard();
@@ -902,18 +1135,27 @@ export function buildImportJstrisDrilltris2Level(): CuratedPuzzleLevel {
     'I'
   ];
   const timeline: TimelineEntry[] = [
-    { tick: 90, kind: 'retrim' },
-    { loop: { startTick: 360, periodTicks: 720, sequence: [{ at: 0, kind: 'curtain' }] } },
-    { tick: 900, kind: 'magnet' },
+    { afterPieces: 1, kind: 'garbage', params: { lines: 1, delayTicks: 6 } },
+    { afterPieces: 2, kind: 'sticky' },
+    { afterPieces: 3, kind: 'retrim' },
+    { afterPieces: 4, kind: 'snag' },
+    { afterPieces: 5, kind: 'retrim' },
+    { afterPieces: 6, kind: 'sticky' },
+    { afterPieces: 7, kind: 'garbage', params: { lines: 1, delayTicks: 6 } },
+    { afterPieces: 8, kind: 'curtain' },
+    { afterPieces: 9, kind: 'magnet', params: { stacks: 1 } },
+    { afterPieces: 10, kind: 'snag' },
+    { afterPieces: 11, kind: 'freeze', params: { durationTicks: 360 } },
   ];
 
   return freezeLevel({
     id: 'import-jstris-drilltris-2',
     name: 'Jstris: drilltris 2',
+    description: 'Drill shaft variant: drop I-pieces rapidly to eliminate all garbage before hazards lock you down.',
     seed: 71071,
     initialBoard: board,
     queuePrefix,
-    goal: { kind: 'clear-lines', lines: 7 },
+    goal: { kind: 'garbage-clear' },
     timeline,
     shopPolicy: 'none',
     allowHold: true,
@@ -942,14 +1184,24 @@ export function buildImportJstrisSrsTowerLevel(): CuratedPuzzleLevel {
 
   const queuePrefix: ShapeType[] = ['T', 'T', 'L', 'T', 'L', 'S', 'I', 'I'];
   const timeline: TimelineEntry[] = [
-    { tick: 90, kind: 'poison', params: { variant: 2 } },
-    { tick: 200, kind: 'wildcard', params: { variant: 2 } },
-    { afterPieces: 14, kind: 'snag' },
+    { afterPieces: 2, kind: 'poison', params: { variant: 2 } },
+    { afterPieces: 4, kind: 'sticky' },
+    { afterPieces: 5, kind: 'wildcard', params: { variant: 2 } },
+    { afterPieces: 7, kind: 'curtain' },
+    { afterPieces: 9, kind: 'snag' },
+    { afterPieces: 12, kind: 'sticky' },
+    { afterPieces: 15, kind: 'magnet' },
+    { afterPieces: 18, kind: 'retrim' },
+    { afterPieces: 21, kind: 'curtain' },
+    { afterPieces: 24, kind: 'snag' },
+    { afterPieces: 27, kind: 'freeze', params: { durationTicks: 360 } },
+    { afterPieces: 30, kind: 'retrim' },
   ];
 
   return freezeLevel({
     id: 'import-jstris-srs-tower',
     name: 'Jstris: SRS Tower',
+    description: 'Use Super Rotation System wall kicks to navigate pieces through the high tower.',
     seed: 76076,
     initialBoard: board,
     queuePrefix,
@@ -969,7 +1221,7 @@ export function buildImportJstrisSrsTowerLevel(): CuratedPuzzleLevel {
  * Source: https://jstris.jezevec10.com/map/89 (API maps/api/89).
  * Board decoded from base64 data (200 nibbles); non-zero → G. Kept bottom
  * 8 row(s) for spawn headroom. Exact API queue as queuePrefix.
- * SRS training; retrim→magnet→curtain. Goal clear-lines:8.
+ * SRS training; retrim→magnet→curtain. Goal garbage-clear: clear all garbage.
  */
 export function buildImportJstrisSrsTrainingLevel(): CuratedPuzzleLevel {
   const board = emptyBoard();
@@ -984,14 +1236,24 @@ export function buildImportJstrisSrsTrainingLevel(): CuratedPuzzleLevel {
 
   const queuePrefix: ShapeType[] = ['J', 'Z', 'S', 'T', 'L', 'T', 'T', 'L', 'O', 'I', 'I'];
   const timeline: TimelineEntry[] = [
-    { tick: 120, kind: 'retrim' },
-    { tick: 280, kind: 'magnet' },
-    { tick: 480, kind: 'curtain' },
+    { afterPieces: 2, kind: 'retrim' },
+    { afterPieces: 4, kind: 'magnet' },
+    { afterPieces: 6, kind: 'curtain' },
+    { afterPieces: 8, kind: 'sticky' },
+    { afterPieces: 10, kind: 'snag' },
+    { afterPieces: 12, kind: 'retrim' },
+    { afterPieces: 14, kind: 'freeze', params: { durationTicks: 360 } },
+    { afterPieces: 16, kind: 'magnet', params: { stacks: 1 } },
+    { afterPieces: 18, kind: 'curtain' },
+    { afterPieces: 20, kind: 'sticky' },
+    { afterPieces: 22, kind: 'snag' },
+    { afterPieces: 24, kind: 'retrim' },
   ];
 
   return freezeLevel({
     id: 'import-jstris-srs-training',
     name: 'Jstris: SRS Training',
+    description: 'Master SRS kicks and spins through tight, technical geometric gaps.',
     seed: 89089,
     initialBoard: board,
     queuePrefix,
@@ -1009,7 +1271,7 @@ export function buildImportJstrisSrsTrainingLevel(): CuratedPuzzleLevel {
  * Source: https://jstris.jezevec10.com/map/97 (API maps/api/97).
  * Board decoded from base64 data (200 nibbles); non-zero → G. Kept bottom
  * 8 row(s) for spawn headroom. Exact API queue as queuePrefix.
- * DT cannon; snag→curtain→magnet afterPieces. Goal clear-lines:6.
+ * DT cannon; snag→curtain→magnet afterPieces. Goal garbage-clear: clear all garbage.
  */
 export function buildImportJstrisDtCannonPracticeLevel(): CuratedPuzzleLevel {
   const board = emptyBoard();
@@ -1024,14 +1286,24 @@ export function buildImportJstrisDtCannonPracticeLevel(): CuratedPuzzleLevel {
 
   const queuePrefix: ShapeType[] = ['T', 'T', 'T', 'T', 'T'];
   const timeline: TimelineEntry[] = [
-    { afterPieces: 2, kind: 'snag' },
-    { afterPieces: 5, kind: 'curtain' },
-    { afterPieces: 8, kind: 'magnet' },
+    { afterPieces: 2, kind: 'sticky' },
+    { afterPieces: 4, kind: 'curtain' },
+    { afterPieces: 6, kind: 'retrim' },
+    { afterPieces: 8, kind: 'snag' },
+    { afterPieces: 10, kind: 'magnet' },
+    { afterPieces: 12, kind: 'sticky' },
+    { afterPieces: 14, kind: 'freeze', params: { durationTicks: 360 } },
+    { afterPieces: 16, kind: 'curtain' },
+    { afterPieces: 18, kind: 'snag' },
+    { afterPieces: 21, kind: 'retrim' },
+    { afterPieces: 24, kind: 'sticky' },
+    { afterPieces: 27, kind: 'snag' },
   ];
 
   return freezeLevel({
     id: 'import-jstris-dt-cannon-practice',
     name: 'Jstris: DT Cannon Practice',
+    description: 'Construct and fire a classic DT Cannon setup for massive line clearing.',
     seed: 97000,
     initialBoard: board,
     queuePrefix,
@@ -1049,7 +1321,7 @@ export function buildImportJstrisDtCannonPracticeLevel(): CuratedPuzzleLevel {
  * Source: https://jstris.jezevec10.com/map/99 (API maps/api/99).
  * Board decoded from base64 data (200 nibbles); non-zero → G. Kept bottom
  * 8 row(s) for spawn headroom. Exact API queue as queuePrefix.
- * Godspin; purge→sticky→garbage. Goal clear-lines:7.
+ * Godspin; purge→sticky→garbage. Goal garbage-clear: clear all garbage.
  */
 export function buildImportJstrisGodspinLevel(): CuratedPuzzleLevel {
   const board = emptyBoard();
@@ -1064,14 +1336,25 @@ export function buildImportJstrisGodspinLevel(): CuratedPuzzleLevel {
 
   const queuePrefix: ShapeType[] = ['Z', 'T', 'T', 'Z', 'T', 'L', 'J', 'O', 'I', 'I', 'T', 'Z', 'S'];
   const timeline: TimelineEntry[] = [
-    { tick: 150, kind: 'purge', params: { variant: 2 } },
-    { tick: 300, kind: 'sticky' },
-    { tick: 450, kind: 'garbage', params: { lines: 1, delayTicks: 12 } },
+    { afterPieces: 2, kind: 'sticky' },
+    { afterPieces: 3, kind: 'poison', params: { variant: 2 } },
+    { afterPieces: 5, kind: 'curtain' },
+    { afterPieces: 7, kind: 'snag' },
+    { afterPieces: 10, kind: 'purge', params: { variant: 2 } },
+    { afterPieces: 12, kind: 'retrim' },
+    { afterPieces: 14, kind: 'magnet' },
+    { afterPieces: 16, kind: 'sticky' },
+    { afterPieces: 18, kind: 'curtain' },
+    { afterPieces: 21, kind: 'snag' },
+    { afterPieces: 24, kind: 'magnet', params: { stacks: 1 } },
+    { afterPieces: 27, kind: 'freeze', params: { durationTicks: 360 } },
+    { afterPieces: 30, kind: 'retrim' },
   ];
 
   return freezeLevel({
     id: 'import-jstris-godspin',
     name: 'Jstris: Godspin',
+    description: 'Perform the legendary Godspin T-piece twist through impossible-looking overhangs.',
     seed: 99002,
     initialBoard: board,
     queuePrefix,
@@ -1104,14 +1387,22 @@ export function buildImportJstrisManyStsdLevel(): CuratedPuzzleLevel {
 
   const queuePrefix: ShapeType[] = ['T', 'T', 'T', 'T', 'T', 'T', 'T', 'T', 'O', 'J', 'L', 'I', 'I'];
   const timeline: TimelineEntry[] = [
-    { afterPieces: 4, kind: 'magnet' },
-    { afterPieces: 9, kind: 'snag' },
-    { afterPieces: 14, kind: 'freeze', params: { durationTicks: 360 } },
+    { afterPieces: 2, kind: 'sticky' },
+    { afterPieces: 4, kind: 'snag' },
+    { afterPieces: 6, kind: 'freeze', params: { durationTicks: 360 } },
+    { afterPieces: 8, kind: 'magnet' },
+    { afterPieces: 10, kind: 'retrim' },
+    { afterPieces: 12, kind: 'garbage', params: { lines: 1, delayTicks: 12 } },
+    { afterPieces: 14, kind: 'snag' },
+    { afterPieces: 16, kind: 'sticky' },
+    { afterPieces: 18, kind: 'curtain' },
+    { afterPieces: 20, kind: 'magnet', params: { stacks: 1 } },
   ];
 
   return freezeLevel({
     id: 'import-jstris-many-stsd',
     name: 'Jstris: Many STSD',
+    description: 'Chain multiple Super T-Spin Double setups in rapid succession.',
     seed: 105008,
     initialBoard: board,
     queuePrefix,
@@ -1129,7 +1420,7 @@ export function buildImportJstrisManyStsdLevel(): CuratedPuzzleLevel {
  * Source: https://jstris.jezevec10.com/map/216 (API maps/api/216).
  * Board decoded from base64 data (200 nibbles); non-zero → G. Kept bottom
  * 8 row(s) for spawn headroom. Exact API queue as queuePrefix.
- * Tripz; curtain→retrim→sticky. Goal clear-lines:9.
+ * Tripz; curtain→retrim→sticky. Goal garbage-clear: clear all garbage.
  */
 export function buildImportJstrisTripzLevel(): CuratedPuzzleLevel {
   const board = emptyBoard();
@@ -1144,14 +1435,25 @@ export function buildImportJstrisTripzLevel(): CuratedPuzzleLevel {
 
   const queuePrefix: ShapeType[] = ['Z', 'Z', 'Z', 'Z', 'Z', 'I', 'I', 'I', 'I', 'I', 'I', 'I'];
   const timeline: TimelineEntry[] = [
-    { tick: 100, kind: 'curtain' },
-    { tick: 220, kind: 'retrim' },
-    { tick: 400, kind: 'sticky' },
+    { afterPieces: 2, kind: 'snag' },
+    { afterPieces: 4, kind: 'sticky' },
+    { afterPieces: 6, kind: 'garbage', params: { lines: 1, delayTicks: 12 } },
+    { afterPieces: 8, kind: 'curtain' },
+    { afterPieces: 10, kind: 'sticky' },
+    { afterPieces: 12, kind: 'freeze', params: { durationTicks: 360 } },
+    { afterPieces: 14, kind: 'retrim' },
+    { afterPieces: 16, kind: 'snag' },
+    { afterPieces: 18, kind: 'curtain' },
+    { afterPieces: 21, kind: 'magnet', params: { stacks: 1 } },
+    { afterPieces: 24, kind: 'curtain' },
+    { afterPieces: 27, kind: 'retrim' },
+    { afterPieces: 30, kind: 'snag' },
   ];
 
   return freezeLevel({
     id: 'import-jstris-tripz',
     name: 'Jstris: tripz',
+    description: 'Execute triple T-spin setups back-to-back under escalating hazard tempo.',
     seed: 216022,
     initialBoard: board,
     queuePrefix,
@@ -1169,7 +1471,7 @@ export function buildImportJstrisTripzLevel(): CuratedPuzzleLevel {
  * Source: https://jstris.jezevec10.com/map/305 (API maps/api/305).
  * Board decoded from base64 data (200 nibbles); non-zero → G. Kept bottom
  * 8 row(s) for spawn headroom. Exact API queue as queuePrefix.
- * Gutter; freeze-primary mid-solve. Goal clear-lines:6.
+ * Gutter; freeze-primary mid-solve. Goal garbage-clear: clear all garbage.
  */
 export function buildImportJstrisTheGutterLevel(): CuratedPuzzleLevel {
   const board = emptyBoard();
@@ -1184,12 +1486,24 @@ export function buildImportJstrisTheGutterLevel(): CuratedPuzzleLevel {
 
   const queuePrefix: ShapeType[] = ['T', 'T', 'S', 'T', 'T', 'S', 'O'];
   const timeline: TimelineEntry[] = [
-    { tick: 300, kind: 'freeze', params: { durationTicks: 900 } },
+    { afterPieces: 1, kind: 'curtain' },
+    { afterPieces: 3, kind: 'magnet' },
+    { afterPieces: 5, kind: 'snag' },
+    { afterPieces: 7, kind: 'retrim' },
+    { afterPieces: 9, kind: 'garbage', params: { lines: 1, delayTicks: 12 } },
+    { afterPieces: 11, kind: 'freeze', params: { durationTicks: 360 } },
+    { afterPieces: 13, kind: 'curtain' },
+    { afterPieces: 15, kind: 'sticky' },
+    { afterPieces: 17, kind: 'magnet', params: { stacks: 1 } },
+    { afterPieces: 19, kind: 'snag' },
+    { afterPieces: 21, kind: 'garbage', params: { lines: 1, delayTicks: 12 } },
+    { afterPieces: 23, kind: 'sticky' },
   ];
 
   return freezeLevel({
     id: 'import-jstris-the-gutter',
     name: 'Jstris: The Gutter',
+    description: 'Dig through deep gutter garbage wells with precise lateral piece placements.',
     seed: 305014,
     initialBoard: board,
     queuePrefix,
@@ -1207,14 +1521,14 @@ export function buildImportJstrisTheGutterLevel(): CuratedPuzzleLevel {
  * Source: https://jstris.jezevec10.com/map/355 (API maps/api/355).
  * Board decoded from base64 data (200 nibbles); non-zero → G. Kept bottom
  * 8 row(s) for spawn headroom. Exact API queue as queuePrefix.
- * Downstack; garbage→magnet + late snag. Goal clear-lines:8.
+ * Downstack; garbage→magnet + late snag. Goal garbage-clear: clear all garbage.
  */
 export function buildImportJstris1v1DownstackLevel(): CuratedPuzzleLevel {
   const board = emptyBoard();
-  paintGarbageRow(board, 0, [0]);
-  paintGarbageRow(board, 1, [0]);
-  paintGarbageRow(board, 2, [0]);
-  paintGarbageRow(board, 3, [0]);
+  paintGarbageRow(board, 0, [3]);
+  paintGarbageRow(board, 1, [3]);
+  paintGarbageRow(board, 2, [7]);
+  paintGarbageRow(board, 3, [7]);
   paintGarbageRow(board, 4, [5]);
   paintGarbageRow(board, 5, [5]);
   paintGarbageRow(board, 6, [1]);
@@ -1222,18 +1536,29 @@ export function buildImportJstris1v1DownstackLevel(): CuratedPuzzleLevel {
 
   const queuePrefix: ShapeType[] = ['O', 'I', 'J', 'T', 'L', 'L', 'J', 'S', 'I'];
   const timeline: TimelineEntry[] = [
-    { tick: 120, kind: 'garbage', params: { lines: 1, delayTicks: 18 } },
-    { tick: 240, kind: 'magnet' },
-    { afterPieces: 10, kind: 'snag' },
+    { afterPieces: 2, kind: 'garbage', params: { lines: 1, delayTicks: 12 } },
+    { afterPieces: 4, kind: 'sticky' },
+    { afterPieces: 6, kind: 'magnet' },
+    { afterPieces: 8, kind: 'curtain' },
+    { afterPieces: 10, kind: 'garbage', params: { lines: 1, delayTicks: 12 } },
+    { afterPieces: 12, kind: 'retrim' },
+    { afterPieces: 14, kind: 'snag' },
+    { afterPieces: 16, kind: 'garbage', params: { lines: 1, delayTicks: 12 } },
+    { afterPieces: 18, kind: 'freeze', params: { durationTicks: 360 } },
+    { afterPieces: 21, kind: 'magnet', params: { stacks: 1 } },
+    { afterPieces: 24, kind: 'curtain' },
+    { afterPieces: 27, kind: 'retrim' },
+    { afterPieces: 30, kind: 'snag' },
   ];
 
   return freezeLevel({
     id: 'import-jstris-1v1-downstack',
     name: 'Jstris: 1v1 downstack',
+    description: 'Downstack an intense 8-line opponent attack until all garbage is cleared, surviving late-game curtain and magnet spikes.',
     seed: 355064,
     initialBoard: board,
     queuePrefix,
-    goal: { kind: 'clear-lines', lines: 8 },
+    goal: { kind: 'garbage-clear' },
     timeline,
     shopPolicy: 'none',
     allowHold: true,
@@ -1262,14 +1587,22 @@ export function buildImportJstrisAaronSTSpinTowerLevel(): CuratedPuzzleLevel {
 
   const queuePrefix: ShapeType[] = ['T', 'T', 'T', 'T', 'T', 'T', 'T', 'T', 'T', 'T', 'T', 'T', 'T'];
   const timeline: TimelineEntry[] = [
-    { afterPieces: 3, kind: 'sticky' },
-    { afterPieces: 7, kind: 'curtain' },
-    { afterPieces: 12, kind: 'snag' },
+    { afterPieces: 2, kind: 'curtain' },
+    { afterPieces: 4, kind: 'magnet' },
+    { afterPieces: 6, kind: 'snag' },
+    { afterPieces: 8, kind: 'sticky' },
+    { afterPieces: 10, kind: 'retrim' },
+    { afterPieces: 12, kind: 'curtain' },
+    { afterPieces: 14, kind: 'freeze', params: { durationTicks: 360 } },
+    { afterPieces: 16, kind: 'snag' },
+    { afterPieces: 18, kind: 'sticky' },
+    { afterPieces: 20, kind: 'magnet', params: { stacks: 1 } },
   ];
 
   return freezeLevel({
     id: 'import-jstris-aaron-s-t-spin-tower',
     name: 'Jstris: AAron\'s T-spin tower',
+    description: 'Scale the towering T-spin fortress while avoiding snag traps and freeze locks.',
     seed: 368077,
     initialBoard: board,
     queuePrefix,
@@ -1304,12 +1637,20 @@ export function buildImportJstrisDhdLevel(): CuratedPuzzleLevel {
   const timeline: TimelineEntry[] = [
     { tick: 90, kind: 'poison', params: { variant: 1 } },
     { tick: 210, kind: 'wildcard', params: { variant: 1 } },
-    { tick: 480, kind: 'magnet' },
+    { afterPieces: 5, kind: 'curtain' },
+    { afterPieces: 10, kind: 'snag' },
+    { afterPieces: 15, kind: 'magnet' },
+    { afterPieces: 18, kind: 'garbage', params: { lines: 1, delayTicks: 12 } },
+    { afterPieces: 22, kind: 'sticky' },
+    { afterPieces: 25, kind: 'freeze', params: { durationTicks: 360 } },
+    { afterPieces: 28, kind: 'retrim' },
+    { afterPieces: 32, kind: 'sticky' },
   ];
 
   return freezeLevel({
     id: 'import-jstris-dhd',
     name: 'Jstris: DHD',
+    description: 'Double Hard Drop downstacking challenge: clear high-density obstacles under poison threat.',
     seed: 410022,
     initialBoard: board,
     queuePrefix,
@@ -1327,7 +1668,7 @@ export function buildImportJstrisDhdLevel(): CuratedPuzzleLevel {
  * Source: https://jstris.jezevec10.com/map/9100 (API maps/api/9100).
  * Board decoded from base64 data (200 nibbles); non-zero → G. Kept bottom
  * 3 authentic TST rows for spawn headroom. Exact API queue as queuePrefix.
- * Soft afterPieces pressure (snag→curtain→magnet). Goal clear-lines:4.
+ * Soft afterPieces pressure (snag→curtain→magnet). Goal garbage-clear: clear all garbage.
  */
 export function buildImportJstrisTSpinTriplesLevel(): CuratedPuzzleLevel {
   const board = emptyBoard();
@@ -1338,14 +1679,25 @@ export function buildImportJstrisTSpinTriplesLevel(): CuratedPuzzleLevel {
 
   const queuePrefix: ShapeType[] = ['T', 'T', 'T', 'T', 'O', 'J', 'J', 'T', 'T', 'T', 'T', 'O', 'J', 'J', 'O', 'O'];
   const timeline: TimelineEntry[] = [
-    { afterPieces: 5, kind: 'snag' },
-    { afterPieces: 10, kind: 'curtain' },
-    { afterPieces: 15, kind: 'magnet' },
+    { afterPieces: 2, kind: 'sticky' },
+    { afterPieces: 4, kind: 'curtain' },
+    { afterPieces: 6, kind: 'garbage', params: { lines: 1, delayTicks: 12 } },
+    { afterPieces: 8, kind: 'magnet' },
+    { afterPieces: 10, kind: 'snag' },
+    { afterPieces: 12, kind: 'curtain' },
+    { afterPieces: 14, kind: 'sticky' },
+    { afterPieces: 16, kind: 'freeze', params: { durationTicks: 360 } },
+    { afterPieces: 18, kind: 'retrim' },
+    { afterPieces: 21, kind: 'snag' },
+    { afterPieces: 24, kind: 'magnet', params: { stacks: 1 } },
+    { afterPieces: 27, kind: 'curtain' },
+    { afterPieces: 30, kind: 'snag' },
   ];
 
   return freezeLevel({
     id: 'import-jstris-t-spin-triples',
     name: 'Jstris: T-Spin triples!',
+    description: 'Execute pristine T-Spin Triples into pre-slotted overhang geometry.',
     seed: 9100079,
     initialBoard: board,
     queuePrefix,
@@ -1363,7 +1715,7 @@ export function buildImportJstrisTSpinTriplesLevel(): CuratedPuzzleLevel {
  * Board decoded from base64 data (200 nibbles); non-zero → G. Kept bottom
  * 8 row(s) of center-4 corridor for spawn headroom. Exact API queue.
  * Replaces unsolvable L-spin-mania (77) for RulesBot. snag→sticky→purge afterPieces.
- * Goal clear-lines:6.
+ * Goal garbage-clear: clear all garbage.
  */
 export function buildImportJstrisMashSpaceLevel(): CuratedPuzzleLevel {
   const board = emptyBoard();
@@ -1378,18 +1730,29 @@ export function buildImportJstrisMashSpaceLevel(): CuratedPuzzleLevel {
 
   const queuePrefix: ShapeType[] = ['I', 'I', 'I', 'I', 'I', 'I', 'I', 'I', 'I', 'I', 'I', 'I', 'I', 'I', 'I', 'I', 'I', 'I', 'I'];
   const timeline: TimelineEntry[] = [
-    { afterPieces: 4, kind: 'snag' },
-    { afterPieces: 8, kind: 'sticky' },
-    { afterPieces: 12, kind: 'purge', params: { variant: 2 } },
+    { afterPieces: 1, kind: 'snag' },
+    { afterPieces: 3, kind: 'retrim' },
+    { afterPieces: 5, kind: 'sticky' },
+    { afterPieces: 7, kind: 'magnet' },
+    { afterPieces: 9, kind: 'curtain' },
+    { afterPieces: 11, kind: 'freeze', params: { durationTicks: 360 } },
+    { afterPieces: 13, kind: 'garbage', params: { lines: 1, delayTicks: 12 } },
+    { afterPieces: 15, kind: 'snag' },
+    { afterPieces: 17, kind: 'retrim' },
+    { afterPieces: 19, kind: 'sticky' },
+    { afterPieces: 21, kind: 'magnet', params: { stacks: 1 } },
+    { afterPieces: 23, kind: 'curtain' },
+    { afterPieces: 25, kind: 'garbage', params: { lines: 1, delayTicks: 12 } },
   ];
 
   return freezeLevel({
     id: 'import-jstris-mash-space',
     name: 'Jstris: Mash space',
+    description: 'Fast-drop I-pieces down the central corridor to wipe out the flanking garbage walls.',
     seed: 160063,
     initialBoard: board,
     queuePrefix,
-    goal: { kind: 'clear-lines', lines: 6 },
+    goal: { kind: 'garbage-clear' },
     timeline,
     shopPolicy: 'none',
     allowHold: true,
@@ -1401,44 +1764,50 @@ export function buildImportJstrisMashSpaceLevel(): CuratedPuzzleLevel {
 
 export function buildAuthoredLevels(): CuratedPuzzleLevel[] {
   return [
-    buildCheeseKeyholeLevel(),
-    buildFrozenWellLevel(),
-    buildSkewStairsLevel(),
-    buildPulseGarbageLevel(),
-    buildCheeseLadderLevel(),
-    buildDigShaftLevel(),
-    buildTSlotSetupLevel(),
-    buildFourWideLevel(),
-    buildHoldDisciplineLevel(),
-    buildPoisonBeatLevel(),
-    buildCurtainDropLevel(),
-    buildLateIWellLevel(),
-    // Trial imports (picker only; not on DAILY_SCHEDULE slots).
-    buildImportJstrisCheckboardLevel(),
-    buildImportJstrisUltimate29ComboLevel(),
-    buildImportFumenC4w3resLevel(),
-    // JSTRIS BATCH20
-    buildImportJstrisPerfectClearHowLevel(),
-    buildImportJstrisClearTheRainbowLevel(),
-    buildImportJstrisLspinsEasyLevel(),
-    buildImportJstrisCheese10Level(),
-    buildImportJstrisClogLevel(),
-    buildImportJstrisSSpinTripleLevel(),
+    // --- Tier 1: Novice / Warmup (Introductory downstack & drill fundamentals) ---
     buildImportJstrisDrilltris1Level(),
     buildImportJstrisDrilltris2Level(),
-    buildImportJstrisSrsTowerLevel(),
     buildImportJstrisMashSpaceLevel(),
-    buildImportJstrisSrsTrainingLevel(),
+    buildCheeseKeyholeLevel(),
+    buildImportJstrisClearTheRainbowLevel(),
+    buildSkewStairsLevel(),
+    buildImportJstrisPerfectClearHowLevel(),
+
+    // --- Tier 2: Apprentice (Hold management, ladder cheese & basic setups) ---
+    buildFrozenWellLevel(),
+    buildCheeseLadderLevel(),
+    buildDigShaftLevel(),
+    buildImportJstrisCheckboardLevel(),
+    buildImportJstrisLspinsEasyLevel(),
+    buildTSlotSetupLevel(),
     buildImportJstrisDtCannonPracticeLevel(),
-    buildImportJstrisGodspinLevel(),
+
+    // --- Tier 3: Intermediate (Spin techniques, combo chains & attack recovery) ---
+    buildImportJstrisTSpinTriplesLevel(),
+    buildImportFumenC4w3resLevel(),
+    buildImportJstrisTheGutterLevel(),
+    buildImportJstrisSSpinTripleLevel(),
+    buildFourWideLevel(),
+    buildImportJstrisClogLevel(),
+    buildImportJstris1v1DownstackLevel(),
+
+    // --- Tier 4: Advanced (Technical kick navigation, heavy hazard pacing & hold limits) ---
+    buildHoldDisciplineLevel(),
+    buildPulseGarbageLevel(),
     buildImportJstrisManyStsdLevel(),
     buildImportJstrisTripzLevel(),
-    buildImportJstrisTheGutterLevel(),
-    buildImportJstris1v1DownstackLevel(),
+    buildImportJstrisSrsTrainingLevel(),
+    buildImportJstrisCheese10Level(),
+    buildLateIWellLevel(),
+
+    // --- Tier 5: Master / Expert (Pinnacle execution, poison mechanics & blindness) ---
+    buildImportJstrisSrsTowerLevel(),
+    buildImportJstrisGodspinLevel(),
     buildImportJstrisAaronSTSpinTowerLevel(),
+    buildImportJstrisUltimate29ComboLevel(),
+    buildPoisonBeatLevel(),
     buildImportJstrisDhdLevel(),
-    buildImportJstrisTSpinTriplesLevel(),
-    // JSTRIS BATCH20 END
+    buildCurtainDropLevel(),
   ];
 }
 

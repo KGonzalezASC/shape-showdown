@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "puzzleId": "import-jstris-aaron-s-t-spin-tower",
-  "contentHash": "83b0999939c5e98ee643b623c0d853ea870f17577ac157e268b5b944840d385d",
+  "contentHash": "f1e41bdcade2baeadcca9d7e6a7c240571edcad2065c25daac71b60cb892d81a",
   "engineProtocolVersion": 4,
   "packageVersion": "0.0.0",
   "validationStatus": "passed",
@@ -36,9 +36,9 @@
       "qualifies": true,
       "solved": true,
       "topOut": false,
-      "score": 1546,
-      "ticksUsed": 916,
-      "piecesUsed": 25,
+      "score": 1572,
+      "ticksUsed": 1455,
+      "piecesUsed": 36,
       "linesCleared": 10,
       "perfectClear": false
     },
@@ -48,9 +48,9 @@
       "qualifies": true,
       "solved": true,
       "topOut": false,
-      "score": 1546,
-      "ticksUsed": 916,
-      "piecesUsed": 25,
+      "score": 1572,
+      "ticksUsed": 1455,
+      "piecesUsed": 36,
       "linesCleared": 10,
       "perfectClear": false
     }
@@ -58,9 +58,9 @@
   "selectedBaseline": {
     "profileId": "player-limited-default",
     "profileIdentity": "player-limited-default|v1|player-limited|topology=none|garbage=0|seed=0",
-    "score": 1546,
-    "ticksUsed": 916,
-    "piecesUsed": 25,
+    "score": 1572,
+    "ticksUsed": 1455,
+    "piecesUsed": 36,
     "linesCleared": 10,
     "solved": true
   },
@@ -70,16 +70,44 @@
   },
   "scriptedEvents": [
     {
-      "afterPieces": 3,
-      "kind": "sticky"
-    },
-    {
-      "afterPieces": 7,
+      "afterPieces": 2,
       "kind": "curtain"
     },
     {
-      "afterPieces": 12,
+      "afterPieces": 4,
+      "kind": "magnet"
+    },
+    {
+      "afterPieces": 6,
       "kind": "snag"
+    },
+    {
+      "afterPieces": 8,
+      "kind": "sticky"
+    },
+    {
+      "afterPieces": 10,
+      "kind": "retrim"
+    },
+    {
+      "afterPieces": 12,
+      "kind": "curtain"
+    },
+    {
+      "afterPieces": 14,
+      "kind": "freeze"
+    },
+    {
+      "afterPieces": 16,
+      "kind": "snag"
+    },
+    {
+      "afterPieces": 18,
+      "kind": "sticky"
+    },
+    {
+      "afterPieces": 20,
+      "kind": "magnet"
     }
   ],
   "visibilityPolicy": "partial",

@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "puzzleId": "import-jstris-cheese-10",
-  "contentHash": "2927f6ea919b2df42b5950d7027a4f25eb0b85ec382f720217106105b4350d58",
+  "contentHash": "a4ab23cf77c24a02eba51c3fd7b17eaa1ed79bb8d132a5569f17fe7f3a733704",
   "engineProtocolVersion": 4,
   "packageVersion": "0.0.0",
   "validationStatus": "passed",
@@ -36,10 +36,10 @@
       "qualifies": true,
       "solved": true,
       "topOut": false,
-      "score": 998,
-      "ticksUsed": 128,
-      "piecesUsed": 5,
-      "linesCleared": 8,
+      "score": 6582,
+      "ticksUsed": 2099,
+      "piecesUsed": 99,
+      "linesCleared": 44,
       "perfectClear": false
     },
     {
@@ -48,20 +48,20 @@
       "qualifies": true,
       "solved": true,
       "topOut": false,
-      "score": 998,
-      "ticksUsed": 128,
-      "piecesUsed": 5,
-      "linesCleared": 8,
+      "score": 9010,
+      "ticksUsed": 2324,
+      "piecesUsed": 125,
+      "linesCleared": 59,
       "perfectClear": false
     }
   ],
   "selectedBaseline": {
-    "profileId": "player-limited-default",
-    "profileIdentity": "player-limited-default|v1|player-limited|topology=none|garbage=0|seed=0",
-    "score": 998,
-    "ticksUsed": 128,
-    "piecesUsed": 5,
-    "linesCleared": 8,
+    "profileId": "player-limited-surface",
+    "profileIdentity": "player-limited-surface|v1|player-limited|topology=surface|garbage=0|seed=0",
+    "score": 9010,
+    "ticksUsed": 2324,
+    "piecesUsed": 125,
+    "linesCleared": 59,
     "solved": true
   },
   "allowedMechanics": {
@@ -70,15 +70,43 @@
   },
   "scriptedEvents": [
     {
-      "tick": 120,
+      "afterPieces": 2,
+      "kind": "sticky"
+    },
+    {
+      "afterPieces": 6,
       "kind": "garbage"
     },
     {
-      "tick": 240,
-      "kind": "purge"
+      "afterPieces": 10,
+      "kind": "snag"
     },
     {
-      "tick": 420,
+      "afterPieces": 14,
+      "kind": "retrim"
+    },
+    {
+      "afterPieces": 18,
+      "kind": "magnet"
+    },
+    {
+      "afterPieces": 22,
+      "kind": "freeze"
+    },
+    {
+      "afterPieces": 26,
+      "kind": "garbage"
+    },
+    {
+      "afterPieces": 30,
+      "kind": "sticky"
+    },
+    {
+      "afterPieces": 34,
+      "kind": "retrim"
+    },
+    {
+      "afterPieces": 38,
       "kind": "magnet"
     }
   ],

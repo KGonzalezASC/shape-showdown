@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "puzzleId": "import-jstris-dt-cannon-practice",
-  "contentHash": "1f4e25b6674798f9677e141d97bb3120f5b31178b841bfdf858ca7b9d98a304a",
+  "contentHash": "ad0af8fce9de6e8ce9dfd00d22b3703fef338a40a647edd67af63d4c729753fb",
   "engineProtocolVersion": 4,
   "packageVersion": "0.0.0",
   "validationStatus": "passed",
@@ -36,8 +36,8 @@
       "qualifies": true,
       "solved": true,
       "topOut": false,
-      "score": 842,
-      "ticksUsed": 437,
+      "score": 846,
+      "ticksUsed": 434,
       "piecesUsed": 10,
       "linesCleared": 6,
       "perfectClear": false
@@ -48,8 +48,8 @@
       "qualifies": true,
       "solved": true,
       "topOut": false,
-      "score": 842,
-      "ticksUsed": 437,
+      "score": 846,
+      "ticksUsed": 434,
       "piecesUsed": 10,
       "linesCleared": 6,
       "perfectClear": false
@@ -58,8 +58,8 @@
   "selectedBaseline": {
     "profileId": "player-limited-default",
     "profileIdentity": "player-limited-default|v1|player-limited|topology=none|garbage=0|seed=0",
-    "score": 842,
-    "ticksUsed": 437,
+    "score": 846,
+    "ticksUsed": 434,
     "piecesUsed": 10,
     "linesCleared": 6,
     "solved": true
@@ -71,15 +71,51 @@
   "scriptedEvents": [
     {
       "afterPieces": 2,
-      "kind": "snag"
+      "kind": "sticky"
     },
     {
-      "afterPieces": 5,
+      "afterPieces": 4,
       "kind": "curtain"
     },
     {
+      "afterPieces": 6,
+      "kind": "retrim"
+    },
+    {
       "afterPieces": 8,
+      "kind": "snag"
+    },
+    {
+      "afterPieces": 10,
       "kind": "magnet"
+    },
+    {
+      "afterPieces": 12,
+      "kind": "sticky"
+    },
+    {
+      "afterPieces": 14,
+      "kind": "freeze"
+    },
+    {
+      "afterPieces": 16,
+      "kind": "curtain"
+    },
+    {
+      "afterPieces": 18,
+      "kind": "snag"
+    },
+    {
+      "afterPieces": 21,
+      "kind": "retrim"
+    },
+    {
+      "afterPieces": 24,
+      "kind": "sticky"
+    },
+    {
+      "afterPieces": 27,
+      "kind": "snag"
     }
   ],
   "visibilityPolicy": "partial",

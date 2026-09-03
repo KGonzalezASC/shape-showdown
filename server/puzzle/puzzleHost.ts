@@ -164,6 +164,7 @@ export class PuzzleHost {
     this.socket.emit('puzzle:started', {
       levelId: this.level.id,
       name: this.level.name,
+      description: this.level.description,
       seed: this.level.seed,
       goal: this.level.goal,
       allowHold: this.level.allowHold ?? true,

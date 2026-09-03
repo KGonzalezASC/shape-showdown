@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "puzzleId": "import-jstris-drilltris-2",
-  "contentHash": "8a71fe899e707f0e7632f52cc811ddd4331cc0c469d92f2504943c7028c468a3",
+  "contentHash": "975ff6a7b79558e731c12f6b23d4781089d8e4407fdb301cc439669493a0d3e7",
   "engineProtocolVersion": 4,
   "packageVersion": "0.0.0",
   "validationStatus": "passed",
@@ -36,10 +36,10 @@
       "qualifies": true,
       "solved": true,
       "topOut": false,
-      "score": 810,
-      "ticksUsed": 39,
-      "piecesUsed": 2,
-      "linesCleared": 7,
+      "score": 962,
+      "ticksUsed": 43,
+      "piecesUsed": 3,
+      "linesCleared": 8,
       "perfectClear": false
     },
     {
@@ -48,20 +48,20 @@
       "qualifies": true,
       "solved": true,
       "topOut": false,
-      "score": 810,
-      "ticksUsed": 39,
-      "piecesUsed": 2,
-      "linesCleared": 7,
+      "score": 962,
+      "ticksUsed": 43,
+      "piecesUsed": 3,
+      "linesCleared": 8,
       "perfectClear": false
     }
   ],
   "selectedBaseline": {
     "profileId": "player-limited-default",
     "profileIdentity": "player-limited-default|v1|player-limited|topology=none|garbage=0|seed=0",
-    "score": 810,
-    "ticksUsed": 39,
-    "piecesUsed": 2,
-    "linesCleared": 7,
+    "score": 962,
+    "ticksUsed": 43,
+    "piecesUsed": 3,
+    "linesCleared": 8,
     "solved": true
   },
   "allowedMechanics": {
@@ -70,28 +70,48 @@
   },
   "scriptedEvents": [
     {
-      "tick": 90,
+      "afterPieces": 1,
+      "kind": "garbage"
+    },
+    {
+      "afterPieces": 2,
+      "kind": "sticky"
+    },
+    {
+      "afterPieces": 3,
       "kind": "retrim"
     },
     {
-      "tick": 360,
+      "afterPieces": 4,
+      "kind": "snag"
+    },
+    {
+      "afterPieces": 5,
+      "kind": "retrim"
+    },
+    {
+      "afterPieces": 6,
+      "kind": "sticky"
+    },
+    {
+      "afterPieces": 7,
+      "kind": "garbage"
+    },
+    {
+      "afterPieces": 8,
       "kind": "curtain"
     },
     {
-      "tick": 900,
+      "afterPieces": 9,
       "kind": "magnet"
     },
     {
-      "tick": 1380,
-      "kind": "curtain"
+      "afterPieces": 10,
+      "kind": "snag"
     },
     {
-      "tick": 2400,
-      "kind": "curtain"
-    },
-    {
-      "tick": 3420,
-      "kind": "curtain"
+      "afterPieces": 11,
+      "kind": "freeze"
     }
   ],
   "visibilityPolicy": "partial",

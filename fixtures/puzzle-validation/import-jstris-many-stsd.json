@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "puzzleId": "import-jstris-many-stsd",
-  "contentHash": "7f3f59d59c5e88e26220710e9f1b4c81e936d09785bef20edd649a785f97a584",
+  "contentHash": "cb9a5460ff38aca9ce50dc1bafbdefe06041a848388dbbaffb4946671dee3519",
   "engineProtocolVersion": 4,
   "packageVersion": "0.0.0",
   "validationStatus": "passed",
@@ -36,9 +36,9 @@
       "qualifies": true,
       "solved": true,
       "topOut": false,
-      "score": 1746,
-      "ticksUsed": 921,
-      "piecesUsed": 23,
+      "score": 1868,
+      "ticksUsed": 1670,
+      "piecesUsed": 37,
       "linesCleared": 12,
       "perfectClear": false
     },
@@ -48,9 +48,9 @@
       "qualifies": true,
       "solved": true,
       "topOut": false,
-      "score": 1746,
-      "ticksUsed": 921,
-      "piecesUsed": 23,
+      "score": 1868,
+      "ticksUsed": 1670,
+      "piecesUsed": 37,
       "linesCleared": 12,
       "perfectClear": false
     }
@@ -58,9 +58,9 @@
   "selectedBaseline": {
     "profileId": "player-limited-default",
     "profileIdentity": "player-limited-default|v1|player-limited|topology=none|garbage=0|seed=0",
-    "score": 1746,
-    "ticksUsed": 921,
-    "piecesUsed": 23,
+    "score": 1868,
+    "ticksUsed": 1670,
+    "piecesUsed": 37,
     "linesCleared": 12,
     "solved": true
   },
@@ -70,16 +70,44 @@
   },
   "scriptedEvents": [
     {
-      "afterPieces": 4,
-      "kind": "magnet"
+      "afterPieces": 2,
+      "kind": "sticky"
     },
     {
-      "afterPieces": 9,
+      "afterPieces": 4,
       "kind": "snag"
     },
     {
-      "afterPieces": 14,
+      "afterPieces": 6,
       "kind": "freeze"
+    },
+    {
+      "afterPieces": 8,
+      "kind": "magnet"
+    },
+    {
+      "afterPieces": 10,
+      "kind": "retrim"
+    },
+    {
+      "afterPieces": 12,
+      "kind": "garbage"
+    },
+    {
+      "afterPieces": 14,
+      "kind": "snag"
+    },
+    {
+      "afterPieces": 16,
+      "kind": "sticky"
+    },
+    {
+      "afterPieces": 18,
+      "kind": "curtain"
+    },
+    {
+      "afterPieces": 20,
+      "kind": "magnet"
     }
   ],
   "visibilityPolicy": "partial",

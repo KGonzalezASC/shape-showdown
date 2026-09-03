@@ -80,6 +80,11 @@ export type HazardKind =
 /** Level completion condition checked by the session runner every tick. */
 export type PuzzleGoal =
   | {
+      kind: 'garbage-clear';
+      /** Advisory piece budget for star ratings (v1: not enforced by the runner). */
+      maxPieces?: number;
+    }
+  | {
       kind: 'perfect-clear';
       /** Advisory piece budget for star ratings (v1: not enforced by the runner). */
       maxPieces?: number;
@@ -98,6 +103,7 @@ export type PuzzleGoal =
 export interface PuzzleLevel {
   id: string;
   name: string;
+  description?: string;
   seed: number;
   /** Fixed initial board (garbage rows / poison seeds / pre-placed cells). */
   initialBoard: CellValue[][];

@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "puzzleId": "authored-cheese-keyhole",
-  "contentHash": "ec7b899a2736b060b3c3b54275eecc47b029a358a3219fb7452fd6050cf12373",
+  "contentHash": "1c4dc488dcd05fccc447c0e18f537bed0f478ced7f317881391c086b000476fc",
   "engineProtocolVersion": 4,
   "packageVersion": "0.0.0",
   "validationStatus": "passed",
@@ -36,10 +36,10 @@
       "qualifies": true,
       "solved": true,
       "topOut": false,
-      "score": 644,
-      "ticksUsed": 179,
-      "piecesUsed": 7,
-      "linesCleared": 4,
+      "score": 1292,
+      "ticksUsed": 512,
+      "piecesUsed": 14,
+      "linesCleared": 8,
       "perfectClear": false
     },
     {
@@ -48,20 +48,20 @@
       "qualifies": true,
       "solved": true,
       "topOut": false,
-      "score": 644,
-      "ticksUsed": 179,
-      "piecesUsed": 7,
-      "linesCleared": 4,
+      "score": 3964,
+      "ticksUsed": 1429,
+      "piecesUsed": 53,
+      "linesCleared": 24,
       "perfectClear": false
     }
   ],
   "selectedBaseline": {
-    "profileId": "player-limited-default",
-    "profileIdentity": "player-limited-default|v1|player-limited|topology=none|garbage=0|seed=0",
-    "score": 644,
-    "ticksUsed": 179,
-    "piecesUsed": 7,
-    "linesCleared": 4,
+    "profileId": "player-limited-surface",
+    "profileIdentity": "player-limited-surface|v1|player-limited|topology=surface|garbage=0|seed=0",
+    "score": 3964,
+    "ticksUsed": 1429,
+    "piecesUsed": 53,
+    "linesCleared": 24,
     "solved": true
   },
   "allowedMechanics": {
@@ -70,8 +70,44 @@
   },
   "scriptedEvents": [
     {
-      "tick": 300,
+      "afterPieces": 1,
+      "kind": "garbage"
+    },
+    {
+      "afterPieces": 3,
+      "kind": "retrim"
+    },
+    {
+      "afterPieces": 5,
+      "kind": "magnet"
+    },
+    {
+      "afterPieces": 7,
+      "kind": "sticky"
+    },
+    {
+      "afterPieces": 9,
+      "kind": "curtain"
+    },
+    {
+      "afterPieces": 11,
+      "kind": "snag"
+    },
+    {
+      "afterPieces": 13,
       "kind": "freeze"
+    },
+    {
+      "afterPieces": 15,
+      "kind": "garbage"
+    },
+    {
+      "afterPieces": 17,
+      "kind": "retrim"
+    },
+    {
+      "afterPieces": 19,
+      "kind": "magnet"
     }
   ],
   "visibilityPolicy": "revealed",

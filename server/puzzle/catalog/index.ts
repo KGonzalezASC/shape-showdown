@@ -8,6 +8,7 @@ export { curatePuzzleLevel } from './curate.js';
 export interface PuzzleCatalogSummary {
   id: string;
   name: string;
+  description?: string;
   goal: PuzzleGoal;
   allowHold: boolean;
   visibilityPolicy: PuzzleVisibilityPolicy;
@@ -26,6 +27,7 @@ export function listPuzzleCatalogSummaries(): PuzzleCatalogSummary[] {
   return loadPuzzleCatalog().map((entry) => ({
     id: entry.level.id,
     name: entry.level.name,
+    description: entry.level.description,
     goal: entry.level.goal,
     allowHold: entry.level.allowHold,
     visibilityPolicy: entry.level.visibilityPolicy,

@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "puzzleId": "import-jstris-drilltris-1",
-  "contentHash": "623ef4f50d3f7c9ff783db0fe96c9e2090df67b1c9b8ac14075b42173bde9365",
+  "contentHash": "3fb29ba7b065c6c65b0b3464ade47e49a6764a9578f614c22b2a79062e221e89",
   "engineProtocolVersion": 4,
   "packageVersion": "0.0.0",
   "validationStatus": "passed",
@@ -36,9 +36,9 @@
       "qualifies": true,
       "solved": true,
       "topOut": false,
-      "score": 916,
-      "ticksUsed": 9,
-      "piecesUsed": 2,
+      "score": 964,
+      "ticksUsed": 39,
+      "piecesUsed": 3,
       "linesCleared": 8,
       "perfectClear": false
     },
@@ -48,9 +48,9 @@
       "qualifies": true,
       "solved": true,
       "topOut": false,
-      "score": 916,
-      "ticksUsed": 9,
-      "piecesUsed": 2,
+      "score": 964,
+      "ticksUsed": 39,
+      "piecesUsed": 3,
       "linesCleared": 8,
       "perfectClear": false
     }
@@ -58,9 +58,9 @@
   "selectedBaseline": {
     "profileId": "player-limited-default",
     "profileIdentity": "player-limited-default|v1|player-limited|topology=none|garbage=0|seed=0",
-    "score": 916,
-    "ticksUsed": 9,
-    "piecesUsed": 2,
+    "score": 964,
+    "ticksUsed": 39,
+    "piecesUsed": 3,
     "linesCleared": 8,
     "solved": true
   },
@@ -70,12 +70,48 @@
   },
   "scriptedEvents": [
     {
-      "tick": 120,
+      "afterPieces": 1,
       "kind": "garbage"
     },
     {
-      "tick": 240,
+      "afterPieces": 2,
+      "kind": "retrim"
+    },
+    {
+      "afterPieces": 3,
+      "kind": "sticky"
+    },
+    {
+      "afterPieces": 4,
+      "kind": "magnet"
+    },
+    {
+      "afterPieces": 5,
+      "kind": "curtain"
+    },
+    {
+      "afterPieces": 6,
+      "kind": "snag"
+    },
+    {
+      "afterPieces": 7,
+      "kind": "garbage"
+    },
+    {
+      "afterPieces": 8,
       "kind": "freeze"
+    },
+    {
+      "afterPieces": 9,
+      "kind": "magnet"
+    },
+    {
+      "afterPieces": 10,
+      "kind": "sticky"
+    },
+    {
+      "afterPieces": 11,
+      "kind": "retrim"
     }
   ],
   "visibilityPolicy": "partial",

@@ -227,6 +227,8 @@ export class PuzzleSession {
     const player = this.getPlayerState();
     const goal: PuzzleGoal = this.level.goal;
     switch (goal.kind) {
+      case 'garbage-clear':
+        return !player.board.some((row) => row.some((cell) => cell === 'G'));
       case 'perfect-clear':
         return player.board.every((row) => row.every((cell) => cell === null));
       case 'survive':

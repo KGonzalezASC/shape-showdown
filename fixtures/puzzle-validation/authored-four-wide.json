@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "puzzleId": "authored-four-wide",
-  "contentHash": "1a8344530d115d917ee79120732ec6e1d32f4d49d4da95ae4922235025ddd23e",
+  "contentHash": "ac69617fa6960d54e9e3d5ca5733a44297bdecfd2f22355903bf16bcfdb99626",
   "engineProtocolVersion": 4,
   "packageVersion": "0.0.0",
   "validationStatus": "passed",
@@ -36,10 +36,10 @@
       "qualifies": true,
       "solved": true,
       "topOut": false,
-      "score": 1992,
-      "ticksUsed": 405,
-      "piecesUsed": 22,
-      "linesCleared": 12,
+      "score": 2330,
+      "ticksUsed": 1209,
+      "piecesUsed": 33,
+      "linesCleared": 14,
       "perfectClear": false
     },
     {
@@ -48,19 +48,19 @@
       "qualifies": true,
       "solved": true,
       "topOut": false,
-      "score": 2316,
-      "ticksUsed": 469,
-      "piecesUsed": 26,
-      "linesCleared": 14,
+      "score": 1996,
+      "ticksUsed": 953,
+      "piecesUsed": 23,
+      "linesCleared": 13,
       "perfectClear": false
     }
   ],
   "selectedBaseline": {
-    "profileId": "player-limited-surface",
-    "profileIdentity": "player-limited-surface|v1|player-limited|topology=surface|garbage=0|seed=0",
-    "score": 2316,
-    "ticksUsed": 469,
-    "piecesUsed": 26,
+    "profileId": "player-limited-default",
+    "profileIdentity": "player-limited-default|v1|player-limited|topology=none|garbage=0|seed=0",
+    "score": 2330,
+    "ticksUsed": 1209,
+    "piecesUsed": 33,
     "linesCleared": 14,
     "solved": true
   },
@@ -70,11 +70,51 @@
   },
   "scriptedEvents": [
     {
-      "tick": 60,
+      "afterPieces": 3,
+      "kind": "magnet"
+    },
+    {
+      "afterPieces": 6,
+      "kind": "sticky"
+    },
+    {
+      "afterPieces": 9,
+      "kind": "snag"
+    },
+    {
+      "afterPieces": 12,
+      "kind": "curtain"
+    },
+    {
+      "afterPieces": 15,
+      "kind": "magnet"
+    },
+    {
+      "afterPieces": 18,
+      "kind": "garbage"
+    },
+    {
+      "afterPieces": 21,
+      "kind": "sticky"
+    },
+    {
+      "afterPieces": 24,
+      "kind": "magnet"
+    },
+    {
+      "afterPieces": 27,
       "kind": "retrim"
     },
     {
-      "tick": 150,
+      "afterPieces": 30,
+      "kind": "snag"
+    },
+    {
+      "afterPieces": 34,
+      "kind": "sticky"
+    },
+    {
+      "afterPieces": 38,
       "kind": "magnet"
     }
   ],

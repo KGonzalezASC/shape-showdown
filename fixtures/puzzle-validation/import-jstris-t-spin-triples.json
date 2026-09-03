@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "puzzleId": "import-jstris-t-spin-triples",
-  "contentHash": "9a5d072e21773425ae2aaf7b4f8893087a58c4dc94c3003b6ef432ae1328c9fa",
+  "contentHash": "138cefc48e57dac3aec19df44ac22cad34d26cf52dae44ea5e298d45f8be7a57",
   "engineProtocolVersion": 4,
   "packageVersion": "0.0.0",
   "validationStatus": "passed",
@@ -36,10 +36,10 @@
       "qualifies": true,
       "solved": true,
       "topOut": false,
-      "score": 936,
-      "ticksUsed": 944,
-      "piecesUsed": 17,
-      "linesCleared": 5,
+      "score": 692,
+      "ticksUsed": 754,
+      "piecesUsed": 11,
+      "linesCleared": 4,
       "perfectClear": false
     },
     {
@@ -48,20 +48,20 @@
       "qualifies": true,
       "solved": true,
       "topOut": false,
-      "score": 868,
-      "ticksUsed": 670,
-      "piecesUsed": 13,
-      "linesCleared": 5,
+      "score": 1004,
+      "ticksUsed": 1084,
+      "piecesUsed": 17,
+      "linesCleared": 6,
       "perfectClear": false
     }
   ],
   "selectedBaseline": {
-    "profileId": "player-limited-default",
-    "profileIdentity": "player-limited-default|v1|player-limited|topology=none|garbage=0|seed=0",
-    "score": 936,
-    "ticksUsed": 944,
+    "profileId": "player-limited-surface",
+    "profileIdentity": "player-limited-surface|v1|player-limited|topology=surface|garbage=0|seed=0",
+    "score": 1004,
+    "ticksUsed": 1084,
     "piecesUsed": 17,
-    "linesCleared": 5,
+    "linesCleared": 6,
     "solved": true
   },
   "allowedMechanics": {
@@ -70,16 +70,56 @@
   },
   "scriptedEvents": [
     {
-      "afterPieces": 5,
-      "kind": "snag"
+      "afterPieces": 2,
+      "kind": "sticky"
     },
     {
-      "afterPieces": 10,
+      "afterPieces": 4,
       "kind": "curtain"
     },
     {
-      "afterPieces": 15,
+      "afterPieces": 6,
+      "kind": "garbage"
+    },
+    {
+      "afterPieces": 8,
       "kind": "magnet"
+    },
+    {
+      "afterPieces": 10,
+      "kind": "snag"
+    },
+    {
+      "afterPieces": 12,
+      "kind": "curtain"
+    },
+    {
+      "afterPieces": 14,
+      "kind": "sticky"
+    },
+    {
+      "afterPieces": 16,
+      "kind": "freeze"
+    },
+    {
+      "afterPieces": 18,
+      "kind": "retrim"
+    },
+    {
+      "afterPieces": 21,
+      "kind": "snag"
+    },
+    {
+      "afterPieces": 24,
+      "kind": "magnet"
+    },
+    {
+      "afterPieces": 27,
+      "kind": "curtain"
+    },
+    {
+      "afterPieces": 30,
+      "kind": "snag"
     }
   ],
   "visibilityPolicy": "partial",

@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "puzzleId": "import-fumen-c4w-3res",
-  "contentHash": "84519be8f616d6f14856179bdc2472b432a69fd8b54d2864a914b9b8a306e677",
+  "contentHash": "44091b1440a3065d3423dcf0b830856c3e56536755599b23d5a47b1e9b9d8e6c",
   "engineProtocolVersion": 4,
   "packageVersion": "0.0.0",
   "validationStatus": "passed",
@@ -36,7 +36,7 @@
       "qualifies": true,
       "solved": true,
       "topOut": false,
-      "score": 906,
+      "score": 904,
       "ticksUsed": 77,
       "piecesUsed": 8,
       "linesCleared": 6,
@@ -48,7 +48,7 @@
       "qualifies": true,
       "solved": true,
       "topOut": false,
-      "score": 906,
+      "score": 904,
       "ticksUsed": 77,
       "piecesUsed": 8,
       "linesCleared": 6,
@@ -58,7 +58,7 @@
   "selectedBaseline": {
     "profileId": "player-limited-default",
     "profileIdentity": "player-limited-default|v1|player-limited|topology=none|garbage=0|seed=0",
-    "score": 906,
+    "score": 904,
     "ticksUsed": 77,
     "piecesUsed": 8,
     "linesCleared": 6,
@@ -70,8 +70,52 @@
   },
   "scriptedEvents": [
     {
-      "tick": 300,
-      "kind": "freeze"
+      "afterPieces": 1,
+      "kind": "sticky"
+    },
+    {
+      "afterPieces": 3,
+      "kind": "magnet"
+    },
+    {
+      "afterPieces": 5,
+      "kind": "garbage"
+    },
+    {
+      "afterPieces": 7,
+      "kind": "retrim"
+    },
+    {
+      "afterPieces": 9,
+      "kind": "sticky"
+    },
+    {
+      "afterPieces": 11,
+      "kind": "snag"
+    },
+    {
+      "afterPieces": 13,
+      "kind": "magnet"
+    },
+    {
+      "afterPieces": 15,
+      "kind": "curtain"
+    },
+    {
+      "afterPieces": 17,
+      "kind": "sticky"
+    },
+    {
+      "afterPieces": 19,
+      "kind": "magnet"
+    },
+    {
+      "afterPieces": 22,
+      "kind": "retrim"
+    },
+    {
+      "afterPieces": 25,
+      "kind": "sticky"
     }
   ],
   "visibilityPolicy": "partial",

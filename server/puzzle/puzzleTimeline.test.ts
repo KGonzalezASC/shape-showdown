@@ -126,10 +126,10 @@ describe('puzzle timeline loops', () => {
     assert.deepEqual(
       events.map((e) => ({ tick: e.tick, kind: e.kind })),
       [
-        { tick: 60, kind: 'retrim' },
-        { tick: 480, kind: 'curtain' },
-        { tick: 1200, kind: 'curtain' },
-        { tick: 1800, kind: 'magnet' },
+        { tick: 90, kind: 'retrim' },
+        { tick: 520, kind: 'curtain' },
+        { tick: 1280, kind: 'curtain' },
+        { tick: 1850, kind: 'snag' },
       ],
     );
   });
@@ -314,12 +314,12 @@ describe('puzzle timeline piece triggers', () => {
     assert.deepEqual(
       pieces,
       [
-        { afterPieces: 5, kind: 'freeze' },
-        { afterPieces: 12, kind: 'curtain' },
-        { afterPieces: 20, kind: 'snag' },
+        { afterPieces: 8, kind: 'curtain' },
+        { afterPieces: 14, kind: 'snag' },
+        { afterPieces: 22, kind: 'retrim' },
       ],
     );
-    assert.ok(ticks.some((e) => e.kind === 'retrim'));
     assert.ok(ticks.some((e) => e.kind === 'magnet'));
+    assert.ok(ticks.some((e) => e.kind === 'sticky'));
   });
 });

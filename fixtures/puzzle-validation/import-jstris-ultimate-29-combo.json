@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "puzzleId": "import-jstris-ultimate-29-combo",
-  "contentHash": "0b32c501e310b94c22c309957dfd5fdd7f48f79eec12f4c610a435bfd18b588e",
+  "contentHash": "76c5469fcffa9fc7106e79e7a43a3839ba66402af533efe6f8e246fced2f5321",
   "engineProtocolVersion": 4,
   "packageVersion": "0.0.0",
   "validationStatus": "passed",
@@ -36,8 +36,8 @@
       "qualifies": true,
       "solved": true,
       "topOut": false,
-      "score": 1798,
-      "ticksUsed": 1476,
+      "score": 1888,
+      "ticksUsed": 693,
       "piecesUsed": 25,
       "linesCleared": 10,
       "perfectClear": false
@@ -48,19 +48,19 @@
       "qualifies": true,
       "solved": true,
       "topOut": false,
-      "score": 1798,
-      "ticksUsed": 1476,
-      "piecesUsed": 25,
+      "score": 1920,
+      "ticksUsed": 701,
+      "piecesUsed": 26,
       "linesCleared": 10,
       "perfectClear": false
     }
   ],
   "selectedBaseline": {
-    "profileId": "player-limited-default",
-    "profileIdentity": "player-limited-default|v1|player-limited|topology=none|garbage=0|seed=0",
-    "score": 1798,
-    "ticksUsed": 1476,
-    "piecesUsed": 25,
+    "profileId": "player-limited-surface",
+    "profileIdentity": "player-limited-surface|v1|player-limited|topology=surface|garbage=0|seed=0",
+    "score": 1920,
+    "ticksUsed": 701,
+    "piecesUsed": 26,
     "linesCleared": 10,
     "solved": true
   },
@@ -70,24 +70,44 @@
   },
   "scriptedEvents": [
     {
-      "tick": 120,
-      "kind": "retrim"
-    },
-    {
-      "tick": 480,
+      "tick": 100,
       "kind": "magnet"
     },
     {
-      "afterPieces": 5,
-      "kind": "freeze"
+      "tick": 220,
+      "kind": "sticky"
     },
     {
-      "afterPieces": 12,
+      "tick": 340,
+      "kind": "garbage"
+    },
+    {
+      "tick": 460,
+      "kind": "magnet"
+    },
+    {
+      "tick": 580,
+      "kind": "sticky"
+    },
+    {
+      "tick": 720,
+      "kind": "magnet"
+    },
+    {
+      "tick": 860,
+      "kind": "sticky"
+    },
+    {
+      "afterPieces": 8,
       "kind": "curtain"
     },
     {
-      "afterPieces": 20,
+      "afterPieces": 14,
       "kind": "snag"
+    },
+    {
+      "afterPieces": 22,
+      "kind": "retrim"
     }
   ],
   "visibilityPolicy": "revealed",
