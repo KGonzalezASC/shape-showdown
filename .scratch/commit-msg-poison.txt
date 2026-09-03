@@ -1,0 +1,9 @@
+fix(puzzle): wire solo poisonBoard and gate wildcard on stack poison
+
+Solo puzzle:state omitted poisonBoard/poisonSpread/wildcard source cells, so
+GameField could not render poison like multiplayer public snapshots. Mirror
+those fields on the host wire and PuzzleScreen mapping.
+
+Scripted wildcard-four already skipped without poisonBoard (same as
+canPurchase); add focused tests and retune authored-poison-beat so baselines
+lock poison then apply wildcard before solve (lines=3, wildcard@150).

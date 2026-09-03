@@ -1,0 +1,6 @@
+fix(puzzle): lasting curtain loops wait for effect end before idle gap
+
+materializeTimeline treated periodTicks as fire-to-fire, so curtain-drop
+re-fired every 200 ticks while the prior curtain (60 telegraph + 240
+blackout) was still active. For lasting hazards, periodTicks is now the
+idle clear gap after the effect ends; instant loops keep absolute stride.

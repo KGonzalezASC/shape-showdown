@@ -5,10 +5,11 @@ interface MobileControlsProps {
   onInput: (input: { left: boolean; right: boolean; softDrop: boolean }) => void;
   onAction: (action: 'rotateCW' | 'rotateCCW' | 'hardDrop' | 'hold') => void;
   onShopPress?: () => void;
+  onRetry?: () => void;
   onHeightChange?: (height: number) => void;
 }
 
-const MobileControls: React.FC<MobileControlsProps> = ({ onInput, onAction, onShopPress, onHeightChange }) => {
+const MobileControls: React.FC<MobileControlsProps> = ({ onInput, onAction, onShopPress, onRetry, onHeightChange }) => {
   const rootRef = useRef<HTMLDivElement>(null);
 
   useLayoutEffect(() => {
@@ -146,14 +147,30 @@ const MobileControls: React.FC<MobileControlsProps> = ({ onInput, onAction, onSh
           >
             <Archive className={controlIconClass} strokeWidth={2.5} />
           </button>
-          <button
-            type="button"
-            aria-label="Shop"
-            className={`${controlButtonBase} border-[#557984] text-sky-300 active:border-sky-400`}
-            onPointerDown={tapShop}
-          >
-            <ShoppingBag className={controlIconClass} strokeWidth={2.5} />
-          </button>
+          {onShopPress ? (
+            <button
+              type="button"
+              aria-label="Shop"
+              className={`${controlButtonBase} border-[#557984] text-sky-300 active:border-sky-400`}
+              onPointerDown={tapShop}
+            >
+              <ShoppingBag className={controlIconClass} strokeWidth={2.5} />
+            </button>
+          ) : onRetry ? (
+            <button
+              type="button"
+              aria-label="Retry"
+              className={`${controlButtonBase} border-rose-500/40 text-rose-300 active:border-rose-400`}
+              onPointerDown={(e) => {
+                stop(e);
+                onRetry();
+              }}
+            >
+              <RotateCcw className={controlIconClass} strokeWidth={2.5} />
+            </button>
+          ) : (
+            <div />
+          )}
           <button
             type="button"
             aria-label="Rotate counter-clockwise"

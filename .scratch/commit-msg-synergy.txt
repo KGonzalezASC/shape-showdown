@@ -1,0 +1,6 @@
+fix(puzzle): align poison stacking with multiplayer and add shop synergies
+
+Puzzle timelines now apply shop attack semantics via applyScriptedShopAttack
+(elixir-pulse board-empty gate, pending retrim/curtain/purge, deterministic
+wildcard/purge variants). Authored levels use poison→wildcard, retrim→curtain,
+and retrim→magnet synergies; refresh validation fixtures.

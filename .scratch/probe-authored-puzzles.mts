@@ -24,20 +24,8 @@ for (const level of levels) {
   } : null);
   for (const c of batch.candidates) {
     console.log('  cand', c.profile.id, {
-      qualifies: c.qualifies,
-      solved: c.report.solved,
-      topOut: c.report.topOut,
-      ticks: c.report.ticksUsed,
-      pieces: c.report.piecesUsed,
-      lines: c.report.linesCleared,
-      score: c.report.score,
+      qualifies: c.qualifies, solved: c.report.solved, topOut: c.report.topOut,
+      ticks: c.report.ticksUsed, pieces: c.report.piecesUsed, lines: c.report.linesCleared, score: c.report.score,
     });
   }
-  const diag = runPuzzleBaselineBatch(level, [...DIAGNOSTIC_OMNISCIENT_CANDIDATES]);
-  console.log('omni-batch', diag.selected ? {
-    id: diag.selected.profile.id,
-    ticks: diag.selected.report.ticksUsed,
-    pieces: diag.selected.report.piecesUsed,
-    lines: diag.selected.report.linesCleared,
-  } : 'NONE');
 }

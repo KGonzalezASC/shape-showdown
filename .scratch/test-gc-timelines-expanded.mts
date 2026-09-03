@@ -1,0 +1,115 @@
+import { buildAuthoredLevels } from '../server/puzzle/catalog/authoredLevels.js';
+import { runPuzzleBaselineBatch } from '../server/puzzle/puzzleBaselineBatch.js';
+import { DEFAULT_PUZZLE_VALIDATION_CANDIDATES } from '../server/puzzle/puzzleValidationArtifact.js';
+
+const proposals: Record<string, any[]> = {
+  'authored-cheese-ladder': [
+    { afterPieces: 2, kind: 'sticky' },
+    { afterPieces: 4, kind: 'garbage', params: { lines: 1, delayTicks: 12 } },
+    { afterPieces: 6, kind: 'snag' },
+    { afterPieces: 8, kind: 'magnet' },
+    { afterPieces: 10, kind: 'freeze', params: { durationTicks: 360 } },
+    { afterPieces: 12, kind: 'garbage', params: { lines: 1, delayTicks: 12 } },
+    { afterPieces: 14, kind: 'retrim' },
+    { afterPieces: 16, kind: 'sticky' },
+    { afterPieces: 19, kind: 'snag' },
+    { afterPieces: 22, kind: 'magnet' },
+    { afterPieces: 25, kind: 'freeze', params: { durationTicks: 360 } },
+    { afterPieces: 28, kind: 'retrim' },
+    { afterPieces: 32, kind: 'sticky' },
+  ],
+  'import-jstris-perfect-clear-how': [
+    { afterPieces: 1, kind: 'retrim' },
+    { afterPieces: 3, kind: 'garbage', params: { lines: 1, delayTicks: 12 } },
+    { afterPieces: 5, kind: 'magnet' },
+    { afterPieces: 6, kind: 'sticky' },
+    { afterPieces: 8, kind: 'snag' },
+    { afterPieces: 9, kind: 'freeze', params: { durationTicks: 360 } },
+    { afterPieces: 11, kind: 'retrim' },
+    { afterPieces: 13, kind: 'magnet' },
+    { afterPieces: 15, kind: 'sticky' },
+    { afterPieces: 18, kind: 'snag' },
+    { afterPieces: 21, kind: 'freeze', params: { durationTicks: 360 } },
+    { afterPieces: 24, kind: 'retrim' },
+    { afterPieces: 27, kind: 'magnet' },
+  ],
+  'import-jstris-clear-the-rainbow': [
+    { afterPieces: 1, kind: 'retrim' },
+    { afterPieces: 2, kind: 'sticky' },
+    { afterPieces: 3, kind: 'magnet' },
+    { afterPieces: 4, kind: 'garbage', params: { lines: 1, delayTicks: 12 } },
+    { afterPieces: 5, kind: 'snag' },
+    { afterPieces: 7, kind: 'freeze', params: { durationTicks: 360 } },
+    { afterPieces: 9, kind: 'retrim' },
+    { afterPieces: 11, kind: 'magnet' },
+    { afterPieces: 13, kind: 'sticky' },
+    { afterPieces: 15, kind: 'snag' },
+    { afterPieces: 18, kind: 'freeze', params: { durationTicks: 360 } },
+    { afterPieces: 21, kind: 'retrim' },
+  ],
+  'import-jstris-drilltris-1': [
+    { afterPieces: 1, kind: 'garbage', params: { lines: 1, delayTicks: 6 } },
+    { afterPieces: 1, kind: 'retrim' },
+    { afterPieces: 2, kind: 'freeze', params: { durationTicks: 360 } },
+    { afterPieces: 2, kind: 'snag' },
+    { afterPieces: 3, kind: 'sticky' },
+    { afterPieces: 4, kind: 'magnet' },
+    { afterPieces: 5, kind: 'retrim' },
+    { afterPieces: 6, kind: 'snag' },
+    { afterPieces: 7, kind: 'freeze', params: { durationTicks: 360 } },
+    { afterPieces: 8, kind: 'sticky' },
+    { afterPieces: 10, kind: 'magnet' },
+  ],
+  'import-jstris-drilltris-2': [
+    { afterPieces: 1, kind: 'retrim' },
+    { afterPieces: 1, kind: 'garbage', params: { lines: 1, delayTicks: 6 } },
+    { afterPieces: 2, kind: 'snag' },
+    { afterPieces: 2, kind: 'freeze', params: { durationTicks: 360 } },
+    { afterPieces: 3, kind: 'magnet' },
+    { afterPieces: 4, kind: 'sticky' },
+    { afterPieces: 5, kind: 'retrim' },
+    { afterPieces: 6, kind: 'snag' },
+    { afterPieces: 7, kind: 'freeze', params: { durationTicks: 360 } },
+    { afterPieces: 8, kind: 'magnet' },
+    { afterPieces: 10, kind: 'sticky' },
+  ],
+  'import-jstris-mash-space': [
+    { afterPieces: 1, kind: 'retrim' },
+    { afterPieces: 2, kind: 'snag' },
+    { afterPieces: 3, kind: 'garbage', params: { lines: 1, delayTicks: 12 } },
+    { afterPieces: 4, kind: 'sticky' },
+    { afterPieces: 5, kind: 'magnet' },
+    { afterPieces: 6, kind: 'freeze', params: { durationTicks: 360 } },
+    { afterPieces: 7, kind: 'retrim' },
+    { afterPieces: 9, kind: 'snag' },
+    { afterPieces: 11, kind: 'sticky' },
+    { afterPieces: 13, kind: 'magnet' },
+    { afterPieces: 15, kind: 'freeze', params: { durationTicks: 360 } },
+    { afterPieces: 17, kind: 'retrim' },
+    { afterPieces: 20, kind: 'sticky' },
+  ],
+  'import-jstris-1v1-downstack': [
+    { afterPieces: 2, kind: 'garbage', params: { lines: 1, delayTicks: 12 } },
+    { afterPieces: 3, kind: 'sticky' },
+    { afterPieces: 5, kind: 'magnet' },
+    { afterPieces: 6, kind: 'garbage', params: { lines: 1, delayTicks: 12 } },
+    { afterPieces: 7, kind: 'curtain' },
+    { afterPieces: 8, kind: 'snag' },
+    { afterPieces: 10, kind: 'retrim' },
+    { afterPieces: 12, kind: 'freeze', params: { durationTicks: 360 } },
+    { afterPieces: 14, kind: 'sticky' },
+    { afterPieces: 17, kind: 'magnet' },
+    { afterPieces: 20, kind: 'snag' },
+    { afterPieces: 23, kind: 'retrim' },
+    { afterPieces: 26, kind: 'sticky' },
+  ],
+};
+
+const levels = buildAuthoredLevels();
+
+for (const [id, timeline] of Object.entries(proposals)) {
+  const level = levels.find(l => l.id === id)!;
+  level.timeline = timeline;
+  const batch = runPuzzleBaselineBatch(level, [...DEFAULT_PUZZLE_VALIDATION_CANDIDATES]);
+  console.log(`[${id}] Solved=${batch.selected?.report.solved} | Pieces=${batch.selected?.report.piecesUsed} | Score=${batch.selected?.report.score} | Profile=${batch.selected?.profile.id}`);
+}

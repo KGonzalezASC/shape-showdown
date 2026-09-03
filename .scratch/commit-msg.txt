@@ -1,0 +1,5 @@
+feat(puzzle): harden 8 new authored levels for player-limited baselines
+
+Retune cheese-ladder through late-i-well boards/queues/timelines so dig,
+four-wide, and hold-discipline require real packing instead of skim clears,
+refresh validation fixtures, and document the 12-id daily rotation.

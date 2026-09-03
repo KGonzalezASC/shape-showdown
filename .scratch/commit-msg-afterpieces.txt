@@ -1,0 +1,5 @@
+feat(puzzle): afterPieces timeline beats + undo Ultimate 29-combo PC
+
+Extend TimelineEntry with piece-scheduled one-shots (afterPieces) applied on
+lock; tick/loop materialization unchanged. Retune Ultimate 29-combo to
+clear-lines:10 with mixed tick + piece beats.

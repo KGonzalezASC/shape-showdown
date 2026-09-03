@@ -1,0 +1,3 @@
+feat(puzzle): require shop powerups and vary clear-line goals 4-15
+
+Give every authored catalog puzzle at least one non-garbage shop hazard beat, spread clear-lines goals across 4-15 (curtain stays 2, poison stays 10), regenerate player-limited baselines, and raise the catalog emit test timeout for longer solves.

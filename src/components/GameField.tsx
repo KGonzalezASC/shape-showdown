@@ -50,6 +50,8 @@ interface GameFieldProps {
   showFunds?: boolean;
   /** Match chrome: guest/display name row. Hide for solo puzzles. */
   showPlayerName?: boolean;
+  /** When false (e.g. solo puzzle HUD), hides duplicate title, score, and line clears while preserving effect pills. Default = true. */
+  showStats?: boolean;
   /**
    * When false (solo puzzles like Four Wide), storage is disabled entirely.
    * Distinct from multiplayer `canHold === false` ("Used this piece").
@@ -170,6 +172,7 @@ const GameField = forwardRef<GameFieldRef, GameFieldProps>(({
   showEffectPills = false,
   showFunds = true,
   showPlayerName = true,
+  showStats = true,
   allowHold = true,
   effectTick,
   replayCandidateOverlay = null,
@@ -387,52 +390,78 @@ const GameField = forwardRef<GameFieldRef, GameFieldProps>(({
   return (
     <div className={`relative flex h-full w-full flex-col ${opacityClass}`}>
       {/* ── Header row: title / active-effect pills / line counter ── */}
-      <div className="mb-1 flex items-end justify-between gap-1.5">
-        <h2
-          className={`shrink-0 text-sm font-bold uppercase tracking-widest ${isMe ? 'text-emerald-400' : 'text-rose-400'}`}
-        >
-          {title}
-        </h2>
+      {showStats && (
+        <div className="mb-1 flex items-end justify-between gap-1.5">
+          <h2
+            className={`shrink-0 text-sm font-bold uppercase tracking-widest ${isMe ? 'text-emerald-400' : 'text-rose-400'}`}
+          >
+            {title}
+          </h2>
 
-        {/* Active-effect pills — only renders when effects are present */}
-        {(isMe || showEffectPills) && effectPills.length > 0 && (
-          <div className="flex min-w-0 flex-1 flex-wrap items-center justify-center gap-1 overflow-hidden px-1">
-            {effectPills.map(({ effect, count, remaining }) => {
-              const style = styleForFieldEffect(effect);
-              return (
-                <span
-                  key={effect.id}
-                  className={`inline-flex items-center gap-0.5 animate-pulse ${statusPillClass(style.variant)}`}
-                >
-                  {effect.icon && <span className="text-[10px] leading-none">{effect.icon}</span>}
-                  {effect.label}
-                  {count > 1 && <span className="opacity-80">×{count}</span>}
-                  {remaining !== null && <span className="opacity-80">{remaining}t</span>}
-                </span>
-              );
-            })}
-          </div>
-        )}
+          {/* Active-effect pills — only renders when effects are present */}
+          {(isMe || showEffectPills) && effectPills.length > 0 && (
+            <div className="flex min-w-0 flex-1 flex-wrap items-center justify-center gap-1 overflow-hidden px-1">
+              {effectPills.map(({ effect, count, remaining }) => {
+                const style = styleForFieldEffect(effect);
+                return (
+                  <span
+                    key={effect.id}
+                    className={`inline-flex items-center gap-0.5 animate-pulse ${statusPillClass(style.variant)}`}
+                  >
+                    {effect.icon && <span className="text-[10px] leading-none">{effect.icon}</span>}
+                    {effect.label}
+                    {count > 1 && <span className="opacity-80">×{count}</span>}
+                    {remaining !== null && <span className="opacity-80">{remaining}t</span>}
+                  </span>
+                );
+              })}
+            </div>
+          )}
 
-        <span className="shrink-0 border border-white/10 bg-[#171919] px-2 py-0.5 font-mono text-[10px] tabular-nums text-zinc-300">
-          {player.linesCleared} clears
-        </span>
-      </div>
+          <span className="shrink-0 border border-white/10 bg-[#171919] px-2 py-0.5 font-mono text-[10px] tabular-nums text-zinc-300">
+            {player.linesCleared} clears
+          </span>
+        </div>
+      )}
+
+      {/* When showStats is false, keep active-effect pills directly above the board */}
+      {!showStats && (isMe || showEffectPills) && effectPills.length > 0 && (
+        <div className="mb-1.5 flex min-w-0 flex-wrap items-center justify-center gap-1 overflow-hidden px-1">
+          {effectPills.map(({ effect, count, remaining }) => {
+            const style = styleForFieldEffect(effect);
+            return (
+              <span
+                key={effect.id}
+                className={`inline-flex items-center gap-0.5 animate-pulse ${statusPillClass(style.variant)}`}
+              >
+                {effect.icon && <span className="text-[10px] leading-none">{effect.icon}</span>}
+                {effect.label}
+                {count > 1 && <span className="opacity-80">×{count}</span>}
+                {remaining !== null && <span className="opacity-80">{remaining}t</span>}
+              </span>
+            );
+          })}
+        </div>
+      )}
+
       {showPlayerName && (
         <div className="mb-1 flex items-center font-mono text-[10px] font-bold text-zinc-300">
           <span className="truncate tracking-wide">{playerName}</span>
         </div>
       )}
-      <div className="mb-1 flex items-center gap-3 font-mono text-[9px] font-bold uppercase tracking-wider text-zinc-500">
-        {showFunds && (
+
+      {showStats && (
+        <div className="mb-1 flex items-center gap-3 font-mono text-[9px] font-bold uppercase tracking-wider text-zinc-500">
+          {showFunds && (
+            <span>
+              Funds <strong className={isMe ? 'text-cyan-200' : 'text-rose-200'}>{player.funds}</strong>
+            </span>
+          )}
           <span>
-            Funds <strong className={isMe ? 'text-cyan-200' : 'text-rose-200'}>{player.funds}</strong>
+            Score <strong className={isMe ? 'text-emerald-200' : 'text-rose-200'}>{player.score}</strong>
           </span>
-        )}
-        <span>
-          Score <strong className={isMe ? 'text-emerald-200' : 'text-rose-200'}>{player.score}</strong>
-        </span>
-      </div>
+        </div>
+      )}
       <IncomingGarbageReadout
         fieldTitle={title}
         lines={pendingGarbageTotal(player.pendingGarbage)}

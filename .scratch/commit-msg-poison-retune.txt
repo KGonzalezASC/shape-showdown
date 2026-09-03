@@ -1,0 +1,6 @@
+fix(puzzle): retune Poison Beat and gate wildcard on spread finish
+
+Raise Poison Beat to 10 line clears and earliest wildcard@170 (poison@90
+variant 2). Block wildcard-four shape resolution until poisonSpread is
+idle so mid-spread seed cells cannot lock the copied piece; solo sessions
+defer the beat until the gate passes. Re-emit poison-beat baselines.

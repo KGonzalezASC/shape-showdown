@@ -1,0 +1,17 @@
+from pathlib import Path
+import sys
+sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+gf = Path("src/components/GameField.tsx").read_text(encoding="utf-8")
+print("has X U+2715:", "\u2715" in gf)
+idx = gf.find("const storageDisabled")
+print(gf[idx:idx+850])
+print("---EMPTY---")
+idx3 = gf.find("aria-label={storageDisabled")
+print(gf[idx3-180:idx3+420])
+print("---MEMO---")
+idx4 = gf.find("prev.allowHold")
+print(gf[idx4-120:idx4+80])
+ps = Path("src/components/PuzzleScreen.tsx").read_text(encoding="utf-8")
+idx = ps.find("allowHold={started")
+print("---PS---")
+print(ps[idx-200:idx+100])

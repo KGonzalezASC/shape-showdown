@@ -1,0 +1,7 @@
+feat(puzzle): import 20 Jstris maps with non-null queues
+
+Add twenty curated Jstris imports (exact API queues, bottom-row boards with
+spawn headroom, clear-lines goals) wired into the authored catalog picker only.
+Hazard timelines are varied across freeze/retrim/magnet/curtain/snag/sticky/
+poison+wildcard/garbage/purge with tick, afterPieces, and one sparse loop.
+Includes repeatable .scratch importer; bumps provenance test timeout for catalog size.

@@ -523,76 +523,74 @@ const LandingShowcase: React.FC<LandingShowcaseProps> = ({ onPlayGame }) => {
           </div>
 
           {/* Action Row */}
-          <div className="mt-5 flex flex-wrap items-center justify-center gap-2.5 sm:mt-6 sm:flex-nowrap sm:gap-4">
-            <a
-              href="#game"
-              onClick={(e) => {
-                e.preventDefault();
-                if (onPlayGame) onPlayGame();
-                else setAppRoute('game');
-              }}
-              style={{
-                backgroundColor: activeOption.accent,
-                boxShadow: `0 0 24px ${activeOption.accent}33`,
-              }}
-              className="inline-flex h-10 shrink-0 whitespace-nowrap items-center justify-center gap-1.5 rounded-xl px-4 text-[9px] font-black uppercase tracking-wider text-[#07110d] transition-all hover:brightness-110 active:scale-[0.98] sm:h-12 sm:gap-2 sm:px-8 sm:text-xs"
-            >
-              <Play className="h-3.5 w-3.5 fill-current sm:h-4 sm:w-4" />
-              <span>Play Game</span>
-            </a>
+          <div className="mt-5 sm:mt-6 flex flex-col items-center gap-2.5 sm:gap-3 w-full max-w-4xl mx-auto">
+            {/* Primary Gameplay Actions */}
+            <div className="flex flex-wrap items-center justify-center gap-2 sm:gap-3 w-full">
+              <a
+                href="#game"
+                onClick={(e) => {
+                  e.preventDefault();
+                  if (onPlayGame) onPlayGame();
+                  else setAppRoute('game');
+                }}
+                style={{
+                  backgroundColor: activeOption.accent,
+                  boxShadow: `0 0 24px ${activeOption.accent}40`,
+                }}
+                className="inline-flex h-11 sm:h-12 items-center justify-center gap-2 rounded-xl px-5 sm:px-7 text-[10px] sm:text-xs font-black uppercase tracking-wider text-[#07110d] transition-all hover:brightness-110 active:scale-[0.98]"
+              >
+                <Play className="h-4 w-4 fill-current" />
+                <span>Play Game</span>
+              </a>
 
-            <a
-              href="#puzzles"
-              onClick={(e) => {
-                e.preventDefault();
-                setAppRoute('puzzles');
-              }}
-              style={{
-                backgroundColor: activeOption.accent,
-                boxShadow: `0 0 24px ${activeOption.accent}33`,
-              }}
-              className="inline-flex h-10 shrink-0 whitespace-nowrap items-center justify-center gap-1.5 rounded-xl px-4 text-[9px] font-black uppercase tracking-wider text-[#07110d] transition-all hover:brightness-110 active:scale-[0.98] sm:h-12 sm:gap-2 sm:px-8 sm:text-xs"
-            >
-              <Puzzle className="h-3.5 w-3.5 fill-current sm:h-4 sm:w-4" />
-              <span>Puzzles</span>
-            </a>
+              <a
+                href="#puzzles"
+                onClick={(e) => {
+                  e.preventDefault();
+                  setAppRoute('puzzles');
+                }}
+                className="inline-flex h-11 sm:h-12 items-center justify-center gap-2 rounded-xl border border-amber-400/40 bg-amber-500/10 px-4 sm:px-6 text-[10px] sm:text-xs font-black uppercase tracking-wider text-amber-300 shadow-[0_0_16px_rgba(251,191,36,0.15)] transition-all hover:bg-amber-500/20 hover:border-amber-400/60 active:scale-[0.98]"
+              >
+                <Puzzle className="h-4 w-4 fill-current text-amber-400" />
+                <span>Puzzles</span>
+              </a>
 
-            <a
-              href="#daily"
-              onClick={(e) => {
-                e.preventDefault();
-                sessionStorage.setItem('puzzleAutostart', 'daily');
-                setAppRoute('puzzles');
-              }}
-              style={{
-                backgroundColor: activeOption.accent,
-                boxShadow: `0 0 24px ${activeOption.accent}33`,
-              }}
-              className="inline-flex h-10 shrink-0 whitespace-nowrap items-center justify-center gap-1.5 rounded-xl px-4 text-[9px] font-black uppercase tracking-wider text-[#07110d] transition-all hover:brightness-110 active:scale-[0.98] sm:h-12 sm:gap-2 sm:px-8 sm:text-xs"
-            >
-              <CalendarDays className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
-              <span>Daily</span>
-            </a>
+              <a
+                href="#daily"
+                onClick={(e) => {
+                  e.preventDefault();
+                  sessionStorage.setItem('puzzleAutostart', 'daily');
+                  setAppRoute('puzzles');
+                }}
+                className="inline-flex h-11 sm:h-12 items-center justify-center gap-2 rounded-xl border border-sky-400/40 bg-sky-500/10 px-4 sm:px-6 text-[10px] sm:text-xs font-black uppercase tracking-wider text-sky-300 shadow-[0_0_16px_rgba(56,189,248,0.15)] transition-all hover:bg-sky-500/20 hover:border-sky-400/60 active:scale-[0.98]"
+              >
+                <CalendarDays className="h-4 w-4 text-sky-400" />
+                <span>Daily</span>
+              </a>
+            </div>
 
-            <button
-              type="button"
-              onClick={() => setShowHowToPlay(true)}
-              className="inline-flex h-10 shrink-0 whitespace-nowrap items-center justify-center gap-1.5 rounded-xl border border-white/10 bg-white/[0.04] px-4 text-[9px] font-bold uppercase tracking-wider text-zinc-200 transition-colors hover:border-white/20 hover:bg-white/[0.08] hover:text-white sm:h-12 sm:gap-2 sm:px-6 sm:text-xs"
-            >
-              <HelpCircle className="h-3.5 w-3.5 text-zinc-400 sm:h-4 sm:w-4" />
-              <span>How To Play</span>
-            </button>
-
-            {hasPhysicalInput && (
+            {/* Utility / Info Actions */}
+            <div className="flex flex-wrap items-center justify-center gap-2 sm:gap-2.5">
               <button
                 type="button"
-                onClick={() => setShowControls(true)}
-                className="inline-flex h-10 shrink-0 whitespace-nowrap items-center justify-center gap-1.5 rounded-xl border border-white/10 bg-white/[0.04] px-4 text-[9px] font-bold uppercase tracking-wider text-zinc-200 transition-colors hover:border-white/20 hover:bg-white/[0.08] hover:text-white sm:h-12 sm:gap-2 sm:px-6 sm:text-xs"
+                onClick={() => setShowHowToPlay(true)}
+                className="inline-flex h-9 sm:h-10 items-center justify-center gap-1.5 rounded-lg border border-white/10 bg-white/[0.04] px-3.5 sm:px-4 text-[9px] sm:text-[10px] font-bold uppercase tracking-wider text-zinc-300 transition-colors hover:border-white/20 hover:bg-white/[0.08] hover:text-white"
               >
-                <Keyboard className="h-3.5 w-3.5 text-zinc-400 sm:h-4 sm:w-4" />
-                <span>Controls</span>
+                <HelpCircle className="h-3.5 w-3.5 text-zinc-400" />
+                <span>How To Play</span>
               </button>
-            )}
+
+              {hasPhysicalInput && (
+                <button
+                  type="button"
+                  onClick={() => setShowControls(true)}
+                  className="inline-flex h-9 sm:h-10 items-center justify-center gap-1.5 rounded-lg border border-white/10 bg-white/[0.04] px-3.5 sm:px-4 text-[9px] sm:text-[10px] font-bold uppercase tracking-wider text-zinc-300 transition-colors hover:border-white/20 hover:bg-white/[0.08] hover:text-white"
+                >
+                  <Keyboard className="h-3.5 w-3.5 text-zinc-400" />
+                  <span>Controls</span>
+                </button>
+              )}
+            </div>
           </div>
 
           {/* Opponent search scope — only meaningful inside a Discord Activity */}

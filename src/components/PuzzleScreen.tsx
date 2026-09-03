@@ -1,12 +1,20 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { io, type Socket } from 'socket.io-client';
-import { ArrowLeft, Play, RotateCcw } from 'lucide-react';
+import { ArrowLeft, Gamepad2, Play, RotateCcw } from 'lucide-react';
 import GameField, { type GameFieldRef } from './GameField';
+import MobileControls from './MobileControls';
 import type { PublicPlayerState } from '../state/publicSnapshots';
 import { setAppRoute } from '../appRoute';
 import { useKeyBindings } from '../input/KeyBindingsProvider';
 import { actionForCode } from '../input/keyBindings';
-import { HOLD_SWAP_CUTOFF_VISIBLE_ROW } from '../types';
+import {
+  BOARD_COLS,
+  BOARD_VISIBLE_ROWS,
+  CELL_SIZE,
+  HOLD_SWAP_CUTOFF_VISIBLE_ROW,
+} from '../types';
+import { usePlayfieldLayoutMode } from '../responsive/playfieldLayoutMode';
+import { fitMobilePlayfieldCellSize } from './PlayfieldCellSizer';
 import { appendDiscordFrameId, isDiscordActivityContext } from '../discordContext';
 import { resolveGameServerUrl } from '../hooks/useGameSocket';
 import {
@@ -14,6 +22,18 @@ import {
   presentTimelineHints,
   type PuzzleVisibilityPolicy,
 } from '../puzzle/puzzlePresentation';
+import {
+  calculatePuzzleStars,
+  type PuzzleStarEvaluation,
+} from '../puzzle/puzzleStarRating';
+import {
+  loadAllPuzzleRecords,
+  savePuzzleRecord,
+  getTotalStarsEarned,
+  type PuzzleProgressRecord,
+} from '../state/puzzleProgressStorage';
+import { PuzzleVictoryModal } from './PuzzleVictoryModal';
+import { DEV_TOOLS_ENABLED } from '../devTools';
 
 /**
  * Single-player puzzle screen.
@@ -66,6 +86,7 @@ interface PuzzleBenchmarkWire {
 interface PuzzleStarted {
   levelId: string;
   name: string;
+  description?: string;
   seed: number;
   goal: { kind: string; lines?: number; ticks?: number; maxPieces?: number };
   allowHold?: boolean;
@@ -80,6 +101,7 @@ interface PuzzleStarted {
 interface PuzzleCatalogEntry {
   id: string;
   name: string;
+  description?: string;
   goal: { kind: string; lines?: number; ticks?: number; maxPieces?: number };
   allowHold: boolean;
   visibilityPolicy: PuzzleVisibilityPolicy;
@@ -145,6 +167,8 @@ function toPublicPlayerState(snap: PuzzleWireState, myId: string): PublicPlayerS
 
 const goalLabel = (goal: PuzzleStarted['goal']): string => {
   switch (goal.kind) {
+    case 'garbage-clear':
+      return 'Clear all garbage';
     case 'perfect-clear':
       return 'Clear the whole board';
     case 'survive':
@@ -158,8 +182,163 @@ const goalLabel = (goal: PuzzleStarted['goal']): string => {
   }
 };
 
-const baselinePrimaryLabel = (_benchmark?: PuzzleBenchmarkWire): string => {
-  return 'Record to beat';
+
+interface IncomingEffectMeta {
+  icon: string;
+  name: string;
+  category: string;
+  badgeClass: string;
+  borderClass: string;
+  glowClass: string;
+}
+
+const INCOMING_EFFECT_META: Record<string, IncomingEffectMeta> = {
+  retrim: {
+    icon: '✂️',
+    name: 'Re-Trim',
+    category: 'Attack',
+    badgeClass: 'bg-rose-500/20 text-rose-300 border-rose-500/40',
+    borderClass: 'border-rose-500/40',
+    glowClass: 'shadow-[0_0_12px_rgba(244,63,94,0.18)]',
+  },
+  garbage: {
+    icon: '💥',
+    name: 'Garbage',
+    category: 'Attack',
+    badgeClass: 'bg-red-500/20 text-red-300 border-red-500/40',
+    borderClass: 'border-red-500/40',
+    glowClass: 'shadow-[0_0_12px_rgba(239,68,68,0.18)]',
+  },
+  magnet: {
+    icon: '🧲',
+    name: 'Magnet',
+    category: 'Gravity',
+    badgeClass: 'bg-amber-500/20 text-amber-300 border-amber-500/40',
+    borderClass: 'border-amber-500/40',
+    glowClass: 'shadow-[0_0_12px_rgba(245,158,11,0.18)]',
+  },
+  sticky: {
+    icon: '⏱️',
+    name: 'Sticky',
+    category: 'Lock Limit',
+    badgeClass: 'bg-orange-500/20 text-orange-300 border-orange-500/40',
+    borderClass: 'border-orange-500/40',
+    glowClass: 'shadow-[0_0_12px_rgba(249,115,22,0.18)]',
+  },
+  snag: {
+    icon: '🪝',
+    name: 'Snag',
+    category: 'Disrupt',
+    badgeClass: 'bg-pink-500/20 text-pink-300 border-pink-500/40',
+    borderClass: 'border-pink-500/40',
+    glowClass: 'shadow-[0_0_12px_rgba(236,72,153,0.18)]',
+  },
+  freeze: {
+    icon: '❄️',
+    name: 'Freeze',
+    category: 'Hold Lock',
+    badgeClass: 'bg-cyan-500/20 text-cyan-300 border-cyan-500/40',
+    borderClass: 'border-cyan-500/40',
+    glowClass: 'shadow-[0_0_12px_rgba(6,182,212,0.18)]',
+  },
+  curtain: {
+    icon: '🎭',
+    name: 'Curtain',
+    category: 'Blindness',
+    badgeClass: 'bg-purple-500/20 text-purple-300 border-purple-500/40',
+    borderClass: 'border-purple-500/40',
+    glowClass: 'shadow-[0_0_12px_rgba(168,85,247,0.18)]',
+  },
+  poison: {
+    icon: '🧪',
+    name: 'Poison',
+    category: 'Infection',
+    badgeClass: 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40',
+    borderClass: 'border-emerald-500/40',
+    glowClass: 'shadow-[0_0_12px_rgba(16,185,129,0.18)]',
+  },
+  wildcard: {
+    icon: '🧩',
+    name: 'Wildcard',
+    category: 'Shape-Shift',
+    badgeClass: 'bg-indigo-500/20 text-indigo-300 border-indigo-500/40',
+    borderClass: 'border-indigo-500/40',
+    glowClass: 'shadow-[0_0_12px_rgba(99,102,241,0.18)]',
+  },
+  purge: {
+    icon: '🃏',
+    name: 'Wild Purge',
+    category: 'Cleanse',
+    badgeClass: 'bg-teal-500/20 text-teal-300 border-teal-500/40',
+    borderClass: 'border-teal-500/40',
+    glowClass: 'shadow-[0_0_12px_rgba(20,184,166,0.18)]',
+  },
+  bomber: {
+    icon: '💣',
+    name: 'Bomber',
+    category: 'Blast',
+    badgeClass: 'bg-rose-500/20 text-rose-300 border-rose-500/40',
+    borderClass: 'border-rose-500/40',
+    glowClass: 'shadow-[0_0_12px_rgba(244,63,94,0.18)]',
+  },
+  satellite: {
+    icon: '🛰️',
+    name: 'Satellite',
+    category: 'Defense',
+    badgeClass: 'bg-sky-500/20 text-sky-300 border-sky-500/40',
+    borderClass: 'border-sky-500/40',
+    glowClass: 'shadow-[0_0_12px_rgba(14,165,233,0.18)]',
+  },
+  tectonic: {
+    icon: '🌋',
+    name: 'Tectonic',
+    category: 'Attack',
+    badgeClass: 'bg-stone-500/20 text-stone-300 border-stone-500/40',
+    borderClass: 'border-stone-500/40',
+    glowClass: 'shadow-[0_0_12px_rgba(120,113,108,0.18)]',
+  },
+};
+
+const getEffectMeta = (kind: string): IncomingEffectMeta => {
+  return INCOMING_EFFECT_META[kind.toLowerCase()] ?? {
+    icon: '⚡',
+    name: kind.charAt(0).toUpperCase() + kind.slice(1),
+    category: 'Hazard',
+    badgeClass: 'bg-zinc-700/40 text-zinc-200 border-zinc-500/30',
+    borderClass: 'border-white/10',
+    glowClass: '',
+  };
+};
+
+const getTriggerDetails = (
+  hint: { tick: number; afterPieces?: number },
+  piecesPlaced: number,
+  currentTick: number,
+) => {
+  if (typeof hint.afterPieces === 'number') {
+    const remaining = hint.afterPieces - piecesPlaced;
+    if (remaining <= 0) {
+      return { label: 'NOW', isImminent: true, isUrgent: true };
+    }
+    if (remaining === 1) {
+      return { label: 'NEXT PC', isImminent: true, isUrgent: true };
+    }
+    if (remaining <= 3) {
+      return { label: `in ${remaining} pcs`, isImminent: true, isUrgent: false };
+    }
+    return { label: `in ${remaining} pcs`, isImminent: false, isUrgent: false };
+  }
+  if (hint.tick >= 0) {
+    const sec = Math.max(0, Math.ceil((hint.tick - currentTick) / 60));
+    if (sec <= 2) {
+      return { label: `${sec}s`, isImminent: true, isUrgent: true };
+    }
+    if (sec <= 5) {
+      return { label: `${sec}s`, isImminent: true, isUrgent: false };
+    }
+    return { label: `${sec}s`, isImminent: false, isUrgent: false };
+  }
+  return { label: 'QUEUED', isImminent: false, isUrgent: false };
 };
 
 export const PuzzleScreen: React.FC = () => {
@@ -171,12 +350,18 @@ export const PuzzleScreen: React.FC = () => {
 
   const [state, setState] = useState<PuzzleWireState | null>(null);
   const [started, setStarted] = useState<PuzzleStarted | null>(null);
+  const startedRef = useRef<PuzzleStarted | null>(null);
+  startedRef.current = started;
   const [end, setEnd] = useState<PuzzleEnd | null>(null);
   const [connected, setConnected] = useState(false);
   const [catalog, setCatalog] = useState<PuzzleCatalogEntry[]>([]);
   const [daily, setDaily] = useState<PuzzleDailySummary | null>(null);
   const [selectedPuzzleId, setSelectedPuzzleId] = useState<string | null>(null);
   const [picking, setPicking] = useState(true);
+  const [records, setRecords] = useState<Record<string, PuzzleProgressRecord>>(() =>
+    loadAllPuzzleRecords(),
+  );
+  const [victoryEvaluation, setVictoryEvaluation] = useState<PuzzleStarEvaluation | null>(null);
   const dailyAutostartHandledRef = useRef(false);
   const selectedPuzzleIdRef = useRef<string | null>(null);
   selectedPuzzleIdRef.current = selectedPuzzleId;
@@ -237,15 +422,80 @@ export const PuzzleScreen: React.FC = () => {
         setSelectedPuzzleId(payload.puzzleId ?? payload.levelId);
         setPicking(false);
         setEnd(null);
+        setVictoryEvaluation(null);
       });
       socket.on('puzzle:state', (snap: PuzzleWireState) => {
         if (!cancelled) setState(snap);
       });
       socket.on('puzzle:end', (payload: PuzzleEnd) => {
-        if (!cancelled) setEnd(payload);
+        if (cancelled) return;
+        setEnd(payload);
+        const curStarted = startedRef.current;
+        if (payload.solved) {
+          const evalResult = calculatePuzzleStars(
+            {
+              solved: payload.solved,
+              piecesUsed: payload.piecesUsed,
+              score: payload.score,
+              ticksUsed: payload.ticksUsed,
+              goalKind: curStarted?.goal.kind,
+            },
+            curStarted?.referenceBaseline,
+          );
+          setVictoryEvaluation(evalResult);
+          const currentId = curStarted?.puzzleId ?? curStarted?.levelId ?? payload.levelId;
+          if (currentId) {
+            savePuzzleRecord(
+              currentId,
+              evalResult.stars,
+              payload.piecesUsed,
+              payload.score,
+              payload.ticksUsed,
+            );
+            setRecords(loadAllPuzzleRecords());
+          }
+        } else {
+          setVictoryEvaluation(null);
+        }
       });
     };
     void connect();
+
+    if (DEV_TOOLS_ENABLED && typeof window !== 'undefined') {
+      (window as unknown as { __triggerPuzzleVictory?: (targetStars?: number) => void }).__triggerPuzzleVictory = (
+        targetStars = 3,
+      ) => {
+        const curStarted = startedRef.current;
+        if (!curStarted) return;
+        const baseline = curStarted.referenceBaseline;
+        const piecesUsed =
+          targetStars === 3
+            ? (baseline?.piecesUsed ?? 15)
+            : targetStars === 2
+              ? Math.ceil((baseline?.piecesUsed ?? 15) * 1.3)
+              : (baseline?.piecesUsed ?? 15) + 8;
+        const evalResult = calculatePuzzleStars(
+          {
+            solved: true,
+            piecesUsed,
+            score: 2450,
+            ticksUsed: 800,
+            goalKind: curStarted.goal.kind,
+          },
+          baseline,
+        );
+        setEnd({
+          levelId: curStarted.puzzleId ?? curStarted.levelId,
+          solved: true,
+          piecesUsed,
+          score: 2450,
+          ticksUsed: 800,
+          linesCleared: 4,
+          attemptId: 'dev-test',
+        });
+        setVictoryEvaluation(evalResult);
+      };
+    }
 
     return () => {
       cancelled = true;
@@ -328,6 +578,7 @@ export const PuzzleScreen: React.FC = () => {
     setEnd(null);
     setState(null);
     setStarted(null);
+    setVictoryEvaluation(null);
     setSelectedPuzzleId(puzzleId);
     setPicking(false);
     const socket = socketRef.current;
@@ -342,6 +593,7 @@ export const PuzzleScreen: React.FC = () => {
     setEnd(null);
     setState(null);
     setStarted(null);
+    setVictoryEvaluation(null);
     setPicking(false);
     const socket = socketRef.current;
     if (!socket) return;
@@ -360,10 +612,30 @@ export const PuzzleScreen: React.FC = () => {
     setEnd(null);
     setState(null);
     setStarted(null);
+    setVictoryEvaluation(null);
     setPicking(true);
     socketRef.current?.emit('puzzle:stop');
     socketRef.current?.emit('puzzle:list');
   }, []);
+
+  const currentPuzzleIndex = catalog.findIndex(
+    (c) => c.id === (started?.puzzleId ?? started?.levelId),
+  );
+  const nextPuzzleEntry =
+    currentPuzzleIndex >= 0 && currentPuzzleIndex + 1 < catalog.length
+      ? catalog[currentPuzzleIndex + 1]
+      : null;
+
+  const handleNextLevel = useCallback(() => {
+    if (nextPuzzleEntry) {
+      startPuzzle(nextPuzzleEntry.id);
+    } else {
+      setVictoryEvaluation(null);
+      setPicking(true);
+    }
+  }, [nextPuzzleEntry, startPuzzle]);
+
+  const totalStars = getTotalStarsEarned(records);
 
   const player = state ? toPublicPlayerState(state, 'puzzle-me') : null;
   const finished = isPuzzleFinished(state?.status ?? null, end !== null);
@@ -379,91 +651,128 @@ export const PuzzleScreen: React.FC = () => {
     state?.piecesPlaced ?? 0,
   );
 
-  return (
-    <div className="flex min-h-dvh flex-col items-center justify-center gap-4 bg-[#07080b] p-4 font-sans text-white">
-      <header className="flex w-full max-w-3xl items-center justify-between">
-        <button
-          type="button"
-          onClick={() => setAppRoute('landing')}
-          className="inline-flex items-center gap-1.5 rounded-lg border border-white/10 bg-white/[0.04] px-3 py-1.5 text-xs font-bold uppercase tracking-wider text-zinc-200 hover:bg-white/[0.08]"
-        >
-          <ArrowLeft className="h-3.5 w-3.5" />
-          <span>Back</span>
-        </button>
-        <div className="text-center">
-          <h1 className="text-lg font-black uppercase tracking-wider">Puzzles</h1>
-          {started && !picking && (
-            <p className="text-xs text-zinc-400">
-              {started.name} — {goalLabel(started.goal)}
-              {started.allowHold === false && (
-                <span className="ml-2 rounded bg-amber-500/20 px-1.5 py-0.5 text-[10px] font-bold text-amber-300">
-                  No Hold
-                </span>
-              )}
-              {started.visibilityPolicy && (
-                <span className="ml-2 rounded bg-sky-500/20 px-1.5 py-0.5 text-[10px] font-bold text-sky-300">
-                  {started.visibilityPolicy}
-                </span>
-              )}
-            </p>
-          )}
-        </div>
-        <div className="text-right text-xs text-zinc-400">
-          {state && !picking && <div>Lines: {state.linesCleared}</div>}
-          {state && !picking && <div>Pieces: {state.piecesPlaced ?? 0}</div>}
-          {state && !picking && <div>Time: {Math.floor(state.tick / 60)}s</div>}
-        </div>
-      </header>
+  const hasAuthoredHazards =
+    (started?.timeline?.length ?? 0) > 0 &&
+    started?.visibilityPolicy !== 'hidden' &&
+    started?.visibilityPolicy !== 'unspecified';
 
-      {!picking && started?.referenceBaseline && (
-        <div className="w-full max-w-3xl rounded-xl border border-white/10 bg-[#08090d] px-4 py-3">
-          <div className="mb-1 flex items-baseline justify-between gap-2">
-            <p className="text-[10px] font-bold uppercase tracking-wider text-zinc-500">
-              {baselinePrimaryLabel(started.benchmark)}
-            </p>
-            <p className="text-[10px] text-zinc-600">Reference Baseline</p>
-          </div>
-          <div className="flex flex-wrap gap-4 font-mono text-xs tabular-nums text-zinc-300">
-            <span>
-              Score{' '}
-              <strong className="text-emerald-300">{started.referenceBaseline.score}</strong>
-              {state && (
-                <span className="ml-1 text-zinc-500">/ {state.score}</span>
-              )}
-            </span>
-            <span>
-              Pieces{' '}
-              <strong className="text-sky-300">{started.referenceBaseline.piecesUsed}</strong>
-              {state && (
-                <span className="ml-1 text-zinc-500">/ {state.piecesPlaced ?? 0}</span>
-              )}
-            </span>
-            <span>
-              Ticks{' '}
-              <strong className="text-amber-300">{started.referenceBaseline.ticksUsed}</strong>
-              {state && (
-                <span className="ml-1 text-zinc-500">/ {state.tick}</span>
-              )}
-            </span>
-          </div>
-          {finished && end && (
-            <p className="mt-2 text-[10px] text-zinc-500">
-              Your run: {end.score ?? '—'} score · {end.piecesUsed} pieces · {end.ticksUsed} ticks
-              {end.solved ? ' · solved' : end.topOut ? ' · top out' : ''}
-            </p>
-          )}
-        </div>
-      )}
+  const [showTouchControls, setShowTouchControls] = useState<boolean>(() => {
+    if (typeof window === 'undefined') return false;
+    const saved = localStorage.getItem('puzzleTouchControls');
+    if (saved !== null) return saved === 'true';
+    const isCoarse = window.matchMedia('(pointer: coarse)').matches;
+    const isTouch = typeof navigator !== 'undefined' && (navigator.maxTouchPoints > 0 || isCoarse);
+    return isTouch;
+  });
 
-      {picking ? (
-        <div className="flex w-full max-w-md flex-col gap-3 rounded-xl border border-white/10 bg-[#08090d] p-5">
-          <p className="text-sm font-bold uppercase tracking-wider text-zinc-300">Choose a puzzle</p>
-          {!connected && (
-            <p className="text-xs text-zinc-500">Connecting…</p>
-          )}
-          {connected && catalog.length === 0 && (
-            <p className="text-xs text-zinc-500">Loading catalog…</p>
-          )}
+  const toggleTouchControls = useCallback(() => {
+    setShowTouchControls((prev) => {
+      const next = !prev;
+      try {
+        localStorage.setItem('puzzleTouchControls', String(next));
+      } catch {
+        // ignore
+      }
+      return next;
+    });
+  }, []);
+
+  const [touchControlsHeight, setTouchControlsHeight] = useState(0);
+
+  const handleTouchInput = useCallback(
+    (input: { left: boolean; right: boolean; softDrop: boolean }) => {
+      heldInputsRef.current = input;
+      socketRef.current?.emit('puzzle:input', input);
+    },
+    [],
+  );
+
+  const handleTouchAction = useCallback(
+    (action: 'rotateCW' | 'rotateCCW' | 'hardDrop' | 'hold') => {
+      if (action === 'hardDrop') {
+        myFieldRef.current?.hardDrop();
+        socketRef.current?.emit('puzzle:action', 'hardDrop');
+      } else {
+        socketRef.current?.emit('puzzle:action', action);
+      }
+    },
+    [],
+  );
+
+  const layoutMode = usePlayfieldLayoutMode();
+  const isPhone = layoutMode === 'phone';
+  const isShortWindow = typeof window !== 'undefined' && window.innerHeight < 680;
+  const useCompactHud = isPhone || (showTouchControls && isShortWindow);
+  const showHazardAside = hasAuthoredHazards && !isPhone;
+  const showHazardChip = hasAuthoredHazards && isPhone;
+
+  const boardFitRef = useRef<HTMLDivElement>(null);
+  const playfieldLayoutRef = useRef<HTMLDivElement>(null);
+  const [cellSize, setCellSize] = useState(CELL_SIZE);
+
+  useLayoutEffect(() => {
+    if (picking || !started) return;
+    const layoutNode = playfieldLayoutRef.current;
+    const slotNode = boardFitRef.current;
+    if (!layoutNode || !slotNode) return;
+
+    const measure = () => {
+      const layoutBox = layoutNode.getBoundingClientRect();
+      const slotBox = slotNode.getBoundingClientRect();
+
+      // Available vertical budget for the 18 rows of the board:
+      // slotBox.height, or layoutBox.height minus 46px reserve for hold row & gap
+      const heightBudget = Math.min(
+        slotBox.height > 16 ? slotBox.height : Infinity,
+        layoutBox.height > 48 ? layoutBox.height - 46 : Infinity,
+      );
+      const widthBudget = Math.min(
+        slotBox.width > 16 ? slotBox.width : Infinity,
+        layoutBox.width > 16 ? layoutBox.width : Infinity,
+      );
+      if (!isFinite(heightBudget) || !isFinite(widthBudget) || heightBudget < 10 || widthBudget < 10) return;
+
+      const next = fitMobilePlayfieldCellSize({ width: widthBudget, height: heightBudget });
+      setCellSize((prev) => (prev === next ? prev : next));
+    };
+
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(layoutNode);
+    ro.observe(slotNode);
+    window.addEventListener('resize', measure);
+    return () => {
+      ro.disconnect();
+      window.removeEventListener('resize', measure);
+    };
+  }, [showTouchControls, started?.levelId, picking, hasAuthoredHazards, useCompactHud, showHazardAside]);
+
+  if (picking || !started) {
+    return (
+      <div className="relative flex min-h-dvh w-full flex-col items-center justify-start gap-4 bg-[#07080b] px-3 pt-4 pb-12 font-sans text-white select-none overflow-y-auto">
+        <header className="sticky top-0 z-40 flex w-full max-w-md items-center justify-between rounded-xl border border-white/10 bg-[#08090d]/95 px-3 py-2 shadow-xl backdrop-blur-md">
+          <button
+            type="button"
+            onClick={() => setAppRoute('landing')}
+            className="inline-flex items-center gap-1.5 rounded-lg border border-white/10 bg-white/[0.04] px-2.5 py-1.5 text-xs font-bold uppercase tracking-wider text-zinc-200 hover:bg-white/[0.08]"
+          >
+            <ArrowLeft className="h-3.5 w-3.5" />
+            <span>Menu</span>
+          </button>
+          <h1 className="text-sm sm:text-base font-black uppercase tracking-wider text-zinc-100">
+            Choose a puzzle
+          </h1>
+          <div className="flex items-center gap-1.5 rounded-full border border-amber-400/40 bg-amber-950/40 px-2.5 py-1 text-xs font-black text-amber-300 shadow-[0_0_12px_rgba(245,158,11,0.2)]">
+            <span className="text-sm">⭐</span>
+            <span>
+              {totalStars} / {catalog.length * 3}
+            </span>
+          </div>
+        </header>
+
+        <div className="flex w-full max-w-md flex-col gap-3 rounded-xl border border-white/10 bg-[#08090d] p-4 sm:p-5">
+          {!connected && <p className="text-xs text-zinc-500">Connecting…</p>}
+          {connected && catalog.length === 0 && <p className="text-xs text-zinc-500">Loading catalog…</p>}
           {daily && (
             <button
               type="button"
@@ -478,22 +787,78 @@ export const PuzzleScreen: React.FC = () => {
             </button>
           )}
           <p className="pt-1 text-[10px] font-bold uppercase tracking-wider text-zinc-500">Practice</p>
-          {catalog.map((entry) => (
-            <button
-              key={entry.id}
-              type="button"
-              onClick={() => startPuzzle(entry.id)}
-              className="flex flex-col items-start rounded-lg border border-white/10 bg-white/[0.03] px-4 py-3 text-left hover:bg-white/[0.08]"
-            >
-              <span className="text-sm font-bold">{entry.name}</span>
-              <span className="text-xs text-zinc-400">
-                {goalLabel(entry.goal)}
-                {entry.allowHold ? '' : ' · no hold'}
-                {' · '}
-                {entry.visibilityPolicy}
-              </span>
-            </button>
-          ))}
+          {catalog.map((entry, index) => {
+            const record = records[entry.id];
+            return (
+              <button
+                key={entry.id}
+                type="button"
+                onClick={() => startPuzzle(entry.id)}
+                className="group flex flex-col items-start rounded-xl border border-white/10 bg-white/[0.03] p-3.5 text-left transition-all hover:border-amber-400/30 hover:bg-white/[0.07]"
+              >
+                <div className="flex w-full items-start justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <span className="flex h-5 w-5 items-center justify-center rounded bg-white/10 font-mono text-[10px] font-bold text-zinc-400">
+                      {index + 1}
+                    </span>
+                    <span className="text-sm font-bold text-white group-hover:text-amber-200">
+                      {entry.name}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-1 text-sm tracking-wider">
+                    <span
+                      className={
+                        record && record.bestStars >= 1
+                          ? 'text-amber-400 drop-shadow-[0_0_6px_rgba(251,191,36,0.6)]'
+                          : 'text-zinc-700'
+                      }
+                    >
+                      ★
+                    </span>
+                    <span
+                      className={
+                        record && record.bestStars >= 2
+                          ? 'text-amber-400 drop-shadow-[0_0_6px_rgba(251,191,36,0.6)]'
+                          : 'text-zinc-700'
+                      }
+                    >
+                      ★
+                    </span>
+                    <span
+                      className={
+                        record && record.bestStars >= 3
+                          ? 'text-amber-400 drop-shadow-[0_0_6px_rgba(251,191,36,0.6)]'
+                          : 'text-zinc-700'
+                      }
+                    >
+                      ★
+                    </span>
+                  </div>
+                </div>
+
+                {entry.description && (
+                  <span className="mt-1 text-xs text-zinc-400">{entry.description}</span>
+                )}
+
+                <div className="mt-2 flex w-full items-center justify-between text-[11px] text-zinc-500">
+                  <span>
+                    {goalLabel(entry.goal)}
+                    {entry.allowHold ? '' : ' · no hold'}
+                    {' · '}
+                    {entry.visibilityPolicy}
+                  </span>
+                  {record && (
+                    <span className="font-mono text-[10px] font-bold text-amber-300">
+                      {record.bestPieces !== undefined ? `${record.bestPieces} pcs` : ''}
+                      {record.bestScore !== undefined
+                        ? ` · ${record.bestScore.toLocaleString()} pts`
+                        : ''}
+                    </span>
+                  )}
+                </div>
+              </button>
+            );
+          })}
           <button
             type="button"
             onClick={() => {
@@ -507,9 +872,261 @@ export const PuzzleScreen: React.FC = () => {
             Random curated
           </button>
         </div>
-      ) : (
-        <>
-          <div className="flex items-start justify-center gap-4">
+      </div>
+    );
+  }
+
+  return (
+    <div className="shape-showdown-root relative flex h-dvh max-h-dvh min-h-0 w-full flex-col items-center justify-center overflow-hidden bg-[#07080b] p-1 sm:p-2 text-white select-none">
+      <main className="shape-showdown-screen relative z-10 flex h-full max-h-full min-h-0 w-full max-w-[480px] sm:max-w-[820px] md:max-w-[1020px] flex-col overflow-hidden">
+        {/* Header row (shrink-0) */}
+        <header className="w-full shrink-0 flex items-center justify-between border-b border-white/10 bg-[#08090d]/95 px-2.5 sm:px-3 py-1.5 shadow-md backdrop-blur-md">
+          <div className="flex items-center gap-1.5 sm:gap-2">
+            <button
+              type="button"
+              onClick={() => setAppRoute('landing')}
+              className="inline-flex items-center gap-1 rounded-lg border border-white/10 bg-white/[0.04] px-2 sm:px-2.5 py-1 text-[11px] sm:text-xs font-bold uppercase tracking-wider text-zinc-200 hover:bg-white/[0.08]"
+            >
+              <ArrowLeft className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
+              <span className="hidden min-[380px]:inline">Menu</span>
+            </button>
+            <button
+              type="button"
+              onClick={pickAnother}
+              className="inline-flex items-center gap-1 rounded-lg border border-white/10 bg-white/[0.04] px-2 sm:px-2.5 py-1 text-[11px] sm:text-xs font-bold uppercase tracking-wider text-zinc-200 hover:bg-white/[0.08]"
+            >
+              <Play className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
+              <span className="hidden min-[380px]:inline">Levels</span>
+            </button>
+          </div>
+
+          <div className="flex flex-col items-center text-center min-w-0 px-1">
+            <h1 className="truncate text-xs sm:text-base font-black uppercase tracking-wider max-w-[140px] sm:max-w-none">
+              {started.name}
+            </h1>
+            <div className="mt-0.5 flex items-center justify-center gap-1 text-[9px] sm:text-[10px] text-zinc-400">
+              <span className="rounded bg-white/10 px-1.5 py-0.2 font-bold text-zinc-200">
+                {goalLabel(started.goal)}
+              </span>
+              {started.allowHold === false && (
+                <span className="rounded bg-amber-500/20 px-1 py-0.2 text-[8px] font-bold text-amber-300">
+                  No Hold
+                </span>
+              )}
+            </div>
+          </div>
+
+          <div className="flex items-center gap-1.5">
+            <button
+              type="button"
+              onClick={toggleTouchControls}
+              title={showTouchControls ? 'Hide touch controls' : 'Show touch controls'}
+              aria-label={showTouchControls ? 'Hide touch controls' : 'Show touch controls'}
+              className={`inline-flex items-center gap-1 rounded-lg border px-2 sm:px-2.5 py-1 text-[11px] sm:text-xs font-bold uppercase tracking-wider transition-all ${
+                showTouchControls
+                  ? 'border-emerald-500/50 bg-emerald-500/20 text-emerald-300 shadow-[0_0_12px_rgba(16,185,129,0.3)]'
+                  : 'border-white/10 bg-white/[0.04] text-zinc-400 hover:bg-white/[0.08] hover:text-white'
+              }`}
+            >
+              <Gamepad2 className="h-3.5 w-3.5" />
+              <span className="hidden sm:inline">{showTouchControls ? 'Touch ON' : 'Touch'}</span>
+            </button>
+          </div>
+        </header>
+
+        {/* HUD Row (shrink-0) */}
+        {useCompactHud ? (
+          <div className="w-full shrink-0 mx-auto max-w-sm rounded-lg border border-white/10 bg-[#08090d]/95 px-2.5 py-1 mt-1 shadow-md">
+            <div className="flex items-center justify-between font-mono text-[11px]">
+              <div className="flex items-center gap-1">
+                <span className="font-sans text-[9px] font-bold uppercase text-zinc-400">Goal:</span>
+                <span className="font-bold text-white">
+                  {state?.linesCleared ?? 0}
+                  {started.goal.lines !== undefined && (
+                    <span className="text-zinc-500">/{started.goal.lines}L</span>
+                  )}
+                </span>
+              </div>
+
+              <div className="flex items-center gap-1">
+                <span className="font-sans text-[9px] font-bold uppercase text-zinc-400">Pcs:</span>
+                <span className="font-bold text-sky-300">{state?.piecesPlaced ?? 0}</span>
+                {started.referenceBaseline && (
+                  <span
+                    className={`text-[9px] font-bold ${
+                      (state?.piecesPlaced ?? 0) <= started.referenceBaseline.piecesUsed + 1
+                        ? 'text-amber-400'
+                        : 'text-zinc-500 line-through'
+                    }`}
+                  >
+                    (≤{started.referenceBaseline.piecesUsed + 1}★)
+                  </span>
+                )}
+              </div>
+
+              <div className="flex items-center gap-1">
+                <span className="font-sans text-[9px] font-bold uppercase text-zinc-400">Score:</span>
+                <span className="font-bold text-emerald-400">{(state?.score ?? 0).toLocaleString()}</span>
+              </div>
+            </div>
+
+            {started.referenceBaseline && (
+              <div className="mt-1 h-1 w-full overflow-hidden rounded-full bg-white/10">
+                <div
+                  className={`h-full transition-all duration-300 ${
+                    (state?.piecesPlaced ?? 0) <= started.referenceBaseline.piecesUsed + 1
+                      ? 'bg-gradient-to-r from-emerald-400 to-sky-400'
+                      : 'bg-zinc-600'
+                  }`}
+                  style={{
+                    width: `${Math.min(
+                      100,
+                      ((state?.piecesPlaced ?? 0) / Math.max(1, started.referenceBaseline.piecesUsed + 1)) * 100,
+                    )}%`,
+                  }}
+                />
+              </div>
+            )}
+          </div>
+        ) : (
+          <div className="w-full shrink-0 mx-auto max-w-3xl rounded-xl border border-white/10 bg-[#08090d]/95 p-3.5 mt-1.5 shadow-xl backdrop-blur-md">
+            <div className="flex flex-wrap items-center justify-between gap-4">
+              <div className="flex items-center gap-6">
+                <div className="flex flex-col">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-400">Your Score</span>
+                  <span className="font-mono text-xl font-black text-emerald-400 drop-shadow-[0_0_8px_rgba(52,211,153,0.3)]">
+                    {(state?.score ?? 0).toLocaleString()}
+                  </span>
+                </div>
+                <div className="flex flex-col">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-400">Pieces Placed</span>
+                  <span className="font-mono text-xl font-black text-sky-300 drop-shadow-[0_0_8px_rgba(125,211,252,0.3)]">
+                    {state?.piecesPlaced ?? 0}
+                  </span>
+                </div>
+                <div className="flex flex-col">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-400">Lines Cleared</span>
+                  <span className="font-mono text-xl font-black text-white">
+                    {state?.linesCleared ?? 0}
+                    {started.goal.lines !== undefined && (
+                      <span className="text-sm font-medium text-zinc-500"> / {started.goal.lines}</span>
+                    )}
+                  </span>
+                </div>
+              </div>
+
+              {started.referenceBaseline && (
+                <div
+                  id="dev-victory-trigger"
+                  onClick={
+                    DEV_TOOLS_ENABLED
+                      ? () => {
+                          const baseline = started.referenceBaseline;
+                          const piecesUsed = baseline?.piecesUsed ?? 15;
+                          const evalResult = calculatePuzzleStars(
+                            {
+                              solved: true,
+                              piecesUsed,
+                              score: 2450,
+                              ticksUsed: 800,
+                              goalKind: started.goal.kind,
+                            },
+                            baseline,
+                          );
+                          setEnd({
+                            levelId: started.puzzleId ?? started.levelId,
+                            solved: true,
+                            piecesUsed,
+                            score: 2450,
+                            ticksUsed: 800,
+                            linesCleared: 4,
+                            attemptId: 'dev-test',
+                          });
+                          setVictoryEvaluation(evalResult);
+                        }
+                      : undefined
+                  }
+                  className={`flex items-center gap-3 rounded-xl border border-amber-500/20 bg-amber-500/[0.04] px-3.5 py-2 ${
+                    DEV_TOOLS_ENABLED ? 'cursor-pointer select-none hover:bg-amber-500/[0.08]' : ''
+                  }`}
+                >
+                  <div className="flex flex-col text-right">
+                    <div className="flex items-center justify-end gap-1.5 text-[10px] font-black uppercase tracking-wider text-amber-400">
+                      <span>🎯</span>
+                      <span>3★ Target Par</span>
+                    </div>
+                    <div className="font-mono text-xs font-bold text-zinc-200">
+                      <span>≤ {started.referenceBaseline.piecesUsed + 1} pcs</span>
+                      {started.referenceBaseline.score !== undefined && (
+                        <span className="text-zinc-400"> · {started.referenceBaseline.score.toLocaleString()} pts</span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {started.referenceBaseline && (
+              <div className="mt-2.5">
+                <div className="h-1.5 w-full overflow-hidden rounded-full bg-white/10">
+                  <div
+                    className={`h-full transition-all duration-300 ${
+                      (state?.piecesPlaced ?? 0) <= started.referenceBaseline.piecesUsed + 1
+                        ? 'bg-gradient-to-r from-emerald-500 to-sky-400'
+                        : 'bg-zinc-600'
+                    }`}
+                    style={{
+                      width: `${Math.min(
+                        100,
+                        ((state?.piecesPlaced ?? 0) / Math.max(1, started.referenceBaseline.piecesUsed + 1)) * 100,
+                      )}%`,
+                    }}
+                  />
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Compact Hazard Chip (shrink-0) */}
+        {showHazardChip && (
+          <div className="w-full shrink-0 mx-auto max-w-sm flex items-center justify-between rounded-lg border border-white/10 bg-[#08090d]/90 px-2.5 py-0.5 mt-1 text-[11px] shadow-sm">
+            <div className="flex items-center gap-1.5 truncate">
+              {timelineHints.length > 0 ? (
+                <>
+                  <span className="relative flex h-2 w-2 shrink-0">
+                    <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-rose-400 opacity-75" />
+                    <span className="relative inline-flex h-2 w-2 rounded-full bg-rose-500" />
+                  </span>
+                  <span className="font-bold text-rose-300 text-[10px] uppercase">Hazard:</span>
+                  <span className="truncate text-zinc-200 text-[11px] font-bold">
+                    {getEffectMeta(timelineHints[0].kind).name}
+                  </span>
+                  <span className="rounded bg-white/10 px-1 py-0.2 font-mono text-[9px] text-amber-300">
+                    {getTriggerDetails(timelineHints[0], state?.piecesPlaced ?? 0, state?.tick ?? 0).label}
+                  </span>
+                </>
+              ) : (
+                <>
+                  <span className="inline-flex h-2 w-2 rounded-full bg-emerald-500" />
+                  <span className="font-bold text-emerald-400 text-[11px]">All Hazards Cleared ✨</span>
+                </>
+              )}
+            </div>
+            {timelineHints.length > 1 && (
+              <span className="ml-1 shrink-0 rounded bg-white/10 px-1.5 py-0.2 font-mono text-[9px] font-bold text-zinc-400">
+                +{timelineHints.length - 1} more
+              </span>
+            )}
+          </div>
+        )}
+
+        {/* Playfield Area (flex-1 min-h-0 overflow-hidden) */}
+        <div
+          ref={playfieldLayoutRef}
+          className="relative flex min-h-0 w-full flex-1 items-center justify-center gap-3 overflow-hidden py-0.5"
+        >
+          <div className="relative flex h-full min-h-0 w-full flex-1 items-center justify-center overflow-hidden">
             {player ? (
               <GameField
                 ref={myFieldRef}
@@ -518,77 +1135,186 @@ export const PuzzleScreen: React.FC = () => {
                 title="Puzzle"
                 showFunds={false}
                 showPlayerName={false}
+                showStats={false}
+                cellSize={cellSize}
+                boardFitRef={boardFitRef}
                 hatchingEnabled={false}
                 allowHold={started?.allowHold !== false}
                 status={finished ? 'ended' : 'playing'}
               />
             ) : (
-              <div className="flex h-[420px] w-[240px] items-center justify-center rounded-xl border border-white/10 bg-[#08090d] text-sm text-zinc-500">
+              <div className="flex h-[380px] w-[220px] items-center justify-center rounded-xl border border-white/10 bg-[#08090d] text-sm text-zinc-500">
                 {connected ? 'Loading puzzle…' : 'Connecting…'}
-              </div>
-            )}
-            {timelineHints.length > 0 && (
-              <div className="w-40 rounded-xl border border-white/10 bg-[#08090d] p-3 text-xs text-zinc-300">
-                <p className="mb-2 font-bold uppercase tracking-wider text-zinc-400">Upcoming</p>
-                <ul className="space-y-1">
-                  {timelineHints.map((hint, index) => (
-                    <li key={`${hint.kind}-${index}`}>
-                      {typeof hint.afterPieces === 'number'
-                        ? `${hint.kind} after ${hint.afterPieces} pcs`
-                        : hint.tick < 0
-                          ? hint.kind
-                          : `${hint.kind} @ ${Math.floor(hint.tick / 60)}s`}
-                    </li>
-                  ))}
-                </ul>
               </div>
             )}
           </div>
 
-          {finished && (
-            <div className="flex flex-col items-center gap-3 rounded-xl border border-white/10 bg-[#08090d] px-8 py-6 text-center">
-              <p className="text-xl font-black uppercase tracking-wider">
-                {end?.solved || state?.status === 'solved'
-                  ? 'Solved!'
-                  : end?.topOut || state?.status === 'topout'
-                    ? 'Top Out'
-                    : 'Session Ended'}
-              </p>
-              {end && (
-                <p className="text-xs text-zinc-400">
-                  {end.linesCleared} lines · {end.piecesUsed} pieces ·{' '}
-                  {Math.round(end.ticksUsed / 60)}s
-                  {end.attemptId ? ` · attempt ${end.attemptId.slice(0, 8)}` : ''}
-                </p>
-              )}
-              <div className="flex gap-2">
-                <button
-                  type="button"
-                  onClick={restartSame}
-                  className="inline-flex items-center gap-1.5 rounded-lg bg-white/10 px-4 py-2 text-xs font-bold uppercase tracking-wider hover:bg-white/20"
+          {showHazardAside && (
+            <aside
+              className="hidden md:flex w-56 shrink-0 flex-col gap-2 rounded-xl border border-white/10 bg-[#08090d]/95 p-3 shadow-2xl backdrop-blur-md"
+              aria-label="Incoming hazards"
+            >
+              <div className="flex items-center justify-between border-b border-white/10 pb-2">
+                <div className="flex items-center gap-1.5">
+                  {timelineHints.length > 0 ? (
+                    <span className="relative flex h-2 w-2">
+                      <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-rose-400 opacity-75" />
+                      <span className="relative inline-flex h-2 w-2 rounded-full bg-rose-500" />
+                    </span>
+                  ) : (
+                    <span className="inline-flex h-2 w-2 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.7)]" />
+                  )}
+                  <h2 className="text-[10px] font-black uppercase tracking-widest text-zinc-300">
+                    Incoming Hazards
+                  </h2>
+                </div>
+                <span
+                  className={`rounded px-1.5 py-0.5 font-mono text-[9px] font-bold ${
+                    timelineHints.length > 0
+                      ? 'bg-white/10 text-zinc-400'
+                      : 'border border-emerald-500/30 bg-emerald-950/40 text-emerald-300'
+                  }`}
                 >
-                  <RotateCcw className="h-3.5 w-3.5" />
-                  <span>Retry</span>
-                </button>
+                  {timelineHints.length > 0 ? timelineHints.length : '✓'}
+                </span>
+              </div>
+
+              {timelineHints.length > 0 ? (
+                <div className="flex max-h-[380px] flex-col gap-1.5 overflow-y-auto pr-0.5">
+                  {timelineHints.map((hint, index) => {
+                    const meta = getEffectMeta(hint.kind);
+                    const { label, isImminent, isUrgent } = getTriggerDetails(
+                      hint,
+                      state?.piecesPlaced ?? 0,
+                      state?.tick ?? 0,
+                    );
+
+                    return (
+                      <div
+                        key={`${hint.kind}-${index}`}
+                        className={`group flex items-center justify-between gap-2 rounded-lg border p-1.5 transition-all ${
+                          isUrgent
+                            ? `${meta.borderClass} ${meta.glowClass} bg-white/[0.08] ring-1 ring-rose-500/40`
+                            : isImminent
+                              ? `${meta.borderClass} bg-white/[0.05]`
+                              : 'border-white/5 bg-white/[0.02] hover:border-white/15 hover:bg-white/[0.05]'
+                        }`}
+                      >
+                        <div className="flex min-w-0 items-center gap-2">
+                          <span
+                            className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-md border text-sm shadow-sm ${meta.badgeClass}`}
+                            aria-hidden
+                          >
+                            {meta.icon}
+                          </span>
+                          <div className="flex min-w-0 flex-col">
+                            <span className="truncate text-xs font-bold leading-none text-zinc-100">
+                              {meta.name}
+                            </span>
+                            <span className="mt-0.5 text-[9px] font-medium uppercase tracking-wider text-zinc-500">
+                              {meta.category}
+                            </span>
+                          </div>
+                        </div>
+
+                        <span
+                          className={`shrink-0 rounded px-1.5 py-0.5 font-mono text-[9px] font-bold uppercase tracking-wider ${
+                            isUrgent
+                              ? 'animate-pulse bg-rose-500/30 text-rose-200'
+                              : isImminent
+                                ? 'bg-amber-500/20 text-amber-300'
+                                : 'bg-white/10 text-zinc-400'
+                          }`}
+                        >
+                          {label}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className="flex flex-col items-center justify-center py-6 text-center">
+                  <span className="text-xl">✨</span>
+                  <span className="mt-1 text-[11px] font-bold text-emerald-400">All Hazards Cleared</span>
+                  <span className="mt-0.5 text-[9px] text-zinc-500">Focus on downstacking</span>
+                </div>
+              )}
+            </aside>
+          )}
+        </div>
+
+        {/* On-Screen Touch Controls (shrink-0 mt-auto) */}
+        {showTouchControls && (
+          <MobileControls
+            onInput={handleTouchInput}
+            onAction={handleTouchAction}
+            onRetry={restartSame}
+          />
+        )}
+      </main>
+
+      {victoryEvaluation && end?.solved && started && (
+        <PuzzleVictoryModal
+          evaluation={victoryEvaluation}
+          levelName={started.name}
+          piecesUsed={end.piecesUsed}
+          score={end.score}
+          linesCleared={end.linesCleared}
+          hasNextLevel={Boolean(nextPuzzleEntry)}
+          onNextLevel={handleNextLevel}
+          onRetry={restartSame}
+          onExit={pickAnother}
+        />
+      )}
+
+      {finished && (!victoryEvaluation || !end?.solved) && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 p-4 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="flex w-full max-w-sm flex-col items-center gap-4 rounded-2xl border border-rose-500/40 bg-[#0b0c13] p-6 text-center shadow-[0_0_50px_rgba(244,63,94,0.25)] ring-1 ring-rose-500/20">
+            <div className="flex h-16 w-16 items-center justify-center rounded-2xl border border-rose-500/40 bg-rose-500/10 text-3xl shadow-[0_0_20px_rgba(244,63,94,0.3)]">
+              💀
+            </div>
+            <div>
+              <p className="text-xl font-black uppercase tracking-wider text-rose-400">
+                {end?.topOut || state?.status === 'topout'
+                  ? 'Top Out!'
+                  : 'Session Ended'}
+              </p>
+              <p className="mt-1.5 text-xs text-zinc-400">
+                {end
+                  ? `${end.linesCleared} lines cleared · ${end.piecesUsed} pieces placed`
+                  : 'Stack reached the spawn ceiling'}
+              </p>
+            </div>
+            <div className="mt-1 flex w-full flex-col gap-2">
+              <button
+                type="button"
+                onClick={restartSame}
+                className="flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-rose-600 to-red-500 py-3 text-xs font-bold uppercase tracking-wider text-white shadow-lg shadow-rose-900/40 transition-all hover:brightness-110 active:scale-98"
+              >
+                <RotateCcw className="h-4 w-4" />
+                <span>Try Again (R)</span>
+              </button>
+              <div className="flex w-full gap-2">
                 <button
                   type="button"
                   onClick={pickAnother}
-                  className="inline-flex items-center gap-1.5 rounded-lg bg-white/10 px-4 py-2 text-xs font-bold uppercase tracking-wider hover:bg-white/20"
+                  className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-xl border border-white/10 bg-white/[0.05] py-2.5 text-xs font-bold uppercase tracking-wider text-zinc-300 transition-all hover:bg-white/10 active:scale-98"
                 >
                   <Play className="h-3.5 w-3.5" />
-                  <span>Pick Another</span>
+                  <span>Levels</span>
                 </button>
                 <button
                   type="button"
                   onClick={() => setAppRoute('landing')}
-                  className="inline-flex items-center gap-1.5 rounded-lg border border-white/10 px-4 py-2 text-xs font-bold uppercase tracking-wider text-zinc-300 hover:bg-white/10"
+                  className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-xl border border-white/10 bg-white/[0.05] py-2.5 text-xs font-bold uppercase tracking-wider text-zinc-300 transition-all hover:bg-white/10 active:scale-98"
                 >
+                  <ArrowLeft className="h-3.5 w-3.5" />
                   <span>Menu</span>
                 </button>
               </div>
             </div>
-          )}
-        </>
+          </div>
+        </div>
       )}
     </div>
   );

@@ -1,0 +1,5 @@
+feat(puzzle): survive-clear goal + retune Curtain Drop and Ultimate 29-combo
+
+Add compound survive-clear PuzzleGoal (alive at horizon and lines >= N).
+Curtain Drop uses sparse curtains + late magnet over a x3 human window.
+Ultimate 29-combo is perfect-clear with exact Jstris queue and time-tax beats.

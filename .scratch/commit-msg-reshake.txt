@@ -1,0 +1,5 @@
+feat(puzzle): reshake all catalog timelines + garbage-clear goal
+
+Break cross-map copycat effect orders (sticky>snag>magnet and cheese twins),
+keep beat counts, normalize timeline TS formatting, wire garbage-clear and
+level descriptions through catalog/host, and regen validation baselines.

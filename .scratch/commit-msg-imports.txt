@@ -1,0 +1,5 @@
+feat(puzzle): import Jstris 255 static-queue + Hard Drop C4W fumen
+
+Add Ultimate 29-combo (exact API queue) and center 4-wide 3-res dig
+board from published Hard Drop fumen; drop rejected Ronylicha RNG stand-in.
+

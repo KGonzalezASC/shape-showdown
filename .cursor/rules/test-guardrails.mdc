@@ -1,0 +1,37 @@
+---
+description: Enforce test lock, opt-in test creation, token bounds, and direct execution
+alwaysApply: true
+---
+
+# Test Discipline & Guardrails
+
+Follow these four rules whenever working on code or tests in this workspace:
+
+## 1. Opt-In Test Creation (No Unsolicited Tests)
+- New test files and suites are opt-in. Do not create unit, integration, end-to-end, or spec tests unless explicitly directed.
+- Do not add new test helper fixtures or mock suites autonomously.
+- Ban tautological mirror tests: never write tests that merely assert the code produces whatever output it just emitted.
+- Ban trivial asset tests: never write tests verifying static images, noise textures, or styling status codes.
+- Focus on shipping the product. Create tests only to freeze an already verified, workable product state when directed.
+
+## 2. Test Lock (Never Mutate Existing Tests)
+- Existing tests define expected behavior. Treat them as read-only specifications.
+- Never edit, weaken, skip, or delete existing test assertions when code fails.
+- Never alter mock return values, fixtures, or snapshots to match buggy behavior.
+- Fix the implementation code until existing tests pass. The bug is in the code, not the test.
+- Only modify an existing test if the user explicitly orders a specification change.
+- Place new tests in separate test blocks or new test files without editing existing tests.
+
+## 3. Token Bounds and Output Discipline
+- Run scoped tests only. Target the single test file or name filter relevant to the change.
+- Recommended scoped test commands for this workspace:
+  - `bun test <file>` (target single file)
+- Never run entire test suites or monorepo test runs unless explicitly requested.
+- Suppress noisy test output. Never dump full pass lists or coverage tables into context.
+- On test failure, capture only the failing assertion, error message, and top stack frame (under 30 lines).
+- Stop iterative brute-force test loops. If a test fails twice, stop and diagnose the root cause before re-running.
+
+## 4. Direct Execution Only (No Subagents for Tests)
+- Run all test commands directly in the primary agent thread.
+- Never spawn subagents to run tests, write tests, or debug test failures unless directed by the user.
+- Subagents consume multiplied tokens and lose context. Keep verification local and direct.

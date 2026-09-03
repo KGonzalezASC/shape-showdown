@@ -21,8 +21,14 @@ export const IncomingGarbageReadout: React.FC<IncomingGarbageReadoutProps> = ({
     aria-label={`${fieldTitle} incoming garbage`}
   >
     <div className="flex min-w-0 items-center gap-2">
-      <span className={`${ssStatusPillClasses.red} incoming-garbage-pill gap-1.5`}>
-        <span aria-hidden>↓</span>
+      <span
+        className={`${ssStatusPillClasses.red} incoming-garbage-pill gap-1.5 ${
+          lines > 0 ? 'animate-pulse ring-1 ring-rose-400/50' : ''
+        }`}
+      >
+        <span className="incoming-garbage-pill-icon text-[9px] leading-none" aria-hidden>
+          {lines > 0 ? '💥' : '↓'}
+        </span>
         <strong className="incoming-garbage-pill-value text-[8px]">{lines} IN</strong>
       </span>
     </div>
