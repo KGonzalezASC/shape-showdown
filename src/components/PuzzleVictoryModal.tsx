@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useRef } from 'react';
 import type { PuzzleStarEvaluation } from '../puzzle/puzzleStarRating';
+import { isPalmOrEdgeContact } from '../input/touchSafety';
 
 interface PuzzleVictoryModalProps {
   evaluation: PuzzleStarEvaluation;
@@ -256,6 +257,12 @@ export const PuzzleVictoryModal: React.FC<PuzzleVictoryModalProps> = ({
   const displayLines = useAnimatedCounter(linesCleared, showStats, 450);
 
   const timersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
+  const modalRef = useRef<HTMLDivElement>(null);
+  const retryPointerAllowedRef = useRef(false);
+
+  useEffect(() => {
+    modalRef.current?.focus();
+  }, []);
 
   const triggerCardThump = () => {
     setCardThumping(true);
@@ -348,9 +355,6 @@ export const PuzzleVictoryModal: React.FC<PuzzleVictoryModalProps> = ({
           e.preventDefault();
           skipAnimation();
         }
-      } else if (e.key === 'r' || e.key === 'R') {
-        e.preventDefault();
-        onRetry();
       } else if (e.key === 'Escape') {
         e.preventDefault();
         onExit();
@@ -358,7 +362,7 @@ export const PuzzleVictoryModal: React.FC<PuzzleVictoryModalProps> = ({
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [animationDone, hasNextLevel, onNextLevel, onRetry, onExit]);
+  }, [animationDone, hasNextLevel, onNextLevel, onExit]);
 
   const victoryTitle =
     !animationDone && revealedStars === 0
@@ -371,7 +375,12 @@ export const PuzzleVictoryModal: React.FC<PuzzleVictoryModalProps> = ({
 
   return (
     <div
+      ref={modalRef}
+      tabIndex={-1}
       onClick={!animationDone ? skipAnimation : undefined}
+      role="alertdialog"
+      aria-modal="true"
+      aria-labelledby="puzzle-victory-title"
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 p-4 backdrop-blur-md animate-in fade-in duration-200 cursor-default select-none"
     >
       <style>{`
@@ -491,6 +500,7 @@ export const PuzzleVictoryModal: React.FC<PuzzleVictoryModalProps> = ({
 
         {/* Dynamic Victory Banner */}
         <h2
+          id="puzzle-victory-title"
           className={`mt-2 text-xl sm:text-2xl font-black uppercase tracking-wider transition-all duration-300 ${
             revealedStars === 3
               ? 'bg-gradient-to-r from-amber-200 via-yellow-300 to-amber-400 bg-clip-text text-transparent drop-shadow-[0_2px_14px_rgba(251,191,36,0.7)] scale-105'
@@ -619,7 +629,7 @@ export const PuzzleVictoryModal: React.FC<PuzzleVictoryModalProps> = ({
             <button
               type="button"
               onClick={onNextLevel}
-              className="group flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-amber-400 via-amber-500 to-amber-600 px-5 py-3 text-sm font-black uppercase tracking-wider text-black shadow-lg shadow-amber-500/25 transition-all hover:scale-[1.02] hover:brightness-110 active:scale-[0.98]"
+              className="group flex min-h-[44px] w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-amber-400 via-amber-500 to-amber-600 px-5 py-3 text-sm font-black uppercase tracking-wider text-black shadow-lg shadow-amber-500/25 transition-all hover:scale-[1.02] hover:brightness-110 active:scale-[0.98]"
             >
               <span>Next Puzzle</span>
               <kbd className="rounded bg-black/20 px-1.5 py-0.5 text-[10px] font-black">Enter</kbd>
@@ -629,17 +639,29 @@ export const PuzzleVictoryModal: React.FC<PuzzleVictoryModalProps> = ({
           <div className="flex gap-2">
             <button
               type="button"
-              onClick={onRetry}
-              className="flex flex-1 items-center justify-center gap-1.5 rounded-xl border border-white/15 bg-white/5 py-2.5 text-xs font-bold uppercase tracking-wider text-zinc-200 transition-all hover:bg-white/10 active:scale-95"
+              onPointerDown={(event) => {
+                retryPointerAllowedRef.current = !isPalmOrEdgeContact(event);
+              }}
+              onPointerCancel={() => {
+                retryPointerAllowedRef.current = false;
+              }}
+              onClick={(event) => {
+                if (event.detail > 0) {
+                  const allowed = retryPointerAllowedRef.current;
+                  retryPointerAllowedRef.current = false;
+                  if (!allowed) return;
+                }
+                onRetry();
+              }}
+              className="flex min-h-[44px] flex-1 items-center justify-center gap-1.5 rounded-xl border border-white/15 bg-white/5 py-2.5 text-xs font-bold uppercase tracking-wider text-zinc-200 transition-all hover:bg-white/10 active:scale-95"
             >
               <span>Retry</span>
-              <kbd className="rounded bg-white/10 px-1.5 py-0.5 text-[9px] text-zinc-400">R</kbd>
             </button>
 
             <button
               type="button"
               onClick={onExit}
-              className="flex flex-1 items-center justify-center gap-1.5 rounded-xl border border-white/15 bg-white/5 py-2.5 text-xs font-bold uppercase tracking-wider text-zinc-400 transition-all hover:bg-white/10 hover:text-zinc-200 active:scale-95"
+              className="flex min-h-[44px] flex-1 items-center justify-center gap-1.5 rounded-xl border border-white/15 bg-white/5 py-2.5 text-xs font-bold uppercase tracking-wider text-zinc-400 transition-all hover:bg-white/10 hover:text-zinc-200 active:scale-95"
             >
               <span>Level Select</span>
               <kbd className="rounded bg-white/10 px-1.5 py-0.5 text-[9px] text-zinc-400">Esc</kbd>

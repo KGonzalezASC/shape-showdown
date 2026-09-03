@@ -8,6 +8,7 @@ import { KeyBindingsProvider } from './input/KeyBindingsProvider';
 import { GameStateProvider } from './state/GameStateProvider';
 import { DEV_TOOLS_ENABLED } from './devTools';
 import { getAppRoute, setAppRoute, type AppRoute } from './appRoute';
+import { useDocumentInteractionPolicy } from './input/documentInteractionPolicy';
 
 export const RootApp: React.FC = () => {
   const [route, setRoute] = useState<AppRoute>(() => getAppRoute());
@@ -28,6 +29,9 @@ export const RootApp: React.FC = () => {
   useEffect(() => {
     document.documentElement.dataset.page = route === 'game' ? 'game' : 'landing';
   }, [route]);
+  useDocumentInteractionPolicy(
+    route === 'landing' ? 'landing' : route === 'puzzles' ? 'puzzle-picker' : 'gameplay',
+  );
 
   if (
     DEV_TOOLS_ENABLED

@@ -53,11 +53,13 @@ interface GameFieldProps {
   /** When false (e.g. solo puzzle HUD), hides duplicate title, score, and line clears while preserving effect pills. Default = true. */
   showStats?: boolean;
   /**
-   * When false (solo puzzles like Four Wide), storage is disabled entirely.
+   /** When false (solo puzzles like Four Wide), storage is disabled entirely.
    * Distinct from multiplayer `canHold === false` ("Used this piece").
    * Default / undefined = enabled.
    */
   allowHold?: boolean;
+  /** Multiplayer-only incoming garbage readout. Default / undefined = shown. */
+  showIncomingGarbage?: boolean;
   /** Current replay tick used to show remaining effect duration. */
   effectTick?: number;
   /** Replay-only counterfactual placement overlay for the inspected player. */
@@ -174,6 +176,7 @@ const GameField = forwardRef<GameFieldRef, GameFieldProps>(({
   showPlayerName = true,
   showStats = true,
   allowHold = true,
+  showIncomingGarbage = true,
   effectTick,
   replayCandidateOverlay = null,
 }, ref) => {
@@ -462,11 +465,13 @@ const GameField = forwardRef<GameFieldRef, GameFieldProps>(({
           </span>
         </div>
       )}
-      <IncomingGarbageReadout
-        fieldTitle={title}
-        lines={pendingGarbageTotal(player.pendingGarbage)}
-        magnetLevel={player.magnetPermanentStacks ?? 0}
-      />
+      {showIncomingGarbage && (
+        <IncomingGarbageReadout
+          fieldTitle={title}
+          lines={pendingGarbageTotal(player.pendingGarbage)}
+          magnetLevel={player.magnetPermanentStacks ?? 0}
+        />
+      )}
       <div
         ref={boardFitRef}
         data-board-fit-slot={boardFitRef ? 'mobile' : undefined}
@@ -660,7 +665,7 @@ const GameField = forwardRef<GameFieldRef, GameFieldProps>(({
       </div>
       {isMe && (
         <div
-          className="mt-1.5 flex items-center justify-between gap-2 border border-white/10 bg-[#101212]/90 px-2 py-1.5"
+          className="game-field-storage mt-1.5 flex items-center justify-between gap-2 border border-white/10 bg-[#101212]/90 px-2 py-1.5"
         >
           <div className="min-w-0">
             <p className="text-[10px] font-bold uppercase tracking-wider text-zinc-300">Storage (Shift)</p>
@@ -761,7 +766,8 @@ export default React.memo(GameField, (prev, next) => {
     prev.faceGrowthStartedAtMs !== next.faceGrowthStartedAtMs ||
     prev.showFunds !== next.showFunds ||
     prev.showPlayerName !== next.showPlayerName ||
-    prev.allowHold !== next.allowHold
+    prev.allowHold !== next.allowHold ||
+    prev.showIncomingGarbage !== next.showIncomingGarbage
   ) {
     return false;
   }

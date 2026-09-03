@@ -1,24 +1,24 @@
-import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { io, type Socket } from 'socket.io-client';
-import { ArrowLeft, Gamepad2, Play, RotateCcw } from 'lucide-react';
+import { ArrowLeft, Play, RotateCcw } from 'lucide-react';
 import GameField, { type GameFieldRef } from './GameField';
-import MobileControls from './MobileControls';
+import MobileControls, { type MobileControlsRef } from './MobileControls';
+import { OnScreenControlsPreferenceButton } from './OnScreenControlsPreference';
 import type { PublicPlayerState } from '../state/publicSnapshots';
 import { setAppRoute } from '../appRoute';
 import { useKeyBindings } from '../input/KeyBindingsProvider';
 import { actionForCode } from '../input/keyBindings';
 import {
-  BOARD_COLS,
-  BOARD_VISIBLE_ROWS,
   CELL_SIZE,
   HOLD_SWAP_CUTOFF_VISIBLE_ROW,
 } from '../types';
+import type { ActionType, InputState } from '../types';
 import { usePlayfieldLayoutMode } from '../responsive/playfieldLayoutMode';
+import { usePuzzleViewportConstraints } from '../responsive/puzzleViewport';
 import { fitMobilePlayfieldCellSize } from './PlayfieldCellSizer';
 import { appendDiscordFrameId, isDiscordActivityContext } from '../discordContext';
 import { resolveGameServerUrl } from '../hooks/useGameSocket';
 import {
-  isPuzzleFinished,
   presentTimelineHints,
   type PuzzleVisibilityPolicy,
 } from '../puzzle/puzzlePresentation';
@@ -34,6 +34,14 @@ import {
 } from '../state/puzzleProgressStorage';
 import { PuzzleVictoryModal } from './PuzzleVictoryModal';
 import { DEV_TOOLS_ENABLED } from '../devTools';
+import {
+  actionAvailabilityFor,
+  deriveGameplayControlAvailability,
+} from '../input/gameplayControls';
+import { useOnScreenControlsPolicy } from '../input/onScreenControlsPolicy';
+import { useDocumentInteractionPolicy } from '../input/documentInteractionPolicy';
+import { isPalmOrEdgeContact } from '../input/touchSafety';
+import { derivePuzzleViewPhase } from '../puzzle/puzzleViewPhase';
 
 /**
  * Single-player puzzle screen.
@@ -344,6 +352,9 @@ const getTriggerDetails = (
 export const PuzzleScreen: React.FC = () => {
   const socketRef = useRef<Socket | null>(null);
   const myFieldRef = useRef<GameFieldRef>(null);
+  const mobileControlsRef = useRef<MobileControlsRef>(null);
+  const lossModalRef = useRef<HTMLDivElement>(null);
+  const retryPointerAllowedRef = useRef(false);
   const bindings = useKeyBindings();
   const bindingsRef = useRef(bindings);
   bindingsRef.current = bindings;
@@ -365,7 +376,54 @@ export const PuzzleScreen: React.FC = () => {
   const dailyAutostartHandledRef = useRef(false);
   const selectedPuzzleIdRef = useRef<string | null>(null);
   selectedPuzzleIdRef.current = selectedPuzzleId;
-  const heldInputsRef = useRef({ left: false, right: false, softDrop: false });
+  const keyboardInputRef = useRef<InputState>({ left: false, right: false, softDrop: false });
+  const touchInputRef = useRef<InputState>({ left: false, right: false, softDrop: false });
+  const controlsPolicy = useOnScreenControlsPolicy();
+  const puzzlePhase = derivePuzzleViewPhase({
+    picking,
+    selectedPuzzleId,
+    startedPuzzleId: started?.puzzleId ?? started?.levelId ?? null,
+    stateStatus: state?.status ?? null,
+    ended: end !== null,
+    endSolved: end?.solved ?? null,
+  });
+  useDocumentInteractionPolicy(puzzlePhase.kind === 'picker' ? 'puzzle-picker' : 'gameplay', 1);
+
+  const emitInput = useCallback((input: InputState) => {
+    socketRef.current?.emit('puzzle:input', input);
+  }, []);
+  const emitCombinedInput = useCallback(() => {
+    emitInput({
+      left: keyboardInputRef.current.left || touchInputRef.current.left,
+      right: keyboardInputRef.current.right || touchInputRef.current.right,
+      softDrop: keyboardInputRef.current.softDrop || touchInputRef.current.softDrop,
+    });
+  }, [emitInput]);
+  const clearInput = useCallback(() => {
+    keyboardInputRef.current = { left: false, right: false, softDrop: false };
+    touchInputRef.current = { left: false, right: false, softDrop: false };
+    emitInput({ left: false, right: false, softDrop: false });
+  }, [emitInput]);
+  const player = state ? toPublicPlayerState(state, 'puzzle-me') : null;
+  const gameplayInputActive = puzzlePhase.kind === 'playing' && state?.status === 'playing';
+  const controlsAvailability = useMemo(
+    () => deriveGameplayControlAvailability({
+      active: gameplayInputActive,
+      player,
+      currentTick: state?.tick ?? 0,
+      allowHold: started?.allowHold !== false,
+      utility: { kind: 'none' },
+    }),
+    [gameplayInputActive, player, started?.allowHold, state?.tick],
+  );
+  const controlsAvailabilityRef = useRef(controlsAvailability);
+  controlsAvailabilityRef.current = controlsAvailability;
+  const gameplayInputActiveRef = useRef(gameplayInputActive);
+  gameplayInputActiveRef.current = gameplayInputActive;
+
+  useEffect(() => {
+    if (!gameplayInputActive || !controlsPolicy.visible) clearInput();
+  }, [clearInput, controlsPolicy.visible, gameplayInputActive]);
 
   useEffect(() => {
     let cancelled = false;
@@ -389,6 +447,7 @@ export const PuzzleScreen: React.FC = () => {
         socket.emit('puzzle:list');
       });
       socket.on('disconnect', () => {
+        clearInput();
         if (!cancelled) {
           setConnected(false);
           setState(null);
@@ -412,12 +471,14 @@ export const PuzzleScreen: React.FC = () => {
         ) {
           dailyAutostartHandledRef.current = true;
           sessionStorage.removeItem('puzzleAutostart');
+          clearInput();
           setPicking(false);
           socket.emit('puzzle:start', { mode: 'daily' });
         }
       });
       socket.on('puzzle:started', (payload: PuzzleStarted) => {
         if (cancelled) return;
+        clearInput();
         setStarted(payload);
         setSelectedPuzzleId(payload.puzzleId ?? payload.levelId);
         setPicking(false);
@@ -429,6 +490,7 @@ export const PuzzleScreen: React.FC = () => {
       });
       socket.on('puzzle:end', (payload: PuzzleEnd) => {
         if (cancelled) return;
+        clearInput();
         setEnd(payload);
         const curStarted = startedRef.current;
         if (payload.solved) {
@@ -484,6 +546,7 @@ export const PuzzleScreen: React.FC = () => {
           },
           baseline,
         );
+        clearInput();
         setEnd({
           levelId: curStarted.puzzleId ?? curStarted.levelId,
           solved: true,
@@ -499,69 +562,63 @@ export const PuzzleScreen: React.FC = () => {
 
     return () => {
       cancelled = true;
+      clearInput();
       const socket = socketRef.current;
       socket?.emit('puzzle:stop');
       socket?.close();
       socketRef.current = null;
     };
+  }, [clearInput]);
+
+  const handlePuzzleAction = useCallback((action: ActionType) => {
+    if (!gameplayInputActiveRef.current) return;
+    if (!actionAvailabilityFor(controlsAvailabilityRef.current, action).enabled) return;
+    if (action === 'hardDrop') myFieldRef.current?.hardDrop();
+    socketRef.current?.emit('puzzle:action', action);
   }, []);
 
-  // Keyboard controls wired to KeyBindingsProvider (matches multiplayer match behavior).
+  // Keyboard controls stay active on hybrid devices even when on-screen controls are shown.
   useEffect(() => {
-    const emitInput = () => {
-      const socket = socketRef.current;
-      if (!socket) return;
-      socket.emit('puzzle:input', { ...heldInputsRef.current });
-    };
+    const onKeyDown = (event: KeyboardEvent) => {
+      const action = actionForCode(bindingsRef.current, event.code);
+      if (!action || !gameplayInputActiveRef.current) return;
 
-    const onKeyDown = (e: KeyboardEvent) => {
-      const action = actionForCode(bindingsRef.current, e.code);
-      if (!action) return;
-
-      e.preventDefault();
+      event.preventDefault();
       if (action === 'moveLeft') {
-        if (heldInputsRef.current.left) return;
-        heldInputsRef.current = { ...heldInputsRef.current, left: true };
-        emitInput();
+        if (keyboardInputRef.current.left) return;
+        keyboardInputRef.current = { ...keyboardInputRef.current, left: true };
+        emitCombinedInput();
       } else if (action === 'moveRight') {
-        if (heldInputsRef.current.right) return;
-        heldInputsRef.current = { ...heldInputsRef.current, right: true };
-        emitInput();
+        if (keyboardInputRef.current.right) return;
+        keyboardInputRef.current = { ...keyboardInputRef.current, right: true };
+        emitCombinedInput();
       } else if (action === 'softDrop') {
-        if (heldInputsRef.current.softDrop) return;
-        heldInputsRef.current = { ...heldInputsRef.current, softDrop: true };
-        emitInput();
+        if (keyboardInputRef.current.softDrop) return;
+        keyboardInputRef.current = { ...keyboardInputRef.current, softDrop: true };
+        emitCombinedInput();
       } else if (action === 'hardDrop') {
-        myFieldRef.current?.hardDrop();
-        socketRef.current?.emit('puzzle:action', 'hardDrop');
+        handlePuzzleAction('hardDrop');
       } else if (action === 'rotateCW') {
-        if (e.repeat) return;
-        socketRef.current?.emit('puzzle:action', 'rotateCW');
+        if (!event.repeat) handlePuzzleAction('rotateCW');
       } else if (action === 'rotateCCW') {
-        if (e.repeat) return;
-        socketRef.current?.emit('puzzle:action', 'rotateCCW');
+        if (!event.repeat) handlePuzzleAction('rotateCCW');
       } else if (action === 'hold') {
-        socketRef.current?.emit('puzzle:action', 'hold');
+        handlePuzzleAction('hold');
       }
     };
 
-    const onKeyUp = (e: KeyboardEvent) => {
-      const action = actionForCode(bindingsRef.current, e.code);
+    const onKeyUp = (event: KeyboardEvent) => {
+      const action = actionForCode(bindingsRef.current, event.code);
       if (action === 'moveLeft') {
-        heldInputsRef.current = { ...heldInputsRef.current, left: false };
-        emitInput();
+        keyboardInputRef.current = { ...keyboardInputRef.current, left: false };
+        emitCombinedInput();
       } else if (action === 'moveRight') {
-        heldInputsRef.current = { ...heldInputsRef.current, right: false };
-        emitInput();
+        keyboardInputRef.current = { ...keyboardInputRef.current, right: false };
+        emitCombinedInput();
       } else if (action === 'softDrop') {
-        heldInputsRef.current = { ...heldInputsRef.current, softDrop: false };
-        emitInput();
+        keyboardInputRef.current = { ...keyboardInputRef.current, softDrop: false };
+        emitCombinedInput();
       }
-    };
-
-    const clearInput = () => {
-      heldInputsRef.current = { left: false, right: false, softDrop: false };
-      emitInput();
     };
 
     window.addEventListener('keydown', onKeyDown);
@@ -571,10 +628,12 @@ export const PuzzleScreen: React.FC = () => {
       window.removeEventListener('keydown', onKeyDown);
       window.removeEventListener('keyup', onKeyUp);
       window.removeEventListener('blur', clearInput);
+      clearInput();
     };
-  }, []);
+  }, [clearInput, emitCombinedInput, handlePuzzleAction]);
 
   const startPuzzle = useCallback((puzzleId: string) => {
+    clearInput();
     setEnd(null);
     setState(null);
     setStarted(null);
@@ -587,9 +646,10 @@ export const PuzzleScreen: React.FC = () => {
       socket.connect();
     }
     socket.emit('puzzle:start', { mode: 'catalog', puzzleId });
-  }, []);
+  }, [clearInput]);
 
   const startDaily = useCallback(() => {
+    clearInput();
     setEnd(null);
     setState(null);
     setStarted(null);
@@ -601,22 +661,40 @@ export const PuzzleScreen: React.FC = () => {
       socket.connect();
     }
     socket.emit('puzzle:start', { mode: 'daily' });
-  }, []);
+  }, [clearInput]);
 
   const restartSame = useCallback(() => {
     const id = selectedPuzzleIdRef.current;
     if (id) startPuzzle(id);
   }, [startPuzzle]);
 
-  const pickAnother = useCallback(() => {
+  const startRandom = useCallback(() => {
+    clearInput();
     setEnd(null);
     setState(null);
     setStarted(null);
     setVictoryEvaluation(null);
+    setSelectedPuzzleId(null);
+    setPicking(false);
+    const socket = socketRef.current;
+    if (!socket) return;
+    if (!socket.connected) {
+      socket.connect();
+    }
+    socket.emit('puzzle:start', { mode: 'random' });
+  }, [clearInput]);
+
+  const pickAnother = useCallback(() => {
+    clearInput();
+    setEnd(null);
+    setState(null);
+    setStarted(null);
+    setVictoryEvaluation(null);
+    setSelectedPuzzleId(null);
     setPicking(true);
     socketRef.current?.emit('puzzle:stop');
     socketRef.current?.emit('puzzle:list');
-  }, []);
+  }, [clearInput]);
 
   const currentPuzzleIndex = catalog.findIndex(
     (c) => c.id === (started?.puzzleId ?? started?.levelId),
@@ -630,15 +708,19 @@ export const PuzzleScreen: React.FC = () => {
     if (nextPuzzleEntry) {
       startPuzzle(nextPuzzleEntry.id);
     } else {
-      setVictoryEvaluation(null);
-      setPicking(true);
+      pickAnother();
     }
-  }, [nextPuzzleEntry, startPuzzle]);
+  }, [nextPuzzleEntry, pickAnother, startPuzzle]);
 
   const totalStars = getTotalStarsEarned(records);
 
-  const player = state ? toPublicPlayerState(state, 'puzzle-me') : null;
-  const finished = isPuzzleFinished(state?.status ?? null, end !== null);
+  const finished = puzzlePhase.kind === 'finished';
+
+  useEffect(() => {
+    if (!finished || (victoryEvaluation && end?.solved)) return;
+    lossModalRef.current?.focus();
+  }, [end?.solved, finished, victoryEvaluation]);
+
   const timelineHints = presentTimelineHints(
     (started?.timeline ?? []).map((event) => ({
       tick: typeof event.tick === 'number' ? event.tick : -1,
@@ -656,62 +738,28 @@ export const PuzzleScreen: React.FC = () => {
     started?.visibilityPolicy !== 'hidden' &&
     started?.visibilityPolicy !== 'unspecified';
 
-  const [showTouchControls, setShowTouchControls] = useState<boolean>(() => {
-    if (typeof window === 'undefined') return false;
-    const saved = localStorage.getItem('puzzleTouchControls');
-    if (saved !== null) return saved === 'true';
-    const isCoarse = window.matchMedia('(pointer: coarse)').matches;
-    const isTouch = typeof navigator !== 'undefined' && (navigator.maxTouchPoints > 0 || isCoarse);
-    return isTouch;
-  });
+  const handleTouchInput = useCallback((input: InputState) => {
+    touchInputRef.current = input;
+    emitCombinedInput();
+  }, [emitCombinedInput]);
 
-  const toggleTouchControls = useCallback(() => {
-    setShowTouchControls((prev) => {
-      const next = !prev;
-      try {
-        localStorage.setItem('puzzleTouchControls', String(next));
-      } catch {
-        // ignore
-      }
-      return next;
-    });
-  }, []);
-
-  const [touchControlsHeight, setTouchControlsHeight] = useState(0);
-
-  const handleTouchInput = useCallback(
-    (input: { left: boolean; right: boolean; softDrop: boolean }) => {
-      heldInputsRef.current = input;
-      socketRef.current?.emit('puzzle:input', input);
-    },
-    [],
-  );
-
-  const handleTouchAction = useCallback(
-    (action: 'rotateCW' | 'rotateCCW' | 'hardDrop' | 'hold') => {
-      if (action === 'hardDrop') {
-        myFieldRef.current?.hardDrop();
-        socketRef.current?.emit('puzzle:action', 'hardDrop');
-      } else {
-        socketRef.current?.emit('puzzle:action', action);
-      }
-    },
-    [],
-  );
+  const handleTouchAction = handlePuzzleAction;
 
   const layoutMode = usePlayfieldLayoutMode();
-  const isPhone = layoutMode === 'phone';
-  const isShortWindow = typeof window !== 'undefined' && window.innerHeight < 680;
-  const useCompactHud = isPhone || (showTouchControls && isShortWindow);
-  const showHazardAside = hasAuthoredHazards && !isPhone;
-  const showHazardChip = hasAuthoredHazards && isPhone;
+  const isNarrowLayout = layoutMode === 'phone';
+  const viewportConstraints = usePuzzleViewportConstraints();
+  const isShortWindow = viewportConstraints.short;
+  const isLandscapeWindow = viewportConstraints.landscape;
+  const useCompactHud = isShortWindow || isLandscapeWindow;
+  const showHazardAside = hasAuthoredHazards && !isNarrowLayout && !isShortWindow && !isLandscapeWindow;
+  const showHazardChip = hasAuthoredHazards && (isNarrowLayout || isShortWindow || isLandscapeWindow);
 
   const boardFitRef = useRef<HTMLDivElement>(null);
   const playfieldLayoutRef = useRef<HTMLDivElement>(null);
   const [cellSize, setCellSize] = useState(CELL_SIZE);
 
   useLayoutEffect(() => {
-    if (picking || !started) return;
+    if (puzzlePhase.kind !== 'playing') return;
     const layoutNode = playfieldLayoutRef.current;
     const slotNode = boardFitRef.current;
     if (!layoutNode || !slotNode) return;
@@ -720,17 +768,9 @@ export const PuzzleScreen: React.FC = () => {
       const layoutBox = layoutNode.getBoundingClientRect();
       const slotBox = slotNode.getBoundingClientRect();
 
-      // Available vertical budget for the 18 rows of the board:
-      // slotBox.height, or layoutBox.height minus 46px reserve for hold row & gap
-      const heightBudget = Math.min(
-        slotBox.height > 16 ? slotBox.height : Infinity,
-        layoutBox.height > 48 ? layoutBox.height - 46 : Infinity,
-      );
-      const widthBudget = Math.min(
-        slotBox.width > 16 ? slotBox.width : Infinity,
-        layoutBox.width > 16 ? layoutBox.width : Infinity,
-      );
-      if (!isFinite(heightBudget) || !isFinite(widthBudget) || heightBudget < 10 || widthBudget < 10) return;
+      const heightBudget = slotBox.height;
+      const widthBudget = Math.min(slotBox.width, layoutBox.width);
+      if (!Number.isFinite(heightBudget) || !Number.isFinite(widthBudget) || heightBudget < 16 || widthBudget < 16) return;
 
       const next = fitMobilePlayfieldCellSize({ width: widthBudget, height: heightBudget });
       setCellSize((prev) => (prev === next ? prev : next));
@@ -739,15 +779,14 @@ export const PuzzleScreen: React.FC = () => {
     measure();
     const ro = new ResizeObserver(measure);
     ro.observe(layoutNode);
-    ro.observe(slotNode);
     window.addEventListener('resize', measure);
     return () => {
       ro.disconnect();
       window.removeEventListener('resize', measure);
     };
-  }, [showTouchControls, started?.levelId, picking, hasAuthoredHazards, useCompactHud, showHazardAside]);
+  }, [controlsPolicy.visible, puzzlePhase.kind, hasAuthoredHazards, useCompactHud, showHazardAside]);
 
-  if (picking || !started) {
+  if (puzzlePhase.kind === 'picker') {
     return (
       <div className="relative flex min-h-dvh w-full flex-col items-center justify-start gap-4 bg-[#07080b] px-3 pt-4 pb-12 font-sans text-white select-none overflow-y-auto">
         <header className="sticky top-0 z-40 flex w-full max-w-md items-center justify-between rounded-xl border border-white/10 bg-[#08090d]/95 px-3 py-2 shadow-xl backdrop-blur-md">
@@ -861,12 +900,7 @@ export const PuzzleScreen: React.FC = () => {
           })}
           <button
             type="button"
-            onClick={() => {
-              const socket = socketRef.current;
-              if (!socket) return;
-              setPicking(false);
-              socket.emit('puzzle:start', { mode: 'random' });
-            }}
+            onClick={startRandom}
             className="rounded-lg bg-white/10 px-4 py-2 text-xs font-bold uppercase tracking-wider hover:bg-white/20"
           >
             Random curated
@@ -876,11 +910,32 @@ export const PuzzleScreen: React.FC = () => {
     );
   }
 
+  if (!started) {
+    return (
+      <div className="puzzle-starting-screen relative flex h-dvh w-full items-center justify-center overflow-hidden bg-[#07080b] p-4 text-center text-white">
+        <div className="flex w-full max-w-sm flex-col items-center gap-4 rounded-xl border border-white/10 bg-[#08090d] p-6 shadow-xl">
+          <p className="text-xs font-bold uppercase tracking-[0.14em] text-zinc-300">Starting puzzle...</p>
+          <p className="text-[10px] leading-5 text-zinc-500">Waiting for the first board snapshot.</p>
+          <button
+            type="button"
+            onClick={pickAnother}
+            className="min-h-[44px] rounded-lg border border-white/10 bg-white/[0.04] px-4 py-2 text-[10px] font-bold uppercase tracking-wider text-zinc-200 hover:bg-white/[0.08]"
+          >
+            Levels
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="shape-showdown-root relative flex h-dvh max-h-dvh min-h-0 w-full flex-col items-center justify-center overflow-hidden bg-[#07080b] p-1 sm:p-2 text-white select-none">
-      <main className="shape-showdown-screen relative z-10 flex h-full max-h-full min-h-0 w-full max-w-[480px] sm:max-w-[820px] md:max-w-[1020px] flex-col overflow-hidden">
+    <div className="shape-showdown-root puzzle-game-root relative flex h-dvh max-h-dvh min-h-0 w-full flex-col items-center justify-center overflow-hidden bg-[#07080b] p-1 sm:p-2 text-white select-none">
+      <main
+        inert={finished}
+        className="shape-showdown-screen puzzle-game-screen relative z-10 flex h-full max-h-full min-h-0 w-full max-w-[480px] sm:max-w-[820px] md:max-w-[1020px] flex-col overflow-hidden"
+      >
         {/* Header row (shrink-0) */}
-        <header className="w-full shrink-0 flex items-center justify-between border-b border-white/10 bg-[#08090d]/95 px-2.5 sm:px-3 py-1.5 shadow-md backdrop-blur-md">
+        <header className="puzzle-game-header w-full shrink-0 flex items-center justify-between border-b border-white/10 bg-[#08090d]/95 px-2.5 sm:px-3 py-1.5 shadow-md backdrop-blur-md">
           <div className="flex items-center gap-1.5 sm:gap-2">
             <button
               type="button"
@@ -917,26 +972,22 @@ export const PuzzleScreen: React.FC = () => {
           </div>
 
           <div className="flex items-center gap-1.5">
-            <button
-              type="button"
-              onClick={toggleTouchControls}
-              title={showTouchControls ? 'Hide touch controls' : 'Show touch controls'}
-              aria-label={showTouchControls ? 'Hide touch controls' : 'Show touch controls'}
-              className={`inline-flex items-center gap-1 rounded-lg border px-2 sm:px-2.5 py-1 text-[11px] sm:text-xs font-bold uppercase tracking-wider transition-all ${
-                showTouchControls
-                  ? 'border-emerald-500/50 bg-emerald-500/20 text-emerald-300 shadow-[0_0_12px_rgba(16,185,129,0.3)]'
-                  : 'border-white/10 bg-white/[0.04] text-zinc-400 hover:bg-white/[0.08] hover:text-white'
-              }`}
-            >
-              <Gamepad2 className="h-3.5 w-3.5" />
-              <span className="hidden sm:inline">{showTouchControls ? 'Touch ON' : 'Touch'}</span>
-            </button>
+            <OnScreenControlsPreferenceButton
+              onBeforeChange={(next) => {
+                if (next === 'hidden') {
+                  clearInput();
+                  mobileControlsRef.current?.clearInput();
+                }
+              }}
+            />
           </div>
         </header>
 
+        {/* HUD and hazard status stay in normal flow except in landscape, where they move beside the board. */}
+        <div className="puzzle-status-area">
         {/* HUD Row (shrink-0) */}
         {useCompactHud ? (
-          <div className="w-full shrink-0 mx-auto max-w-sm rounded-lg border border-white/10 bg-[#08090d]/95 px-2.5 py-1 mt-1 shadow-md">
+          <div className="puzzle-hud puzzle-hud--compact w-full shrink-0 mx-auto max-w-sm rounded-lg border border-white/10 bg-[#08090d]/95 px-2.5 py-1 mt-1 shadow-md">
             <div className="flex items-center justify-between font-mono text-[11px]">
               <div className="flex items-center gap-1">
                 <span className="font-sans text-[9px] font-bold uppercase text-zinc-400">Goal:</span>
@@ -989,7 +1040,7 @@ export const PuzzleScreen: React.FC = () => {
             )}
           </div>
         ) : (
-          <div className="w-full shrink-0 mx-auto max-w-3xl rounded-xl border border-white/10 bg-[#08090d]/95 p-3.5 mt-1.5 shadow-xl backdrop-blur-md">
+          <div className="puzzle-hud puzzle-hud--full w-full shrink-0 mx-auto max-w-3xl rounded-xl border border-white/10 bg-[#08090d]/95 p-3.5 mt-1.5 shadow-xl backdrop-blur-md">
             <div className="flex flex-wrap items-center justify-between gap-4">
               <div className="flex items-center gap-6">
                 <div className="flex flex-col">
@@ -1090,7 +1141,7 @@ export const PuzzleScreen: React.FC = () => {
 
         {/* Compact Hazard Chip (shrink-0) */}
         {showHazardChip && (
-          <div className="w-full shrink-0 mx-auto max-w-sm flex items-center justify-between rounded-lg border border-white/10 bg-[#08090d]/90 px-2.5 py-0.5 mt-1 text-[11px] shadow-sm">
+          <div className="puzzle-hazard-chip w-full shrink-0 mx-auto max-w-sm flex items-center justify-between rounded-lg border border-white/10 bg-[#08090d]/90 px-2.5 py-0.5 mt-1 text-[11px] shadow-sm">
             <div className="flex items-center gap-1.5 truncate">
               {timelineHints.length > 0 ? (
                 <>
@@ -1121,12 +1172,14 @@ export const PuzzleScreen: React.FC = () => {
           </div>
         )}
 
+        </div>
+
         {/* Playfield Area (flex-1 min-h-0 overflow-hidden) */}
         <div
           ref={playfieldLayoutRef}
-          className="relative flex min-h-0 w-full flex-1 items-center justify-center gap-3 overflow-hidden py-0.5"
+          className="puzzle-playfield-area relative flex min-h-0 w-full flex-1 items-center justify-center gap-3 overflow-hidden py-0.5"
         >
-          <div className="relative flex h-full min-h-0 w-full flex-1 items-center justify-center overflow-hidden">
+          <div className="puzzle-board-slot relative flex h-full min-h-0 w-full flex-1 items-center justify-center overflow-hidden">
             {player ? (
               <GameField
                 ref={myFieldRef}
@@ -1136,6 +1189,7 @@ export const PuzzleScreen: React.FC = () => {
                 showFunds={false}
                 showPlayerName={false}
                 showStats={false}
+                showIncomingGarbage={false}
                 cellSize={cellSize}
                 boardFitRef={boardFitRef}
                 hatchingEnabled={false}
@@ -1151,7 +1205,7 @@ export const PuzzleScreen: React.FC = () => {
 
           {showHazardAside && (
             <aside
-              className="hidden md:flex w-56 shrink-0 flex-col gap-2 rounded-xl border border-white/10 bg-[#08090d]/95 p-3 shadow-2xl backdrop-blur-md"
+              className="hidden min-[661px]:flex w-56 shrink-0 flex-col gap-2 rounded-xl border border-white/10 bg-[#08090d]/95 p-3 shadow-2xl backdrop-blur-md"
               aria-label="Incoming hazards"
             >
               <div className="flex items-center justify-between border-b border-white/10 pb-2">
@@ -1244,11 +1298,12 @@ export const PuzzleScreen: React.FC = () => {
         </div>
 
         {/* On-Screen Touch Controls (shrink-0 mt-auto) */}
-        {showTouchControls && (
+        {controlsPolicy.visible && gameplayInputActive && (
           <MobileControls
+            ref={mobileControlsRef}
             onInput={handleTouchInput}
             onAction={handleTouchAction}
-            onRetry={restartSame}
+            availability={controlsAvailability}
           />
         )}
       </main>
@@ -1268,7 +1323,14 @@ export const PuzzleScreen: React.FC = () => {
       )}
 
       {finished && (!victoryEvaluation || !end?.solved) && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 p-4 backdrop-blur-sm animate-in fade-in duration-200">
+        <div
+          ref={lossModalRef}
+          tabIndex={-1}
+          role="alertdialog"
+          aria-modal="true"
+          aria-label="Puzzle result"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 p-4 backdrop-blur-sm animate-in fade-in duration-200"
+        >
           <div className="flex w-full max-w-sm flex-col items-center gap-4 rounded-2xl border border-rose-500/40 bg-[#0b0c13] p-6 text-center shadow-[0_0_50px_rgba(244,63,94,0.25)] ring-1 ring-rose-500/20">
             <div className="flex h-16 w-16 items-center justify-center rounded-2xl border border-rose-500/40 bg-rose-500/10 text-3xl shadow-[0_0_20px_rgba(244,63,94,0.3)]">
               💀
@@ -1288,17 +1350,30 @@ export const PuzzleScreen: React.FC = () => {
             <div className="mt-1 flex w-full flex-col gap-2">
               <button
                 type="button"
-                onClick={restartSame}
-                className="flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-rose-600 to-red-500 py-3 text-xs font-bold uppercase tracking-wider text-white shadow-lg shadow-rose-900/40 transition-all hover:brightness-110 active:scale-98"
+                onPointerDown={(event) => {
+                  retryPointerAllowedRef.current = !isPalmOrEdgeContact(event);
+                }}
+                onPointerCancel={() => {
+                  retryPointerAllowedRef.current = false;
+                }}
+                onClick={(event) => {
+                  if (event.detail > 0) {
+                    const allowed = retryPointerAllowedRef.current;
+                    retryPointerAllowedRef.current = false;
+                    if (!allowed) return;
+                  }
+                  restartSame();
+                }}
+                className="flex min-h-[44px] w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-rose-600 to-red-500 py-3 text-xs font-bold uppercase tracking-wider text-white shadow-lg shadow-rose-900/40 transition-all hover:brightness-110 active:scale-98"
               >
                 <RotateCcw className="h-4 w-4" />
-                <span>Try Again (R)</span>
+                <span>Try Again</span>
               </button>
               <div className="flex w-full gap-2">
                 <button
                   type="button"
                   onClick={pickAnother}
-                  className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-xl border border-white/10 bg-white/[0.05] py-2.5 text-xs font-bold uppercase tracking-wider text-zinc-300 transition-all hover:bg-white/10 active:scale-98"
+                  className="flex min-h-[44px] flex-1 inline-flex items-center justify-center gap-1.5 rounded-xl border border-white/10 bg-white/[0.05] py-2.5 text-xs font-bold uppercase tracking-wider text-zinc-300 transition-all hover:bg-white/10 active:scale-98"
                 >
                   <Play className="h-3.5 w-3.5" />
                   <span>Levels</span>
@@ -1306,7 +1381,7 @@ export const PuzzleScreen: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => setAppRoute('landing')}
-                  className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-xl border border-white/10 bg-white/[0.05] py-2.5 text-xs font-bold uppercase tracking-wider text-zinc-300 transition-all hover:bg-white/10 active:scale-98"
+                  className="flex min-h-[44px] flex-1 inline-flex items-center justify-center gap-1.5 rounded-xl border border-white/10 bg-white/[0.05] py-2.5 text-xs font-bold uppercase tracking-wider text-zinc-300 transition-all hover:bg-white/10 active:scale-98"
                 >
                   <ArrowLeft className="h-3.5 w-3.5" />
                   <span>Menu</span>

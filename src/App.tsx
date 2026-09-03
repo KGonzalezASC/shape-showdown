@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useLayoutEffect, useReducer, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useLayoutEffect, useMemo, useReducer, useRef, useState } from 'react';
 import { AlertTriangle, RefreshCw, Trophy, WifiOff } from 'lucide-react';
 import { AnimatePresence, LazyMotion, domAnimation, m } from 'motion/react';
 import { DrillConsole, DrillResult } from './components/DrillConsole';
@@ -7,7 +7,8 @@ import { MatchScopePicker } from './components/MatchScopePicker';
 import { PlayfieldShell } from './components/PlayfieldShell';
 import { ServerDiagnosticsPanel } from './components/ServerDiagnosticsPanel';
 import { ShapeLoadingSpinner } from './components/ShapeLoadingSpinner';
-import MobileControls from './components/MobileControls';
+import MobileControls, { type MobileControlsRef } from './components/MobileControls';
+import { OnScreenControlsPreferenceButton } from './components/OnScreenControlsPreference';
 import { GameFieldRef } from './components/GameField';
 import { BackgroundPrototype } from './components/BackgroundPrototype';
 import { ThemeBackground } from './presentation/ThemeBackground';
@@ -29,7 +30,8 @@ import {
   usePlayfieldSnapshot,
   useServerHealth,
 } from './state/GameStateProvider';
-import { ActionType, COUNTDOWN_SECONDS } from './types';
+import { COUNTDOWN_SECONDS } from './types';
+import type { ActionType, InputState } from './types';
 import { isShopViewportUnplayable } from './responsive/shopViewportWarning';
 import {
   playfieldScreenClass,
@@ -44,6 +46,11 @@ import {
 import { setAppRoute } from './appRoute';
 import { isDiscordActivityContext } from './discordContext';
 import { relaunchForClientUpdate } from './discordActivity';
+import {
+  actionAvailabilityFor,
+  deriveGameplayControlAvailability,
+} from './input/gameplayControls';
+import { useOnScreenControlsPolicy } from './input/onScreenControlsPolicy';
 
 
 interface DrillState {
@@ -72,7 +79,6 @@ function drillReducer(state: DrillState, action: DrillAction): DrillState {
 }
 
 interface AppShellState {
-  showTouchControls: boolean;
   showViewportWarning: boolean;
   hatchingEnabled: boolean;
   backgroundSeedKey: number;
@@ -82,7 +88,6 @@ interface AppShellState {
 }
 
 type AppShellAction =
-  | { type: 'REVEAL_TOUCH_CONTROLS' }
   | { type: 'SET_VIEWPORT_WARNING'; visible: boolean }
   | { type: 'TOGGLE_HATCHING' }
   | { type: 'RESEED_PURCHASE'; matchSeed: number; startedAtMs: number }
@@ -91,8 +96,6 @@ type AppShellAction =
 
 function createInitialAppShellState(): AppShellState {
   return {
-    showTouchControls: window.matchMedia('(pointer: coarse)').matches
-      || window.matchMedia('(hover: none)').matches,
     showViewportWarning: false,
     hatchingEnabled: false,
     backgroundSeedKey: 0,
@@ -104,8 +107,6 @@ function createInitialAppShellState(): AppShellState {
 
 function appShellReducer(state: AppShellState, action: AppShellAction): AppShellState {
   switch (action.type) {
-    case 'REVEAL_TOUCH_CONTROLS':
-      return state.showTouchControls ? state : { ...state, showTouchControls: true };
     case 'SET_VIEWPORT_WARNING':
       return state.showViewportWarning === action.visible
         ? state
@@ -158,7 +159,6 @@ export const GameView: React.FC<GameViewProps> = ({ onExitToLanding }) => {
     createInitialAppShellState,
   );
   const {
-    showTouchControls,
     showViewportWarning,
     hatchingEnabled,
     backgroundSeedKey,
@@ -167,29 +167,6 @@ export const GameView: React.FC<GameViewProps> = ({ onExitToLanding }) => {
     faceGrowthStartedAtMs,
   } = appShellState;
 
-  useEffect(() => {
-    const coarsePointer = window.matchMedia('(pointer: coarse)');
-    const noHover = window.matchMedia('(hover: none)');
-    const revealForTouchInput = (event: PointerEvent) => {
-      if (event.pointerType === 'touch' || event.pointerType === 'pen') {
-        appShellDispatch({ type: 'REVEAL_TOUCH_CONTROLS' });
-      }
-    };
-    const revealForTouchFirstDevice = () => {
-      if (coarsePointer.matches || noHover.matches) {
-        appShellDispatch({ type: 'REVEAL_TOUCH_CONTROLS' });
-      }
-    };
-
-    window.addEventListener('pointerdown', revealForTouchInput, { passive: true });
-    coarsePointer.addEventListener('change', revealForTouchFirstDevice);
-    noHover.addEventListener('change', revealForTouchFirstDevice);
-    return () => {
-      window.removeEventListener('pointerdown', revealForTouchInput);
-      coarsePointer.removeEventListener('change', revealForTouchFirstDevice);
-      noHover.removeEventListener('change', revealForTouchFirstDevice);
-    };
-  }, []);
 
   const chrome = useMatchChromeSnapshot();
   const {
@@ -203,6 +180,54 @@ export const GameView: React.FC<GameViewProps> = ({ onExitToLanding }) => {
     findNewOpponent,
   } = useGameActions();
   const handleShopConfirm = useShopConfirm();
+  const controlsPolicy = useOnScreenControlsPolicy();
+  const showOnScreenControls = controlsPolicy.visible;
+  const heldKeysRef = useRef<InputState>({ left: false, right: false, softDrop: false });
+  const clearHeldInput = useCallback(() => {
+    heldKeysRef.current = { left: false, right: false, softDrop: false };
+    sendInputState({ left: false, right: false, softDrop: false });
+  }, [sendInputState]);
+
+  const isPlaying = chrome.status === 'playing';
+  const isTerminalOutcome = chrome.status === 'ended';
+  const isAuthoritativelyPaused = gameState?.pause !== undefined && !isTerminalOutcome;
+  const isConnectionInterrupted = connected
+    && !isTerminalOutcome
+    && !isAuthoritativelyPaused
+    && (
+      matchDiagnostics.phase === 'reconnecting'
+      || matchDiagnostics.phase === 'error'
+      || matchDiagnostics.phase === 'session-invalid'
+      || matchDiagnostics.phase === 'service-unavailable'
+      || matchDiagnostics.phase === 'server-void'
+    );
+  const gameplayInputActive = connected
+    && isPlaying
+    && playfield.status === 'playing'
+    && !isAuthoritativelyPaused
+    && !isConnectionInterrupted;
+  const controlsAvailability = useMemo(
+    () => deriveGameplayControlAvailability({
+      active: gameplayInputActive,
+      player: playfield.myPlayer,
+      currentTick: chrome.tick,
+      utility: {
+        kind: 'shop',
+        enabled: gameplayInputActive && chrome.shopPhase !== 'waiting',
+        ...(gameplayInputActive && chrome.shopPhase === 'waiting'
+          ? { disabledReason: 'Shop is not available' }
+          : !gameplayInputActive
+            ? { disabledReason: 'Gameplay is not active' }
+            : {}),
+        onActivate: handleShopConfirm,
+      },
+    }),
+    [chrome.shopPhase, chrome.tick, gameplayInputActive, handleShopConfirm, playfield.myPlayer],
+  );
+  const controlsAvailabilityRef = useRef(controlsAvailability);
+  controlsAvailabilityRef.current = controlsAvailability;
+  const controlsActiveRef = useRef(gameplayInputActive);
+  controlsActiveRef.current = gameplayInputActive;
 
   const [queuedSearchScope, setQueuedSearchScope] = useState<SearchScope>(
     () => readPreferredMatchScope() ?? (isDiscordActivityContext() ? 'guild' : 'global'),
@@ -276,6 +301,7 @@ export const GameView: React.FC<GameViewProps> = ({ onExitToLanding }) => {
   const lastMatchStatusRef = useRef(chrome.status);
 
   const myFieldRef = useRef<GameFieldRef>(null);
+  const mobileControlsRef = useRef<MobileControlsRef>(null);
   const oppDesktopFieldRef = useRef<GameFieldRef>(null);
 
   const handleDrillResult = useCallback((result: DrillResult) => {
@@ -301,6 +327,8 @@ export const GameView: React.FC<GameViewProps> = ({ onExitToLanding }) => {
 
   const handleAction = useCallback(
     (action: ActionType) => {
+      const availability = actionAvailabilityFor(controlsAvailabilityRef.current, action);
+      if (!availability.enabled) return;
       const me = stateRef.current.playfield.myPlayer;
       if (action === 'hardDrop' && me?.activePiece && !me.snagHardDropBlocked) {
         triggerShake(true, 'soft');
@@ -370,7 +398,7 @@ export const GameView: React.FC<GameViewProps> = ({ onExitToLanding }) => {
       window.removeEventListener('resize', measure);
       window.visualViewport?.removeEventListener('resize', measure);
     };
-  }, [chrome.shopPhase, connected, hasLocalPlayer, layoutMode, showTouchControls]);
+  }, [chrome.shopPhase, connected, hasLocalPlayer, layoutMode, showOnScreenControls]);
 
   useEffect(() => {
     if (!drill.result) return;
@@ -378,19 +406,9 @@ export const GameView: React.FC<GameViewProps> = ({ onExitToLanding }) => {
     return () => window.clearTimeout(t);
   }, [drill.result]);
 
-  const heldKeysRef = useRef({ left: false, right: false, softDrop: false });
   useEffect(() => {
-    if (!showViewportWarning) return;
-    heldKeysRef.current = { left: false, right: false, softDrop: false };
-    sendInputState({ left: false, right: false, softDrop: false });
-  }, [showViewportWarning, sendInputState]);
-
-  useEffect(() => {
-    if (playfield.status !== 'playing') {
-      heldKeysRef.current = { left: false, right: false, softDrop: false };
-      sendInputState({ left: false, right: false, softDrop: false });
-    }
-  }, [playfield.status, sendInputState]);
+    if (!gameplayInputActive || showViewportWarning || !showOnScreenControls) clearHeldInput();
+  }, [clearHeldInput, gameplayInputActive, showOnScreenControls, showViewportWarning]);
 
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
@@ -403,7 +421,7 @@ export const GameView: React.FC<GameViewProps> = ({ onExitToLanding }) => {
         }
       }
       const { playfield: pf, myId: id } = stateRef.current;
-      if (pf.status !== 'playing' || !id || !pf.myPlayer) return;
+      if (!controlsActiveRef.current || pf.status !== 'playing' || !id || !pf.myPlayer) return;
 
       const action = actionForCode(bindingsRef.current, e.code);
       if (!action) return;
@@ -432,7 +450,8 @@ export const GameView: React.FC<GameViewProps> = ({ onExitToLanding }) => {
       } else if (action === 'hold') {
         handleAction('hold');
       } else if (action === 'shop') {
-        handleShopConfirm();
+        const utility = controlsAvailabilityRef.current.utility;
+        if (utility.kind === 'shop' && utility.enabled) utility.onActivate();
       }
     };
     const onKeyUp = (e: KeyboardEvent) => {
@@ -460,8 +479,9 @@ export const GameView: React.FC<GameViewProps> = ({ onExitToLanding }) => {
       window.removeEventListener('keydown', onKeyDown);
       window.removeEventListener('keyup', onKeyUp);
       window.removeEventListener('blur', clearInput);
+      clearHeldInput();
     };
-  }, [handleAction, sendInputState, handleShopConfirm, showViewportWarning]);
+  }, [clearHeldInput, handleAction, handleShopConfirm, sendInputState, showViewportWarning]);
 
   useEffect(() => {
     const evt = chrome.lastMatchEvent;
@@ -474,20 +494,6 @@ export const GameView: React.FC<GameViewProps> = ({ onExitToLanding }) => {
     }
   }, [chrome.lastMatchEvent, myId, triggerShake]);
 
-  const isPlaying = chrome.status === 'playing';
-  const isTerminalOutcome = chrome.status === 'ended';
-  const isAuthoritativelyPaused = gameState?.pause !== undefined
-    && !isTerminalOutcome;
-  const isConnectionInterrupted = connected
-    && !isTerminalOutcome
-    && !isAuthoritativelyPaused
-    && (
-      matchDiagnostics.phase === 'reconnecting'
-      || matchDiagnostics.phase === 'error'
-      || matchDiagnostics.phase === 'session-invalid'
-      || matchDiagnostics.phase === 'service-unavailable'
-      || matchDiagnostics.phase === 'server-void'
-    );
   const showDeveloperReconnectHint = DEV_TOOLS_ENABLED
     && (
       matchDiagnostics.phase === 'reconnecting'
@@ -683,7 +689,18 @@ export const GameView: React.FC<GameViewProps> = ({ onExitToLanding }) => {
             inert={showViewportWarning || isConnectionInterrupted || isAuthoritativelyPaused || isTerminalOutcome}
             className={playfieldScreenClass(layoutMode)}
           >
-            <MatchChrome />
+            <MatchChrome
+              actionSlot={
+                <OnScreenControlsPreferenceButton
+                  onBeforeChange={(next) => {
+                    if (next === 'hidden') {
+                      mobileControlsRef.current?.clearInput();
+                      clearHeldInput();
+                    }
+                  }}
+                />
+              }
+            />
             {DEV_TOOLS_ENABLED && drill.enabled && gameState && myId && gameState.players[myId] && (
               <DrillConsole
                 player={gameState.players[myId]}
@@ -714,11 +731,12 @@ export const GameView: React.FC<GameViewProps> = ({ onExitToLanding }) => {
                   : undefined
               }
             />
-            {showTouchControls && (
+            {showOnScreenControls && gameplayInputActive && (
               <MobileControls
+                ref={mobileControlsRef}
                 onInput={sendInputState}
                 onAction={handleAction}
-                onShopPress={handleShopConfirm}
+                availability={controlsAvailability}
               />
             )}
           </main>
