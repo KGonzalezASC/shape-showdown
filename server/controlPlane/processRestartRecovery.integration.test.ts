@@ -9,7 +9,7 @@ import { createTestDatabase } from './testDatabase.js';
 import { MatchStore } from './matchStore.js';
 import { runMigrations } from './migrations.js';
 import { startGameServer, type RunningGameServer } from '../gameServer.js';
-import { makePlayer } from '../puzzleEngine/engine.js';
+import { makePlayer } from '../../src/puzzle/runtime/engine.js';
 import { createPlayerRngChannels } from '../../src/rng.js';
 import { GAME_PROTOCOL_VERSION } from '../../src/protocol/version.js';
 import { ClientPacketDecoder } from '../../src/protocol/ClientPacketDecoder.js';

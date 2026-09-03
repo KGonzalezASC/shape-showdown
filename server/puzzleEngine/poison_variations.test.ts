@@ -13,8 +13,8 @@ import {
   applyTectonicShift,
   startTectonicShift,
   advanceTectonicShift,
-} from './engine.js';
-import { applyShopPurchase } from '../shop.js';
+} from '../../src/puzzle/runtime/engine.js';
+import { applyShopPurchase } from '../../src/puzzle/runtime/shop.js';
 import {
   BOARD_COLS,
   BOARD_ROWS,
@@ -169,7 +169,7 @@ describe('poison spread variations', () => {
     for (let x = 1; x < BOARD_COLS; x++) {
       p1.board[bottom][x] = 'I';
     }
-    
+
     // Position the active piece (e.g. horizontal I-piece aligned at x=-1, y=bottom-1)
     // cells: [[0,1],[1,1],[2,1],[3,1]] -> offset [1,1] falls at (0, bottom), clearing the line.
     p1.activePiece = {
@@ -192,7 +192,7 @@ describe('poison spread variations', () => {
     const p2 = makePlayer('a', rng);
     p2.board = createEmptyBoard();
     p2.poisonBoard = Array.from({ length: BOARD_ROWS }, () => Array.from({ length: BOARD_COLS }, () => 0));
-    
+
     // Fill the bottom row except col 0. Even columns are poisoned.
     for (let x = 1; x < BOARD_COLS; x++) {
       p2.board[bottom][x] = 'I';
@@ -200,7 +200,7 @@ describe('poison spread variations', () => {
         p2.poisonBoard[bottom][x] = 1;
       }
     }
-    
+
     p2.activePiece = {
       type: 'I',
       rotation: 0,
@@ -227,7 +227,7 @@ describe('poison spread variations', () => {
     const rng = makeRng(1);
     const buyer = makePlayer('a', rng);
     const opponent = makePlayer('b', rng);
-    
+
     const game = {
       players: { a: buyer, b: opponent },
       status: 'playing' as const,
@@ -265,18 +265,18 @@ describe('poison spread variations', () => {
       'Source cells should be saved for the board outline',
     );
     assert.equal(opponent.customNextPieceVariant, 2, 'Should capture variant 2');
-    
+
     opponent.activePiece = null;
     opponent.nextQueue = ['I'];
-    
+
     stepPlayer(game.tick, opponent, rng, []);
-    
+
     const active = opponent.activePiece;
     assert.ok(active, 'Should spawn a piece');
     assert.ok(active.customOffsets, 'Spawned piece should have customOffsets');
     assert.equal(active.customOffsets.length, 2, 'Custom shape should have 2 cells');
     assert.deepEqual(active.customOffsets, [[0, 0], [1, 0]], 'Offsets should be [0,0] and [1,0]');
-    
+
     assert.equal(active.x, 4, 'Two-cell piece should be centered in the 10-column arena');
     assert.equal(active.y, BOARD_HIDDEN_ROWS - 2, 'Piece should spawn at standard height');
     assert.equal(active.poisoned, false, 'Piece should not be marked poisoned');
@@ -298,9 +298,9 @@ describe('poison spread variations', () => {
     opponent.activePiece.y = BOARD_ROWS - 2;
     opponent.activePiece.x = 0;
     opponent.lockDelayRemainingTicks = 1;
-    
+
     stepPlayer(game.tick, opponent, rng, []);
-    
+
     assert.equal(opponent.activePiece, null, 'Piece should lock and activePiece become null');
     assert.equal(opponent.board[BOARD_ROWS - 2][0], 'W', 'Landed piece cell 1 should lock as W');
     assert.equal(opponent.board[BOARD_ROWS - 1][0], 'W', 'Landed piece cell 2 should lock as W');

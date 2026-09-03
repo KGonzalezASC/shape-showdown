@@ -8,7 +8,7 @@ import { applyBomberBlastSimulation, RulesBot } from './rulesBot.js';
 import { Scenario } from './scenario.js';
 import { ScriptedDriver } from './inputDriver.js';
 import { createPlayerRngChannels } from '../../src/rng.js';
-import { makePlayer } from '../puzzleEngine/engine.js';
+import { makePlayer } from '../../src/puzzle/runtime/engine.js';
 import { BOARD_COLS, BOARD_HIDDEN_ROWS, BOARD_ROWS, CURTAIN_FROST_ROWS } from '../../src/constants.js';
 import type { GameState } from '../../src/types.js';
 

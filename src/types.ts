@@ -308,6 +308,8 @@ export interface PlayerState {
   canHold: boolean;
   nextQueue: ShapeType[];
   bag: ShapeType[];
+  /** Shared puzzle runtime flag: the preloaded piece source must not refill from RNG. */
+  finitePieceSourceExhausted?: boolean;
   score: number;
   funds: number;
   linesCleared: number;

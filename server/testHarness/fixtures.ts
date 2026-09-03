@@ -1,6 +1,6 @@
 import { BOARD_COLS, BOARD_ROWS } from '../../src/constants.js';
 import type { CellValue, PlayerState, GamePiece } from '../../src/types.js';
-import { createEmptyBoard, makePlayer } from '../puzzleEngine/engine.js';
+import { createEmptyBoard, makePlayer } from '../../src/puzzle/runtime/engine.js';
 import { type RngChannels } from '../../src/rng.js';
 
 export type PlayerFixture = (player: PlayerState) => void;

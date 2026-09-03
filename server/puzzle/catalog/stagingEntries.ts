@@ -1,4 +1,4 @@
-import type { CuratedPuzzleLevel } from '../puzzleTypes.js';
+import type { LegacyCuratedPuzzleLevel } from '../puzzleTypes.js';
 import { curatePuzzleLevel, type CuratedPuzzleEntry } from './curate.js';
 import { buildAuthoredLevels } from './authoredLevels.js';
 
@@ -11,7 +11,7 @@ function freezeLevel<T>(value: T): T {
  * Replaces generator dump frozenStagingLevels.json.
  */
 const AUTHORED_CATALOG: CuratedPuzzleEntry[] = (() => {
-  return buildAuthoredLevels().map((level: CuratedPuzzleLevel) =>
+  return buildAuthoredLevels().map((level: LegacyCuratedPuzzleLevel) =>
     curatePuzzleLevel(level, {
       allowHold: level.allowHold,
       shopPolicy: level.shopPolicy,

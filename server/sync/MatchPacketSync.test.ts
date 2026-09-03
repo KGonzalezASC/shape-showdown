@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import type { Socket } from 'socket.io';
-import { makePlayer, makeRng } from '../puzzleEngine/engine.js';
+import { makePlayer, makeRng } from '../../src/puzzle/runtime/engine.js';
 import { ClientPacketDecoder } from '../../src/protocol/ClientPacketDecoder.js';
 import { readPacketHeader } from '../../src/protocol/encodeMatchPacket.js';
 import { PACKET_KIND_DELTA, PACKET_KIND_KEYFRAME } from '../../src/protocol/version.js';
@@ -160,4 +160,3 @@ describe('MatchPacketSync', () => {
     assert.equal(decodedEnd?.chrome.winnerId, 'local');
   });
 });
-

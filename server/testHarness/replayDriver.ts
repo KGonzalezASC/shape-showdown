@@ -8,9 +8,9 @@ import type {
   ReplayInputFrame,
 } from '../../src/types.js';
 import { createPlayerRngChannels, type RngChannels } from '../../src/rng.js';
-import { applyShopPurchase, openPlayerShop } from '../shop.js';
+import { applyShopPurchase, openPlayerShop } from '../../src/puzzle/runtime/shop.js';
 import { PRICING_POLICY_VERSION } from '../../src/shop/shopPricing.js';
-import { matchStep } from '../puzzleEngine/matchStep.js';
+import { matchStep } from '../../src/puzzle/runtime/matchStep.js';
 import type { DriverObservation, InputDriver, PlayerCommand } from './inputDriver.js';
 
 export interface ReplayVerificationOptions {

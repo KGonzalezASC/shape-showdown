@@ -1,4 +1,4 @@
-import type { CuratedPuzzleLevel, PuzzleGoal, PuzzleVisibilityPolicy } from '../puzzleTypes.js';
+import type { LegacyCuratedPuzzleLevel, PuzzleGoal, PuzzleVisibilityPolicy } from '../puzzleTypes.js';
 import type { CuratedPuzzleEntry } from './curate.js';
 import { buildStagingCatalogEntries } from './stagingEntries.js';
 
@@ -19,7 +19,7 @@ export function loadPuzzleCatalog(): CuratedPuzzleEntry[] {
   return buildStagingCatalogEntries();
 }
 
-export function listCuratedPuzzleLevels(): CuratedPuzzleLevel[] {
+export function listCuratedPuzzleLevels(): LegacyCuratedPuzzleLevel[] {
   return loadPuzzleCatalog().map((entry) => entry.level);
 }
 

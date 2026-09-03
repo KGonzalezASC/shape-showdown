@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "puzzleId": "authored-dig-shaft",
-  "contentHash": "89c6bab995f1a28e922619d96f64bdd22c77c722a97311ea03ec1a70b4076acd",
+  "contentHash": "8835ef0a128b531f972885dcae268202c7981ccc14bc30eecf6ae81b821fd00d",
   "engineProtocolVersion": 4,
   "packageVersion": "0.0.0",
   "validationStatus": "passed",
@@ -48,10 +48,10 @@
       "qualifies": true,
       "solved": true,
       "topOut": false,
-      "score": 2464,
-      "ticksUsed": 1055,
-      "piecesUsed": 30,
-      "linesCleared": 15,
+      "score": 2260,
+      "ticksUsed": 973,
+      "piecesUsed": 26,
+      "linesCleared": 14,
       "perfectClear": false
     }
   ],

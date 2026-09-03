@@ -15,12 +15,14 @@ import {
   SocketAuthErrorPayload,
 } from '../src/types.js';
 import {
-  initialSeed,
   makePlayer,
-  replayDateLabel,
   tickSeconds,
+} from '../src/puzzle/runtime/engine.js';
+import {
+  initialSeed,
+  replayDateLabel,
 } from './puzzleEngine/engine.js';
-import { matchStep } from './puzzleEngine/matchStep.js';
+import { matchStep } from '../src/puzzle/runtime/matchStep.js';
 import { createPlayerRngChannels, type RngChannels } from '../src/rng.js';
 import { SHOP_ITEM_BY_ID } from '../src/shop/shopCatalog.js';
 import { getPricingView, PRICING_POLICY_VERSION } from '../src/shop/shopPricing.js';
@@ -28,7 +30,7 @@ import {
   applyShopPurchase,
   openPlayerShop,
   resetPlayerShop,
-} from './shop.js';
+} from '../src/puzzle/runtime/shop.js';
 import type { MatchPersistence } from './controlPlane/matchPersistence.js';
 import type { JoinTicket } from './controlPlane/matchStore.js';
 import { logError, logInfo, logWarn } from './observability/logger.js';

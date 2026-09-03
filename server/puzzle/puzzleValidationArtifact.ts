@@ -12,6 +12,10 @@ import {
   type PuzzleVisibilityPolicy,
 } from './puzzleTypes.js';
 import { extractPieceTimeline, materializeTimeline } from './puzzleTimeline.js';
+import { migratePuzzleLevelToPublishedPuzzlePayload } from './publishedPuzzleAdapter.js';
+import { encodeCanonicalBytes } from '../../src/puzzle/publishedPuzzle.js';
+
+const PUZZLE_CONTENT_HASH_PREFIX = 'shape-showdown:puzzle:v1\0';
 
 export type PuzzleValidationStatus = 'passed' | 'failed' | 'invalid-batch';
 
@@ -100,23 +104,15 @@ export const DIAGNOSTIC_OMNISCIENT_CANDIDATES: readonly RulesBotCandidateProfile
   },
 ];
 
-/** Stable SHA-256 of the immutable puzzle content used for promotion checks. */
+/** Stable SHA-256 of the canonical published puzzle payload used for validation artifacts. */
 export function hashPuzzleContent(level: PuzzleLevel): string {
-  const payload = {
-    id: level.id,
-    name: level.name,
-    seed: level.seed,
-    initialBoard: level.initialBoard,
-    queuePrefix: level.queuePrefix,
-    goal: level.goal,
-    timeline: level.timeline,
-    shopPolicy: level.shopPolicy,
-    allowHold: level.allowHold ?? true,
-    par: level.par ?? null,
-    benchmark: level.benchmark ?? DEFAULT_PUZZLE_BENCHMARK,
-    visibilityPolicy: level.visibilityPolicy ?? 'unspecified',
-  };
-  return createHash('sha256').update(JSON.stringify(payload)).digest('hex');
+  const payload = migratePuzzleLevelToPublishedPuzzlePayload(level);
+  const prefixBytes = new TextEncoder().encode(PUZZLE_CONTENT_HASH_PREFIX);
+  const payloadBytes = encodeCanonicalBytes(payload);
+  const input = new Uint8Array(prefixBytes.length + payloadBytes.length);
+  input.set(prefixBytes, 0);
+  input.set(payloadBytes, prefixBytes.length);
+  return createHash('sha256').update(input).digest('hex');
 }
 
 export interface BuildPuzzleValidationArtifactInput {

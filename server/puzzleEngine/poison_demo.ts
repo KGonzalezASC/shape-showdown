@@ -8,14 +8,14 @@
  * Run: bun run server/puzzleEngine/poison_demo.ts
  */
 
-import { SHAPES } from './pieces.js';
+import { SHAPES } from '../../src/puzzle/runtime/pieces.js';
 import {
   BOARD_COLS,
   BOARD_ROWS,
   POISON_GENERATIONS,
 } from '../../src/constants.js';
 import type { CellValue, ShapeType, RotationState } from '../../src/types.js';
-import { createEmptyBoard, createEmptyPoisonBoard, spreadPoisonWaveOnce } from './engine.js';
+import { createEmptyBoard, createEmptyPoisonBoard, spreadPoisonWaveOnce } from '../../src/puzzle/runtime/engine.js';
 
 function getCells(piece: { type: ShapeType; rotation: RotationState; x: number; y: number }) {
   return SHAPES[piece.type][piece.rotation].map(([dx, dy]) => ({

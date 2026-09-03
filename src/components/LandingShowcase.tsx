@@ -1,5 +1,5 @@
 import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { CalendarDays, HelpCircle, Keyboard, Play, Puzzle, X } from 'lucide-react';
+import { HelpCircle, Keyboard, Play, Puzzle, X } from 'lucide-react';
 import { useSetThemeId, useThemePackage } from '../presentation/ThemeProvider';
 import { THEME_IDS, type ThemeId } from '../presentation/themePackage';
 import { isDiscordActivityContext, openExternalUrl } from '../discordContext';
@@ -555,18 +555,6 @@ const LandingShowcase: React.FC<LandingShowcaseProps> = ({ onPlayGame }) => {
                 <span>Puzzles</span>
               </a>
 
-              <a
-                href="#daily"
-                onClick={(e) => {
-                  e.preventDefault();
-                  sessionStorage.setItem('puzzleAutostart', 'daily');
-                  setAppRoute('puzzles');
-                }}
-                className="inline-flex h-11 sm:h-12 items-center justify-center gap-2 rounded-xl border border-sky-400/40 bg-sky-500/10 px-4 sm:px-6 text-[10px] sm:text-xs font-black uppercase tracking-wider text-sky-300 shadow-[0_0_16px_rgba(56,189,248,0.15)] transition-all hover:bg-sky-500/20 hover:border-sky-400/60 active:scale-[0.98]"
-              >
-                <CalendarDays className="h-4 w-4 text-sky-400" />
-                <span>Daily</span>
-              </a>
             </div>
 
             {/* Utility / Info Actions */}

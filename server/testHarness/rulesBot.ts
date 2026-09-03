@@ -16,8 +16,8 @@ import {
 } from '../../src/constants.js';
 import type { ActionType, CellValue, PendingGarbagePacket, RotationState, ShapeType, GamePiece, CandidateSubScores, CandidateEvaluationTrace, BotDecisionTrace } from '../../src/types.js';
 import { PublicPlayerState } from '../../src/state/publicSnapshots.js';
-import { SHAPES } from '../puzzleEngine/pieces.js';
-import { detectPlusAttackFor, previewAttackFromClear } from '../puzzleEngine/engine.js';
+import { SHAPES } from '../../src/puzzle/runtime/pieces.js';
+import { detectPlusAttackFor, previewAttackFromClear } from '../../src/puzzle/runtime/engine.js';
 import type { DriverObservation, InputDriver, PlayerCommand } from './inputDriver.js';
 import type { ObservationMode, PlayerObservation } from './observationProjector.js';
 

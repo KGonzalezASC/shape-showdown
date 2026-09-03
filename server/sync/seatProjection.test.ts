@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-import { makePlayer } from '../puzzleEngine/engine.js';
+import { makePlayer } from '../../src/puzzle/runtime/engine.js';
 import { makeRng } from '../../src/rng.js';
 import type { GameState } from '../../src/types.js';
 import { seatSnapshotToClientModel } from '../../src/protocol/clientMatchModel.js';

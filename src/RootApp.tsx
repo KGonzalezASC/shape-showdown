@@ -1,6 +1,5 @@
 import React, { useEffect, useState } from 'react';
 import LandingShowcase from './components/LandingShowcase';
-import { PuzzleScreen } from './components/PuzzleScreen';
 import { GameView } from './App';
 import { BackgroundPrototype } from './components/BackgroundPrototype';
 import { ThemeProvider } from './presentation/ThemeProvider';
@@ -9,6 +8,8 @@ import { GameStateProvider } from './state/GameStateProvider';
 import { DEV_TOOLS_ENABLED } from './devTools';
 import { getAppRoute, setAppRoute, type AppRoute } from './appRoute';
 import { useDocumentInteractionPolicy } from './input/documentInteractionPolicy';
+
+const LazyPuzzleScreen = React.lazy(() => import('./components/PuzzleScreen'));
 
 export const RootApp: React.FC = () => {
   const [route, setRoute] = useState<AppRoute>(() => getAppRoute());
@@ -45,9 +46,17 @@ export const RootApp: React.FC = () => {
     <ThemeProvider>
       <KeyBindingsProvider>
         {route === 'landing' ? (
-          <LandingShowcase onPlayGame={() => setAppRoute('puzzles')} />
+          <LandingShowcase onPlayGame={() => setAppRoute('game')} />
         ) : route === 'puzzles' ? (
-          <PuzzleScreen />
+          <React.Suspense
+            fallback={
+              <div className="flex h-dvh w-full items-center justify-center bg-[#07080b] font-mono text-xs uppercase tracking-widest text-zinc-500">
+                Loading puzzle runtime...
+              </div>
+            }
+          >
+            <LazyPuzzleScreen />
+          </React.Suspense>
         ) : (
           <GameStateProvider>
             <GameView onExitToLanding={() => setAppRoute('landing')} />

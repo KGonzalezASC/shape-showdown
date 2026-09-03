@@ -21,7 +21,7 @@ import {
 } from './rulesBot.js';
 import { Scenario } from './scenario.js';
 import { createSimpleShopPolicy, PairedRunner } from './pairedRunner.js';
-import { createEmptyBoard, detectPlusAttackFor, previewAttackFromClear } from '../puzzleEngine/engine.js';
+import { createEmptyBoard, detectPlusAttackFor, previewAttackFromClear } from '../../src/puzzle/runtime/engine.js';
 import { BOARD_COLS, BOARD_ROWS, BOARD_HIDDEN_ROWS } from '../../src/constants.js';
 import type { DriverObservation } from './inputDriver.js';
 import { defaultObservationProjector } from './observationProjector.js';
@@ -399,7 +399,7 @@ describe('RulesBot Adapter & Attack Preview', () => {
     const bot = new RulesBot({ mode: 'player-limited' });
     const scenario = new Scenario({ seed: 202 });
     const p1 = scenario.getPlayerState('p1');
-    
+
     // Start with delayed garbage (arrivalTick = 25 at tick 0 -> ticksUntilArrival = 25)
     p1.pendingGarbage = [{ lines: 3, arrivalTick: 25 }];
     (scenario as unknown as { gameState: { tick: number } }).gameState.tick = 0;

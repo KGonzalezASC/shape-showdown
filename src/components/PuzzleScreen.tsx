@@ -1,5 +1,4 @@
 import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { io, type Socket } from 'socket.io-client';
 import { ArrowLeft, Play, RotateCcw } from 'lucide-react';
 import GameField, { type GameFieldRef } from './GameField';
 import MobileControls, { type MobileControlsRef } from './MobileControls';
@@ -16,12 +15,14 @@ import type { ActionType, InputState } from '../types';
 import { usePlayfieldLayoutMode } from '../responsive/playfieldLayoutMode';
 import { usePuzzleViewportConstraints } from '../responsive/puzzleViewport';
 import { fitMobilePlayfieldCellSize } from './PlayfieldCellSizer';
-import { appendDiscordFrameId, isDiscordActivityContext } from '../discordContext';
-import { resolveGameServerUrl } from '../hooks/useGameSocket';
 import {
   presentTimelineHints,
   type PuzzleVisibilityPolicy,
 } from '../puzzle/puzzlePresentation';
+import { PuzzleRuntimeClient } from '../puzzle/runtime/PuzzleRuntimeClient.js';
+import { decodePublishedPuzzleManifest, decodePublishedPuzzlePack } from '../puzzle/publishedPuzzleCodec.js';
+import { stableSeedForPuzzle } from '../puzzle/runtime/PuzzleRuntime.js';
+import type { PublishedPuzzleV1, PuzzleActionV1 } from '../puzzle/publishedPuzzle.js';
 import {
   calculatePuzzleStars,
   type PuzzleStarEvaluation,
@@ -46,9 +47,9 @@ import { derivePuzzleViewPhase } from '../puzzle/puzzleViewPhase';
 /**
  * Single-player puzzle screen.
  *
- * Connects a direct socket session (no queue or second seat), streams player
- * snapshots via `puzzle:state`, renders using the standard GameField, and
- * delegates player input through the unified KeyBindings configuration.
+ * Runs client-side via a deterministic Web Worker simulation without a live socket,
+ * renders using the standard GameField, and delegates player input through the
+ * unified KeyBindings configuration.
  */
 
 interface PuzzleWireState {
@@ -115,16 +116,6 @@ interface PuzzleCatalogEntry {
   visibilityPolicy: PuzzleVisibilityPolicy;
 }
 
-interface PuzzleDailySummary {
-  dateKey: string;
-  puzzleId: string;
-  name: string;
-}
-
-interface PuzzleCatalogPayload {
-  puzzles: PuzzleCatalogEntry[];
-  daily: PuzzleDailySummary;
-}
 
 interface PuzzleEnd {
   solved: boolean;
@@ -349,8 +340,24 @@ const getTriggerDetails = (
   return { label: 'QUEUED', isImminent: false, isUrgent: false };
 };
 
+export type PuzzleContentLoadState =
+  | 'idle'
+  | 'loading'
+  | 'ready'
+  | 'incompatible'
+  | 'corrupt-content'
+  | 'failed';
+
+export interface PuzzleViewAttemptState {
+  client: PuzzleRuntimeClient | null;
+  puzzle: PublishedPuzzleV1 | null;
+  contentHash: string | null;
+  wireState: PuzzleWireState | null;
+  end: PuzzleEnd | null;
+}
+
 export const PuzzleScreen: React.FC = () => {
-  const socketRef = useRef<Socket | null>(null);
+  const clientRef = useRef<PuzzleRuntimeClient | null>(null);
   const myFieldRef = useRef<GameFieldRef>(null);
   const mobileControlsRef = useRef<MobileControlsRef>(null);
   const lossModalRef = useRef<HTMLDivElement>(null);
@@ -359,21 +366,24 @@ export const PuzzleScreen: React.FC = () => {
   const bindingsRef = useRef(bindings);
   bindingsRef.current = bindings;
 
+  const [contentState, setContentState] = useState<PuzzleContentLoadState>('idle');
+  const [contentError, setContentError] = useState<string | null>(null);
+  const [puzzlesById, setPuzzlesById] = useState<Map<string, PublishedPuzzleV1>>(new Map());
+  const puzzlesByIdRef = useRef<Map<string, PublishedPuzzleV1>>(puzzlesById);
+  puzzlesByIdRef.current = puzzlesById;
+
   const [state, setState] = useState<PuzzleWireState | null>(null);
   const [started, setStarted] = useState<PuzzleStarted | null>(null);
   const startedRef = useRef<PuzzleStarted | null>(null);
   startedRef.current = started;
   const [end, setEnd] = useState<PuzzleEnd | null>(null);
-  const [connected, setConnected] = useState(false);
   const [catalog, setCatalog] = useState<PuzzleCatalogEntry[]>([]);
-  const [daily, setDaily] = useState<PuzzleDailySummary | null>(null);
   const [selectedPuzzleId, setSelectedPuzzleId] = useState<string | null>(null);
   const [picking, setPicking] = useState(true);
   const [records, setRecords] = useState<Record<string, PuzzleProgressRecord>>(() =>
     loadAllPuzzleRecords(),
   );
   const [victoryEvaluation, setVictoryEvaluation] = useState<PuzzleStarEvaluation | null>(null);
-  const dailyAutostartHandledRef = useRef(false);
   const selectedPuzzleIdRef = useRef<string | null>(null);
   selectedPuzzleIdRef.current = selectedPuzzleId;
   const keyboardInputRef = useRef<InputState>({ left: false, right: false, softDrop: false });
@@ -390,7 +400,7 @@ export const PuzzleScreen: React.FC = () => {
   useDocumentInteractionPolicy(puzzlePhase.kind === 'picker' ? 'puzzle-picker' : 'gameplay', 1);
 
   const emitInput = useCallback((input: InputState) => {
-    socketRef.current?.emit('puzzle:input', input);
+    clientRef.current?.setInput(input);
   }, []);
   const emitCombinedInput = useCallback(() => {
     emitInput({
@@ -425,104 +435,74 @@ export const PuzzleScreen: React.FC = () => {
     if (!gameplayInputActive || !controlsPolicy.visible) clearInput();
   }, [clearInput, controlsPolicy.visible, gameplayInputActive]);
 
+  const loadPuzzleContent = useCallback(async () => {
+    setContentState('loading');
+    setContentError(null);
+    try {
+      const baseUrl = import.meta.env.BASE_URL || './';
+      const manifestUrl = new URL('puzzles/manifest.json', new URL(baseUrl, window.location.href)).toString();
+      const manifestRes = await fetch(manifestUrl);
+      if (!manifestRes.ok) {
+        throw new Error(`Failed to fetch puzzle manifest: HTTP ${manifestRes.status}`);
+      }
+      const manifestText = await manifestRes.text();
+      const manifest = decodePublishedPuzzleManifest(manifestText);
+
+      if (manifest.puzzleRuntimeVersion !== 'puzzle-runtime-v1') {
+        setContentState('incompatible');
+        setContentError(`Incompatible puzzle runtime version: ${manifest.puzzleRuntimeVersion}`);
+        return;
+      }
+
+      const loaded = new Map<string, PublishedPuzzleV1>();
+      const catalogList: PuzzleCatalogEntry[] = [];
+
+      for (const packRef of manifest.packs) {
+        const packUrl = new URL(packRef.url, manifestUrl).toString();
+        const packRes = await fetch(packUrl);
+        if (!packRes.ok) {
+          throw new Error(`Failed to fetch puzzle pack: HTTP ${packRes.status}`);
+        }
+        const packBytes = new Uint8Array(await packRes.arrayBuffer());
+        const pack = await decodePublishedPuzzlePack(packBytes, packRef.sha256);
+
+        for (const puzzle of pack.puzzles) {
+          loaded.set(puzzle.payload.id, puzzle);
+          catalogList.push({
+            id: puzzle.payload.id,
+            name: puzzle.payload.name,
+            description: puzzle.payload.description,
+            goal: puzzle.payload.goal,
+            allowHold: puzzle.payload.allowedMechanics.allowHold,
+            visibilityPolicy: puzzle.payload.visibilityPolicy,
+          });
+        }
+      }
+
+      setPuzzlesById(loaded);
+      setCatalog(catalogList);
+      setContentState('ready');
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      if (
+        msg.includes('SHA-256')
+        || msg.includes('corrupt')
+        || msg.includes('mismatch')
+        || msg.includes('checksum')
+      ) {
+        setContentState('corrupt-content');
+      } else {
+        setContentState('failed');
+      }
+      setContentError(msg);
+    }
+  }, []);
+
   useEffect(() => {
-    let cancelled = false;
-    const connect = async (): Promise<void> => {
-      const url = await resolveGameServerUrl();
-      if (cancelled) return;
+    void loadPuzzleContent();
+  }, [loadPuzzleContent]);
 
-      const isDiscord = isDiscordActivityContext();
-      const socket = io(appendDiscordFrameId(url), {
-        path: isDiscord ? '/socketio' : '/socket.io',
-        transports: isDiscord ? ['websocket'] : ['websocket', 'polling'],
-        auth: {
-          purpose: 'puzzle',
-        },
-      });
-      socketRef.current = socket;
-
-      socket.on('connect', () => {
-        if (cancelled) return;
-        setConnected(true);
-        socket.emit('puzzle:list');
-      });
-      socket.on('disconnect', () => {
-        clearInput();
-        if (!cancelled) {
-          setConnected(false);
-          setState(null);
-        }
-      });
-      socket.on('connect_error', (err) => {
-        console.warn('Puzzle socket connection error:', err);
-      });
-      socket.on('puzzle:catalog', (payload: PuzzleCatalogPayload | PuzzleCatalogEntry[]) => {
-        if (cancelled) return;
-        const puzzles = Array.isArray(payload) ? payload : payload.puzzles;
-        const dailyPayload = Array.isArray(payload) ? null : payload.daily;
-        setCatalog(puzzles);
-        if (dailyPayload) setDaily(dailyPayload);
-
-        // LandingShowcase Daily button stashes this flag.
-        if (
-          !dailyAutostartHandledRef.current &&
-          typeof sessionStorage !== 'undefined' &&
-          sessionStorage.getItem('puzzleAutostart') === 'daily'
-        ) {
-          dailyAutostartHandledRef.current = true;
-          sessionStorage.removeItem('puzzleAutostart');
-          clearInput();
-          setPicking(false);
-          socket.emit('puzzle:start', { mode: 'daily' });
-        }
-      });
-      socket.on('puzzle:started', (payload: PuzzleStarted) => {
-        if (cancelled) return;
-        clearInput();
-        setStarted(payload);
-        setSelectedPuzzleId(payload.puzzleId ?? payload.levelId);
-        setPicking(false);
-        setEnd(null);
-        setVictoryEvaluation(null);
-      });
-      socket.on('puzzle:state', (snap: PuzzleWireState) => {
-        if (!cancelled) setState(snap);
-      });
-      socket.on('puzzle:end', (payload: PuzzleEnd) => {
-        if (cancelled) return;
-        clearInput();
-        setEnd(payload);
-        const curStarted = startedRef.current;
-        if (payload.solved) {
-          const evalResult = calculatePuzzleStars(
-            {
-              solved: payload.solved,
-              piecesUsed: payload.piecesUsed,
-              score: payload.score,
-              ticksUsed: payload.ticksUsed,
-              goalKind: curStarted?.goal.kind,
-            },
-            curStarted?.referenceBaseline,
-          );
-          setVictoryEvaluation(evalResult);
-          const currentId = curStarted?.puzzleId ?? curStarted?.levelId ?? payload.levelId;
-          if (currentId) {
-            savePuzzleRecord(
-              currentId,
-              evalResult.stars,
-              payload.piecesUsed,
-              payload.score,
-              payload.ticksUsed,
-            );
-            setRecords(loadAllPuzzleRecords());
-          }
-        } else {
-          setVictoryEvaluation(null);
-        }
-      });
-    };
-    void connect();
-
+  useEffect(() => {
     if (DEV_TOOLS_ENABLED && typeof window !== 'undefined') {
       (window as unknown as { __triggerPuzzleVictory?: (targetStars?: number) => void }).__triggerPuzzleVictory = (
         targetStars = 3,
@@ -561,12 +541,9 @@ export const PuzzleScreen: React.FC = () => {
     }
 
     return () => {
-      cancelled = true;
       clearInput();
-      const socket = socketRef.current;
-      socket?.emit('puzzle:stop');
-      socket?.close();
-      socketRef.current = null;
+      clientRef.current?.dispose();
+      clientRef.current = null;
     };
   }, [clearInput]);
 
@@ -574,7 +551,7 @@ export const PuzzleScreen: React.FC = () => {
     if (!gameplayInputActiveRef.current) return;
     if (!actionAvailabilityFor(controlsAvailabilityRef.current, action).enabled) return;
     if (action === 'hardDrop') myFieldRef.current?.hardDrop();
-    socketRef.current?.emit('puzzle:action', action);
+    clientRef.current?.sendAction(action as PuzzleActionV1);
   }, []);
 
   // Keyboard controls stay active on hybrid devices even when on-screen controls are shown.
@@ -636,31 +613,105 @@ export const PuzzleScreen: React.FC = () => {
     clearInput();
     setEnd(null);
     setState(null);
-    setStarted(null);
     setVictoryEvaluation(null);
     setSelectedPuzzleId(puzzleId);
     setPicking(false);
-    const socket = socketRef.current;
-    if (!socket) return;
-    if (!socket.connected) {
-      socket.connect();
-    }
-    socket.emit('puzzle:start', { mode: 'catalog', puzzleId });
-  }, [clearInput]);
 
-  const startDaily = useCallback(() => {
-    clearInput();
-    setEnd(null);
-    setState(null);
-    setStarted(null);
-    setVictoryEvaluation(null);
-    setPicking(false);
-    const socket = socketRef.current;
-    if (!socket) return;
-    if (!socket.connected) {
-      socket.connect();
-    }
-    socket.emit('puzzle:start', { mode: 'daily' });
+    const puzzle = puzzlesByIdRef.current.get(puzzleId);
+    if (!puzzle) return;
+
+    clientRef.current?.dispose();
+    const client = new PuzzleRuntimeClient();
+    clientRef.current = client;
+
+    const startedPayload: PuzzleStarted = {
+      levelId: puzzle.payload.id,
+      name: puzzle.payload.name,
+      description: puzzle.payload.description,
+      seed: stableSeedForPuzzle(puzzle.payload.id),
+      goal: puzzle.payload.goal,
+      allowHold: puzzle.payload.allowedMechanics.allowHold,
+      visibilityPolicy: puzzle.payload.visibilityPolicy,
+      puzzleId: puzzle.payload.id,
+      timeline: puzzle.payload.timeline.map((event) => ({
+        tick: event.kind === 'atTick' ? event.tick : undefined,
+        afterPieces: event.kind === 'afterPieces' ? event.afterPieces : undefined,
+        kind: event.hazard,
+      })),
+      benchmark: puzzle.payload.benchmark,
+      referenceBaseline: puzzle.publicBaseline,
+    };
+    setStarted(startedPayload);
+
+    client.onSnapshot((snap) => {
+      const p = snap.gameState.players.puzzle;
+      if (!p) return;
+      setState({
+        tick: snap.gameState.tick,
+        board: p.board,
+        activePiece: p.activePiece,
+        holdPiece: p.holdPiece,
+        canHold: p.canHold,
+        swapCutoffRow: p.swapCutoffRow,
+        allowHold: puzzle.payload.allowedMechanics.allowHold,
+        holdFrozenUntilTick: p.holdFrozenUntilTick,
+        activeEffects: p.activeEffects,
+        nextQueue: p.nextQueue,
+        score: p.score,
+        linesCleared: p.linesCleared,
+        piecesPlaced: snap.piecesUsed,
+        pendingGarbage: p.pendingGarbage.reduce((sum, g) => sum + g.lines, 0),
+        topOut: p.topOut,
+        status: snap.status === 'solved' ? 'solved' : snap.status === 'top-out' ? 'topout' : 'playing',
+        goal: puzzle.payload.goal,
+        levelId: puzzle.payload.id,
+        levelName: puzzle.payload.name,
+        poisonBoard: p.poisonBoard,
+        poisonSpread: p.poisonSpread,
+        customNextPieceSourceCells: p.customNextPieceSourceCells,
+        curtainDefenseLevel: p.curtainDefenseLevel,
+        pendingHazardKinds: [],
+      });
+    });
+
+    client.onFinished((event) => {
+      clearInput();
+      const endPayload: PuzzleEnd = {
+        solved: event.result.solved,
+        topOut: event.result.topOut,
+        ticksUsed: event.result.ticksUsed,
+        piecesUsed: event.result.piecesUsed,
+        linesCleared: event.result.linesCleared,
+        perfectClear: event.result.perfectClear,
+        score: event.result.score,
+        levelId: puzzle.payload.id,
+      };
+      setEnd(endPayload);
+      if (event.result.solved) {
+        const evalResult = calculatePuzzleStars(
+          {
+            solved: true,
+            piecesUsed: event.result.piecesUsed,
+            score: event.result.score,
+            ticksUsed: event.result.ticksUsed,
+            goalKind: puzzle.payload.goal.kind,
+          },
+          puzzle.publicBaseline,
+        );
+        setVictoryEvaluation(evalResult);
+        savePuzzleRecord(
+          puzzle.payload.id,
+          evalResult.stars,
+          event.result.piecesUsed,
+          event.result.score,
+          event.result.ticksUsed,
+          puzzle.contentHash,
+        );
+        setRecords(loadAllPuzzleRecords());
+      }
+    });
+
+    void client.load(puzzle);
   }, [clearInput]);
 
   const restartSame = useCallback(() => {
@@ -669,31 +720,21 @@ export const PuzzleScreen: React.FC = () => {
   }, [startPuzzle]);
 
   const startRandom = useCallback(() => {
-    clearInput();
-    setEnd(null);
-    setState(null);
-    setStarted(null);
-    setVictoryEvaluation(null);
-    setSelectedPuzzleId(null);
-    setPicking(false);
-    const socket = socketRef.current;
-    if (!socket) return;
-    if (!socket.connected) {
-      socket.connect();
-    }
-    socket.emit('puzzle:start', { mode: 'random' });
-  }, [clearInput]);
+    if (catalog.length === 0) return;
+    const randomEntry = catalog[Math.floor(Math.random() * catalog.length)];
+    startPuzzle(randomEntry.id);
+  }, [catalog, startPuzzle]);
 
   const pickAnother = useCallback(() => {
     clearInput();
+    clientRef.current?.dispose();
+    clientRef.current = null;
     setEnd(null);
     setState(null);
     setStarted(null);
     setVictoryEvaluation(null);
     setSelectedPuzzleId(null);
     setPicking(true);
-    socketRef.current?.emit('puzzle:stop');
-    socketRef.current?.emit('puzzle:list');
   }, [clearInput]);
 
   const currentPuzzleIndex = catalog.findIndex(
@@ -810,21 +851,47 @@ export const PuzzleScreen: React.FC = () => {
         </header>
 
         <div className="flex w-full max-w-md flex-col gap-3 rounded-xl border border-white/10 bg-[#08090d] p-4 sm:p-5">
-          {!connected && <p className="text-xs text-zinc-500">Connecting…</p>}
-          {connected && catalog.length === 0 && <p className="text-xs text-zinc-500">Loading catalog…</p>}
-          {daily && (
-            <button
-              type="button"
-              onClick={startDaily}
-              className="flex flex-col items-start rounded-xl border border-amber-400/40 bg-gradient-to-br from-amber-500/20 to-orange-600/10 px-4 py-4 text-left shadow-[0_0_24px_rgba(251,191,36,0.12)] hover:from-amber-500/30 hover:to-orange-600/20"
-            >
-              <span className="text-[10px] font-black uppercase tracking-[0.2em] text-amber-300">
-                Today&apos;s Challenge
-              </span>
-              <span className="mt-1 text-base font-black text-white">{daily.name}</span>
-              <span className="mt-0.5 text-xs text-amber-100/70">{daily.dateKey}</span>
-            </button>
+          {contentState === 'loading' && <p className="text-xs text-zinc-500">Loading puzzle catalog…</p>}
+          {contentState === 'failed' && (
+            <div className="flex flex-col gap-2 rounded-lg border border-red-500/30 bg-red-950/20 p-3">
+              <p className="text-xs font-bold text-red-300">Failed to load puzzle catalog</p>
+              {contentError && <p className="text-[11px] font-mono text-zinc-400">{contentError}</p>}
+              <button
+                type="button"
+                onClick={loadPuzzleContent}
+                className="mt-1 self-start rounded bg-red-800/40 px-2.5 py-1 text-xs font-bold text-red-200 hover:bg-red-800/60"
+              >
+                Retry
+              </button>
+            </div>
           )}
+          {contentState === 'incompatible' && (
+            <div className="flex flex-col gap-2 rounded-lg border border-amber-500/30 bg-amber-950/20 p-3">
+              <p className="text-xs font-bold text-amber-300">Incompatible puzzle version</p>
+              {contentError && <p className="text-[11px] font-mono text-zinc-400">{contentError}</p>}
+              <button
+                type="button"
+                onClick={loadPuzzleContent}
+                className="mt-1 self-start rounded bg-amber-800/40 px-2.5 py-1 text-xs font-bold text-amber-200 hover:bg-amber-800/60"
+              >
+                Retry
+              </button>
+            </div>
+          )}
+          {contentState === 'corrupt-content' && (
+            <div className="flex flex-col gap-2 rounded-lg border border-rose-500/30 bg-rose-950/20 p-3">
+              <p className="text-xs font-bold text-rose-300">Corrupt puzzle pack</p>
+              {contentError && <p className="text-[11px] font-mono text-zinc-400">{contentError}</p>}
+              <button
+                type="button"
+                onClick={loadPuzzleContent}
+                className="mt-1 self-start rounded bg-rose-800/40 px-2.5 py-1 text-xs font-bold text-rose-200 hover:bg-rose-800/60"
+              >
+                Retry
+              </button>
+            </div>
+          )}
+
           <p className="pt-1 text-[10px] font-bold uppercase tracking-wider text-zinc-500">Practice</p>
           {catalog.map((entry, index) => {
             const record = records[entry.id];
@@ -1198,7 +1265,7 @@ export const PuzzleScreen: React.FC = () => {
               />
             ) : (
               <div className="flex h-[380px] w-[220px] items-center justify-center rounded-xl border border-white/10 bg-[#08090d] text-sm text-zinc-500">
-                {connected ? 'Loading puzzle…' : 'Connecting…'}
+                Loading puzzle…
               </div>
             )}
           </div>

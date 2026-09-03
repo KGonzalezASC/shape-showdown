@@ -1,6 +1,6 @@
 import { BOARD_COLS, BOARD_ROWS } from '../../../src/constants.js';
 import type { CellValue, ShapeType } from '../../../src/types.js';
-import { DEFAULT_PUZZLE_BENCHMARK, type CuratedPuzzleLevel, type TimelineEntry, type TimelineEvent } from '../puzzleTypes.js';
+import { DEFAULT_PUZZLE_BENCHMARK, type LegacyCuratedPuzzleLevel, type TimelineEntry, type TimelineEvent } from '../puzzleTypes.js';
 
 /** Empty 20x10 board. */
 export function emptyBoard(): CellValue[][] {
@@ -38,7 +38,7 @@ function freezeLevel<T>(value: T): T {
  * Cheese Keyhole - staggered multi-row cheese with a 2x2 keyhole and side wells.
  * Freeze mid-opening forces early O/J/L commitment into the keyhole.
  */
-export function buildCheeseKeyholeLevel(): CuratedPuzzleLevel {
+export function buildCheeseKeyholeLevel(): LegacyCuratedPuzzleLevel {
   const board = emptyBoard();
   paintGarbageRow(board, 0, [3, 7]);
   paintGarbageRow(board, 1, [4, 5, 8]);
@@ -79,7 +79,7 @@ export function buildCheeseKeyholeLevel(): CuratedPuzzleLevel {
  * Frozen Well - left ramp + right stub basin. Freeze at tick 360 (~6s) locks hold
  * mid-human-solve so early holds matter.
  */
-export function buildFrozenWellLevel(): CuratedPuzzleLevel {
+export function buildFrozenWellLevel(): LegacyCuratedPuzzleLevel {
   const board = emptyBoard();
   paintColumnStack(board, 0, 5);
   paintColumnStack(board, 1, 6);
@@ -133,7 +133,7 @@ export function buildFrozenWellLevel(): CuratedPuzzleLevel {
  * Skew Stairs - diagonal cheese stairs with retrim→magnet swap-line / speed pressure
  * while ascending the holes in order.
  */
-export function buildSkewStairsLevel(): CuratedPuzzleLevel {
+export function buildSkewStairsLevel(): LegacyCuratedPuzzleLevel {
   const board = emptyBoard();
   paintGarbageRow(board, 0, [0, 1]);
   paintGarbageRow(board, 1, [1, 2]);
@@ -179,7 +179,7 @@ export function buildSkewStairsLevel(): CuratedPuzzleLevel {
  * Pulse Garbage - cheese dig with retrim + magnet synergy (swap-line / speed pressure)
  * plus a mid-run garbage pulse.
  */
-export function buildPulseGarbageLevel(): CuratedPuzzleLevel {
+export function buildPulseGarbageLevel(): LegacyCuratedPuzzleLevel {
   const board = emptyBoard();
   paintGarbageRow(board, 0, [2, 7]);
   paintGarbageRow(board, 1, [3, 6]);
@@ -223,7 +223,7 @@ export function buildPulseGarbageLevel(): CuratedPuzzleLevel {
  * Cheese Ladder - multi-row staggered cheese with ascending hole ladder.
  * Snag (fortify) mid-climb clamps movement while ascending holes.
  */
-export function buildCheeseLadderLevel(): CuratedPuzzleLevel {
+export function buildCheeseLadderLevel(): LegacyCuratedPuzzleLevel {
   const board = emptyBoard();
   paintGarbageRow(board, 0, [1]);
   paintGarbageRow(board, 1, [2, 8]);
@@ -268,7 +268,7 @@ export function buildCheeseLadderLevel(): CuratedPuzzleLevel {
  * Dig Shaft - cheese dig with a preferred shaft lane, garbage pulse, and freeze
  * so the dig must continue under locked-hold pressure.
  */
-export function buildDigShaftLevel(): CuratedPuzzleLevel {
+export function buildDigShaftLevel(): LegacyCuratedPuzzleLevel {
   const board = emptyBoard();
   paintGarbageRow(board, 0, [4, 8]);
   paintGarbageRow(board, 1, [4, 1]);
@@ -310,7 +310,7 @@ export function buildDigShaftLevel(): CuratedPuzzleLevel {
  * T-Slot Setup - T-oriented pocket; early T bankable, late T finishes.
  * Sticky (quickstep) clock pressure while the pocket is prepared.
  */
-export function buildTSlotSetupLevel(): CuratedPuzzleLevel {
+export function buildTSlotSetupLevel(): LegacyCuratedPuzzleLevel {
   const board = emptyBoard();
   paintGarbageRow(board, 0, [3, 4, 5]);
   paintGarbageRow(board, 1, [4]);
@@ -357,7 +357,7 @@ export function buildTSlotSetupLevel(): CuratedPuzzleLevel {
  * Retrim→magnet adds swap-line / speed pressure inside the corridor (freeze would be
  * a weak beat with hold already off).
  */
-export function buildFourWideLevel(): CuratedPuzzleLevel {
+export function buildFourWideLevel(): LegacyCuratedPuzzleLevel {
   const board = emptyBoard();
   paintColumnStack(board, 0, 7);
   paintColumnStack(board, 1, 8);
@@ -403,7 +403,7 @@ export function buildFourWideLevel(): CuratedPuzzleLevel {
 }
 
 /** Hold Discipline - center well; freeze at 360 punishes late holds. */
-export function buildHoldDisciplineLevel(): CuratedPuzzleLevel {
+export function buildHoldDisciplineLevel(): LegacyCuratedPuzzleLevel {
   const board = emptyBoard();
   paintColumnStack(board, 0, 4);
   paintColumnStack(board, 1, 5);
@@ -457,7 +457,7 @@ export function buildHoldDisciplineLevel(): CuratedPuzzleLevel {
  * Poison Beat - poison (fixed variant) then wildcard-four with the same variant
  * once poison is on the stack and spread has finished (multiplayer prerequisite).
  */
-export function buildPoisonBeatLevel(): CuratedPuzzleLevel {
+export function buildPoisonBeatLevel(): LegacyCuratedPuzzleLevel {
   const board = emptyBoard();
   paintGarbageRow(board, 0, [1, 6]);
   paintGarbageRow(board, 1, [2, 7]);
@@ -501,7 +501,7 @@ export function buildPoisonBeatLevel(): CuratedPuzzleLevel {
  * loop); mid/late magnet escalator punishes lingering. Win = alive at horizon
  * AND linesCleared >= 12.
  */
-export function buildCurtainDropLevel(): CuratedPuzzleLevel {
+export function buildCurtainDropLevel(): LegacyCuratedPuzzleLevel {
   const board = emptyBoard();
   paintGarbageRow(board, 0, [0, 5]);
   paintGarbageRow(board, 1, [1, 6]);
@@ -516,7 +516,7 @@ export function buildCurtainDropLevel(): CuratedPuzzleLevel {
     { tick: 1280, kind: 'curtain' },
     { tick: 1850, kind: 'snag' },
     { afterPieces: 12, kind: 'garbage', params: { lines: 1, delayTicks: 18 } },
-    { afterPieces: 20, kind: 'freeze', params: { durationTicks: 360 } },
+    { afterPieces: 20, kind: 'freeze', params: { durationTicks: 240 } },
     { afterPieces: 28, kind: 'sticky' },
     { afterPieces: 40, kind: 'retrim' },
     { afterPieces: 52, kind: 'garbage', params: { lines: 1, delayTicks: 18 } },
@@ -546,7 +546,7 @@ export function buildCurtainDropLevel(): CuratedPuzzleLevel {
  * Late I Well - deep well that wants a late I; awkward early S/Z/O force setup.
  * Freeze mid-setup punishes banking the I too late.
  */
-export function buildLateIWellLevel(): CuratedPuzzleLevel {
+export function buildLateIWellLevel(): LegacyCuratedPuzzleLevel {
   const board = emptyBoard();
   paintColumnStack(board, 0, 6);
   paintColumnStack(board, 1, 7);
@@ -602,7 +602,7 @@ export function buildLateIWellLevel(): CuratedPuzzleLevel {
  * Original queue was null (random); authored dig-oriented prefix. finish=0
  * (default clear-map) approximated as clear-lines:4 partial dig.
  */
-export function buildImportJstrisCheckboardLevel(): CuratedPuzzleLevel {
+export function buildImportJstrisCheckboardLevel(): LegacyCuratedPuzzleLevel {
   const board = emptyBoard();
   // Bottom 8 rows of decoded checkerboard (jstris rows 12–19), holes alternate.
   paintGarbageRow(board, 0, [0, 2, 4, 6, 8]);
@@ -659,7 +659,7 @@ export function buildImportJstrisCheckboardLevel(): CuratedPuzzleLevel {
  * Timeline demos piece-scheduled beats (freeze@5, curtain@12, snag@20) mixed with
  * a couple early tick beats. Avoids poison/wildcard on this map.
  */
-export function buildImportJstrisUltimate29ComboLevel(): CuratedPuzzleLevel {
+export function buildImportJstrisUltimate29ComboLevel(): LegacyCuratedPuzzleLevel {
   const board = emptyBoard();
   // Authentic jstris bottom 2 rows (r19 hole@9, r18 hole@6): walls filled, hole open.
   paintGarbageRow(board, 0, [0, 1, 2, 3, 4, 5, 6, 7, 8]);
@@ -708,7 +708,7 @@ export function buildImportJstrisUltimate29ComboLevel(): CuratedPuzzleLevel {
  * residual + wall columns) for spawn headroom vs full 16-row source stack.
  * No quiz queue in fumen; fixed 4-wide-oriented prefix. clear-lines:6 dig goal.
  */
-export function buildImportFumenC4w3resLevel(): CuratedPuzzleLevel {
+export function buildImportFumenC4w3resLevel(): LegacyCuratedPuzzleLevel {
   const board = emptyBoard();
   // Bottom residual rows from decoded fumen (y=0 floor), then center-4 walls.
   paintGarbageRow(board, 0, [4, 5, 6]);
@@ -762,7 +762,7 @@ export function buildImportFumenC4w3resLevel(): CuratedPuzzleLevel {
  * 4 row(s) for spawn headroom. Exact API queue as queuePrefix.
  * PC opener; piece-scheduled curtain→snag→magnet. Goal garbage-clear: clear all garbage.
  */
-export function buildImportJstrisPerfectClearHowLevel(): CuratedPuzzleLevel {
+export function buildImportJstrisPerfectClearHowLevel(): LegacyCuratedPuzzleLevel {
   const board = emptyBoard();
   paintGarbageRow(board, 0, [2, 3, 4, 5, 7, 8]);
   paintGarbageRow(board, 1, [2, 3, 4, 5]);
@@ -809,7 +809,7 @@ export function buildImportJstrisPerfectClearHowLevel(): CuratedPuzzleLevel {
  * 8 row(s) for spawn headroom. Exact API queue as queuePrefix.
  * Well dig; retrim→magnet + garbage pulse. Goal garbage-clear: clear all garbage.
  */
-export function buildImportJstrisClearTheRainbowLevel(): CuratedPuzzleLevel {
+export function buildImportJstrisClearTheRainbowLevel(): LegacyCuratedPuzzleLevel {
   const board = emptyBoard();
   paintGarbageRow(board, 0, [7, 8, 9]);
   paintGarbageRow(board, 1, [7, 8, 9]);
@@ -859,7 +859,7 @@ export function buildImportJstrisClearTheRainbowLevel(): CuratedPuzzleLevel {
  * 8 row(s) for spawn headroom. Exact API queue as queuePrefix.
  * L-spin stack; sticky→freeze→snag afterPieces. Goal clear-lines:5.
  */
-export function buildImportJstrisLspinsEasyLevel(): CuratedPuzzleLevel {
+export function buildImportJstrisLspinsEasyLevel(): LegacyCuratedPuzzleLevel {
   const board = emptyBoard();
   paintGarbageRow(board, 0, [6, 7]);
   paintGarbageRow(board, 1, [6]);
@@ -909,7 +909,7 @@ export function buildImportJstrisLspinsEasyLevel(): CuratedPuzzleLevel {
  * 10 row(s) for spawn headroom. Exact API queue as queuePrefix.
  * Cheese 10; garbage→purge→magnet ticks. Goal garbage-clear: clear all garbage.
  */
-export function buildImportJstrisCheese10Level(): CuratedPuzzleLevel {
+export function buildImportJstrisCheese10Level(): LegacyCuratedPuzzleLevel {
   const board = emptyBoard();
   paintGarbageRow(board, 0, [4]);
   paintGarbageRow(board, 1, [0]);
@@ -959,7 +959,7 @@ export function buildImportJstrisCheese10Level(): CuratedPuzzleLevel {
  * 8 row(s) for spawn headroom. Exact API queue as queuePrefix.
  * Clog chambers; snag + piece retrim/curtain. Goal garbage-clear: clear all garbage.
  */
-export function buildImportJstrisClogLevel(): CuratedPuzzleLevel {
+export function buildImportJstrisClogLevel(): LegacyCuratedPuzzleLevel {
   const board = emptyBoard();
   paintGarbageRow(board, 0, [1, 2]);
   paintGarbageRow(board, 1, [1, 2, 3, 4, 5, 6, 7, 8]);
@@ -1010,7 +1010,7 @@ export function buildImportJstrisClogLevel(): CuratedPuzzleLevel {
  * 8 row(s) for spawn headroom. Exact API queue as queuePrefix.
  * S-spin triple; sticky→magnet + late purge. Goal clear-lines:5.
  */
-export function buildImportJstrisSSpinTripleLevel(): CuratedPuzzleLevel {
+export function buildImportJstrisSSpinTripleLevel(): LegacyCuratedPuzzleLevel {
   const board = emptyBoard();
   paintGarbageRow(board, 0, [3]);
   paintGarbageRow(board, 1, [3, 4]);
@@ -1060,7 +1060,7 @@ export function buildImportJstrisSSpinTripleLevel(): CuratedPuzzleLevel {
  * 8 row(s) for spawn headroom. Exact API queue as queuePrefix.
  * Drill shaft; early garbage + mid freeze. Goal garbage-clear: clear all garbage.
  */
-export function buildImportJstrisDrilltris1Level(): CuratedPuzzleLevel {
+export function buildImportJstrisDrilltris1Level(): LegacyCuratedPuzzleLevel {
   const board = emptyBoard();
   paintGarbageRow(board, 0, []);
   paintGarbageRow(board, 1, []);
@@ -1117,7 +1117,7 @@ export function buildImportJstrisDrilltris1Level(): CuratedPuzzleLevel {
  * 8 row(s) for spawn headroom. Exact API queue as queuePrefix.
  * Drill 2; retrim + sparse curtain loop + late magnet. Goal garbage-clear: clear all garbage.
  */
-export function buildImportJstrisDrilltris2Level(): CuratedPuzzleLevel {
+export function buildImportJstrisDrilltris2Level(): LegacyCuratedPuzzleLevel {
   const board = emptyBoard();
   paintGarbageRow(board, 0, []);
   paintGarbageRow(board, 1, []);
@@ -1171,7 +1171,7 @@ export function buildImportJstrisDrilltris2Level(): CuratedPuzzleLevel {
  * 8 row(s) for spawn headroom. Exact API queue as queuePrefix.
  * SRS tower; poison→wildcard (+ late snag). Goal clear-lines:10.
  */
-export function buildImportJstrisSrsTowerLevel(): CuratedPuzzleLevel {
+export function buildImportJstrisSrsTowerLevel(): LegacyCuratedPuzzleLevel {
   const board = emptyBoard();
   paintGarbageRow(board, 0, [7, 8]);
   paintGarbageRow(board, 1, [7]);
@@ -1223,7 +1223,7 @@ export function buildImportJstrisSrsTowerLevel(): CuratedPuzzleLevel {
  * 8 row(s) for spawn headroom. Exact API queue as queuePrefix.
  * SRS training; retrim→magnet→curtain. Goal garbage-clear: clear all garbage.
  */
-export function buildImportJstrisSrsTrainingLevel(): CuratedPuzzleLevel {
+export function buildImportJstrisSrsTrainingLevel(): LegacyCuratedPuzzleLevel {
   const board = emptyBoard();
   paintGarbageRow(board, 0, [7]);
   paintGarbageRow(board, 1, [7]);
@@ -1273,7 +1273,7 @@ export function buildImportJstrisSrsTrainingLevel(): CuratedPuzzleLevel {
  * 8 row(s) for spawn headroom. Exact API queue as queuePrefix.
  * DT cannon; snag→curtain→magnet afterPieces. Goal garbage-clear: clear all garbage.
  */
-export function buildImportJstrisDtCannonPracticeLevel(): CuratedPuzzleLevel {
+export function buildImportJstrisDtCannonPracticeLevel(): LegacyCuratedPuzzleLevel {
   const board = emptyBoard();
   paintGarbageRow(board, 0, [7]);
   paintGarbageRow(board, 1, [7]);
@@ -1323,7 +1323,7 @@ export function buildImportJstrisDtCannonPracticeLevel(): CuratedPuzzleLevel {
  * 8 row(s) for spawn headroom. Exact API queue as queuePrefix.
  * Godspin; purge→sticky→garbage. Goal garbage-clear: clear all garbage.
  */
-export function buildImportJstrisGodspinLevel(): CuratedPuzzleLevel {
+export function buildImportJstrisGodspinLevel(): LegacyCuratedPuzzleLevel {
   const board = emptyBoard();
   paintGarbageRow(board, 0, [7]);
   paintGarbageRow(board, 1, [7, 8]);
@@ -1374,7 +1374,7 @@ export function buildImportJstrisGodspinLevel(): CuratedPuzzleLevel {
  * 8 row(s) for spawn headroom. Exact API queue as queuePrefix.
  * STSD tower; magnet→snag→freeze afterPieces. Goal clear-lines:11.
  */
-export function buildImportJstrisManyStsdLevel(): CuratedPuzzleLevel {
+export function buildImportJstrisManyStsdLevel(): LegacyCuratedPuzzleLevel {
   const board = emptyBoard();
   paintGarbageRow(board, 0, [6, 7]);
   paintGarbageRow(board, 1, [6, 7]);
@@ -1422,7 +1422,7 @@ export function buildImportJstrisManyStsdLevel(): CuratedPuzzleLevel {
  * 8 row(s) for spawn headroom. Exact API queue as queuePrefix.
  * Tripz; curtain→retrim→sticky. Goal garbage-clear: clear all garbage.
  */
-export function buildImportJstrisTripzLevel(): CuratedPuzzleLevel {
+export function buildImportJstrisTripzLevel(): LegacyCuratedPuzzleLevel {
   const board = emptyBoard();
   paintGarbageRow(board, 0, [8]);
   paintGarbageRow(board, 1, [8, 9]);
@@ -1473,7 +1473,7 @@ export function buildImportJstrisTripzLevel(): CuratedPuzzleLevel {
  * 8 row(s) for spawn headroom. Exact API queue as queuePrefix.
  * Gutter; freeze-primary mid-solve. Goal garbage-clear: clear all garbage.
  */
-export function buildImportJstrisTheGutterLevel(): CuratedPuzzleLevel {
+export function buildImportJstrisTheGutterLevel(): LegacyCuratedPuzzleLevel {
   const board = emptyBoard();
   paintGarbageRow(board, 0, []);
   paintGarbageRow(board, 1, [4, 5]);
@@ -1523,7 +1523,7 @@ export function buildImportJstrisTheGutterLevel(): CuratedPuzzleLevel {
  * 8 row(s) for spawn headroom. Exact API queue as queuePrefix.
  * Downstack; garbage→magnet + late snag. Goal garbage-clear: clear all garbage.
  */
-export function buildImportJstris1v1DownstackLevel(): CuratedPuzzleLevel {
+export function buildImportJstris1v1DownstackLevel(): LegacyCuratedPuzzleLevel {
   const board = emptyBoard();
   paintGarbageRow(board, 0, [3]);
   paintGarbageRow(board, 1, [3]);
@@ -1574,7 +1574,7 @@ export function buildImportJstris1v1DownstackLevel(): CuratedPuzzleLevel {
  * 8 row(s) for spawn headroom. Exact API queue as queuePrefix.
  * T-spin tower; sticky→curtain→snag afterPieces. Goal clear-lines:10.
  */
-export function buildImportJstrisAaronSTSpinTowerLevel(): CuratedPuzzleLevel {
+export function buildImportJstrisAaronSTSpinTowerLevel(): LegacyCuratedPuzzleLevel {
   const board = emptyBoard();
   paintGarbageRow(board, 0, [5, 6, 7, 8]);
   paintGarbageRow(board, 1, [6, 7, 8]);
@@ -1622,7 +1622,7 @@ export function buildImportJstrisAaronSTSpinTowerLevel(): CuratedPuzzleLevel {
  * 8 row(s) for spawn headroom. Exact API queue as queuePrefix.
  * DHD; poison→wildcard + magnet. Goal clear-lines:12.
  */
-export function buildImportJstrisDhdLevel(): CuratedPuzzleLevel {
+export function buildImportJstrisDhdLevel(): LegacyCuratedPuzzleLevel {
   const board = emptyBoard();
   paintGarbageRow(board, 0, [4]);
   paintGarbageRow(board, 1, [3, 4, 5]);
@@ -1670,7 +1670,7 @@ export function buildImportJstrisDhdLevel(): CuratedPuzzleLevel {
  * 3 authentic TST rows for spawn headroom. Exact API queue as queuePrefix.
  * Soft afterPieces pressure (snag→curtain→magnet). Goal garbage-clear: clear all garbage.
  */
-export function buildImportJstrisTSpinTriplesLevel(): CuratedPuzzleLevel {
+export function buildImportJstrisTSpinTriplesLevel(): LegacyCuratedPuzzleLevel {
   const board = emptyBoard();
   // Bottom 3 of TST pair pattern (r17–19).
   paintGarbageRow(board, 0, [2, 8]);
@@ -1717,7 +1717,7 @@ export function buildImportJstrisTSpinTriplesLevel(): CuratedPuzzleLevel {
  * Replaces unsolvable L-spin-mania (77) for RulesBot. snag→sticky→purge afterPieces.
  * Goal garbage-clear: clear all garbage.
  */
-export function buildImportJstrisMashSpaceLevel(): CuratedPuzzleLevel {
+export function buildImportJstrisMashSpaceLevel(): LegacyCuratedPuzzleLevel {
   const board = emptyBoard();
   paintGarbageRow(board, 0, [3, 4, 5, 6]);
   paintGarbageRow(board, 1, [3, 4, 5, 6]);
@@ -1762,7 +1762,7 @@ export function buildImportJstrisMashSpaceLevel(): CuratedPuzzleLevel {
 }
 // --- END JSTRIS BATCH20 ---
 
-export function buildAuthoredLevels(): CuratedPuzzleLevel[] {
+export function buildAuthoredLevels(): LegacyCuratedPuzzleLevel[] {
   return [
     // --- Tier 1: Novice / Warmup (Introductory downstack & drill fundamentals) ---
     buildImportJstrisDrilltris1Level(),

@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { afterEach, describe, it } from 'node:test';
 import { createPlayerRngChannels } from '../rng';
 import type { GameState } from '../types';
-import { makePlayer } from '../../server/puzzleEngine/engine';
+import { makePlayer } from '../puzzle/runtime/engine';
 import {
   getChromeSnapshot,
   getRawGameState,

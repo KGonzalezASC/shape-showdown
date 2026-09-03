@@ -14,7 +14,7 @@ import { decodeReplayFile } from '../src/replayCodec.js';
 import { R2ReplayStore, setDefaultR2ReplayStoreForTests } from './storage/r2ReplayStore.js';
 import { resetRecordingControlForTests, setRecordingActive } from './controlPlane/recordingControl.js';
 import type { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
-import { makePlayer } from './puzzleEngine/engine.js';
+import { makePlayer } from '../src/puzzle/runtime/engine.js';
 import { createPlayerRngChannels } from '../src/rng.js';
 import type { Server, Socket } from 'socket.io';
 import type { JoinTicket, MatchRecord } from './controlPlane/matchStore.js';

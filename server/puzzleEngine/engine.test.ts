@@ -15,7 +15,7 @@ import {
   applyBomberToBuyer,
   detonateBomberBlast,
   stepPlayer,
-} from './engine.js';
+} from '../../src/puzzle/runtime/engine.js';
 import {
   createPlayerRngChannels,
 } from '../../src/rng.js';
@@ -432,12 +432,12 @@ describe('puzzle engine', () => {
     // 2. Lock the first piece without clearing a line.
     assert.ok(player.activePiece);
     const firstType = player.activePiece.type;
-    
+
     // Position it at the floor so it is grounded and locks.
     player.activePiece.y = BOARD_ROWS - 2;
     player.lockDelayRemainingTicks = 0;
     stepPlayer(game.tick, player, rng, []);
-    
+
     // The first piece should have locked, and a new one spawned.
     assert.notEqual(player.activePiece?.type, firstType);
     // The sticky cap MUST persist because no lines were cleared!

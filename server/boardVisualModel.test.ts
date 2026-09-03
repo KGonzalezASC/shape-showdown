@@ -23,7 +23,7 @@ import { paintBoardCanvasOverlay } from '../src/board/BoardCanvasOverlay';
 import { localDevelopmentGameServerUrl } from '../src/network/localGameServer';
 import { BOARD_COLS, BOARD_HIDDEN_ROWS, BOARD_ROWS } from '../src/types';
 import { toPublicPlayerState } from '../src/state/publicSnapshots';
-import { makePlayer, makeRng } from './puzzleEngine/engine.js';
+import { makePlayer, makeRng } from '../src/puzzle/runtime/engine.js';
 
 function visualPlayer() {
   const player = makePlayer('visual', makeRng(7));

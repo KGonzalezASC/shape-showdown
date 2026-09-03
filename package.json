@@ -9,7 +9,7 @@
     "dev:server": "cross-env NODE_ENV=development ALLOW_IN_MEMORY_DATABASE=true bun server.ts",
     "dev:client": "bunx vite",
     "dev:local": "cross-env VITE_GAME_SERVER_URL=http://localhost:3000 bunx vite",
-    "build:client": "bunx vite build",
+    "build:client": "bunx vite build && bun scripts/build-puzzle-packs.mts",
     "build:replay": "bunx vite build -c vite.replay.config.mjs",
     "build:server": "bun build server.ts --target=bun --external vite --define 'process.env.NODE_ENV=\"production\"' --outfile=dist-server/server.mjs && bun scripts/copy-migrations.mts",
     "build:server:bin": "bun build server.ts --compile --target=bun-linux-x64 --external vite --define 'process.env.NODE_ENV=\"production\"' --outfile=dist-server/shape-showdown-server.x86_64 && bun scripts/copy-migrations.mts",

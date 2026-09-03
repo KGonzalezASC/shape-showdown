@@ -1,8 +1,8 @@
 import type { ActionType, GameState, InputState, MatchEvent, PlayerState } from '../../src/types.js';
 import { createPlayerRngChannels, type RngChannels } from '../../src/rng.js';
-import { makePlayer } from '../puzzleEngine/engine.js';
-import { matchStep } from '../puzzleEngine/matchStep.js';
-import { applyShopPurchase, openPlayerShop } from '../shop.js';
+import { makePlayer } from '../../src/puzzle/runtime/engine.js';
+import { matchStep } from '../../src/puzzle/runtime/matchStep.js';
+import { applyShopPurchase, openPlayerShop } from '../../src/puzzle/runtime/shop.js';
 import { SHOP_ITEM_BY_ID } from '../../src/shop/shopCatalog.js';
 import { getPricingView } from '../../src/shop/shopPricing.js';
 import { clonePlayer, type InputDriver } from './inputDriver.js';

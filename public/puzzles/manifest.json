@@ -1,0 +1,50 @@
+{
+  "schemaVersion": 1,
+  "puzzleRuntimeVersion": "puzzle-runtime-v1",
+  "releaseId": "0.0.0-07ae336e",
+  "packs": [
+    {
+      "id": "curated-catalog",
+      "url": "./packs/curated-catalog.07ae336e3ce14fd7.json",
+      "sha256": "07ae336e3ce14fd73a4ed4747d07bb29d0abe0323ac2f78c3dde684b1b95bb28",
+      "byteLength": 121683,
+      "puzzleIds": [
+        "import-jstris-drilltris-1",
+        "import-jstris-drilltris-2",
+        "import-jstris-mash-space",
+        "authored-cheese-keyhole",
+        "import-jstris-clear-the-rainbow",
+        "authored-skew-stairs",
+        "import-jstris-perfect-clear-how",
+        "authored-well-freeze",
+        "authored-cheese-ladder",
+        "authored-dig-shaft",
+        "import-jstris-checkboard",
+        "import-jstris-lspins-easy",
+        "authored-tslot-setup",
+        "import-jstris-dt-cannon-practice",
+        "import-jstris-t-spin-triples",
+        "import-fumen-c4w-3res",
+        "import-jstris-the-gutter",
+        "import-jstris-s-spin-triple",
+        "authored-four-wide",
+        "import-jstris-clog",
+        "import-jstris-1v1-downstack",
+        "authored-hold-discipline",
+        "authored-pulse-garbage",
+        "import-jstris-many-stsd",
+        "import-jstris-tripz",
+        "import-jstris-srs-training",
+        "import-jstris-cheese-10",
+        "authored-late-i-well",
+        "import-jstris-srs-tower",
+        "import-jstris-godspin",
+        "import-jstris-aaron-s-t-spin-tower",
+        "import-jstris-ultimate-29-combo",
+        "authored-poison-beat",
+        "import-jstris-dhd",
+        "authored-curtain-drop"
+      ]
+    }
+  ]
+}

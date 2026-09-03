@@ -1,13 +1,13 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { makePlayer, makeRng, stepPlayer } from './puzzleEngine/engine.js';
+import { makePlayer, makeRng, stepPlayer } from '../src/puzzle/runtime/engine.js';
 import {
   applyShopPurchase,
   openPlayerShop,
   rollShopOnLineClear,
   tickPlayerShop,
   SHOP_CYCLE_TICKS,
-} from './shop.js';
+} from '../src/puzzle/runtime/shop.js';
 import { SHOP_ROLL_POOL, SHOP_ITEM_BY_ID } from '../src/shop/shopCatalog.js';
 import { createInitialShopRoll, drawWeightedShopOffers, SHOP_VISIBLE_COUNT } from '../src/shop/shopRoll.js';
 import { BOARD_HIDDEN_ROWS } from '../src/constants.js';

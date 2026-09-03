@@ -6,7 +6,6 @@ import { PuzzleSession } from './puzzleSession.js';
 import type { PuzzleLevel, PuzzleVisibilityPolicy } from './puzzleTypes.js';
 import { visibleNextQueueCount } from '../../src/puzzle/puzzlePresentation.js';
 import { getCuratedPuzzleEntry, listPuzzleCatalogSummaries, loadPuzzleCatalog } from './catalog/index.js';
-import { getDailyChallenge, getDailyChallengeSummary } from './catalog/dailyCalendar.js';
 import { loadReferenceBaseline } from './catalog/referenceBaselines.js';
 import type { InputDriver, DriverObservation, PlayerCommand } from '../testHarness/inputDriver.js';
 import { extractPieceTimeline, materializeTimeline } from './puzzleTimeline.js';
@@ -67,10 +66,9 @@ export type PuzzleStartPayload = {
   /**
    * catalog: require puzzleId
    * random: pick a random curated entry
-   * daily: today's challenge from the daily calendar
    * generated: legacy archetype generator (practice only)
    */
-  mode?: 'catalog' | 'random' | 'generated' | 'daily';
+  mode?: 'catalog' | 'random' | 'generated';
   /** Seed for generated mode only. Catalog levels keep their frozen seed. */
   seed?: number;
   /** Generated archetype name when mode=generated. */
@@ -145,10 +143,7 @@ export class PuzzleHost {
   }
 
   public listCatalog(): void {
-    this.socket.emit('puzzle:catalog', {
-      puzzles: listPuzzleCatalogSummaries(),
-      daily: getDailyChallengeSummary(),
-    });
+    this.socket.emit('puzzle:catalog', listPuzzleCatalogSummaries());
   }
 
   public start(payload?: PuzzleStartPayload): void {
@@ -277,9 +272,6 @@ export class PuzzleHost {
       return this.pickGeneratedLevel(payload?.seed, payload?.level);
     }
 
-    if (mode === 'daily') {
-      return getDailyChallenge().entry.level;
-    }
 
     if (mode === 'catalog') {
       const puzzleId = payload?.puzzleId;

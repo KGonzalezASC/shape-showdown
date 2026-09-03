@@ -5,10 +5,10 @@ import {
   POISON_SPREAD_INTERVAL_TICKS,
 } from '../../src/constants.js';
 import type { CellValue, ShapeType } from '../../src/types.js';
-import { createEmptyBoard, createEmptyPoisonBoard } from '../puzzleEngine/engine.js';
+import { createEmptyBoard, createEmptyPoisonBoard } from '../../src/puzzle/runtime/engine.js';
 import type { MutableRng } from '../../src/rng.js';
 import { rngInt, rngNext } from '../../src/rng.js';
-import { PIECE_SEQUENCE } from '../puzzleEngine/pieces.js';
+import { PIECE_SEQUENCE } from '../../src/puzzle/runtime/pieces.js';
 import type { PuzzleLevel, TimelineEntry } from './puzzleTypes.js';
 import { offsetTimelineEntries } from './puzzleTimeline.js';
 

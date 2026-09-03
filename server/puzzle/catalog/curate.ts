@@ -1,6 +1,6 @@
 import { assertSupportedPuzzleTimeline } from '../puzzleHazards.js';
 import type {
-  CuratedPuzzleLevel,
+  LegacyCuratedPuzzleLevel,
   PuzzleBenchmarkPolicy,
   PuzzleLevel,
   PuzzleVisibilityPolicy,
@@ -16,7 +16,7 @@ export interface CuratePuzzleOptions {
 }
 
 export interface CuratedPuzzleEntry {
-  level: CuratedPuzzleLevel;
+  level: LegacyCuratedPuzzleLevel;
   intendedSolutionRefs: string[];
   solutionAlternativeRefs: string[];
 }
@@ -45,7 +45,7 @@ export function curatePuzzleLevel(
     );
   }
   assertSupportedPuzzleTimeline(level.timeline, `curatePuzzleLevel(${level.id})`);
-  const curated: CuratedPuzzleLevel = {
+  const curated: LegacyCuratedPuzzleLevel = {
     ...level,
     shopPolicy: options.shopPolicy ?? level.shopPolicy,
     allowHold: options.allowHold,

@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "puzzleId": "import-jstris-tripz",
-  "contentHash": "c47b73940df705dd716377311b665e5431b25069e2b539d373643d4f3f6104a2",
+  "contentHash": "6fea2badc2f0fc55804da016174b4e43cd311a5bdd0e2cba467d37f191144104",
   "engineProtocolVersion": 4,
   "packageVersion": "0.0.0",
   "validationStatus": "passed",
@@ -37,7 +37,7 @@
       "solved": true,
       "topOut": false,
       "score": 1282,
-      "ticksUsed": 783,
+      "ticksUsed": 784,
       "piecesUsed": 15,
       "linesCleared": 9,
       "perfectClear": false
@@ -49,7 +49,7 @@
       "solved": true,
       "topOut": false,
       "score": 1282,
-      "ticksUsed": 783,
+      "ticksUsed": 784,
       "piecesUsed": 15,
       "linesCleared": 9,
       "perfectClear": false
@@ -59,7 +59,7 @@
     "profileId": "player-limited-default",
     "profileIdentity": "player-limited-default|v1|player-limited|topology=none|garbage=0|seed=0",
     "score": 1282,
-    "ticksUsed": 783,
+    "ticksUsed": 784,
     "piecesUsed": 15,
     "linesCleared": 9,
     "solved": true

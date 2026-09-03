@@ -70,3 +70,14 @@ The declared metric and direction used to select a Reference Baseline from quali
 ### Validation Artifact
 An immutable build/staging record for one curated puzzle content hash: engine/protocol version, candidate batch outcomes, selected Reference Baseline metrics, allowed mechanics, scripted events, visibility policy placeholder, and solution references without embedding hidden solution command traces. Produced by `bun run validate:puzzles` under `fixtures/puzzle-validation/`.
 
+## Client-run puzzle publication
+
+### Static puzzle publication
+The immutable player-safe puzzle payload, content hash, and public baseline metrics delivered as static files. It contains the finite piece sequence and deterministic challenge rules, but no RulesBot profiles, validation traces, author notes, or server-only shop policy.
+
+### Casual attempt
+A local playthrough that runs in the browser without a Railway request, socket connection, or trusted result submission. The player may retry it, but its result remains local progress.
+
+### Verified attempt
+A playthrough with a compact command trace that a matching puzzle runtime can replay. The verifier accepts only known published content and a supported runtime version, then compares its authoritative outcome with the submitted claim. Verification establishes replay consistency, not that a human supplied the commands.
+

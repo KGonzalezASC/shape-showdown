@@ -1,7 +1,7 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { matchStep, canonicalMatchEvents } from './matchStep.js';
-import { makePlayer } from './engine.js';
+import { matchStep, canonicalMatchEvents } from '../../src/puzzle/runtime/matchStep.js';
+import { makePlayer } from '../../src/puzzle/runtime/engine.js';
 import { createPlayerRngChannels } from '../../src/rng.js';
 import { BOARD_COLS, BOARD_ROWS } from '../../src/constants.js';
 import type { GameState, MatchEvent } from '../../src/types.js';

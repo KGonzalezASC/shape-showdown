@@ -5,9 +5,9 @@ import { PuzzleSession } from './puzzleSession.js';
 import { generatePuzzleLevel } from './puzzleGenerator.js';
 import { RulesBot } from '../testHarness/rulesBot.js';
 import type { PuzzleLevel } from './puzzleTypes.js';
-import { applyScriptedShopAttack } from '../shop.js';
+import { applyScriptedShopAttack } from '../../src/puzzle/runtime/shop.js';
 import { WILDCARD_INCOMING_LABEL } from '../../src/shop/fieldEffects.js';
-import { makePlayer } from '../puzzleEngine/engine.js';
+import { makePlayer } from '../../src/puzzle/runtime/engine.js';
 import { createPlayerRngChannels } from '../../src/rng.js';
 import { buildPoisonBeatLevel } from './catalog/authoredLevels.js';
 

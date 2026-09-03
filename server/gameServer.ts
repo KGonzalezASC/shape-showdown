@@ -226,7 +226,7 @@ export async function startGameServer(
       socket.emit('puzzle:error', { message: 'failed to list puzzle catalog' });
     }
   });
-  socket.on('puzzle:start', (payload?: { puzzleId?: string; mode?: 'catalog' | 'random' | 'generated' | 'daily'; seed?: number; level?: string }) => {
+  socket.on('puzzle:start', (payload?: { puzzleId?: string; mode?: 'catalog' | 'random' | 'generated'; seed?: number; level?: string }) => {
       try {
         puzzleHost.start(payload);
       } catch (error) {

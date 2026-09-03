@@ -1,5 +1,6 @@
 export interface PuzzleProgressRecord {
   puzzleId: string;
+  contentHash?: string;
   bestStars: number;
   bestPieces?: number;
   bestScore?: number;
@@ -35,6 +36,7 @@ export function savePuzzleRecord(
   pieces: number,
   score?: number,
   ticks?: number,
+  contentHash?: string,
 ): PuzzleProgressRecord {
   const all = loadAllPuzzleRecords();
   const existing = all[puzzleId];
@@ -65,6 +67,7 @@ export function savePuzzleRecord(
       typeof existing?.bestTicks === 'number' && typeof ticks === 'number'
         ? Math.min(ticks, existing.bestTicks)
         : ticks ?? existing?.bestTicks,
+    ...(contentHash ? { contentHash } : existing?.contentHash ? { contentHash: existing.contentHash } : {}),
     clearedAt: Date.now(),
   };
 

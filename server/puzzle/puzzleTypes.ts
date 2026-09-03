@@ -1,4 +1,5 @@
 import type { CellValue, ShapeType } from '../../src/types.js';
+import type { PublishedPuzzlePayloadV1 } from '../../src/puzzle/publishedPuzzle.js';
 
 /**
  * Single-player puzzle mode types.
@@ -99,8 +100,12 @@ export type PuzzleGoal =
       lines: number;
     };
 
-/** A single-player puzzle level: board + piece stream + scripted hazard timeline. */
-export interface PuzzleLevel {
+/**
+ * Legacy server level used by PuzzleSession and the authoring catalog during the
+ * migration to published content. It deliberately keeps queuePrefix and
+ * shopPolicy so existing server fixtures can continue to run unchanged.
+ */
+export interface LegacyPuzzleLevel {
   id: string;
   name: string;
   description?: string;
@@ -112,7 +117,7 @@ export interface PuzzleLevel {
   goal: PuzzleGoal;
   /** Scripted hazard timeline standing in for the missing opponent (may include loops). */
   timeline: TimelineEntry[];
-  /** Shop policy: 'none' = pure puzzle, 'standard' = normal line-clear rolls. */
+  /** Legacy server-only shop policy. Published solo content has no shop policy. */
   shopPolicy: 'none' | 'standard';
   /** Whether the player is permitted to use the hold chamber (default true). */
   allowHold?: boolean;
@@ -130,6 +135,9 @@ export interface PuzzleLevel {
    */
   visibilityPolicy?: PuzzleVisibilityPolicy;
 }
+
+/** @deprecated Use LegacyPuzzleLevel in server-only migration code. */
+export type PuzzleLevel = LegacyPuzzleLevel;
 
 /** Metric used when selecting a Reference Baseline from a candidate batch. */
 export type PuzzleBenchmarkMetric = 'score' | 'ticks' | 'pieces';
@@ -155,10 +163,18 @@ export const DEFAULT_PUZZLE_BENCHMARK: PuzzleBenchmarkPolicy = {
 export type PuzzleVisibilityPolicy = 'hidden' | 'partial' | 'revealed';
 
 /**
- * Curated catalog level: product content with required policy fields.
- * Generator-made ad-hoc levels may still omit these; catalog entries may not.
+ * Target curated content for publication. The shared V1 payload has a complete
+ * finite sequence, an explicit hold policy, and a discriminated timeline. It has
+ * no seed continuation or solo shop policy.
  */
-export type CuratedPuzzleLevel = PuzzleLevel & {
+export type CuratedPuzzleContent = PublishedPuzzlePayloadV1;
+export type CuratedPuzzleLevel = CuratedPuzzleContent;
+
+/**
+ * Legacy curated catalog shape retained until the catalog is exported through the
+ * publication adapter. This is not a PublishedPuzzleV1 payload.
+ */
+export type LegacyCuratedPuzzleLevel = LegacyPuzzleLevel & {
   shopPolicy: 'none' | 'standard';
   allowHold: boolean;
   benchmark: PuzzleBenchmarkPolicy;
