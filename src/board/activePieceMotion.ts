@@ -18,18 +18,6 @@ export interface ActivePieceMotion {
 }
 
 /**
- * Soft drop / gravity netcasts advance Y by 1 (sometimes 2 when a 60Hz sim
- * tick is sampled at 30Hz). Restarting the 72ms cubic ease on every step
- * leaves the piece forever mid-lerp and feels mushy on phone.
- */
-export function isActivePieceSoftDropStep(
-  from: ActivePiecePoint,
-  to: ActivePiecePoint,
-): boolean {
-  return from.x === to.x && to.y > from.y && (to.y - from.y) <= 2;
-}
-
-/**
  * Normal play snapshots can be two simulation ticks apart while soft drop is
  * held (60Hz simulation versus the 30Hz play netcast). Keep that movement
  * continuous; only larger discontinuities should snap.

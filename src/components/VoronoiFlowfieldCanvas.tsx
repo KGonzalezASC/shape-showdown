@@ -20,13 +20,13 @@ import {
   type PoisonPalette,
 } from '../presentation/shapePalette';
 import type { PiecePalette } from '../presentation/themePackage';
+import { usePlayfieldLayoutMode } from '../responsive/playfieldLayoutMode';
 import {
   ACTIVE_PIECE_MOTION_MS,
   collectActivePieceStackHandoffs,
   interpolateActivePiecePoint,
   shouldRestartActivePieceVisualLifetime,
   shouldSnapActivePieceMotion,
-  isActivePieceSoftDropStep,
   type ActivePieceMotion,
   type ActivePiecePoint,
 } from '../board/activePieceMotion';
@@ -749,6 +749,7 @@ export const VoronoiFlowfieldCanvas: React.FC<VoronoiFlowfieldCanvasProps> = Rea
   piecePalette = SHAPE_COLORS,
   poisonPalette = DEFAULT_POISON_PALETTE,
 }) => {
+  const layoutMode = usePlayfieldLayoutMode();
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
   // Stable refs prevent animation loop teardown on 60Hz state updates
@@ -957,16 +958,12 @@ export const VoronoiFlowfieldCanvas: React.FC<VoronoiFlowfieldCanvasProps> = Rea
       const previous = previousById.get(cell.offsetIndex);
       const existing = activeMotionRef.current.get(cell.offsetIndex);
       const jumped = previous && shouldSnapActivePieceMotion(previous, cell);
-      const softDropStep = previous != null && isActivePieceSoftDropStep(previous, cell);
-      // Soft-drop / gravity Y steps arrive ~30Hz. Snapping keeps the piece on
-      // the authoritative cell instead of chaining incomplete 72ms cubic eases.
-      if (!previous || jumped || softDropStep || (previous.x === cell.x && previous.y === cell.y)) {
-        nextMotion.set(
-          cell.offsetIndex,
-          softDropStep || jumped || !previous
-            ? { from: cell, to: cell, startedAt: now }
-            : (existing ?? { from: cell, to: cell, startedAt: now }),
-        );
+      if (!previous || jumped || (previous.x === cell.x && previous.y === cell.y)) {
+        nextMotion.set(cell.offsetIndex, existing ?? {
+          from: cell,
+          to: cell,
+          startedAt: now,
+        });
         continue;
       }
       const from = existing
@@ -1042,10 +1039,18 @@ export const VoronoiFlowfieldCanvas: React.FC<VoronoiFlowfieldCanvasProps> = Rea
           activeStackHandoffRef.current.delete(key);
         }
       }
+      const rawDpr = window.devicePixelRatio || 1;
+      // Phone soft-drop paints the full voronoi board every frame; cap backing
+      // store so we stay closer to main's motion feel without 3x pixel fill.
+      // Read matchMedia each frame — this rAF effect intentionally omits layout deps.
+      const phoneLayout = !window.matchMedia('(min-width: 661px)').matches;
+      const requestedDpr = phoneLayout
+        ? Math.min(rawDpr, 1.5)
+        : Math.min(rawDpr, 2);
       const size = syncCanvasBackingStore(
         canvas,
         cs,
-        window.devicePixelRatio || 1,
+        requestedDpr,
       );
       const { cssWidth, cssHeight, dpr } = size;
       if (blobCanvas.width !== cssWidth || blobCanvas.height !== cssHeight) {
@@ -1094,13 +1099,27 @@ export const VoronoiFlowfieldCanvas: React.FC<VoronoiFlowfieldCanvasProps> = Rea
       ctx.clearRect(0, 0, cssWidth, cssHeight);
 
       // ── Pass 1: Color-batched regular polygon fills ──
+      let softDropMotionActive = false;
+      for (const motion of activeMotionRef.current.values()) {
+        if (
+          motion.from.x === motion.to.x
+          && motion.to.y > motion.from.y
+          && (timestamp - motion.startedAt) < ACTIVE_PIECE_MOTION_MS
+        ) {
+          softDropMotionActive = true;
+          break;
+        }
+      }
+
       for (const [color, cells] of cellMap.colorBuckets) {
         const regularCells = cells.filter((cell) => !cell.isPoison);
         if (regularCells.length === 0) continue;
         ctx.fillStyle = color;
         ctx.beginPath();
         for (const cell of regularCells) {
-          const wobbleSpeed = REGULAR_PIECE_WOBBLE_SPEED;
+          const wobbleSpeed = softDropMotionActive && cell.activeOffsetIndex === undefined
+            ? 0
+            : REGULAR_PIECE_WOBBLE_SPEED;
           const { x: cx, y: cy } = cellCenter(cell);
           traceCellPolygon(
             ctx,
@@ -1128,7 +1147,9 @@ export const VoronoiFlowfieldCanvas: React.FC<VoronoiFlowfieldCanvasProps> = Rea
       for (const [, cells] of cellMap.colorBuckets) {
         for (const cell of cells) {
           if (cell.isPoison) continue;
-          const wobbleSpeed = REGULAR_PIECE_WOBBLE_SPEED;
+          const wobbleSpeed = softDropMotionActive && cell.activeOffsetIndex === undefined
+            ? 0
+            : REGULAR_PIECE_WOBBLE_SPEED;
           const { x: cx, y: cy } = cellCenter(cell);
           traceCellPolygon(
             ctx,
@@ -1255,7 +1276,10 @@ export const VoronoiFlowfieldCanvas: React.FC<VoronoiFlowfieldCanvasProps> = Rea
       style={{
         width: BOARD_COLS * cellSize,
         height: BOARD_VISIBLE_ROWS * cellSize,
-        filter: 'drop-shadow(0 0 6px rgba(0, 0, 0, 0.4))',
+        // CSS filter on an animating canvas is expensive on phone DPR.
+        ...(layoutMode === 'phone'
+          ? {}
+          : { filter: 'drop-shadow(0 0 6px rgba(0, 0, 0, 0.4))' }),
       }}
       className="pointer-events-none absolute inset-0 z-0"
     />
