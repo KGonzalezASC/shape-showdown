@@ -1099,17 +1099,6 @@ export const VoronoiFlowfieldCanvas: React.FC<VoronoiFlowfieldCanvasProps> = Rea
       ctx.clearRect(0, 0, cssWidth, cssHeight);
 
       // ── Pass 1: Color-batched regular polygon fills ──
-      let softDropMotionActive = false;
-      for (const motion of activeMotionRef.current.values()) {
-        if (
-          motion.from.x === motion.to.x
-          && motion.to.y > motion.from.y
-          && (timestamp - motion.startedAt) < ACTIVE_PIECE_MOTION_MS
-        ) {
-          softDropMotionActive = true;
-          break;
-        }
-      }
 
       for (const [color, cells] of cellMap.colorBuckets) {
         const regularCells = cells.filter((cell) => !cell.isPoison);
@@ -1117,9 +1106,7 @@ export const VoronoiFlowfieldCanvas: React.FC<VoronoiFlowfieldCanvasProps> = Rea
         ctx.fillStyle = color;
         ctx.beginPath();
         for (const cell of regularCells) {
-          const wobbleSpeed = softDropMotionActive && cell.activeOffsetIndex === undefined
-            ? 0
-            : REGULAR_PIECE_WOBBLE_SPEED;
+          const wobbleSpeed = REGULAR_PIECE_WOBBLE_SPEED;
           const { x: cx, y: cy } = cellCenter(cell);
           traceCellPolygon(
             ctx,
@@ -1147,9 +1134,7 @@ export const VoronoiFlowfieldCanvas: React.FC<VoronoiFlowfieldCanvasProps> = Rea
       for (const [, cells] of cellMap.colorBuckets) {
         for (const cell of cells) {
           if (cell.isPoison) continue;
-          const wobbleSpeed = softDropMotionActive && cell.activeOffsetIndex === undefined
-            ? 0
-            : REGULAR_PIECE_WOBBLE_SPEED;
+          const wobbleSpeed = REGULAR_PIECE_WOBBLE_SPEED;
           const { x: cx, y: cy } = cellCenter(cell);
           traceCellPolygon(
             ctx,
