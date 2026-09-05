@@ -1,0 +1,44 @@
+
+.battle-screen {
+  position: relative; z-index: 10; display: flex; flex-direction: column; flex: 0 0 auto;
+  width: 100%; height: min(880px, calc(100dvh - 24px)); --battle-min-height: 660px; min-height: calc(var(--battle-min-height) + var(--battle-details-height, 0px)); max-width: 1320px;
+  padding: 10px; color: var(--ss-text-primary);
+}
+.battle-layout-owner { position: relative; flex: 1; min-height: 0; width: 100%; }
+.battle-layout { display: grid; height: 100%; width: 100%; min-width: 0; min-height: 0; gap: 12px; padding-block: 10px; align-items: stretch; }
+.battle-layout--desktop { grid-template-columns: minmax(220px, 260px) minmax(0, 1fr) minmax(0, 1fr); grid-template-rows: minmax(0, 1fr); grid-template-areas: 'shop board opponent'; }
+.battle-screen--tablet { max-width: 900px; }
+.battle-layout--tablet { grid-template-columns: minmax(0, 1fr) minmax(220px, 260px); grid-template-rows: auto minmax(0, 1fr); grid-template-areas: 'board opponent' 'board shop'; }
+.battle-board { border-radius: 8px; background: color-mix(in srgb, var(--ss-panel-well) 75%, transparent); }
+.battle-shop { min-height: 0; overflow: hidden; }
+.battle-shop .desktop-keyboard-legend { flex: 0 0 auto; }
+.battle-screen--phone { max-width: 660px; --battle-min-height: 696px; height: max(680px, calc(100dvh - 12px)); padding: 4px; }
+.battle-layout--phone { gap: 8px; grid-template-columns: minmax(0, 1fr) clamp(132px, 37vw, 220px); grid-template-rows: auto minmax(0, 1fr); grid-template-areas: 'board opponent' 'board shop'; }
+.battle-layout--phone .field-alert { font-size: 11px; }
+.battle-layout--phone .incoming-garbage-readout { flex-wrap: wrap; }
+.battle-screen--tablet:has(.mobile-touch-controls), .battle-screen--desktop:has(.mobile-touch-controls) { --battle-min-height: 800px; }
+.battle-screen--phone:has(.mobile-touch-controls) { --battle-min-height: 836px; }
+.battle-screen .ss-match-chrome { min-height: 38px; justify-content: flex-start; text-align: left; }
+.battle-screen .ss-match-chrome > div { position: static; margin-left: auto; }
+.battle-screen .game-field-storage, .battle-screen .incoming-garbage-readout { flex: 0 0 auto; }
+.battle-viewport { overflow: hidden; overscroll-behavior-y: contain; touch-action: none; padding-bottom: max(12px, env(safe-area-inset-bottom)); }
+.battle-viewport > .battle-screen { margin-block: auto; }
+
+.battle-layout--phone .battle-board { padding: 4px; }
+.battle-layout--phone .battle-board h2 { font: 700 12px/1.3 system-ui, sans-serif; letter-spacing: .04em; }
+.battle-layout--phone .battle-board > div > div:first-child { flex-wrap: wrap; }
+.battle-layout--phone .game-field-storage { padding: 5px; flex-wrap: wrap; font-family: system-ui, sans-serif; }
+.battle-layout--phone .game-field-storage p { font-size: 10px; letter-spacing: 0; }
+.battle-layout--phone .game-field-storage > div:last-child { margin-inline-start: auto; }
+.battle-layout--phone .field-alert-heading { gap: 3px 6px; }
+
+
+.battle-screen.shape-showdown-screen { min-height: calc(var(--battle-min-height) + var(--battle-details-height, 0px)); }
+
+.battle-screen .ss-match-chrome { min-height: 36px; padding: 0 4px; gap: 8px; font-size: 8px; }
+.battle-screen .on-screen-controls-preference { min-height: 36px; border: 0; border-radius: 0; background: transparent; padding: 0 4px; font-size: 8px; letter-spacing: .06em; color: var(--ss-text-secondary); }
+.battle-screen .on-screen-controls-preference svg { display: none; }
+.battle-screen .landing-forecast-label { display: inline-block; font: 9px/1.3 system-ui, sans-serif; color: var(--ss-text-secondary); padding: 2px 4px; background: var(--ss-panel-well); }
+
+.battle-layout--phone .swap-line-label { display: none; }
+

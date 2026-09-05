@@ -26,6 +26,7 @@ import {
 import { PlayfieldCellSizeContext } from './playfieldCellSizeContext';
 import { VoronoiFlowfieldCanvas } from './VoronoiFlowfieldCanvas';
 import { IncomingGarbageReadout } from './IncomingGarbageReadout';
+import { FieldEffectReadout } from './FieldEffectReadout';
 
 interface GameFieldProps {
   player: PublicPlayerState;
@@ -46,6 +47,9 @@ interface GameFieldProps {
   performanceId?: string;
   /** Replay diagnostics can show effect pills for both players, not only the local player. */
   showEffectPills?: boolean;
+  showEffectReadout?: boolean;
+  compactEffectReadout?: boolean;
+  showLineClears?: boolean;
   /** Match chrome: shop wallet. Hide for solo puzzles. */
   showFunds?: boolean;
   /** Match chrome: guest/display name row. Hide for solo puzzles. */
@@ -172,6 +176,9 @@ const GameField = forwardRef<GameFieldRef, GameFieldProps>(({
   faceGrowthStartedAtMs = null,
   performanceId = title,
   showEffectPills = false,
+  showEffectReadout = false,
+  compactEffectReadout = false,
+  showLineClears = true,
   showFunds = true,
   showPlayerName = true,
   showStats = true,
@@ -402,7 +409,7 @@ const GameField = forwardRef<GameFieldRef, GameFieldProps>(({
           </h2>
 
           {/* Active-effect pills — only renders when effects are present */}
-          {(isMe || showEffectPills) && effectPills.length > 0 && (
+          {(isMe || showEffectPills) && !showEffectReadout && effectPills.length > 0 && (
             <div className="flex min-w-0 flex-1 flex-wrap items-center justify-center gap-1 overflow-hidden px-1">
               {effectPills.map(({ effect, count, remaining }) => {
                 const style = styleForFieldEffect(effect);
@@ -421,14 +428,14 @@ const GameField = forwardRef<GameFieldRef, GameFieldProps>(({
             </div>
           )}
 
-          <span className="shrink-0 border border-white/10 bg-[#171919] px-2 py-0.5 font-mono text-[10px] tabular-nums text-zinc-300">
+          {showLineClears && <span className="shrink-0 border border-white/10 bg-[#171919] px-2 py-0.5 font-mono text-[10px] tabular-nums text-zinc-300">
             {player.linesCleared} clears
-          </span>
+          </span>}
         </div>
       )}
 
       {/* When showStats is false, keep active-effect pills directly above the board */}
-      {!showStats && (isMe || showEffectPills) && effectPills.length > 0 && (
+      {!showStats && (isMe || showEffectPills) && !showEffectReadout && effectPills.length > 0 && (
         <div className="mb-1.5 flex min-w-0 flex-wrap items-center justify-center gap-1 overflow-hidden px-1">
           {effectPills.map(({ effect, count, remaining }) => {
             const style = styleForFieldEffect(effect);
@@ -446,6 +453,8 @@ const GameField = forwardRef<GameFieldRef, GameFieldProps>(({
           })}
         </div>
       )}
+
+      {showEffectReadout && <FieldEffectReadout compactOnly={compactEffectReadout} effects={activeEffects} tick={effectTick} fieldTitle={title} />}
 
       {showPlayerName && (
         <div className="mb-1 flex items-center font-mono text-[10px] font-bold text-zinc-300">
@@ -764,6 +773,12 @@ export default React.memo(GameField, (prev, next) => {
     prev.fieldRole !== next.fieldRole ||
     prev.decorationSeed !== next.decorationSeed ||
     prev.faceGrowthStartedAtMs !== next.faceGrowthStartedAtMs ||
+    prev.showLineClears !== next.showLineClears ||
+    prev.showEffectReadout !== next.showEffectReadout ||
+    prev.compactEffectReadout !== next.compactEffectReadout ||
+    prev.showEffectPills !== next.showEffectPills ||
+    prev.effectTick !== next.effectTick ||
+    prev.showStats !== next.showStats ||
     prev.showFunds !== next.showFunds ||
     prev.showPlayerName !== next.showPlayerName ||
     prev.allowHold !== next.allowHold ||

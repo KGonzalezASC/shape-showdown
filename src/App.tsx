@@ -32,9 +32,7 @@ import {
 } from './state/GameStateProvider';
 import { COUNTDOWN_SECONDS } from './types';
 import type { ActionType, InputState } from './types';
-import { isShopViewportUnplayable } from './responsive/shopViewportWarning';
 import {
-  playfieldScreenClass,
   playfieldViewportPaddingClass,
   usePlayfieldLayoutMode,
 } from './responsive/playfieldLayoutMode';
@@ -58,8 +56,6 @@ interface DrillState {
   result: DrillResult | null;
 }
 
-const VIEWPORT_WARNING_DELAY_MS = 300;
-
 type DrillAction =
   | { type: 'TOGGLE' }
   | { type: 'SET_RESULT'; payload: DrillResult }
@@ -79,7 +75,6 @@ function drillReducer(state: DrillState, action: DrillAction): DrillState {
 }
 
 interface AppShellState {
-  showViewportWarning: boolean;
   hatchingEnabled: boolean;
   backgroundSeedKey: number;
   faceSeedKey: number;
@@ -88,7 +83,6 @@ interface AppShellState {
 }
 
 type AppShellAction =
-  | { type: 'SET_VIEWPORT_WARNING'; visible: boolean }
   | { type: 'TOGGLE_HATCHING' }
   | { type: 'RESEED_PURCHASE'; matchSeed: number; startedAtMs: number }
   | { type: 'RESEED_COUNTDOWN' }
@@ -96,7 +90,6 @@ type AppShellAction =
 
 function createInitialAppShellState(): AppShellState {
   return {
-    showViewportWarning: false,
     hatchingEnabled: false,
     backgroundSeedKey: 0,
     faceSeedKey: 0,
@@ -107,10 +100,6 @@ function createInitialAppShellState(): AppShellState {
 
 function appShellReducer(state: AppShellState, action: AppShellAction): AppShellState {
   switch (action.type) {
-    case 'SET_VIEWPORT_WARNING':
-      return state.showViewportWarning === action.visible
-        ? state
-        : { ...state, showViewportWarning: action.visible };
     case 'TOGGLE_HATCHING':
       return { ...state, hatchingEnabled: !state.hatchingEnabled };
     case 'RESEED_PURCHASE':
@@ -159,7 +148,6 @@ export const GameView: React.FC<GameViewProps> = ({ onExitToLanding }) => {
     createInitialAppShellState,
   );
   const {
-    showViewportWarning,
     hatchingEnabled,
     backgroundSeedKey,
     faceSeedKey,
@@ -339,66 +327,6 @@ export const GameView: React.FC<GameViewProps> = ({ onExitToLanding }) => {
     [sendAction, triggerShake],
   );
 
-  useLayoutEffect(() => {
-    const rail = railRef.current;
-    if (!rail) return;
-
-    let animationFrame = 0;
-    let warningTimer: number | null = null;
-    let disposed = false;
-    const shopCannotFit = () => {
-      const offerList = rail.querySelector<HTMLElement>('.shop-offer-list');
-      const offerRows = rail.querySelectorAll<HTMLElement>('.shop-offer-row');
-      if (!offerList || offerRows.length === 0) return false;
-
-      return isShopViewportUnplayable({
-        viewportWidth: window.innerWidth,
-        shopPhase: chrome.shopPhase,
-        offerCount: offerRows.length,
-        offerListHeight: offerList.clientHeight,
-      });
-    };
-    const measure = () => {
-      if (disposed) return;
-      window.cancelAnimationFrame(animationFrame);
-      animationFrame = window.requestAnimationFrame(() => {
-        if (!shopCannotFit()) {
-          if (warningTimer !== null) {
-            window.clearTimeout(warningTimer);
-            warningTimer = null;
-          }
-          appShellDispatch({ type: 'SET_VIEWPORT_WARNING', visible: false });
-          return;
-        }
-
-        if (warningTimer !== null) return;
-        warningTimer = window.setTimeout(() => {
-          warningTimer = null;
-          if (!disposed && shopCannotFit()) {
-            appShellDispatch({ type: 'SET_VIEWPORT_WARNING', visible: true });
-          }
-        }, VIEWPORT_WARNING_DELAY_MS);
-      });
-    };
-
-    const resizeObserver = new ResizeObserver(measure);
-    resizeObserver.observe(rail);
-    const offerList = rail.querySelector<HTMLElement>('.shop-offer-list');
-    if (offerList) resizeObserver.observe(offerList);
-    window.addEventListener('resize', measure);
-    window.visualViewport?.addEventListener('resize', measure);
-    void document.fonts.ready.then(measure);
-    measure();
-
-    return () => {
-      disposed = true;
-      window.cancelAnimationFrame(animationFrame);
-      if (warningTimer !== null) window.clearTimeout(warningTimer);
-      resizeObserver.disconnect();
-      window.removeEventListener('resize', measure);
-      window.visualViewport?.removeEventListener('resize', measure);
-    };
-  }, [chrome.shopPhase, connected, hasLocalPlayer, layoutMode, showOnScreenControls]);
 
   useEffect(() => {
     if (!drill.result) return;
@@ -407,12 +335,11 @@ export const GameView: React.FC<GameViewProps> = ({ onExitToLanding }) => {
   }, [drill.result]);
 
   useEffect(() => {
-    if (!gameplayInputActive || showViewportWarning || !showOnScreenControls) clearHeldInput();
-  }, [clearHeldInput, gameplayInputActive, showOnScreenControls, showViewportWarning]);
+    if (!gameplayInputActive || !showOnScreenControls) clearHeldInput();
+  }, [clearHeldInput, gameplayInputActive, showOnScreenControls]);
 
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
-      if (showViewportWarning) return;
       if (DEV_TOOLS_ENABLED) {
         if (e.key === 'F6') {
           e.preventDefault();
@@ -455,7 +382,6 @@ export const GameView: React.FC<GameViewProps> = ({ onExitToLanding }) => {
       }
     };
     const onKeyUp = (e: KeyboardEvent) => {
-      if (showViewportWarning) return;
       const action = actionForCode(bindingsRef.current, e.code);
       if (action === 'moveLeft') {
         heldKeysRef.current = { ...heldKeysRef.current, left: false };
@@ -481,7 +407,7 @@ export const GameView: React.FC<GameViewProps> = ({ onExitToLanding }) => {
       window.removeEventListener('blur', clearInput);
       clearHeldInput();
     };
-  }, [clearHeldInput, handleAction, handleShopConfirm, sendInputState, showViewportWarning]);
+  }, [clearHeldInput, handleAction, handleShopConfirm, sendInputState]);
 
   useEffect(() => {
     const evt = chrome.lastMatchEvent;
@@ -550,7 +476,7 @@ export const GameView: React.FC<GameViewProps> = ({ onExitToLanding }) => {
   }, [chrome.status, gameState?.seed]);
 
   return (
-    <div className={`relative flex h-dvh max-h-dvh min-h-0 flex-col items-center justify-center overflow-hidden text-[var(--ss-text-primary)] ${playfieldViewportPaddingClass(layoutMode)}`}>
+    <div className={`battle-viewport relative flex h-dvh max-h-dvh min-h-0 flex-col items-center overflow-hidden text-[var(--ss-text-primary)] ${playfieldViewportPaddingClass(layoutMode)}`}>
       <ThemeBackground isPlaying={isPlaying} decorationSeed={backgroundDecorationSeed} />
       {DEV_TOOLS_ENABLED && (
         <ServerDiagnosticsPanel
@@ -686,8 +612,8 @@ export const GameView: React.FC<GameViewProps> = ({ onExitToLanding }) => {
       ) : (
         <>
           <main
-            inert={showViewportWarning || isConnectionInterrupted || isAuthoritativelyPaused || isTerminalOutcome}
-            className={playfieldScreenClass(layoutMode)}
+            inert={isConnectionInterrupted || isAuthoritativelyPaused || isTerminalOutcome}
+            className={`shape-showdown-screen battle-screen battle-screen--${layoutMode}`}
           >
             <MatchChrome
               actionSlot={
@@ -740,34 +666,6 @@ export const GameView: React.FC<GameViewProps> = ({ onExitToLanding }) => {
               />
             )}
           </main>
-
-          {showViewportWarning && (
-            <div
-              role="alertdialog"
-              aria-modal="true"
-              aria-live="assertive"
-              aria-labelledby="viewport-warning-title"
-              aria-describedby="viewport-warning-description"
-              tabIndex={-1}
-              className="fixed inset-0 z-[100] grid place-items-center overflow-y-auto bg-black/95 p-3 text-center"
-            >
-              <div className="w-full max-w-xl border-4 border-rose-400 bg-[#111] p-4 shadow-[8px_8px_0_#000] sm:p-6">
-                <p className="mb-2 text-[8px] uppercase tracking-[0.16em] text-rose-300">Display warning</p>
-                <h2
-                  id="viewport-warning-title"
-                  className="text-[clamp(16px,5vw,28px)] leading-tight uppercase text-white"
-                >
-                  The shop cannot fit
-                </h2>
-                <p
-                  id="viewport-warning-description"
-                  className="mx-auto mt-4 max-w-md text-[9px] leading-5 text-zinc-300"
-                >
-                  please play the game at playable resolution
-                </p>
-              </div>
-            </div>
-          )}
 
       <LazyMotion features={domAnimation}>
         <AnimatePresence>
@@ -1022,3 +920,4 @@ const App: React.FC<GameViewProps> = (props) => {
 };
 
 export default App;
+

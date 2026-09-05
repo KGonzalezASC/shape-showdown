@@ -12,6 +12,7 @@ import { fieldFrameClass } from '../ui/shapeShowdownTheme';
 import { VoronoiFlowfieldCanvas } from './VoronoiFlowfieldCanvas';
 import { IncomingGarbageReadout } from './IncomingGarbageReadout';
 import { BoardGridLines } from './BoardGridLines';
+import { FieldEffectReadout } from './FieldEffectReadout';
 
 interface OpponentMiniFieldProps {
   player: PublicPlayerState | null;
@@ -106,7 +107,6 @@ const OpponentMiniField: React.FC<OpponentMiniFieldProps> = ({
               {opponentName}
             </p>
           </div>
-          <p className="shrink-0 font-mono text-[9px] font-bold text-[var(--ss-opponent-strong)]">{player.funds}</p>
         </div>
         <IncomingGarbageReadout
           fieldTitle="Opponent Field"
@@ -115,6 +115,7 @@ const OpponentMiniField: React.FC<OpponentMiniFieldProps> = ({
           magnetLevel={player.magnetPermanentStacks ?? 0}
         />
       </div>
+      <FieldEffectReadout effects={player.activeEffects ?? []} fieldTitle="Opponent Field" compactOnly />
       <div className="mx-auto w-fit overflow-hidden border border-[var(--ss-opponent-border)]">
         <div
           className="relative bg-[var(--ss-panel-well)]"
@@ -142,11 +143,7 @@ const OpponentMiniField: React.FC<OpponentMiniFieldProps> = ({
           />
         </div>
       </div>
-      <div className="mt-1 flex items-center justify-between text-[8px] font-semibold uppercase tracking-wider">
-        <span className="text-[var(--ss-text-tertiary)]">
-          Ln <span className="font-mono text-[var(--ss-text-primary)]">{player.linesCleared}</span>
-        </span>
-      </div>
+
     </div>
   );
 };

@@ -20,6 +20,8 @@ function applyMode(mode: DocumentInteractionMode): void {
   const isLanding = mode === 'landing' || mode === 'puzzle-picker';
   const overflow = isLanding ? 'auto' : 'hidden';
   const overscrollBehavior = isLanding ? 'auto' : 'none';
+  // Gameplay must use touch-action: none so the browser does not arbitrate
+  // scroll/pinch gestures against L/R piece moves on the playfield.
   const touchAction = isLanding ? 'auto' : 'none';
 
   html.style.height = isLanding ? 'auto' : '100%';

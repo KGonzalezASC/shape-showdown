@@ -10,9 +10,9 @@ interface OnScreenControlsPreferenceProps {
 }
 
 const preferenceLabel: Record<OnScreenControlsPreference, string> = {
-  auto: 'Controls: Auto',
-  shown: 'Controls: On',
-  hidden: 'Controls: Off',
+  auto: 'Touch: Auto',
+  shown: 'Touch: On',
+  hidden: 'Touch: Off',
 };
 
 const nextPreference: Record<OnScreenControlsPreference, OnScreenControlsPreference> = {

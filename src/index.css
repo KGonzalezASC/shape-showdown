@@ -168,7 +168,7 @@
   --ss-legend-key-fill: #2a2d2d;
   --ss-shrine-frame: #ffffff;
   --ss-shrine-spark: rgba(231, 53, 53, 0.7);
-  --ss-grid-line: rgba(255, 255, 255, 0.08);
+  --ss-grid-line: rgba(255, 255, 255, 0.18);
 }
 
 [data-theme="seasalt"] {

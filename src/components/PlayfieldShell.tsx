@@ -1,10 +1,12 @@
-import React, { useContext, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import './BattleLayout.css';
+import React, { useLayoutEffect, useMemo, useRef, useState } from 'react';
 import GameField, { GameFieldRef } from './GameField';
-import OpponentMiniField from './OpponentMiniField';
 import ShopRail from './ShopRail';
+import OpponentMiniField from './OpponentMiniField';
 import { PlayfieldCellSizeContext } from './playfieldCellSizeContext';
 import { fitMobilePlayfieldCellSize } from './PlayfieldCellSizer';
 import { BOARD_COLS, BOARD_VISIBLE_ROWS, CELL_SIZE } from '../types';
+import { GAME_TICK_RATE } from '../constants';
 import { resolveShopOffers, SHOP_ITEM_BY_ID } from '../shop/shopCatalog';
 import { useMatchChromeSnapshot, usePlayfieldSnapshot } from '../state/GameStateProvider';
 import { useShopConfirm } from '../hooks/useShopConfirm';
@@ -13,12 +15,10 @@ import { IncomingGarbageReadout } from './IncomingGarbageReadout';
 import DesktopKeyboardLegend from './DesktopKeyboardLegend';
 import { fieldFrameClass, fieldTitleClass } from '../ui/shapeShowdownTheme';
 import {
-  playfieldGridClass,
   type PlayfieldLayoutMode,
 } from '../responsive/playfieldLayoutMode';
 
-function WaitingForOpponentBoard() {
-  const cell = useContext(PlayfieldCellSizeContext);
+function WaitingForOpponentBoard({ cell }: { cell: number }) {
   return (
     <div className="relative shrink-0">
       <div className="mb-1">
@@ -27,7 +27,6 @@ function WaitingForOpponentBoard() {
           <span className="truncate tracking-wide">Searching for opponent…</span>
         </div>
         <div className="mb-1 flex items-center gap-3 font-mono text-[9px] font-bold uppercase tracking-wider text-[var(--ss-text-tertiary)]">
-          <span>Funds <strong className="text-[var(--ss-opponent-strong)]">0</strong></span>
           <span>Score <strong className="text-[var(--ss-opponent-strong)]">0</strong></span>
         </div>
         <IncomingGarbageReadout fieldTitle="Opponent Field" lines={0} />
@@ -68,12 +67,15 @@ export const PlayfieldShell: React.FC<PlayfieldShellProps> = ({
   const playfieldRef = useRef<HTMLDivElement>(null);
   const boardFitRef = useRef<HTMLDivElement>(null);
   const [cellSize, setCellSize] = useState(CELL_SIZE);
+  const opponentBoardFitRef = useRef<HTMLDivElement>(null);
+  const [opponentCellSize, setOpponentCellSize] = useState(CELL_SIZE);
   const playfield = usePlayfieldSnapshot();
   const chrome = useMatchChromeSnapshot();
   const handleShopConfirm = useShopConfirm();
   const { myPlayer, opponentPlayer } = playfield;
   const isDesktop = layoutMode === 'desktop';
   const hasLocalPlayer = myPlayer !== null;
+  const hasOpponentPlayer = opponentPlayer !== null;
 
   const shopOffers = useMemo(() => resolveShopOffers(chrome.shopOfferIds), [chrome.shopOfferIds]);
   const purchasedItem = useMemo(() => {
@@ -81,20 +83,34 @@ export const PlayfieldShell: React.FC<PlayfieldShellProps> = ({
     return SHOP_ITEM_BY_ID.get(chrome.shopLastPurchasedItemId) ?? null;
   }, [chrome.shopLastPurchasedItemId]);
 
-  const isItemDisabled = useMemo(() => (item: (typeof shopOffers)[number]) => {
-    if (item.id === 'storage-toxin') return !opponentPlayer?.holdPiece;
-    if (item.id === 'wildcard-four') {
-      return !opponentPlayer?.poisonBoard?.some((row) => row.some((cell) => cell > 0));
+  const getItemDisabledReason = useMemo(() => (item: (typeof shopOffers)[number]) => {
+    if (item.id === 'storage-toxin' && !opponentPlayer?.opponentHasHold) {
+      return 'Opponent needs a stored piece';
     }
-    return false;
+    if (item.id === 'wildcard-four') {
+      if (!opponentPlayer?.opponentHasPoison) return 'Opponent needs poisoned cells';
+      if (opponentPlayer.poisonSpread != null) return 'Wait for poison to finish spreading';
+    }
+    return null;
   }, [opponentPlayer]);
+  const isItemDisabled = useMemo(() => (item: (typeof shopOffers)[number]) =>
+    getItemDisabledReason(item) !== null, [getItemDisabledReason]);
 
-  const shopCanPurchase = chrome.shopPhase === 'cycling' || chrome.shopPhase === 'ready';
+  const shopCanPurchase = chrome.shopPhase !== 'waiting';
   const isPlaying = playfield.status === 'playing';
 
+  const hasActivePricingWindow = useMemo(
+    () => Object.values(chrome.shopPricing as Record<string, { windowStartedAtTick?: number | null }>).some(
+      (state) => state?.windowStartedAtTick !== null && state?.windowStartedAtTick !== undefined,
+    ),
+    [chrome.shopPricing],
+  );
+  // Gate ShopRail to 1Hz pricing ticks so memo can skip idle 60Hz chrome updates.
+  const shopTick = hasActivePricingWindow ? Math.floor(chrome.tick / GAME_TICK_RATE) * GAME_TICK_RATE : 0;
   useLayoutEffect(() => {
     const playfieldLayout = playfieldRef.current;
     const slot = boardFitRef.current;
+    const opponentSlot = opponentBoardFitRef.current;
     if (!playfieldLayout || !slot) return;
 
     const measure = () => {
@@ -102,26 +118,35 @@ export const PlayfieldShell: React.FC<PlayfieldShellProps> = ({
       if (box.width < 8 || box.height < 8) return;
       const next = fitMobilePlayfieldCellSize({ width: box.width, height: box.height });
       setCellSize((previous) => (previous === next ? previous : next));
+      if (opponentSlot) {
+        const opponentBox = opponentSlot.getBoundingClientRect();
+        if (opponentBox.width >= 8 && opponentBox.height >= 8) {
+          const opponentNext = fitMobilePlayfieldCellSize(opponentBox);
+          setOpponentCellSize((previous) => previous === opponentNext ? previous : opponentNext);
+        }
+      }
     };
 
     measure();
     const observer = new ResizeObserver(measure);
+    // Observe the stable layout owner only — observing the fit slot can feedback
+    // when cellSize changes resize the slot on phone.
     observer.observe(playfieldLayout);
     return () => observer.disconnect();
-  }, [hasLocalPlayer, layoutMode]);
+  }, [hasLocalPlayer, hasOpponentPlayer, layoutMode]);
 
   const boardFramePadding = layoutMode === 'phone' ? 'p-1.5' : 'p-2';
 
   return (
     <PlayfieldCellSizeContext.Provider value={cellSize}>
-      <div className="relative min-h-0 w-full flex-1">
+      <div className="battle-layout-owner">
         <div
           ref={playfieldRef}
           data-playfield-layout={layoutMode}
-          className={playfieldGridClass(layoutMode)}
+          className={`battle-layout battle-layout--${layoutMode}`}
         >
           <div
-            className={`min-h-0 min-w-0 overflow-visible border ${fieldFrameClass('self')} ${boardFramePadding} [grid-area:board]`}
+            className={`battle-board min-h-0 min-w-0 overflow-visible border ${fieldFrameClass('self')} ${boardFramePadding} [grid-area:board]`}
           >
             {myPlayer && (
               <BoardProfiler id="local-player-field" renderer="board-canvas">
@@ -130,6 +155,10 @@ export const PlayfieldShell: React.FC<PlayfieldShellProps> = ({
                   ref={myFieldRef}
                   player={myPlayer}
                   isMe={true}
+                  showEffectReadout
+                  compactEffectReadout={layoutMode === 'phone'}
+                  showPlayerName={false}
+                  showFunds={false}
                   title="Your Field"
                   fieldRole="self"
                   cellSize={cellSize}
@@ -158,8 +187,13 @@ export const PlayfieldShell: React.FC<PlayfieldShellProps> = ({
                     player={opponentPlayer}
                     isMe={false}
                     title="Opponent Field"
+                    showLineClears={false}
+                    showFunds={false}
                     fieldRole="opponent"
-                    cellSize={cellSize}
+                    cellSize={opponentCellSize}
+                    boardFitRef={opponentBoardFitRef}
+                    showEffectReadout
+                    compactEffectReadout
                     status={playfield.status}
                     hatchingEnabled={hatchingEnabled}
                     decorationSeed={decorationSeed}
@@ -168,11 +202,10 @@ export const PlayfieldShell: React.FC<PlayfieldShellProps> = ({
                   />
                 </BoardProfiler>
               ) : (
-                <WaitingForOpponentBoard />
+                <WaitingForOpponentBoard cell={opponentCellSize} />
               )
             ) : (
               <OpponentMiniField
-                key={matchVisualKey}
                 player={opponentPlayer}
                 hatchingEnabled={hatchingEnabled}
                 viewportMode={layoutMode === 'tablet' ? 'tablet' : 'phone'}
@@ -182,9 +215,7 @@ export const PlayfieldShell: React.FC<PlayfieldShellProps> = ({
 
           <div
             ref={railRef}
-            className={`flex min-h-0 min-w-0 flex-col gap-2 [grid-area:shop] ${
-              isDesktop ? '' : 'shop-utility-rail overflow-y-auto'
-            }`}
+            className="battle-shop flex min-h-0 min-w-0 flex-col gap-2 [grid-area:shop]"
           >
             <ShopRail
               items={shopOffers}
@@ -196,8 +227,9 @@ export const PlayfieldShell: React.FC<PlayfieldShellProps> = ({
               onConfirm={handleShopConfirm}
               availableFunds={chrome.availableFunds}
               pricing={chrome.shopPricing}
-              currentTick={chrome.tick}
+              currentTick={shopTick}
               isItemDisabled={isItemDisabled}
+              getItemDisabledReason={getItemDisabledReason}
               viewportMode={layoutMode}
               hatchingEnabled={hatchingEnabled}
               onToggleHatching={onToggleHatching}
@@ -209,3 +241,4 @@ export const PlayfieldShell: React.FC<PlayfieldShellProps> = ({
     </PlayfieldCellSizeContext.Provider>
   );
 };
+

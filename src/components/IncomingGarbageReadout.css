@@ -1,0 +1,6 @@
+.garbage-status { display: flex; align-items: center; justify-content: space-between; gap: 4px 10px; margin-block: 5px; padding: 6px 0; border-top: 1px solid var(--ss-stroke-secondary); font: 12px/1.3 system-ui, sans-serif; color: var(--ss-text-secondary); }
+.garbage-status[data-incoming="true"] { color: #ffb6ba; }
+.garbage-status strong { font-size: 15px; font-variant-numeric: tabular-nums; }
+.garbage-status--compact { font-size: 10px; flex-wrap: wrap; }
+.garbage-status--compact strong { font-size: 12px; }
+.garbage-pull { font-size: 11px; }

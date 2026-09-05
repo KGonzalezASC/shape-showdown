@@ -48,6 +48,10 @@ export interface GameActions {
 }
 
 const GameActionsContext = createContext<GameActions | null>(null);
+
+export function GameActionsProvider({ actions, children }: { actions: GameActions; children: React.ReactNode }) {
+  return <GameActionsContext.Provider value={actions}>{children}</GameActionsContext.Provider>;
+}
 const initialServerHealth: ServerHealthSnapshot = {
   databaseMode: 'unknown',
   databaseHealth: 'unknown',

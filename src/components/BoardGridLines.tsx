@@ -17,7 +17,7 @@ export function BoardGridLines({
 }) {
   const width = BOARD_COLS * cellSize;
   const height = BOARD_VISIBLE_ROWS * cellSize;
-  const stroke = 'var(--ss-grid-line, rgba(255,255,255,0.08))';
+  const stroke = 'var(--ss-grid-line, rgba(255,255,255,0.18))';
 
   const verticals = Array.from({ length: BOARD_COLS + 1 }, (_, column) => {
     const x = column * cellSize + 0.5;

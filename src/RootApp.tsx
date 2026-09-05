@@ -10,9 +10,13 @@ import { getAppRoute, setAppRoute, type AppRoute } from './appRoute';
 import { useDocumentInteractionPolicy } from './input/documentInteractionPolicy';
 
 const LazyPuzzleScreen = React.lazy(() => import('./components/PuzzleScreen'));
+const LazyPowerupUiPreview = DEV_TOOLS_ENABLED
+  ? React.lazy(() => import('./components/PowerupUiPreview'))
+  : null;
 
 export const RootApp: React.FC = () => {
   const [route, setRoute] = useState<AppRoute>(() => getAppRoute());
+  const powerupPreview = DEV_TOOLS_ENABLED && new URLSearchParams(window.location.search).get('prototype') === 'powerups';
 
   useEffect(() => {
     const handleRouteChange = () => {
@@ -28,10 +32,10 @@ export const RootApp: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    document.documentElement.dataset.page = route === 'game' ? 'game' : 'landing';
-  }, [route]);
+    document.documentElement.dataset.page = route === 'game' || powerupPreview ? 'game' : 'landing';
+  }, [route, powerupPreview]);
   useDocumentInteractionPolicy(
-    route === 'landing' ? 'landing' : route === 'puzzles' ? 'puzzle-picker' : 'gameplay',
+    powerupPreview || route === 'landing' ? 'landing' : route === 'puzzles' ? 'puzzle-picker' : 'gameplay',
   );
 
   if (
@@ -45,7 +49,11 @@ export const RootApp: React.FC = () => {
   return (
     <ThemeProvider>
       <KeyBindingsProvider>
-        {route === 'landing' ? (
+        {powerupPreview && LazyPowerupUiPreview ? (
+          <React.Suspense fallback={<div className="p-6 text-white">Loading UI preview…</div>}>
+            <LazyPowerupUiPreview />
+          </React.Suspense>
+        ) : route === 'landing' ? (
           <LandingShowcase onPlayGame={() => setAppRoute('game')} />
         ) : route === 'puzzles' ? (
           <React.Suspense
