@@ -95,6 +95,33 @@ export function deriveGameplayControlAvailability({
   };
 }
 
+function actionGateEqual(
+  a: { enabled: boolean; disabledReason?: string },
+  b: { enabled: boolean; disabledReason?: string },
+): boolean {
+  return a.enabled === b.enabled && a.disabledReason === b.disabledReason;
+}
+
+/** Soft-drop Y churn should not allocate a new availability object for MobileControls. */
+export function gameplayControlAvailabilityEqual(
+  a: GameplayControlAvailability,
+  b: GameplayControlAvailability,
+): boolean {
+  if (!actionGateEqual(a.hardDrop, b.hardDrop)) return false;
+  if (!actionGateEqual(a.hold, b.hold)) return false;
+  if (!actionGateEqual(a.rotateCW, b.rotateCW)) return false;
+  if (!actionGateEqual(a.rotateCCW, b.rotateCCW)) return false;
+  if (a.utility.kind !== b.utility.kind) return false;
+  if (a.utility.kind === 'none' || b.utility.kind === 'none') {
+    return a.utility.kind === b.utility.kind;
+  }
+  return (
+    a.utility.enabled === b.utility.enabled
+    && a.utility.disabledReason === b.utility.disabledReason
+    && a.utility.onActivate === b.utility.onActivate
+  );
+}
+
 export function actionAvailabilityFor(
   availability: GameplayControlAvailability,
   action: ActionType,

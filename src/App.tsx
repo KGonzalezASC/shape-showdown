@@ -48,6 +48,7 @@ import { relaunchForClientUpdate } from './discordActivity';
 import {
   actionAvailabilityFor,
   deriveGameplayControlAvailability,
+  gameplayControlAvailabilityEqual,
 } from './input/gameplayControls';
 import { useOnScreenControlsPolicy } from './input/onScreenControlsPolicy';
 
@@ -199,8 +200,11 @@ export const GameView: React.FC<GameViewProps> = ({ onExitToLanding }) => {
   const holdClockTick = useCoarseMatchTick(
     playfield.myPlayer?.holdFrozenUntilTick !== undefined ? 6 : null,
   );
-  const controlsAvailability = useMemo(
-    () => deriveGameplayControlAvailability({
+  const controlsAvailabilityRef = useRef<ReturnType<typeof deriveGameplayControlAvailability> | null>(null);
+  // Keep a stable availability object while gates are unchanged so MobileControls
+  // (React.memo) skips soft-drop Y churn on the phone control pad.
+  const controlsAvailability = useMemo(() => {
+    const next = deriveGameplayControlAvailability({
       active: gameplayInputActive,
       player: playfield.myPlayer,
       currentTick: holdClockTick,
@@ -214,10 +218,12 @@ export const GameView: React.FC<GameViewProps> = ({ onExitToLanding }) => {
             : {}),
         onActivate: handleShopConfirm,
       },
-    }),
-    [chrome.shopPhase, gameplayInputActive, handleShopConfirm, holdClockTick, playfield.myPlayer],
-  );
-  const controlsAvailabilityRef = useRef(controlsAvailability);
+    });
+    const previous = controlsAvailabilityRef.current;
+    if (previous && gameplayControlAvailabilityEqual(previous, next)) return previous;
+    controlsAvailabilityRef.current = next;
+    return next;
+  }, [chrome.shopPhase, gameplayInputActive, handleShopConfirm, holdClockTick, playfield.myPlayer]);
   controlsAvailabilityRef.current = controlsAvailability;
   const controlsActiveRef = useRef(gameplayInputActive);
   controlsActiveRef.current = gameplayInputActive;

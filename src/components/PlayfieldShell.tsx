@@ -20,7 +20,7 @@ import { fieldFrameClass, fieldTitleClass } from '../ui/shapeShowdownTheme';
 import {
   type PlayfieldLayoutMode,
 } from '../responsive/playfieldLayoutMode';
-import type { PublicPlayerState } from '../state/publicSnapshots';
+import { publicPlayersEqual, type PublicPlayerState } from '../state/publicSnapshots';
 import type { ShopItem } from '../types';
 
 function WaitingForOpponentBoard({ cell }: { cell: number }) {
@@ -115,7 +115,14 @@ const BattleShopRail = memo(function BattleShopRail({
       {isDesktop && <DesktopKeyboardLegend />}
     </div>
   );
-});
+}, (prev, next) => (
+  prev.railRef === next.railRef
+  && prev.layoutMode === next.layoutMode
+  && prev.isPlaying === next.isPlaying
+  && prev.hatchingEnabled === next.hatchingEnabled
+  && prev.onToggleHatching === next.onToggleHatching
+  && publicPlayersEqual(prev.opponentPlayer, next.opponentPlayer)
+));
 
 interface PlayfieldShellProps {
   railRef: React.RefObject<HTMLDivElement | null>;

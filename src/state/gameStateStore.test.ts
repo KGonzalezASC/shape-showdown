@@ -5,11 +5,15 @@ import type { GameState } from '../types';
 import { makePlayer } from '../puzzle/runtime/engine';
 import {
   getChromeSnapshot,
+  getPlayfieldSnapshot,
   getRawGameState,
+  setClientMatchModelStore,
   setGameStateStore,
   subscribeChrome,
   subscribeMatchTick,
 } from './gameStateStore';
+import type { ClientMatchModel } from '../protocol/wireTypes';
+import { toPublicPlayerState } from './publicSnapshots';
 
 afterEach(() => {
   setGameStateStore(null, null);
@@ -88,5 +92,51 @@ describe('chrome vs tick subscription split', () => {
 
     unsubChrome();
     unsubTick();
+  });
+});
+
+describe('playfield player reference retention', () => {
+  it('keeps opponentPlayer identity across local soft-drop Y updates', () => {
+    const base = createState({ status: 'playing', tick: 20 });
+    const myPlayer = toPublicPlayerState(base.players.me);
+    const opponentPlayer = toPublicPlayerState(base.players.opponent);
+    const model: ClientMatchModel = {
+      tick: 20,
+      seed: base.seed,
+      chrome: {
+        status: 'playing',
+        countdown: 0,
+        seed: base.seed,
+        winnerId: null,
+        endReason: undefined,
+        technicalVictory: undefined,
+        restartTimer: undefined,
+        pausePlayerId: null,
+        pauseStartedAt: null,
+      },
+      myId: 'me',
+      myPlayer,
+      opponentPlayer,
+    };
+    setClientMatchModelStore(model, 'me');
+    const first = getPlayfieldSnapshot();
+    assert.equal(first.opponentPlayer, opponentPlayer);
+
+    assert.ok(myPlayer.activePiece);
+    setClientMatchModelStore({
+      ...model,
+      tick: 21,
+      myPlayer: {
+        ...myPlayer,
+        activePiece: { ...myPlayer.activePiece, y: myPlayer.activePiece.y + 1 },
+      },
+      // Fresh opponent object that is publicly equal — store must retain prior ref.
+      opponentPlayer: { ...opponentPlayer, board: opponentPlayer.board.map((row) => [...row]) },
+    }, 'me');
+
+    const second = getPlayfieldSnapshot();
+    assert.notEqual(second.myPlayer, first.myPlayer);
+    assert.equal(second.myPlayer?.activePiece?.y, (first.myPlayer?.activePiece?.y ?? 0) + 1);
+    assert.equal(second.opponentPlayer, first.opponentPlayer);
   });
 });

@@ -127,14 +127,29 @@ function buildChromeSnapshot(): MatchChromeSnapshot {
   };
 }
 
+/**
+ * Soft-drop / gravity churn allocates a fresh ClientMatchModel every netcast.
+ * Keep prior PublicPlayerState references when publicly equal so memoized shop /
+ * opponent chrome does not reconcile on local piece Y updates.
+ */
+function retainEqualPlayer(
+  previous: PublicPlayerState | null,
+  next: PublicPlayerState | null,
+): PublicPlayerState | null {
+  return publicPlayersEqual(previous, next) ? previous : next;
+}
+
 function buildPlayfieldSnapshot(): PlayfieldSnapshot {
   if (!clientMatchModel) return emptyPlayfieldSnapshot();
 
   return {
     status: clientMatchModel.chrome.status,
     myId,
-    myPlayer: clientMatchModel.myPlayer,
-    opponentPlayer: clientMatchModel.opponentPlayer,
+    myPlayer: retainEqualPlayer(playfieldSnapshot.myPlayer, clientMatchModel.myPlayer),
+    opponentPlayer: retainEqualPlayer(
+      playfieldSnapshot.opponentPlayer,
+      clientMatchModel.opponentPlayer,
+    ),
   };
 }
 
