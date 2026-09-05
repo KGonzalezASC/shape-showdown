@@ -12,6 +12,7 @@ import {
   publicPlayersEqual,
   toPublicPlayerState,
 } from './publicSnapshots';
+import { GAME_TICK_RATE } from '../constants';
 
 export interface MatchChromeSnapshot {
   status: MatchStatus;
@@ -56,6 +57,7 @@ let chromeSnapshot: MatchChromeSnapshot = emptyChromeSnapshot();
 let playfieldSnapshot: PlayfieldSnapshot = emptyPlayfieldSnapshot();
 
 const chromeListeners = new Set<Listener>();
+const tickListeners = new Set<Listener>();
 const playfieldListeners = new Set<Listener>();
 const connectionListeners = new Set<Listener>();
 
@@ -136,10 +138,10 @@ function buildPlayfieldSnapshot(): PlayfieldSnapshot {
   };
 }
 
+/** Shell/chrome equality ignores tick — tick has its own subscription channel. */
 function chromeSnapshotsEqual(a: MatchChromeSnapshot, b: MatchChromeSnapshot): boolean {
   if (a.status !== b.status) return false;
   if (a.countdown !== b.countdown) return false;
-  if (a.tick !== b.tick) return false;
   if (a.myId !== b.myId) return false;
   if (a.myScore !== b.myScore) return false;
   if (a.oppScore !== b.oppScore) return false;
@@ -228,9 +230,17 @@ function buildRawGameStateSnapshot(): GameState | null {
 function publishSnapshots() {
   rawGameStateSnapshot = buildRawGameStateSnapshot();
   const nextChrome = buildChromeSnapshot();
-  if (!chromeSnapshotsEqual(chromeSnapshot, nextChrome)) {
+  const tickChanged = chromeSnapshot.tick !== nextChrome.tick;
+  const shellChanged = !chromeSnapshotsEqual(chromeSnapshot, nextChrome);
+  if (shellChanged || tickChanged) {
+    // Keep tick current for imperative readers even when shell listeners are quiet.
     chromeSnapshot = nextChrome;
+  }
+  if (shellChanged) {
     chromeListeners.forEach((listener) => listener());
+  }
+  if (tickChanged) {
+    tickListeners.forEach((listener) => listener());
   }
 
   const nextPlayfield = buildPlayfieldSnapshot();
@@ -296,15 +306,43 @@ export function setGameStateStore(state: GameState | null, id: string | null) {
 export function setLastMatchEventStore(event: MatchEvent | null) {
   lastMatchEvent = event;
   const nextChrome = buildChromeSnapshot();
-  if (!chromeSnapshotsEqual(chromeSnapshot, nextChrome)) {
+  const tickChanged = chromeSnapshot.tick !== nextChrome.tick;
+  const shellChanged = !chromeSnapshotsEqual(chromeSnapshot, nextChrome);
+  if (shellChanged || tickChanged) {
     chromeSnapshot = nextChrome;
+  }
+  if (shellChanged) {
     chromeListeners.forEach((listener) => listener());
+  }
+  if (tickChanged) {
+    tickListeners.forEach((listener) => listener());
   }
 }
 
 export function subscribeChrome(listener: Listener): () => void {
   chromeListeners.add(listener);
   return () => chromeListeners.delete(listener);
+}
+
+/** Fires when match tick advances (typically 60Hz while playing). */
+export function subscribeMatchTick(listener: Listener): () => void {
+  tickListeners.add(listener);
+  return () => tickListeners.delete(listener);
+}
+
+export function getMatchTick(): number {
+  return chromeSnapshot.tick;
+}
+
+/** 1Hz pricing clock while a shop price window is open; else 0 (stable). */
+export function getShopPricingTick(): number {
+  const pricing = chromeSnapshot.shopPricing as Record<string, { windowStartedAtTick?: number | null }>;
+  const hasActivePricingWindow = Object.values(pricing).some(
+    (state) => state?.windowStartedAtTick !== null && state?.windowStartedAtTick !== undefined,
+  );
+  return hasActivePricingWindow
+    ? Math.floor(chromeSnapshot.tick / GAME_TICK_RATE) * GAME_TICK_RATE
+    : 0;
 }
 
 export function subscribePlayfield(listener: Listener): () => void {

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import type { ActiveFieldEffect, FieldEffectKind } from '../types';
-import { getChromeSnapshot, subscribeChrome } from '../state/gameStateStore';
+import { getMatchTick, subscribeMatchTick } from '../state/gameStateStore';
 import './FieldEffectReadout.css';
 
 type EffectCopy = { name: string; detail: string; phase: 'Incoming' | 'Active' | 'Applied'; helpful?: boolean };
@@ -24,7 +24,7 @@ const EFFECT_COPY: Record<FieldEffectKind, EffectCopy> = {
   'wildcard-four': { name: 'Wildcard +4', detail: 'Poison cells become the shape of an upcoming piece.', phase: 'Incoming' },
   'tectonic-shift': { name: 'Tectonic Shift', detail: 'Your stack is shifting to close gaps.', phase: 'Applied', helpful: true },
 };
-const getClock = () => Math.floor(getChromeSnapshot().tick / 6) * 6;
+const getClock = () => Math.floor(getMatchTick() / 6) * 6;
 const getServerClock = () => 0;
 
 function effectTiming(effect: ActiveFieldEffect, tick: number): string | null {
@@ -77,7 +77,7 @@ function EffectNotice({ effect, count, currentTick, compactOnly }: {
 export function FieldEffectReadout({ effects, tick, fieldTitle, compactOnly = false }: {
   effects: ActiveFieldEffect[]; tick?: number; fieldTitle: string; compactOnly?: boolean;
 }) {
-  const liveTick = useSyncExternalStore(subscribeChrome, getClock, getServerClock);
+  const liveTick = useSyncExternalStore(subscribeMatchTick, getClock, getServerClock);
   const currentTick = tick ?? liveTick;
   const grouped = new Map<string, { effect: ActiveFieldEffect; count: number }>();
   for (const effect of effects) {

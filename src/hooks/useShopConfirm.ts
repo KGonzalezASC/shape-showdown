@@ -2,6 +2,7 @@ import { useCallback } from 'react';
 import { SHOP_ITEM_BY_ID } from '../shop/shopCatalog';
 import { getPricingView } from '../shop/shopPricing';
 import { useGameActions, useMatchChromeSnapshot, usePlayfieldSnapshot } from '../state/GameStateProvider';
+import { getChromeSnapshot } from '../state/gameStateStore';
 
 export function useShopConfirm() {
   const chrome = useMatchChromeSnapshot();
@@ -9,24 +10,35 @@ export function useShopConfirm() {
   const { sendShopOpen, sendShopPurchase } = useGameActions();
 
   return useCallback(() => {
-    if (chrome.shopPhase === 'waiting') return;
+    // Read tick/funds imperatively so this hook does not re-subscribe at 60Hz.
+    const live = getChromeSnapshot();
+    if (live.shopPhase === 'waiting') return;
 
-    if (chrome.shopPhase === 'ready' || chrome.shopPhase === 'expired') {
+    if (live.shopPhase === 'ready' || live.shopPhase === 'expired') {
       sendShopOpen();
       return;
     }
 
-    if (chrome.shopPhase === 'cycling') {
-      const pickedId = chrome.shopOfferIds[chrome.shopCycleIndex];
+    if (live.shopPhase === 'cycling') {
+      const pickedId = live.shopOfferIds[live.shopCycleIndex];
       if (!pickedId) return;
       const picked = SHOP_ITEM_BY_ID.get(pickedId);
       if (!picked) return;
-      const pricingView = getPricingView(pickedId, chrome.shopPricing[pickedId], chrome.tick);
-      if (chrome.availableFunds < pricingView.currentPrice) return;
+      const pricingView = getPricingView(pickedId, live.shopPricing[pickedId], live.tick);
+      if (live.availableFunds < pricingView.currentPrice) return;
       const opponent = playfield.opponentPlayer;
       if (pickedId === 'storage-toxin' && !opponent?.opponentHasHold) return;
       if (pickedId === 'wildcard-four' && (!opponent?.opponentHasPoison || opponent.poisonSpread != null)) return;
       sendShopPurchase(pickedId);
     }
-  }, [chrome, playfield.opponentPlayer, sendShopOpen, sendShopPurchase]);
+  }, [
+    chrome.shopPhase,
+    chrome.shopOfferIds,
+    chrome.shopCycleIndex,
+    chrome.shopPricing,
+    chrome.availableFunds,
+    playfield.opponentPlayer,
+    sendShopOpen,
+    sendShopPurchase,
+  ]);
 }

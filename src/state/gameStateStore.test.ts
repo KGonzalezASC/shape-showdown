@@ -7,6 +7,8 @@ import {
   getChromeSnapshot,
   getRawGameState,
   setGameStateStore,
+  subscribeChrome,
+  subscribeMatchTick,
 } from './gameStateStore';
 
 afterEach(() => {
@@ -61,3 +63,30 @@ function createState(overrides: Partial<GameState>): GameState {
     ...overrides,
   };
 }
+
+describe('chrome vs tick subscription split', () => {
+  it('does not notify chrome listeners on tick-only updates', () => {
+    setGameStateStore(createState({ status: 'playing', tick: 10 }), 'me');
+
+    let chromeNotifications = 0;
+    let tickNotifications = 0;
+    const unsubChrome = subscribeChrome(() => { chromeNotifications += 1; });
+    const unsubTick = subscribeMatchTick(() => { tickNotifications += 1; });
+
+    setGameStateStore(createState({ status: 'playing', tick: 11 }), 'me');
+    assert.equal(chromeNotifications, 0);
+    assert.equal(tickNotifications, 1);
+    assert.equal(getChromeSnapshot().tick, 11);
+
+    setGameStateStore(createState({
+      status: 'playing',
+      tick: 12,
+      pause: { playerId: 'opponent', startedAt: 2_000 },
+    }), 'me');
+    assert.equal(chromeNotifications, 1);
+    assert.equal(tickNotifications, 2);
+
+    unsubChrome();
+    unsubTick();
+  });
+});

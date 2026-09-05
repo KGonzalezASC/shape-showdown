@@ -24,6 +24,7 @@ import {
   useGameActions,
   useGameState,
   useIsConnected,
+  useCoarseMatchTick,
   useMatchChromeSnapshot,
   useMatchDiagnostics,
   useMyId,
@@ -194,11 +195,15 @@ export const GameView: React.FC<GameViewProps> = ({ onExitToLanding }) => {
     && playfield.status === 'playing'
     && !isAuthoritativelyPaused
     && !isConnectionInterrupted;
+  // Hold-freeze is the only control gate that needs a live clock; stay quiet at 60Hz otherwise.
+  const holdClockTick = useCoarseMatchTick(
+    playfield.myPlayer?.holdFrozenUntilTick !== undefined ? 6 : null,
+  );
   const controlsAvailability = useMemo(
     () => deriveGameplayControlAvailability({
       active: gameplayInputActive,
       player: playfield.myPlayer,
-      currentTick: chrome.tick,
+      currentTick: holdClockTick,
       utility: {
         kind: 'shop',
         enabled: gameplayInputActive && chrome.shopPhase !== 'waiting',
@@ -210,7 +215,7 @@ export const GameView: React.FC<GameViewProps> = ({ onExitToLanding }) => {
         onActivate: handleShopConfirm,
       },
     }),
-    [chrome.shopPhase, chrome.tick, gameplayInputActive, handleShopConfirm, playfield.myPlayer],
+    [chrome.shopPhase, gameplayInputActive, handleShopConfirm, holdClockTick, playfield.myPlayer],
   );
   const controlsAvailabilityRef = useRef(controlsAvailability);
   controlsAvailabilityRef.current = controlsAvailability;

@@ -9,14 +9,17 @@ import { useGameSocket } from '../hooks/useGameSocket';
 import {
   getChromeSnapshot,
   getIsConnected,
+  getMatchTick,
   getMyId as getStoredMyId,
   getPlayfieldSnapshot,
   getRawGameState,
+  getShopPricingTick,
   setClientMatchModelStore,
   setLastMatchEventStore,
   setMyIdStore,
   subscribeChrome,
   subscribeConnection,
+  subscribeMatchTick,
   subscribePlayfield,
 } from './gameStateStore';
 import type { ClientMatchModel } from '../protocol/wireTypes';
@@ -139,8 +142,31 @@ export function useGameActions(): GameActions {
   return actions;
 }
 
+
 export function useMatchChromeSnapshot() {
   return useSyncExternalStore(subscribeChrome, getChromeSnapshot, getChromeSnapshot);
+}
+
+/** Full 60Hz match tick — avoid in layout/shop shells; prefer useShopPricingTick / coarse clocks. */
+export function useMatchTick() {
+  return useSyncExternalStore(subscribeMatchTick, getMatchTick, getMatchTick);
+}
+
+/** Quantized shop pricing tick (1Hz while a price window is active). */
+export function useShopPricingTick() {
+  return useSyncExternalStore(subscribeMatchTick, getShopPricingTick, getShopPricingTick);
+}
+
+const subscribeNever = (): (() => void) => () => {};
+
+/** Coarse tick for hold-freeze / effect countdowns. Pass null to disable subscription. */
+export function useCoarseMatchTick(quantum: number | null) {
+  const q = quantum && quantum > 0 ? quantum : null;
+  return useSyncExternalStore(
+    q ? subscribeMatchTick : subscribeNever,
+    () => (q ? Math.floor(getMatchTick() / q) * q : 0),
+    () => 0,
+  );
 }
 
 export function usePlayfieldSnapshot() {

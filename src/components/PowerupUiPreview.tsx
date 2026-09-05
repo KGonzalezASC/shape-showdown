@@ -5,7 +5,7 @@ import { makePlayer, enqueueGarbage } from '../puzzle/runtime/engine';
 import { matchStep } from '../puzzle/runtime/matchStep';
 import { applyShopPurchase, applyScriptedShopAttack, type ScriptedShopAttackId } from '../puzzle/runtime/shop';
 import { openPlayerShop, rollShopOnLineClear } from '../shop/playerShop';
-import { GameActionsProvider, useGameActions, useMatchChromeSnapshot, usePlayfieldSnapshot, type GameActions } from '../state/GameStateProvider';
+import { GameActionsProvider, useGameActions, useMatchChromeSnapshot, useMatchTick, usePlayfieldSnapshot, type GameActions } from '../state/GameStateProvider';
 import { setGameStateStore } from '../state/gameStateStore';
 import { useKeyBindings } from '../input/KeyBindingsProvider';
 import { actionForCode } from '../input/keyBindings';
@@ -60,6 +60,7 @@ function createPreview() {
 function PreviewPlayfield() {
   const layoutMode = usePlayfieldLayoutMode();
   const chrome = useMatchChromeSnapshot();
+  const matchTick = useMatchTick();
   const playfield = usePlayfieldSnapshot();
   const actions = useGameActions();
   const confirmShop = useShopConfirm();
@@ -69,7 +70,7 @@ function PreviewPlayfield() {
   const myFieldRef = useRef<GameFieldRef>(null);
   const opponentRef = useRef<GameFieldRef>(null);
   const availability = deriveGameplayControlAvailability({
-    active: chrome.status === 'playing', player: playfield.myPlayer, currentTick: chrome.tick,
+    active: chrome.status === 'playing', player: playfield.myPlayer, currentTick: matchTick,
     utility: { kind: 'shop', enabled: chrome.shopPhase !== 'waiting', onActivate: confirmShop },
   });
   const confirmRef = useRef(confirmShop);

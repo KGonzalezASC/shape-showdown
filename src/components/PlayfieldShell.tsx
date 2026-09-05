@@ -1,14 +1,17 @@
 import './BattleLayout.css';
-import React, { useLayoutEffect, useMemo, useRef, useState } from 'react';
+import React, { memo, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import GameField, { GameFieldRef } from './GameField';
 import ShopRail from './ShopRail';
 import OpponentMiniField from './OpponentMiniField';
 import { PlayfieldCellSizeContext } from './playfieldCellSizeContext';
 import { fitMobilePlayfieldCellSize } from './PlayfieldCellSizer';
 import { BOARD_COLS, BOARD_VISIBLE_ROWS, CELL_SIZE } from '../types';
-import { GAME_TICK_RATE } from '../constants';
 import { resolveShopOffers, SHOP_ITEM_BY_ID } from '../shop/shopCatalog';
-import { useMatchChromeSnapshot, usePlayfieldSnapshot } from '../state/GameStateProvider';
+import {
+  useMatchChromeSnapshot,
+  usePlayfieldSnapshot,
+  useShopPricingTick,
+} from '../state/GameStateProvider';
 import { useShopConfirm } from '../hooks/useShopConfirm';
 import { BoardProfiler } from '../performance/BoardProfiler';
 import { IncomingGarbageReadout } from './IncomingGarbageReadout';
@@ -17,6 +20,8 @@ import { fieldFrameClass, fieldTitleClass } from '../ui/shapeShowdownTheme';
 import {
   type PlayfieldLayoutMode,
 } from '../responsive/playfieldLayoutMode';
+import type { PublicPlayerState } from '../state/publicSnapshots';
+import type { ShopItem } from '../types';
 
 function WaitingForOpponentBoard({ cell }: { cell: number }) {
   return (
@@ -40,6 +45,77 @@ function WaitingForOpponentBoard({ cell }: { cell: number }) {
     </div>
   );
 }
+
+interface BattleShopRailProps {
+  railRef: React.RefObject<HTMLDivElement | null>;
+  layoutMode: PlayfieldLayoutMode;
+  isPlaying: boolean;
+  opponentPlayer: PublicPlayerState | null;
+  hatchingEnabled: boolean;
+  onToggleHatching?: () => void;
+}
+
+/** Isolated shop host — does not subscribe to playfield, so soft-drop Y churn skips arsenal DOM. */
+const BattleShopRail = memo(function BattleShopRail({
+  railRef,
+  layoutMode,
+  isPlaying,
+  opponentPlayer,
+  hatchingEnabled,
+  onToggleHatching,
+}: BattleShopRailProps) {
+  const chrome = useMatchChromeSnapshot();
+  const shopTick = useShopPricingTick();
+  const handleShopConfirm = useShopConfirm();
+  const isDesktop = layoutMode === 'desktop';
+
+  const shopOffers = useMemo(() => resolveShopOffers(chrome.shopOfferIds), [chrome.shopOfferIds]);
+  const purchasedItem = useMemo(() => {
+    if (!chrome.shopLastPurchasedItemId) return null;
+    return SHOP_ITEM_BY_ID.get(chrome.shopLastPurchasedItemId) ?? null;
+  }, [chrome.shopLastPurchasedItemId]);
+
+  const getItemDisabledReason = useMemo(() => (item: ShopItem) => {
+    if (item.id === 'storage-toxin' && !opponentPlayer?.opponentHasHold) {
+      return 'Opponent needs a stored piece';
+    }
+    if (item.id === 'wildcard-four') {
+      if (!opponentPlayer?.opponentHasPoison) return 'Opponent needs poisoned cells';
+      if (opponentPlayer.poisonSpread != null) return 'Wait for poison to finish spreading';
+    }
+    return null;
+  }, [opponentPlayer]);
+  const isItemDisabled = useMemo(() => (item: ShopItem) =>
+    getItemDisabledReason(item) !== null, [getItemDisabledReason]);
+
+  const shopCanPurchase = chrome.shopPhase !== 'waiting';
+
+  return (
+    <div
+      ref={railRef}
+      className="battle-shop flex min-h-0 min-w-0 flex-col gap-2 [grid-area:shop]"
+    >
+      <ShopRail
+        items={shopOffers}
+        isPlaying={isPlaying}
+        canPurchase={shopCanPurchase}
+        cycleIndex={chrome.shopCycleIndex}
+        shopPhase={chrome.shopPhase}
+        purchasedItem={purchasedItem}
+        onConfirm={handleShopConfirm}
+        availableFunds={chrome.availableFunds}
+        pricing={chrome.shopPricing}
+        currentTick={shopTick}
+        isItemDisabled={isItemDisabled}
+        getItemDisabledReason={getItemDisabledReason}
+        viewportMode={layoutMode}
+        hatchingEnabled={hatchingEnabled}
+        onToggleHatching={onToggleHatching}
+      />
+      {isDesktop && <DesktopKeyboardLegend />}
+    </div>
+  );
+});
 
 interface PlayfieldShellProps {
   railRef: React.RefObject<HTMLDivElement | null>;
@@ -70,43 +146,12 @@ export const PlayfieldShell: React.FC<PlayfieldShellProps> = ({
   const opponentBoardFitRef = useRef<HTMLDivElement>(null);
   const [opponentCellSize, setOpponentCellSize] = useState(CELL_SIZE);
   const playfield = usePlayfieldSnapshot();
-  const chrome = useMatchChromeSnapshot();
-  const handleShopConfirm = useShopConfirm();
   const { myPlayer, opponentPlayer } = playfield;
   const isDesktop = layoutMode === 'desktop';
   const hasLocalPlayer = myPlayer !== null;
   const hasOpponentPlayer = opponentPlayer !== null;
-
-  const shopOffers = useMemo(() => resolveShopOffers(chrome.shopOfferIds), [chrome.shopOfferIds]);
-  const purchasedItem = useMemo(() => {
-    if (!chrome.shopLastPurchasedItemId) return null;
-    return SHOP_ITEM_BY_ID.get(chrome.shopLastPurchasedItemId) ?? null;
-  }, [chrome.shopLastPurchasedItemId]);
-
-  const getItemDisabledReason = useMemo(() => (item: (typeof shopOffers)[number]) => {
-    if (item.id === 'storage-toxin' && !opponentPlayer?.opponentHasHold) {
-      return 'Opponent needs a stored piece';
-    }
-    if (item.id === 'wildcard-four') {
-      if (!opponentPlayer?.opponentHasPoison) return 'Opponent needs poisoned cells';
-      if (opponentPlayer.poisonSpread != null) return 'Wait for poison to finish spreading';
-    }
-    return null;
-  }, [opponentPlayer]);
-  const isItemDisabled = useMemo(() => (item: (typeof shopOffers)[number]) =>
-    getItemDisabledReason(item) !== null, [getItemDisabledReason]);
-
-  const shopCanPurchase = chrome.shopPhase !== 'waiting';
   const isPlaying = playfield.status === 'playing';
 
-  const hasActivePricingWindow = useMemo(
-    () => Object.values(chrome.shopPricing as Record<string, { windowStartedAtTick?: number | null }>).some(
-      (state) => state?.windowStartedAtTick !== null && state?.windowStartedAtTick !== undefined,
-    ),
-    [chrome.shopPricing],
-  );
-  // Gate ShopRail to 1Hz pricing ticks so memo can skip idle 60Hz chrome updates.
-  const shopTick = hasActivePricingWindow ? Math.floor(chrome.tick / GAME_TICK_RATE) * GAME_TICK_RATE : 0;
   useLayoutEffect(() => {
     const playfieldLayout = playfieldRef.current;
     const slot = boardFitRef.current;
@@ -213,32 +258,16 @@ export const PlayfieldShell: React.FC<PlayfieldShellProps> = ({
             )}
           </div>
 
-          <div
-            ref={railRef}
-            className="battle-shop flex min-h-0 min-w-0 flex-col gap-2 [grid-area:shop]"
-          >
-            <ShopRail
-              items={shopOffers}
-              isPlaying={isPlaying}
-              canPurchase={shopCanPurchase}
-              cycleIndex={chrome.shopCycleIndex}
-              shopPhase={chrome.shopPhase}
-              purchasedItem={purchasedItem}
-              onConfirm={handleShopConfirm}
-              availableFunds={chrome.availableFunds}
-              pricing={chrome.shopPricing}
-              currentTick={shopTick}
-              isItemDisabled={isItemDisabled}
-              getItemDisabledReason={getItemDisabledReason}
-              viewportMode={layoutMode}
-              hatchingEnabled={hatchingEnabled}
-              onToggleHatching={onToggleHatching}
-            />
-            {isDesktop && <DesktopKeyboardLegend />}
-          </div>
+          <BattleShopRail
+            railRef={railRef}
+            layoutMode={layoutMode}
+            isPlaying={isPlaying}
+            opponentPlayer={opponentPlayer}
+            hatchingEnabled={hatchingEnabled}
+            onToggleHatching={onToggleHatching}
+          />
         </div>
       </div>
     </PlayfieldCellSizeContext.Provider>
   );
 };
-
