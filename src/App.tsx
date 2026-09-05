@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useLayoutEffect, useMemo, useReducer, useRef, useState, useSyncExternalStore } from 'react';
+import React, { useCallback, useEffect, useLayoutEffect, useMemo, useReducer, useRef, useState } from 'react';
 import { AlertTriangle, RefreshCw, Trophy, WifiOff } from 'lucide-react';
 import { AnimatePresence, LazyMotion, domAnimation, m } from 'motion/react';
 import { DrillConsole, DrillResult } from './components/DrillConsole';
@@ -22,19 +22,15 @@ import { useShopConfirm } from './hooks/useShopConfirm';
 import {
   GameStateProvider,
   useGameActions,
+  useGameState,
   useIsConnected,
   useCoarseMatchTick,
   useMatchChromeSnapshot,
   useMatchDiagnostics,
   useMyId,
+  usePlayfieldSnapshot,
   useServerHealth,
 } from './state/GameStateProvider';
-import {
-  getPlayfieldSnapshot,
-  getRawGameState,
-  subscribePlayfield,
-  type PlayfieldSnapshot,
-} from './state/gameStateStore';
 import { COUNTDOWN_SECONDS } from './types';
 import type { ActionType, InputState } from './types';
 import {
@@ -140,19 +136,14 @@ export const GameView: React.FC<GameViewProps> = ({ onExitToLanding }) => {
   const connected = useIsConnected();
   const serverHealth = useServerHealth();
   const matchDiagnostics = useMatchDiagnostics();
+  const gameState = useGameState();
   const myId = useMyId();
+  const playfield = usePlayfieldSnapshot();
   const bindings = useKeyBindings();
   const bindingsRef = useRef(bindings);
   bindingsRef.current = bindings;
   const layoutMode = usePlayfieldLayoutMode();
-  // Soft-drop Y churn lives on the playfield channel. GameView keeps shell/chrome
-  // off that bus and only re-renders when control gates (or seat presence) change.
-  const [hasLocalPlayer, setHasLocalPlayer] = useState(
-    () => Boolean(getPlayfieldSnapshot().myPlayer),
-  );
-  const [holdFreezeArmed, setHoldFreezeArmed] = useState(
-    () => getPlayfieldSnapshot().myPlayer?.holdFrozenUntilTick !== undefined,
-  );
+  const hasLocalPlayer = Boolean(playfield.myPlayer);
   const [appShellState, appShellDispatch] = useReducer(
     appShellReducer,
     undefined,
@@ -189,7 +180,7 @@ export const GameView: React.FC<GameViewProps> = ({ onExitToLanding }) => {
 
   const isPlaying = chrome.status === 'playing';
   const isTerminalOutcome = chrome.status === 'ended';
-  const isAuthoritativelyPaused = chrome.pausePlayerId !== null && !isTerminalOutcome;
+  const isAuthoritativelyPaused = gameState?.pause !== undefined && !isTerminalOutcome;
   const isConnectionInterrupted = connected
     && !isTerminalOutcome
     && !isAuthoritativelyPaused
@@ -202,79 +193,40 @@ export const GameView: React.FC<GameViewProps> = ({ onExitToLanding }) => {
     );
   const gameplayInputActive = connected
     && isPlaying
-    && chrome.status === 'playing'
+    && playfield.status === 'playing'
     && !isAuthoritativelyPaused
     && !isConnectionInterrupted;
   // Hold-freeze is the only control gate that needs a live clock; stay quiet at 60Hz otherwise.
-  const holdClockTick = useCoarseMatchTick(holdFreezeArmed ? 6 : null);
+  const holdClockTick = useCoarseMatchTick(
+    playfield.myPlayer?.holdFrozenUntilTick !== undefined ? 6 : null,
+  );
   const controlsAvailabilityRef = useRef<ReturnType<typeof deriveGameplayControlAvailability> | null>(null);
-  const [controlsAvailability, setControlsAvailability] = useState(() => {
-    const initial = deriveGameplayControlAvailability({
-      active: false,
-      player: getPlayfieldSnapshot().myPlayer,
-      currentTick: 0,
+  // Keep a stable availability object while gates are unchanged so MobileControls
+  // (React.memo) skips soft-drop Y churn on the phone control pad.
+  const controlsAvailability = useMemo(() => {
+    const next = deriveGameplayControlAvailability({
+      active: gameplayInputActive,
+      player: playfield.myPlayer,
+      currentTick: holdClockTick,
       utility: {
         kind: 'shop',
-        enabled: false,
-        disabledReason: 'Gameplay is not active',
+        enabled: gameplayInputActive && chrome.shopPhase !== 'waiting',
+        ...(gameplayInputActive && chrome.shopPhase === 'waiting'
+          ? { disabledReason: 'Shop is not available' }
+          : !gameplayInputActive
+            ? { disabledReason: 'Gameplay is not active' }
+            : {}),
         onActivate: handleShopConfirm,
       },
     });
-    controlsAvailabilityRef.current = initial;
-    return initial;
-  });
+    const previous = controlsAvailabilityRef.current;
+    if (previous && gameplayControlAvailabilityEqual(previous, next)) return previous;
+    controlsAvailabilityRef.current = next;
+    return next;
+  }, [chrome.shopPhase, gameplayInputActive, handleShopConfirm, holdClockTick, playfield.myPlayer]);
+  controlsAvailabilityRef.current = controlsAvailability;
   const controlsActiveRef = useRef(gameplayInputActive);
   controlsActiveRef.current = gameplayInputActive;
-  const gameplayInputActiveRef = useRef(gameplayInputActive);
-  gameplayInputActiveRef.current = gameplayInputActive;
-  const shopPhaseRef = useRef(chrome.shopPhase);
-  shopPhaseRef.current = chrome.shopPhase;
-  const holdClockTickRef = useRef(holdClockTick);
-  holdClockTickRef.current = holdClockTick;
-  const handleShopConfirmRef = useRef(handleShopConfirm);
-  handleShopConfirmRef.current = handleShopConfirm;
-
-  const stateRef = useRef<{ playfield: PlayfieldSnapshot; myId: string | null }>({
-    playfield: getPlayfieldSnapshot(),
-    myId,
-  });
-  stateRef.current.myId = myId;
-
-  const syncPlayfieldShell = useCallback(() => {
-    const playfield = getPlayfieldSnapshot();
-    stateRef.current = { playfield, myId: stateRef.current.myId };
-    setHasLocalPlayer(Boolean(playfield.myPlayer));
-    setHoldFreezeArmed(playfield.myPlayer?.holdFrozenUntilTick !== undefined);
-    const active = gameplayInputActiveRef.current;
-    const next = deriveGameplayControlAvailability({
-      active,
-      player: playfield.myPlayer,
-      currentTick: holdClockTickRef.current,
-      utility: {
-        kind: 'shop',
-        enabled: active && shopPhaseRef.current !== 'waiting',
-        ...(active && shopPhaseRef.current === 'waiting'
-          ? { disabledReason: 'Shop is not available' }
-          : !active
-            ? { disabledReason: 'Gameplay is not active' }
-            : {}),
-        onActivate: handleShopConfirmRef.current,
-      },
-    });
-    const previous = controlsAvailabilityRef.current;
-    if (previous && gameplayControlAvailabilityEqual(previous, next)) return;
-    controlsAvailabilityRef.current = next;
-    setControlsAvailability(next);
-  }, []);
-
-  useEffect(() => {
-    syncPlayfieldShell();
-    return subscribePlayfield(syncPlayfieldShell);
-  }, [syncPlayfieldShell]);
-
-  useEffect(() => {
-    syncPlayfieldShell();
-  }, [gameplayInputActive, chrome.shopPhase, holdClockTick, handleShopConfirm, syncPlayfieldShell]);
 
   const [queuedSearchScope, setQueuedSearchScope] = useState<SearchScope>(
     () => readPreferredMatchScope() ?? (isDiscordActivityContext() ? 'guild' : 'global'),
@@ -308,7 +260,7 @@ export const GameView: React.FC<GameViewProps> = ({ onExitToLanding }) => {
   const [pauseSecondsRemaining, setPauseSecondsRemaining] = useState<number | null>(null);
   const pauseReturnTriggeredRef = useRef(false);
   useEffect(() => {
-    const pauseStartedAt = chrome.pauseStartedAt ?? undefined;
+    const pauseStartedAt = gameState?.pause?.startedAt;
     if (pauseStartedAt === undefined || chrome.status === 'ended') {
       setPauseSecondsRemaining(null);
       return;
@@ -327,7 +279,7 @@ export const GameView: React.FC<GameViewProps> = ({ onExitToLanding }) => {
     updatePauseClock();
     const interval = window.setInterval(updatePauseClock, 250);
     return () => window.clearInterval(interval);
-  }, [chrome.status, chrome.pauseStartedAt, onExitToLanding]);
+  }, [chrome.status, gameState?.pause?.startedAt, onExitToLanding]);
 
   useEffect(() => {
     if (chrome.endReason !== 'disconnect-forfeit' || pauseReturnTriggeredRef.current) return;
@@ -335,6 +287,11 @@ export const GameView: React.FC<GameViewProps> = ({ onExitToLanding }) => {
     if (onExitToLanding) onExitToLanding();
     else setAppRoute('landing');
   }, [chrome.endReason, onExitToLanding]);
+
+  const stateRef = useRef({ playfield, myId });
+  useLayoutEffect(() => {
+    stateRef.current = { playfield, myId };
+  }, [playfield, myId]);
 
   const railRef = useRef<HTMLDivElement>(null);
   const [drill, drillDispatch] = useReducer(drillReducer, { enabled: false, result: null });
@@ -350,14 +307,9 @@ export const GameView: React.FC<GameViewProps> = ({ onExitToLanding }) => {
     drillDispatch({ type: 'SET_RESULT', payload: result });
   }, []);
 
-  const drillGameState = useSyncExternalStore(
-    DEV_TOOLS_ENABLED && drill.enabled ? subscribePlayfield : () => () => {},
-    getRawGameState,
-    getRawGameState,
-  );
   useLockDrill(
     DEV_TOOLS_ENABLED && drill.enabled,
-    drillGameState,
+    gameState,
     myId,
     sendAction,
     sendInputState,
@@ -487,10 +439,10 @@ export const GameView: React.FC<GameViewProps> = ({ onExitToLanding }) => {
   // Keep the background's per-countdown reroll cadence unchanged. Shrine faces
   // use a separate seed so their entrance animation is not restarted per digit.
   const backgroundDecorationSeed = mixDecorationSeed(
-    chrome.seed || 4207,
+    gameState?.seed ?? 4207,
     backgroundSeedKey,
   );
-  const faceDecorationSeed = mixDecorationSeed(chrome.seed || 4207, faceSeedKey);
+  const faceDecorationSeed = mixDecorationSeed(gameState?.seed ?? 4207, faceSeedKey);
 
   useEffect(() => {
     const purchasedId = chrome.shopLastPurchasedItemId;
@@ -502,11 +454,11 @@ export const GameView: React.FC<GameViewProps> = ({ onExitToLanding }) => {
     if (purchasedId && purchasedId !== prev) {
       appShellDispatch({
         type: 'RESEED_PURCHASE',
-        matchSeed: chrome.seed || 4207,
+        matchSeed: gameState?.seed ?? 4207,
         startedAtMs: performance.now(),
       });
     }
-  }, [chrome.shopLastPurchasedItemId, chrome.seed]);
+  }, [chrome.shopLastPurchasedItemId, gameState?.seed]);
 
   // Reseed the background once per displayed 3→2→1 digit. This intentionally
   // remains independent from the face entrance trigger.
@@ -527,12 +479,12 @@ export const GameView: React.FC<GameViewProps> = ({ onExitToLanding }) => {
     if (previousStatus === 'countdown' && chrome.status === 'playing') {
       appShellDispatch({
         type: 'RESEED_MATCH_START',
-        matchSeed: chrome.seed || 4207,
+        matchSeed: gameState?.seed ?? 4207,
         startedAtMs: performance.now(),
       });
     }
     lastMatchStatusRef.current = chrome.status;
-  }, [chrome.status, chrome.seed]);
+  }, [chrome.status, gameState?.seed]);
 
   return (
     <div className={`battle-viewport relative flex h-dvh max-h-dvh min-h-0 flex-col items-center overflow-hidden text-[var(--ss-text-primary)] ${playfieldViewportPaddingClass(layoutMode)}`}>
@@ -541,8 +493,8 @@ export const GameView: React.FC<GameViewProps> = ({ onExitToLanding }) => {
         <ServerDiagnosticsPanel
           connected={connected}
           database={serverHealth}
-          tick={chrome.tick}
-          matchSeed={chrome.seed || null}
+          tick={gameState?.tick ?? null}
+          matchSeed={gameState?.seed ?? null}
           match={matchDiagnostics}
         />
       )}
@@ -686,9 +638,9 @@ export const GameView: React.FC<GameViewProps> = ({ onExitToLanding }) => {
                 />
               }
             />
-            {DEV_TOOLS_ENABLED && drill.enabled && drillGameState && myId && drillGameState.players[myId] && (
+            {DEV_TOOLS_ENABLED && drill.enabled && gameState && myId && gameState.players[myId] && (
               <DrillConsole
-                player={drillGameState.players[myId]}
+                player={gameState.players[myId]}
                 enabled={drill.enabled}
                 onToggle={() => drillDispatch({ type: 'TOGGLE' })}
                 result={drill.result}
@@ -703,12 +655,12 @@ export const GameView: React.FC<GameViewProps> = ({ onExitToLanding }) => {
               hatchingEnabled={DEV_TOOLS_ENABLED && hatchingEnabled}
               decorationSeed={faceDecorationSeed}
               faceGrowthStartedAtMs={
-                faceGrowthMatchSeed === (chrome.seed || 4207) && faceSeedKey > 0
+                faceGrowthMatchSeed === (gameState?.seed ?? 4207) && faceSeedKey > 0
                   ? (faceGrowthStartedAtMs ?? null)
                   : null
               }
               matchVisualKey={
-                matchDiagnostics.matchId ?? (chrome.seed ? String(chrome.seed) : 'unassigned')
+                matchDiagnostics.matchId ?? (gameState ? String(gameState.seed) : 'unassigned')
               }
               onToggleHatching={
                 DEV_TOOLS_ENABLED
@@ -834,7 +786,7 @@ export const GameView: React.FC<GameViewProps> = ({ onExitToLanding }) => {
                   Match paused
                 </h2>
                 <p className="text-[8px] leading-5 text-zinc-400 sm:text-[9px]">
-                  {chrome.pausePlayerId === myId
+                  {gameState?.pause?.playerId === myId
                     ? 'Your seat is being reclaimed. The match will resume from the server snapshot.'
                     : 'Opponent disconnected. Waiting to reconnect.'}
                 </p>
