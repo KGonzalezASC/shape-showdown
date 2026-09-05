@@ -26,6 +26,7 @@ import {
   interpolateActivePiecePoint,
   shouldRestartActivePieceVisualLifetime,
   shouldSnapActivePieceMotion,
+  isActivePieceSoftDropStep,
   type ActivePieceMotion,
   type ActivePiecePoint,
 } from '../board/activePieceMotion';
@@ -956,12 +957,16 @@ export const VoronoiFlowfieldCanvas: React.FC<VoronoiFlowfieldCanvasProps> = Rea
       const previous = previousById.get(cell.offsetIndex);
       const existing = activeMotionRef.current.get(cell.offsetIndex);
       const jumped = previous && shouldSnapActivePieceMotion(previous, cell);
-      if (!previous || jumped || (previous.x === cell.x && previous.y === cell.y)) {
-        nextMotion.set(cell.offsetIndex, existing ?? {
-          from: cell,
-          to: cell,
-          startedAt: now,
-        });
+      const softDropStep = previous != null && isActivePieceSoftDropStep(previous, cell);
+      // Soft-drop / gravity Y steps arrive ~30Hz. Snapping keeps the piece on
+      // the authoritative cell instead of chaining incomplete 72ms cubic eases.
+      if (!previous || jumped || softDropStep || (previous.x === cell.x && previous.y === cell.y)) {
+        nextMotion.set(
+          cell.offsetIndex,
+          softDropStep || jumped || !previous
+            ? { from: cell, to: cell, startedAt: now }
+            : (existing ?? { from: cell, to: cell, startedAt: now }),
+        );
         continue;
       }
       const from = existing

@@ -85,6 +85,18 @@ type LandingForecastAction =
   | { type: 'TIMEOUT' }
   | { type: 'COMPLETE'; completedPhase: 'timeout' | 'hard-drop'; ticksRemaining: number; cells: Array<{ x: number; y: number }> };
 
+function landingForecastCellsEqual(
+  a: Array<{ x: number; y: number }>,
+  b: Array<{ x: number; y: number }>,
+): boolean {
+  if (a === b) return true;
+  if (a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i += 1) {
+    if (a[i].x !== b[i].x || a[i].y !== b[i].y) return false;
+  }
+  return true;
+}
+
 function landingForecastReducer(
   state: LandingForecastRender,
   action: LandingForecastAction,
@@ -99,7 +111,12 @@ function landingForecastReducer(
           ? { ...state, phase: 'hard-drop' }
           : { cells: action.fallbackCells, phase: 'visible' };
     case 'SHOW':
-      return state.phase === 'hard-drop' ? state : { cells: action.cells, phase: action.phase };
+      if (state.phase === 'hard-drop') return state;
+      // Soft-drop Y churn recalculates the same ghost cells ~30Hz; skip SVG churn.
+      if (state.phase === action.phase && landingForecastCellsEqual(state.cells, action.cells)) {
+        return state;
+      }
+      return { cells: action.cells, phase: action.phase };
     case 'TIMEOUT':
       return state.cells.length > 0 ? { ...state, phase: 'timeout' } : state;
     case 'COMPLETE':
