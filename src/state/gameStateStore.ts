@@ -18,6 +18,8 @@ export interface MatchChromeSnapshot {
   status: MatchStatus;
   countdown: number;
   tick: number;
+  /** Match RNG seed — stable for a seated match; safe on the chrome channel. */
+  seed: number;
   myId: string | null;
   myScore: number;
   oppScore: number;
@@ -66,6 +68,7 @@ function emptyChromeSnapshot(): MatchChromeSnapshot {
     status: 'waiting',
     countdown: 0,
     tick: 0,
+    seed: 0,
     myId: null,
     myScore: 0,
     oppScore: 0,
@@ -105,6 +108,7 @@ function buildChromeSnapshot(): MatchChromeSnapshot {
     status: clientMatchModel.chrome.status,
     countdown: clientMatchModel.chrome.countdown,
     tick: clientMatchModel.tick,
+    seed: clientMatchModel.seed,
     myId,
     myScore: me?.score ?? 0,
     oppScore: opponent?.score ?? 0,
@@ -157,6 +161,7 @@ function buildPlayfieldSnapshot(): PlayfieldSnapshot {
 function chromeSnapshotsEqual(a: MatchChromeSnapshot, b: MatchChromeSnapshot): boolean {
   if (a.status !== b.status) return false;
   if (a.countdown !== b.countdown) return false;
+  if (a.seed !== b.seed) return false;
   if (a.myId !== b.myId) return false;
   if (a.myScore !== b.myScore) return false;
   if (a.oppScore !== b.oppScore) return false;

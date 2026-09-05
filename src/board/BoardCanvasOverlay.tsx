@@ -7,6 +7,22 @@ import {
   syncCanvasBackingStore,
 } from './boardRenderer';
 
+
+function overlayPaintKey(model: BoardVisualModel): string {
+  const parts: string[] = [];
+  for (const cell of model.cells) {
+    if (cell.hatched) parts.push(`h${cell.x},${cell.y}`);
+    if (cell.bomber) parts.push(`b${cell.x},${cell.y}`);
+  }
+  if (model.wildcardOutline.length > 0) {
+    parts.push(`w${model.wildcardOutline.length}`);
+    for (const edge of model.wildcardOutline) {
+      parts.push(edge.join(','));
+    }
+  }
+  return parts.join('|');
+}
+
 interface BoardCanvasOverlayProps {
   model: BoardVisualModel;
   cellSize: number;
@@ -128,9 +144,17 @@ export const BoardCanvasOverlay: React.FC<BoardCanvasOverlayProps> = ({
     canvas.style.height = `${size.cssHeight}px`;
   }, [cellSize]);
 
+  const paintKey = overlayPaintKey(model);
+  const lastPaintKeyRef = useRef<string | null>(null);
+
   useLayoutEffect(() => {
+    // Soft-drop Y churn rebuilds the board visual model ~30Hz. Skip empty
+    // overlay clears when hatch/bomber/wildcard geometry is unchanged.
+    const key = `${paintKey}|${cellSize}`;
+    if (lastPaintKeyRef.current === key) return;
+    lastPaintKeyRef.current = key;
     paintRef.current(performance.now());
-  }, [model, cellSize]);
+  }, [paintKey, cellSize]);
 
   useEffect(() => {
     if (!hasContinuousAnimation) return;
